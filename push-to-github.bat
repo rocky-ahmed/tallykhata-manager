@@ -10,6 +10,11 @@ echo           Uploading TallyKhata to GitHub
 echo           Repository: https://github.com/rocky-ahmed/tallykhata-manager
 echo ================================================================
 echo.
+
+:: Fix Windows user account ownership exception
+git config --global --add safe.directory "*"
+
+echo Pushing main branch to GitHub...
 git push -u origin main
 echo.
 if %ERRORLEVEL% equ 0 (
@@ -18,7 +23,7 @@ if %ERRORLEVEL% equ 0 (
   echo ================================================================
 ) else (
   echo ================================================================
-  echo  Jodi GitHub Login ba Token cheye thake, login korun.
+  echo  Kono shomossha hole screen-e dekhte paben.
   echo ================================================================
 )
 pause
