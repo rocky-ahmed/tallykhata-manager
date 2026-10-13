@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "টালি খাতা",
+    "slug": "tallybook",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#047857"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#047857"
+      },
+      "package": "com.tallybook.offline"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+.expo/
+.expo-cache/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+.DS_Store
+*.log
+
