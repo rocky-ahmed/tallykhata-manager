@@ -161,7 +161,7 @@
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>🧾 ডিজিটাল ভাউচার (রশিদ)</Text>
+              <Text style={styles.modalCardTitle}>ডিজিটাল ভাউচার (রশিদ)</Text>
               <TouchableOpacity onPress={() => setModalVoucher(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -247,19 +247,22 @@
                   Share.share({ message: txt });
                 }}
               >
-                <Text style={styles.voucherBtnText}>📤 শেয়ার</Text>
+                <Image source={require('./assets/icons/ic_share.png')} style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 6 }} resizeMode="contain" />
+                <Text style={styles.voucherBtnText}>শেয়ার</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.voucherBtn, { backgroundColor: COLORS.gold }]}
                 onPress={() => handleOpenEditTxn(selectedVoucherTxn)}
               >
-                <Text style={styles.voucherBtnText}>✏️ সংশোধন</Text>
+                <Image source={require('./assets/icons/ic_edit.png')} style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 6 }} resizeMode="contain" />
+                <Text style={styles.voucherBtnText}>সংশোধন</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.voucherBtn, { backgroundColor: COLORS.red }]}
                 onPress={() => { if (selectedVoucherTxn?.id) handleDeleteTransaction(selectedVoucherTxn.id); }}
               >
-                <Text style={styles.voucherBtnText}>🗑️ মুছুন</Text>
+                <Image source={require('./assets/icons/ic_delete.png')} style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 6 }} resizeMode="contain" />
+                <Text style={styles.voucherBtnText}>মুছুন</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -274,7 +277,7 @@
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>
-                {selectedAccount?.type === 1 ? '✏️ কাস্টমার তথ্য এডিট' : '✏️ সাপ্লায়ার তথ্য এডিট'}
+                {selectedAccount?.type === 1 ? 'কাস্টমার তথ্য এডিট' : 'সাপ্লায়ার তথ্য এডিট'}
               </Text>
               <TouchableOpacity onPress={() => setModalEditAccount(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
@@ -414,11 +417,11 @@
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               {[
-                { key: 'sale', label: '🛒 ক্যাশ বেচা (+)' },
-                { key: 'buy', label: '📦 ক্যাশ কেনা (-)' },
-                { key: 'cost', label: '🧾 দোকান খরচ (-)' },
-                { key: 'malik_in', label: '📥 মালিক দিল (+)' },
-                { key: 'malik_out', label: '📤 মালিক নিল (-)' },
+                { key: 'sale', label: 'ক্যাশ বেচা (+)' },
+                { key: 'buy', label: 'ক্যাশ কেনা (-)' },
+                { key: 'cost', label: 'দোকান খরচ (-)' },
+                { key: 'malik_in', label: 'মালিক দিল (+)' },
+                { key: 'malik_out', label: 'মালিক নিল (-)' },
               ].map((c) => (
                 <TouchableOpacity
                   key={c.key}
@@ -474,7 +477,7 @@
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>⚖️ দিনশেষে ক্যাশবক্স মিলানো</Text>
+              <Text style={styles.modalCardTitle}>দিনশেষে ক্যাশবক্স মিলানো</Text>
               <TouchableOpacity onPress={() => setModalReconcileCash(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -505,7 +508,7 @@
                     if (diff === 0) {
                       return (
                         <Text style={{ color: COLORS.green, fontWeight: 'bold' }}>
-                          ✅ কোনো গরমিল নেই! খাতার হিসাব এবং ড্রয়ারের টাকা পুরোপুরি মিলে গেছে।
+                          কোনো গরমিল নেই! খাতার হিসাব এবং ড্রয়ারের টাকা পুরোপুরি মিলে গেছে।
                         </Text>
                       );
                     } else if (diff > 0) {
@@ -517,7 +520,7 @@
                     } else {
                       return (
                         <Text style={{ color: COLORS.red, fontWeight: 'bold' }}>
-                          ⚠️ ড্রয়ারে ৳ {formatMoney(Math.abs(diff))} টাকা ঘাটতি রয়েছে!
+                          ড্রয়ারে ৳ {formatMoney(Math.abs(diff))} টাকা ঘাটতি রয়েছে!
                         </Text>
                       );
                     }
@@ -548,7 +551,7 @@
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { alignItems: 'center' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>🔳 বাংলা QR কোড</Text>
+              <Text style={styles.modalCardTitle}>বাংলা QR কোড</Text>
               <TouchableOpacity onPress={() => setModalBanglaQR(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -584,7 +587,7 @@
                   });
                 }}
               >
-                <Text style={styles.modalBtnSubmitText}>📤 শেয়ার কিউআর</Text>
+                <Text style={styles.modalBtnSubmitText}>শেয়ার কিউআর</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtnCancel, { flex: 1 }]}
@@ -604,7 +607,7 @@
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>💳 ওয়ালেটে অ্যাড মানি</Text>
+              <Text style={styles.modalCardTitle}>ওয়ালেটে অ্যাড মানি</Text>
               <TouchableOpacity onPress={() => setModalAddMoney(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -656,7 +659,7 @@
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>📱 মোবাইল রিচার্জ</Text>
+              <Text style={styles.modalCardTitle}>মোবাইল রিচার্জ</Text>
               <TouchableOpacity onPress={() => setModalMobileRecharge(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -714,7 +717,7 @@
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>📦 স্টক ও পণ্য তালিকা</Text>
+              <Text style={styles.modalCardTitle}>স্টক ও পণ্য তালিকা</Text>
               <TouchableOpacity onPress={() => setModalAddStock(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -817,7 +820,7 @@
                         <Text style={styles.stockAdjustMiniBtnText}>- আউট</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleDeleteProduct(item.id)} style={{ padding: 2 }}>
-                        <Text style={{ fontSize: 14 }}>🗑️</Text>
+                        <Image source={require('./assets/icons/ic_delete.png')} style={{ width: 16, height: 16 }} resizeMode="contain" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -885,7 +888,7 @@
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>📢 বকেয়া তাগাদা বার্তা</Text>
+              <Text style={styles.modalCardTitle}>বকেয়া তাগাদা বার্তা</Text>
               <TouchableOpacity onPress={() => setModalTagada(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -898,13 +901,13 @@
                 style={[styles.tagadaShareBtn, { backgroundColor: COLORS.blue }]}
                 onPress={() => handleSendTagadaSMS(selectedAccount)}
               >
-                <Text style={styles.tagadaShareBtnText}>📱 সাধারণ SMS</Text>
+                <Text style={styles.tagadaShareBtnText}>সাধারণ SMS</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.tagadaShareBtn, { backgroundColor: COLORS.green }]}
                 onPress={() => handleSendTagadaWhatsApp(selectedAccount)}
               >
-                <Text style={styles.tagadaShareBtnText}>💬 WhatsApp</Text>
+                <Text style={styles.tagadaShareBtnText}>WhatsApp</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -924,7 +927,7 @@
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '85%' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>📝 ব্যবসার নোট ও মেমো</Text>
+              <Text style={styles.modalCardTitle}>ব্যবসার নোট ও মেমো</Text>
               <TouchableOpacity onPress={() => setModalNotes(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -949,13 +952,13 @@
               {notes.map((n) => (
                 <View key={n.id} style={styles.noteItemRow}>
                   <TouchableOpacity onPress={() => handleToggleNote(n.id)} style={{ paddingRight: 8 }}>
-                    <Text style={{ fontSize: 18 }}>{n.isComplete ? '✅' : '⬜'}</Text>
+                    <Text style={{ fontSize: 18 }}>{n.isComplete ? '✓ সম্পন্ন' : '○ বাকি'}</Text>
                   </TouchableOpacity>
                   <Text style={[styles.noteItemText, n.isComplete && styles.noteItemTextDone]}>
                     {n.text}
                   </Text>
                   <TouchableOpacity onPress={() => handleDeleteNote(n.id)} style={{ paddingLeft: 8 }}>
-                    <Text style={{ fontSize: 14 }}>🗑️</Text>
+                    <Image source={require('./assets/icons/ic_delete.png')} style={{ width: 16, height: 16 }} resizeMode="contain" />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -971,7 +974,7 @@
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>📈 লাভ ও ক্ষতির হিসাব</Text>
+              <Text style={styles.modalCardTitle}>লাভ ও ক্ষতির হিসাব</Text>
               <TouchableOpacity onPress={() => setModalProfitLoss(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -1013,7 +1016,7 @@
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>📊 সার্বিক হিসাব স্টেটমেন্ট</Text>
+              <Text style={styles.modalCardTitle}>সার্বিক হিসাব স্টেটমেন্ট</Text>
               <TouchableOpacity onPress={() => setModalFullReport(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -1064,7 +1067,7 @@
                   Share.share({ message: rep });
                 }}
               >
-                <Text style={styles.modalBtnSubmitText}>📤 সম্পূর্ণ রিপোর্ট শেয়ার করুন</Text>
+                <Text style={styles.modalBtnSubmitText}>সম্পূর্ণ রিপোর্ট শেয়ার করুন</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -1078,7 +1081,7 @@
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>🏪 দোকান ও ব্যবসা সেটিংস</Text>
+              <Text style={styles.modalCardTitle}>দোকান ও ব্যবসা সেটিংস</Text>
               <TouchableOpacity onPress={() => setModalSettings(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -1140,7 +1143,7 @@
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>💾 ১০০% অফলাইন ব্যাকআপ ও রিস্টোর</Text>
+              <Text style={styles.modalCardTitle}>১০০% অফলাইন ব্যাকআপ ও রিস্টোর</Text>
               <TouchableOpacity onPress={() => setModalBackupRestore(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -1163,19 +1166,19 @@
                 style={[styles.backupBtn, { backgroundColor: COLORS.primary }]}
                 onPress={handleExportBackup}
               >
-                <Text style={styles.backupBtnText}>📥 ব্যাকআপ তৈরি</Text>
+                <Text style={styles.backupBtnText}>ব্যাকআপ তৈরি</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.backupBtn, { backgroundColor: COLORS.blue }]}
                 onPress={handleShareBackup}
               >
-                <Text style={styles.backupBtnText}>📤 শেয়ার / কপি</Text>
+                <Text style={styles.backupBtnText}>শেয়ার / কপি</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.backupBtn, { backgroundColor: COLORS.gold }]}
                 onPress={handleImportBackup}
               >
-                <Text style={styles.backupBtnText}>📥 রিস্টোর করুন</Text>
+                <Text style={styles.backupBtnText}>রিস্টোর করুন</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1189,7 +1192,7 @@
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '80%' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>🔔 ইনবক্স ও নোটিফিকেশন</Text>
+              <Text style={styles.modalCardTitle}>ইনবক্স ও নোটিফিকেশন</Text>
               <TouchableOpacity onPress={() => setModalInbox(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -1197,7 +1200,7 @@
 
             <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
               <View style={styles.inboxItem}>
-                <Text style={styles.inboxItemTitle}>🎉 টালিখাতা অফলাইন সংস্করণে স্বাগতম!</Text>
+                <Text style={styles.inboxItemTitle}>টালিখাতা অফলাইন সংস্করণে স্বাগতম!</Text>
                 <Text style={styles.inboxItemBody}>
                   আপনার অ্যাপটি সম্পূর্ণ ইন্টারনেট ছাড়া ১০০% অফলাইনে কাজ করে। কোনো মাসিক ফি বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।
                 </Text>
@@ -1205,7 +1208,7 @@
               </View>
 
               <View style={styles.inboxItem}>
-                <Text style={styles.inboxItemTitle}>💾 ব্যাকআপ রাখার পরামর্শ</Text>
+                <Text style={styles.inboxItemTitle}>ব্যাকআপ রাখার পরামর্শ</Text>
                 <Text style={styles.inboxItemBody}>
                   প্রতি সপ্তাহে একবার মেনু থেকে "ডাটা ব্যাকআপ ও রিস্টোর" চেপে ব্যাকআপ কপি করে আপনার হোয়াটসঅ্যাপ বা ড্রাইভে রেখে দিন।
                 </Text>
@@ -1223,7 +1226,7 @@
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>🎧 হেল্প ও সচরাচর প্রশ্ন</Text>
+              <Text style={styles.modalCardTitle}>হেল্প ও সচরাচর প্রশ্ন</Text>
               <TouchableOpacity onPress={() => setModalSupport(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
@@ -1240,7 +1243,7 @@
                   <Text style={styles.supportBannerTitle}>টালিখাতা কাস্টমার সাপোর্ট</Text>
                   <TouchableOpacity onPress={() => Linking.openURL('tel:09612446677')}>
                     <Text style={{ fontSize: 15, color: COLORS.primary, fontWeight: 'bold', marginTop: 3 }}>
-                      📞 হটলাইন: ০৯৬১২-৪৪৬৬৭৭
+                      হটলাইন: ০৯৬১২-৪৪৬৬৭৭
                     </Text>
                   </TouchableOpacity>
                   <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
@@ -1268,7 +1271,7 @@
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>🔒 পিন লক সেটিংস</Text>
+              <Text style={styles.modalCardTitle}>পিন লক সেটিংস</Text>
               <TouchableOpacity onPress={() => setModalPinSetup(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>

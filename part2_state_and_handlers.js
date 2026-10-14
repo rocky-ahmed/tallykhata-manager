@@ -37,6 +37,8 @@ function TallyKhataApp() {
   const [accountFilter, setAccountFilter] = useState('all'); // 'all' | 'due' | 'highest' | 'recent'
   const [searchQuery, setSearchQuery] = useState('');
   const [cashFilter, setCashFilter] = useState('all');
+  const [hideCashAmounts, setHideCashAmounts] = useState(false);
+  const [modalFilter, setModalFilter] = useState(false);
 
   // Calculator & Transaction Entry State
   const [txnType, setTxnType] = useState('given'); // 'given' (দিলাম / লাল) | 'received' (পেলাম / সবুজ)
@@ -193,6 +195,16 @@ function TallyKhataApp() {
         todayCashOut += amt;
         if (c.category === 'cost') todayCosts += amt;
       }
+    }
+  });
+
+  let todayBakiAday = 0;
+  let todaySupplierPay = 0;
+  (cashEntries || []).forEach((c) => {
+    const amt = Number(c.amount) || 0;
+    if (c.date === todayStr) {
+      if (c.category === 'baki_aday') todayBakiAday += amt;
+      if (c.category === 'supplier_pay') todaySupplierPay += amt;
     }
   });
 

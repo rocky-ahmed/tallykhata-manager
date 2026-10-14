@@ -147,7 +147,7 @@ class ErrorBoundary extends Component {
         <SafeAreaView style={styles.errorSafeContainer}>
           <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
           <View style={styles.errorCard}>
-            <Text style={styles.errorIcon}>⚠️</Text>
+            <Image source={require("./assets/icons/ic_notification.png")} style={{ width: 48, height: 48, marginBottom: 12, tintColor: COLORS.primary }} resizeMode="contain" />
             <Text style={styles.errorHeading}>একটি সমস্যা হয়েছে</Text>
             <Text style={styles.errorDetails}>
               {this.state.error ? String(this.state.error.message || this.state.error) : 'Unknown Error'}
@@ -230,7 +230,7 @@ const AUTHENTIC_FAQS = [
   },
   {
     q: '৫. এন্ট্রি দিতে গিয়ে ভুল হলে কীভাবে সংশোধন করবো?',
-    a: 'যেকোনো লেনদেনের ওপর ট্যাপ করলে ডিজিটাল রশিদ ওপেন হবে। সেখান থেকে "✏️ সংশোধন" চেপে টাকার পরিমাণ বা বিবরণ পরিবর্তন করা যাবে অথবা "🗑️ মুছুন" চেপে ডিলিট করা যাবে।'
+    a: 'যেকোনো লেনদেনের ওপর ট্যাপ করলে ডিজিটাল রশিদ ওপেন হবে। সেখান থেকে "সংশোধন" চেপে টাকার পরিমাণ বা বিবরণ পরিবর্তন করা যাবে অথবা "মুছুন" চেপে ডিলিট করা যাবে।'
   },
   {
     q: '৬. তাগাদা মেসেজ কীভাবে পাঠাবো?',

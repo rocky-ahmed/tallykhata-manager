@@ -6,7 +6,7 @@
       <SafeAreaView style={[styles.container, { backgroundColor: COLORS.primary }]}>
         <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
         <View style={styles.pinLockContainer}>
-          <Text style={styles.pinLockIcon}>🔒</Text>
+          <Image source={require("./assets/icons/ic_lock.png")} style={{ width: 56, height: 56, marginBottom: 16, tintColor: "#FFFFFF" }} resizeMode="contain" />
           <Text style={styles.pinLockTitle}>টালিখাতা লক</Text>
           <Text style={styles.pinLockSub}>অ্যাপটি খুলতে আপনার ৪ ডিজিটের পিন দিন</Text>
 
@@ -86,7 +86,7 @@
                 style={styles.headerIconBtn}
                 onPress={() => handleMakeCall(selectedAccount.phone)}
               >
-                <Text style={{ fontSize: 16 }}>📞</Text>
+                <Image source={require("./assets/icons/ic_call.png")} style={{ width: 18, height: 18 }} resizeMode="contain" />
               </TouchableOpacity>
             ) : null}
             {isCustomer ? (
@@ -94,11 +94,11 @@
                 style={styles.headerIconBtn}
                 onPress={() => setModalTagada(true)}
               >
-                <Text style={{ fontSize: 16 }}>📢</Text>
+                <Image source={require("./assets/icons/ic_share.png")} style={{ width: 18, height: 18 }} resizeMode="contain" />
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity style={styles.headerIconBtn} onPress={handleOpenEditAccount}>
-              <Text style={{ fontSize: 16 }}>✏️</Text>
+              <Image source={require("./assets/icons/ic_edit.png")} style={{ width: 18, height: 18 }} resizeMode="contain" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.deleteAccBtn} onPress={handleDeleteAccount}>
               <Text style={styles.deleteAccBtnText}>মুছুন</Text>
@@ -116,10 +116,10 @@
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.profileName}>{selectedAccount.name}</Text>
             <Text style={styles.profilePhone}>
-              {selectedAccount.phone ? '📱 ' + selectedAccount.phone : 'মোবাইল নম্বর নেই'}
+              {selectedAccount.phone || 'মোবাইল নম্বর নেই'}
             </Text>
             {selectedAccount.address ? (
-              <Text style={styles.profileAddress}>📍 {selectedAccount.address}</Text>
+              <Text style={styles.profileAddress}>{selectedAccount.address}</Text>
             ) : null}
           </View>
           <View style={{ alignItems: 'flex-end' }}>
@@ -139,7 +139,7 @@
               style={styles.quickActionItem}
               onPress={() => setModalTagada(true)}
             >
-              <Text style={styles.quickActionEmoji}>📢</Text>
+              <Image source={require('./assets/icons/ic_share.png')} style={{ width: 20, height: 20, marginBottom: 4 }} resizeMode="contain" />
               <Text style={styles.quickActionLabel}>তাগাদা পাঠান</Text>
             </TouchableOpacity>
           ) : null}
@@ -148,7 +148,7 @@
               style={styles.quickActionItem}
               onPress={() => handleMakeCall(selectedAccount.phone)}
             >
-              <Text style={styles.quickActionEmoji}>📞</Text>
+              <Image source={require('./assets/icons/ic_call.png')} style={{ width: 20, height: 20, marginBottom: 4 }} resizeMode="contain" />
               <Text style={styles.quickActionLabel}>কল করুন</Text>
             </TouchableOpacity>
           ) : null}
@@ -165,7 +165,7 @@
               Share.share({ message: fullStatement });
             }}
           >
-            <Text style={styles.quickActionEmoji}>📄</Text>
+            <Image source={require('./assets/icons/ic_pdf.png')} style={{ width: 20, height: 20, marginBottom: 4 }} resizeMode="contain" />
             <Text style={styles.quickActionLabel}>স্টেটমেন্ট শেয়ার</Text>
           </TouchableOpacity>
         </View>
@@ -229,7 +229,7 @@
           }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>📒</Text>
+              <Image source={require('./assets/ic_no_txn_img_customer.png')} style={{ width: 80, height: 80, marginBottom: 8 }} resizeMode="contain" />
               <Text style={styles.emptyText}>কোনো লেনদেন রেকর্ড নেই</Text>
               <Text style={styles.emptySubText}>নিচের বাটন চেপে বাকি বা জমা এন্ট্রি দিন</Text>
             </View>
@@ -262,11 +262,12 @@
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
 
-      {/* --- AUTHENTIC TALLYKHATA TOP HEADER BAR --- */}
+      {/* --- AUTHENTIC TALLYKHATA TOP HEADER BAR (layout_content_main.xml) --- */}
       <View style={styles.topHeaderBar}>
         <TouchableOpacity
           style={styles.headerLeftBiz}
           onPress={() => setModalSettings(true)}
+          activeOpacity={0.8}
         >
           <View style={styles.headerStoreIcon}>
             <Image
@@ -275,62 +276,134 @@
               resizeMode="contain"
             />
           </View>
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Image
+                source={require('./assets/icons/ic_crown.png')}
+                style={{ width: 14, height: 14, marginRight: 4 }}
+                resizeMode="contain"
+              />
               <Text style={styles.headerBizName} numberOfLines={1}>{businessName}</Text>
-              {isGold ? (
-                <View style={styles.headerGoldBadge}>
-                  <Image
-                    source={require('./assets/ic_premium_users.png')}
-                    style={{ width: 14, height: 14, marginRight: 3 }}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.headerGoldBadgeText}>গোল্ড</Text>
-                </View>
-              ) : null}
+              <Image
+                source={require('./assets/icons/ic_arrow_down.png')}
+                style={{ width: 10, height: 10, marginLeft: 4, tintColor: '#1A1A1A' }}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.headerBizPhone}>{ownerPhone}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 1 }}>
+              <Text style={styles.headerBizPhone}>গোল্ড (অবশিষ্টঃ ৭ দিন)</Text>
+              <View style={styles.headerDotSep} />
+              <TouchableOpacity
+                onPress={() => Alert.alert('ভেরিফাইড মার্চেন্ট', 'আপনার টালিখাতা অ্যাকাউন্ট ১০০% ভেরিফাইড ও সুরক্ষিত।')}
+              >
+                <Text style={styles.headerVerifyTag}>ভেরিফাইড</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
 
         <View style={styles.headerRightActions}>
+          {/* Cloud Sync Status */}
           <TouchableOpacity
-            style={styles.headerVerifyBtn}
-            onPress={() => Alert.alert('ভেরিফাইড মার্চেন্ট', 'আপনার টালিখাতা অ্যাকাউন্ট ১০০% ভেরিফাইড ও সুরক্ষিত।')}
+            style={styles.headerToolbarActionBtn}
+            onPress={() => {
+              setBackupJsonText('');
+              setModalBackupRestore(true);
+            }}
+            activeOpacity={0.7}
           >
-            <Text style={styles.headerVerifyText}>✓ ভেরিফাই</Text>
+            <View style={styles.cloudIconWrapper}>
+              <Image
+                source={require('./assets/icons/ic_cloud.png')}
+                style={{ width: 22, height: 22 }}
+                resizeMode="contain"
+              />
+              <View style={styles.cloudTickDot}>
+                <Image
+                  source={require('./assets/icons/ic_check.png')}
+                  style={{ width: 7, height: 7 }}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+            <Text style={styles.headerToolbarActionLabel}>ব্যাকআপ</Text>
           </TouchableOpacity>
 
+          {/* Inbox with 99+ Badge and Bangla text */}
           <TouchableOpacity
-            style={styles.headerIconTouch}
+            style={styles.headerToolbarActionBtn}
             onPress={() => setModalInbox(true)}
+            activeOpacity={0.7}
           >
-            <Text style={styles.headerActionIcon}>🔔</Text>
-            <View style={styles.headerRedDot} />
+            <View style={styles.headerIconWithBadge}>
+              <Image
+                source={require('./assets/icons/ic_inbox.png')}
+                style={{ width: 22, height: 22 }}
+                resizeMode="contain"
+              />
+              <View style={styles.headerCounterBadge}>
+                <Text style={styles.headerCounterText}>99+</Text>
+              </View>
+            </View>
+            <Text style={styles.headerToolbarActionLabel}>ইনবক্স</Text>
           </TouchableOpacity>
 
+          {/* Support with 9+ Badge and Bangla text */}
           <TouchableOpacity
-            style={styles.headerIconTouch}
+            style={styles.headerToolbarActionBtn}
             onPress={() => setModalSupport(true)}
+            activeOpacity={0.7}
           >
-            <Text style={styles.headerActionIcon}>🎧</Text>
+            <View style={styles.headerIconWithBadge}>
+              <Image
+                source={require('./assets/icons/ic_support.png')}
+                style={{ width: 22, height: 22 }}
+                resizeMode="contain"
+              />
+              <View style={styles.headerCounterBadge}>
+                <Text style={styles.headerCounterText}>9+</Text>
+              </View>
+            </View>
+            <Text style={styles.headerToolbarActionLabel}>সাপোর্ট</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* --- DASHBOARD SUMMARY CARDS (পাবো ও দিবো) --- */}
-      <View style={styles.dashboardRow}>
-        <View style={[styles.dashboardCard, { borderBottomColor: COLORS.primary }]}>
-          <Text style={styles.dashLabel}>মোট পাবো (বাকি)</Text>
-          <Text style={[styles.dashAmount, { color: COLORS.primary }]}>
-            ৳ {formatMoney(totalCustomerDue)}
-          </Text>
-        </View>
-        <View style={[styles.dashboardCard, { borderBottomColor: COLORS.green }]}>
-          <Text style={styles.dashLabel}>মোট দেবো (দেনা)</Text>
-          <Text style={[styles.dashAmount, { color: COLORS.green }]}>
-            ৳ {formatMoney(totalSupplierDue)}
-          </Text>
+      {/* --- DASHBOARD SUMMARY CARDS (layout_sale_cash_total.xml) --- */}
+      <View style={styles.dashboardContainer}>
+        <View style={styles.dashboardRow}>
+          {/* Left Card: মোট পাবো */}
+          <TouchableOpacity
+            style={styles.dashboardCard}
+            onPress={() => {
+              setAccountTab('customer');
+              setActiveTab('home');
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.dashAmount, { color: '#B81414' }]}>
+              ৳ {formatMoney(totalCustomerDue)}
+            </Text>
+            <Text style={styles.dashLabel}>মোট পাবো</Text>
+          </TouchableOpacity>
+
+          {/* Authentic Vertical Divider */}
+          <View style={styles.dashboardVerticalDivider} />
+
+          {/* Right Card: মোট দেবো */}
+          <TouchableOpacity
+            style={styles.dashboardCard}
+            onPress={() => {
+              setAccountTab('supplier');
+              setActiveTab('home');
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.dashAmount, { color: '#1C7D50' }]}>
+              ৳ {formatMoney(totalSupplierDue)}
+            </Text>
+            <Text style={styles.dashLabel}>মোট দেবো</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -372,20 +445,52 @@
               </TouchableOpacity>
             </View>
 
-            {/* Search & Filter Bar */}
+            {/* Search & Filter Bar (fragment_home.xml layoutSearch) */}
             <View style={styles.searchBarRow}>
+              <Image
+                source={require('./assets/icons/ic_search.png')}
+                style={{ width: 18, height: 18, marginRight: 8 }}
+                resizeMode="contain"
+              />
               <TextInput
                 style={styles.searchTextInput}
-                placeholder="🔍 নাম বা মোবাইল নম্বর দিয়ে খুঁজুন..."
+                placeholder="নাম বা মোবাইল নম্বর দিয়ে খুঁজুন..."
                 placeholderTextColor={COLORS.textSubtle}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
               {searchQuery ? (
                 <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 6 }}>
-                  <Text style={{ fontSize: 16, color: COLORS.textMuted }}>✕</Text>
+                  <Image
+                    source={require('./assets/icons/ic_close.png')}
+                    style={{ width: 14, height: 14, tintColor: COLORS.textMuted }}
+                    resizeMode="contain"
+                  />
                 </TouchableOpacity>
               ) : null}
+              <TouchableOpacity
+                style={styles.searchFilterBtn}
+                onPress={() => {
+                  const nextF = accountFilter === 'all' ? 'due' : accountFilter === 'due' ? 'highest' : 'all';
+                  setAccountFilter(nextF);
+                }}
+              >
+                <Image
+                  source={require('./assets/icons/ic_filter.png')}
+                  style={{ width: 20, height: 20, tintColor: accountFilter !== 'all' ? COLORS.primary : '#4D4D4D' }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.searchDownloadBtn}
+                onPress={() => setModalFullReport(true)}
+              >
+                <Image
+                  source={require('./assets/icons/ic_download.png')}
+                  style={{ width: 20, height: 20, tintColor: '#4D4D4D' }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
             </View>
 
             {/* Filter Pills */}
@@ -405,6 +510,16 @@
                   </Text>
                 </TouchableOpacity>
               ))}
+            </View>
+
+            {/* List Helper Header (fragment_home.xml lay_list_helper) */}
+            <View style={styles.listHelperHeader}>
+              <Text style={styles.listHelperTitle}>
+                {accountTab === 'supplier' ? 'সাপ্লায়ারের তালিকা' : accountTab === 'all' ? 'সকল খাতার তালিকা' : 'কাস্টমার/সাপ্লায়ারের তালিকা'}
+              </Text>
+              <Text style={[styles.listHelperType, { color: accountTab === 'supplier' ? '#1C7D50' : '#B81414' }]}>
+                {accountTab === 'supplier' ? 'দেবো' : 'পাবো'}
+              </Text>
             </View>
 
             {/* Accounts FlatList */}
@@ -431,10 +546,10 @@
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={styles.accCardName}>{item.name}</Text>
                       <Text style={styles.accCardPhone}>
-                        {item.phone ? '📱 ' + item.phone : 'মোবাইল নেই'}
+                        {item.phone || 'মোবাইল নেই'}
                       </Text>
                       {item.address ? (
-                        <Text style={styles.accCardAddress} numberOfLines={1}>📍 {item.address}</Text>
+                        <Text style={styles.accCardAddress} numberOfLines={1}>{item.address}</Text>
                       ) : null}
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
@@ -461,64 +576,137 @@
               }
             />
 
-            {/* Floating Action Button: New Account */}
+            {/* Floating Action Button: New Account (ll_add_customer) */}
             <TouchableOpacity
               style={styles.floatingAddBtn}
               onPress={() => {
                 setAccType(accountTab === 'supplier' ? 2 : 1);
                 setModalAddAccount(true);
               }}
+              activeOpacity={0.85}
             >
+              <Image
+                source={require('./assets/icons/ic_add_user.png')}
+                style={{ width: 18, height: 18, marginRight: 8, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
               <Text style={styles.floatingAddBtnText}>
-                {accountTab === 'supplier' ? '+ নতুন সাপ্লায়ার' : '+ নতুন কাস্টমার'}
+                নতুন কাস্টমার/সাপ্লায়ার
               </Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* ===================================================================
-            TAB 2: CASHBOX (ক্যাশবক্স)
+            TAB 2: CASHBOX (ক্যাশবক্স - layout_cashbook_dashboard_total.xml)
            =================================================================== */}
         {activeTab === 'cashbox' && (
           <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
-            {/* Cash Dashboard Card */}
+            {/* Cash Dashboard Card (layout_cashbook_dashboard_total.xml) */}
             <View style={styles.cashTopCard}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View>
-                  <Text style={styles.cashTopCardSub}>ক্যাশ বাক্সে বর্তমান নগদ টাকা</Text>
-                  <Text style={styles.cashTotalDisplay}>৳ {formatMoney(totalCash)}</Text>
+              {/* Upper Box: আজকের বেচা & বর্তমান ক্যাশ */}
+              <View style={styles.cashTopDashboardUpper}>
+                <View style={styles.cashTopCol}>
+                  <Text style={styles.cashTopAmount}>
+                    ৳ {hideCashAmounts ? '***' : formatMoney(todaySales || todayCashIn)}
+                  </Text>
+                  <Text style={styles.cashTopLabel}>আজকের বেচা</Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.reconcileBtn}
-                  onPress={() => {
-                    setCountedCash('');
-                    setModalReconcileCash(true);
-                  }}
-                >
-                  <Text style={styles.reconcileBtnText}>⚖️ ক্যাশ মিলাই</Text>
-                </TouchableOpacity>
+
+                <View style={styles.cashTopDivider} />
+
+                <View style={styles.cashTopCol}>
+                  <Text style={[styles.cashTopAmount, { color: '#09101D' }]}>
+                    ৳ {hideCashAmounts ? '***' : formatMoney(totalCash)}
+                  </Text>
+                  <Text style={styles.cashTopLabel}>বর্তমান ক্যাশ</Text>
+                </View>
               </View>
 
-              <View style={styles.cashTodayStatsRow}>
-                <View style={styles.cashTodayStatItem}>
-                  <Text style={styles.cashTodayStatLabel}>আজকের ক্যাশ ইন (+)</Text>
-                  <Text style={[styles.cashTodayStatVal, { color: COLORS.green }]}>
-                    + ৳ {formatMoney(todayCashIn)}
+              {/* Lower Strip: আজ পেলাম & আজ দিলাম (aj_pelam_bg) */}
+              <View style={styles.cashTopDashboardLower}>
+                <View style={styles.cashSubCol}>
+                  <Text style={styles.cashSubLabel}>আজ পেলাম</Text>
+                  <Text style={[styles.cashSubAmount, { color: '#0F8A0F' }]}>
+                    + ৳ {hideCashAmounts ? '***' : formatMoney(todayCashIn)}
                   </Text>
                 </View>
-                <View style={[styles.cashTodayStatItem, { borderLeftWidth: 1, borderColor: COLORS.border }]}>
-                  <Text style={styles.cashTodayStatLabel}>আজকের ক্যাশ আউট (-)</Text>
-                  <Text style={[styles.cashTodayStatVal, { color: COLORS.red }]}>
-                    - ৳ {formatMoney(todayCashOut)}
+
+                <View style={styles.cashSubDivider} />
+
+                <View style={styles.cashSubCol}>
+                  <Text style={styles.cashSubLabel}>আজ দিলাম</Text>
+                  <Text style={[styles.cashSubAmount, { color: '#C4161C' }]}>
+                    - ৳ {hideCashAmounts ? '***' : formatMoney(todayCashOut)}
                   </Text>
                 </View>
               </View>
             </View>
 
-            {/* Quick Action Buttons */}
+            {/* Quick Action Bar (container_report: রিপোর্ট, ক্যাশবক্স মিলাই, ভিউ আইকন) */}
+            <View style={styles.cashActionBarRow}>
+              <TouchableOpacity
+                style={styles.cashActionBarBtn}
+                onPress={() => setModalFullReport(true)}
+              >
+                <Image
+                  source={require('./assets/icons/ic_menu_report.png')}
+                  style={{ width: 18, height: 18, marginRight: 6 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.cashActionBarBtnText}>রিপোর্ট</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.cashActionBarBtn, styles.cashAdjustBtnActive]}
+                onPress={() => {
+                  setCountedCash('');
+                  setModalReconcileCash(true);
+                }}
+              >
+                <Image
+                  source={require('./assets/icons/ic_check.png')}
+                  style={{ width: 18, height: 18, marginRight: 6, tintColor: '#B81414' }}
+                  resizeMode="contain"
+                />
+                <Text style={[styles.cashActionBarBtnText, { color: '#B81414', fontWeight: 'bold' }]}>
+                  ক্যাশবক্স মিলাই
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cashEyeToggleBtn}
+                onPress={() => setHideCashAmounts((prev) => !prev)}
+              >
+                <Image
+                  source={hideCashAmounts ? require('./assets/icons/ic_eye_closed.png') : require('./assets/icons/ic_eye_open.png')}
+                  style={{ width: 20, height: 20, tintColor: '#4D4D4D' }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Baki Aday & Supplier Payment Strip (layout_baki_aday) */}
+            <View style={styles.cashBakiAdayStrip}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.cashBakiAdayLabel}>বাকি আদায়</Text>
+                <Text style={[styles.cashBakiAdayVal, { color: '#34C759' }]}>
+                  ৳ {hideCashAmounts ? '***' : formatMoney(todayBakiAday || (todayCashIn > todaySales ? todayCashIn - todaySales : 0))}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.cashBakiAdayLabel}>পেমেন্ট দেয়া</Text>
+                <Text style={[styles.cashBakiAdayVal, { color: '#B81414' }]}>
+                  ৳ {hideCashAmounts ? '***' : formatMoney(todaySupplierPay || (todayCashOut > todayCosts ? todayCashOut - todayCosts : 0))}
+                </Text>
+              </View>
+            </View>
+
+            {/* Cash Entry Big Buttons (+ ক্যাশ বেচা, - দোকান খরচ) */}
             <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 12, marginTop: 12 }}>
               <TouchableOpacity
-                style={[styles.cashActionBigBtn, { backgroundColor: COLORS.green }]}
+                style={[styles.cashActionBigBtn, { backgroundColor: '#0F8A0F' }]}
                 onPress={() => {
                   setCashCategory('sale');
                   setModalAddCash(true);
@@ -527,7 +715,7 @@
                 <Text style={styles.cashActionBigBtnText}>+ ক্যাশ বেচা</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.cashActionBigBtn, { backgroundColor: COLORS.primary }]}
+                style={[styles.cashActionBigBtn, { backgroundColor: '#B81414' }]}
                 onPress={() => {
                   setCashCategory('cost');
                   setModalAddCash(true);
@@ -537,18 +725,16 @@
               </TouchableOpacity>
             </View>
 
-            {/* Cash Categories Breakdown List (Matching Authentic Layout) */}
+            {/* Cash Categories Breakdown List (layout_cashbook_accounts.xml) */}
             <View style={styles.cashAccountsSection}>
               <Text style={styles.sectionHeading}>ক্যাশবক্সের হিসাব সমূহ</Text>
 
               {[
-                { cat: 'sale', label: '🛒 ক্যাশ বেচা', isIn: true, color: COLORS.green },
-                { cat: 'buy', label: '📦 ক্যাশ কেনা', isIn: false, color: COLORS.red },
-                { cat: 'cost', label: '🧾 দোকানের খরচ', isIn: false, color: COLORS.red },
-                { cat: 'malik_in', label: '📥 মালিক দিল (ক্যাশ জমা)', isIn: true, color: COLORS.green },
-                { cat: 'malik_out', label: '📤 মালিক নিল (ক্যাশ উত্তোলন)', isIn: false, color: COLORS.red },
-                { cat: 'baki_aday', label: '💰 বাকি আদায়', isIn: true, color: COLORS.green },
-                { cat: 'supplier_pay', label: '🤝 পাওনাদার পরিশোধ', isIn: false, color: COLORS.red },
+                { cat: 'sale', label: 'ক্যাশ বেচা', icon: require('./assets/icons/ic_cash_sale.png'), isIn: true, color: '#0F8A0F' },
+                { cat: 'buy', label: 'ক্যাশ কেনা', icon: require('./assets/icons/ic_cash_buy.png'), isIn: false, color: '#B81414' },
+                { cat: 'cost', label: 'খরচ', icon: require('./assets/icons/ic_cash_cost.png'), isIn: false, color: '#B81414' },
+                { cat: 'malik_in', label: 'মালিক দিল', icon: require('./assets/icons/ic_malik_in.png'), isIn: true, color: '#0F8A0F' },
+                { cat: 'malik_out', label: 'মালিক নিল', icon: require('./assets/icons/ic_malik_out.png'), isIn: false, color: '#B81414' },
               ].map((item) => {
                 const catEntries = (cashEntries || []).filter((c) => c.category === item.cat);
                 const sum = catEntries.reduce((acc, cur) => acc + (Number(cur.amount) || 0), 0);
@@ -560,10 +746,16 @@
                       setCashFilter(item.cat);
                     }}
                   >
-                    <Text style={styles.cashAccountRowLabel}>{item.label}</Text>
-                    <Text style={[styles.cashAccountRowVal, { color: item.color }]}>
-                      {item.isIn ? '+' : '-'} ৳ {formatMoney(sum)}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Image source={item.icon} style={{ width: 22, height: 22, marginRight: 10 }} resizeMode="contain" />
+                      <Text style={styles.cashAccountRowLabel}>{item.label}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[styles.cashAccountRowVal, { color: item.color }]}>
+                        {hideCashAmounts ? '***' : `${item.isIn ? '+' : '-'} ৳ ${formatMoney(sum)}`}
+                      </Text>
+                      <Text style={styles.cashAccountChevron}>›</Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -598,17 +790,17 @@
                 return (
                   <View key={item.id} style={styles.cashItemRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.cashItemDesc}>{item.desc}</Text>
+                      <Text style={styles.cashItemDesc}>{item.desc || (item.category === 'sale' ? 'ক্যাশ বেচা' : 'দোকান খরচ')}</Text>
                       <Text style={styles.cashItemDate}>
                         {formatDisplayDate(item.date)} {item.time ? '• ' + item.time : ''}
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.cashItemAmount, { color: isIn ? COLORS.green : COLORS.red }]}>
-                        {isIn ? '+' : '-'} ৳ {formatMoney(item.amount)}
+                      <Text style={[styles.cashItemAmount, { color: isIn ? '#0F8A0F' : '#B81414' }]}>
+                        {hideCashAmounts ? '***' : `${isIn ? '+' : '-'} ৳ ${formatMoney(item.amount)}`}
                       </Text>
                       <TouchableOpacity onPress={() => handleDeleteCashEntry(item.id)}>
-                        <Text style={{ fontSize: 11, color: COLORS.textSubtle, marginTop: 2 }}>মুছুন</Text>
+                        <Text style={styles.cashDeleteText}>মুছুন</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -624,7 +816,7 @@
         {activeTab === 'tagada' && (
           <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
             <View style={styles.tagadaHeaderCard}>
-              <Text style={styles.tagadaHeaderTitle}>📢 বকেয়া তাগাদা কালেকশন</Text>
+              <Text style={styles.tagadaHeaderTitle}>বকেয়া তাগাদা কালেকশন</Text>
               <Text style={styles.tagadaHeaderSub}>
                 যেসব কাস্টমারের কাছে বাকি রয়েছে তাদের সরাসরি SMS বা WhatsApp-এ স্বয়ংক্রিয় তাগাদা পাঠান।
               </Text>
@@ -638,7 +830,7 @@
                 <View key={item.id} style={styles.tagadaCardItem}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.tagadaCustName}>{item.name}</Text>
-                    <Text style={styles.tagadaCustPhone}>📱 {item.phone || 'মোবাইল নেই'}</Text>
+                    <Text style={styles.tagadaCustPhone}>{item.phone || 'মোবাইল নেই'}</Text>
                     <Text style={styles.tagadaCustDue}>বকেয়া: ৳ {formatMoney(item.balance)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
@@ -660,7 +852,7 @@
 
               {dueCustomers.length === 0 && (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>🎉</Text>
+                  <Image source={require('./assets/ic_done.webp')} style={{ width: 64, height: 64, marginBottom: 8 }} resizeMode="contain" />
                   <Text style={styles.emptyText}>কোনো কাস্টমারের কাছে বাকি নেই!</Text>
                   <Text style={styles.emptySubText}>সব কাস্টমারের বকেয়া পরিশোধ রয়েছে।</Text>
                 </View>
@@ -710,7 +902,7 @@
                 onPress={() => setModalAddMoney(true)}
               >
                 <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.blueLight }]}>
-                  <Text style={{ fontSize: 22 }}>💳</Text>
+                  <Image source={require("./assets/nav/nav_tallypay.png")} style={{ width: 24, height: 24, tintColor: COLORS.blue }} resizeMode="contain" />
                 </View>
                 <Text style={styles.walletServiceLabel}>অ্যাড মানি</Text>
               </TouchableOpacity>
@@ -749,7 +941,7 @@
                 }}
               >
                 <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.greenLight }]}>
-                  <Text style={{ fontSize: 22 }}>🏦</Text>
+                  <Image source={require("./assets/icons/ic_cash_sale.png")} style={{ width: 24, height: 24, tintColor: COLORS.green }} resizeMode="contain" />
                 </View>
                 <Text style={styles.walletServiceLabel}>মানি আউট</Text>
               </TouchableOpacity>
@@ -759,7 +951,7 @@
                 onPress={() => setModalMobileRecharge(true)}
               >
                 <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.redLight }]}>
-                  <Text style={{ fontSize: 22 }}>📱</Text>
+                  <Image source={require("./assets/icons/ic_call.png")} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />
                 </View>
                 <Text style={styles.walletServiceLabel}>মোবাইল রিচার্জ</Text>
               </TouchableOpacity>
@@ -769,7 +961,7 @@
                 onPress={() => setModalBanglaQR(true)}
               >
                 <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.goldLight }]}>
-                  <Text style={{ fontSize: 22 }}>📷</Text>
+                  <Image source={require("./assets/ic_bangla_qr.png")} style={{ width: 24, height: 24 }} resizeMode="contain" />
                 </View>
                 <Text style={styles.walletServiceLabel}>কিউআর পেমেন্ট</Text>
               </TouchableOpacity>
@@ -794,14 +986,18 @@
         )}
 
         {/* ===================================================================
-            TAB 5: MENU / MORE (মেনু / আরও - সেটিংস ও টুলস)
+            TAB 5: MENU / MORE (মেনু / ড্রয়ার - activity_main_drawer.xml)
            =================================================================== */}
         {activeTab === 'menu' && (
           <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
-            {/* Merchant Shop Profile Header */}
+            {/* Merchant Shop Profile Header (nav_header_main.xml) */}
             <View style={styles.menuProfileHeader}>
               <View style={styles.menuStoreAvatar}>
-                <Text style={{ fontSize: 32 }}>🏪</Text>
+                <Image
+                  source={require('./assets/ic_tally_khata_logo_reg.png')}
+                  style={{ width: 44, height: 44 }}
+                  resizeMode="contain"
+                />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={styles.menuBizName}>{businessName}</Text>
@@ -816,14 +1012,113 @@
               </TouchableOpacity>
             </View>
 
-            {/* Menu List of Authentic Features */}
+            {/* Group 1: টালিপে ওয়ালেট (nav_group_tp_wallet) */}
+            <View style={styles.menuGroupHeader}>
+              <Text style={styles.menuGroupTitle}>টালিপে ওয়ালেট</Text>
+            </View>
             <View style={styles.menuListContainer}>
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalAddMoney(true)}
+              >
+                <Image source={require('./assets/nav/nav_tallypay.png')} style={{ width: 22, height: 22, tintColor: COLORS.blue }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>একাউন্ট সমূহ</Text>
+                  <Text style={styles.menuListSub}>ব্যালেন্স ৳ {formatMoney(walletBalance)} • সংযুক্ত ব্যাংক ও MFS</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setActiveTab('tallypay')}
+              >
+                <Image source={require('./assets/icons/ic_cash_sale.png')} style={{ width: 22, height: 22, tintColor: COLORS.green }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>লেনদেন বিবরণী</Text>
+                  <Text style={styles.menuListSub}>মোট {walletTxns.length} টি ওয়ালেট লেনদেন</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => Alert.alert('লেনদেনের লিমিট', 'দৈনিক ক্যাশ-ইন লিমিট: ৳ ৫০,০০০ | দৈনিক ক্যাশ-আউট: ৳ ২৫,০০০ | মাসিক লিমিট: ৳ ৫,০০,০০০')}
+              >
+                <Image source={require('./assets/icons/ic_lock.png')} style={{ width: 22, height: 22, tintColor: '#F59E0B' }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>লেনদেনের লিমিট ও চার্জ</Text>
+                  <Text style={styles.menuListSub}>১০০% ফ্রি লেনদেন • কোনো চার্জ নেই</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Group 2: টালিখাতা হিসাব ও রিপোর্ট (nav_tallykhata) */}
+            <View style={styles.menuGroupHeader}>
+              <Text style={styles.menuGroupTitle}>টালিখাতা হিসাব ও রিপোর্ট</Text>
+            </View>
+            <View style={styles.menuListContainer}>
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalProfitLoss(true)}
+              >
+                <Image source={require('./assets/icons/ic_menu_profit.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>বেচা কেনা হিসাব</Text>
+                  <Text style={styles.menuListSub}>দৈনিক বেচা-কেনা ও লাভের হিসাব</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => {
+                  setCashFilter('cost');
+                  setActiveTab('cashbox');
+                }}
+              >
+                <Image source={require('./assets/icons/ic_cash_cost.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>খরচ রিপোর্ট</Text>
+                  <Text style={styles.menuListSub}>দোকানের সকল যাবতীয় খরচের তালিকা</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => {
+                  setAccountTab('customer');
+                  setActiveTab('home');
+                }}
+              >
+                <Image source={require('./assets/icons/ic_share.png')} style={{ width: 22, height: 22, tintColor: '#B81414' }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>বাকি হিসাব ও তাগাদা</Text>
+                  <Text style={styles.menuListSub}>মোট বাকি ৳ {formatMoney(totalCustomerDue)}</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalFullReport(true)}
+              >
+                <Image source={require('./assets/icons/ic_menu_report.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>সার্বিক হিসাব রিপোর্ট</Text>
+                  <Text style={styles.menuListSub}>দৈনিক, মাসিক ও বার্ষিক স্টেটমেন্ট তৈরি ও শেয়ার</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.menuListItem}
                 onPress={() => setModalAddStock(true)}
               >
-                <Text style={styles.menuListEmoji}>📦</Text>
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <Image source={require('./assets/icons/ic_menu_stock.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>স্টক ও পণ্য হিসাব</Text>
                   <Text style={styles.menuListSub}>মোট {inventory.length} টি পণ্য • স্টক মূল্য ৳ {formatMoney(totalStockCost)}</Text>
                 </View>
@@ -834,34 +1129,40 @@
                 style={styles.menuListItem}
                 onPress={() => setModalNotes(true)}
               >
-                <Text style={styles.menuListEmoji}>📝</Text>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.menuListTitle}>ব্যবসার নোট ও রিমাইন্ডার</Text>
-                  <Text style={styles.menuListSub}>প্রয়োজনীয় কাজ ও মেমো লিখে রাখুন</Text>
+                <Image source={require('./assets/icons/ic_menu_note.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>ব্যবসার নোট ও মেমো</Text>
+                  <Text style={styles.menuListSub}>প্রয়োজনীয় কাজ ও জরুরি মেমো</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Group 3: সেটিংস ও অন্যান্য (nav_group_others) */}
+            <View style={styles.menuGroupHeader}>
+              <Text style={styles.menuGroupTitle}>সেটিংস ও অন্যান্য</Text>
+            </View>
+            <View style={styles.menuListContainer}>
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalSettings(true)}
+              >
+                <Image source={require('./assets/icons/ic_menu_settings.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>দোকান ও ব্যবসা সেটিংস</Text>
+                  <Text style={styles.menuListSub}>দোকানের নাম, ফোন, ঠিকানা ও প্রারম্ভিক ক্যাশ</Text>
                 </View>
                 <Text style={styles.menuListArrow}>›</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.menuListItem}
-                onPress={() => setModalProfitLoss(true)}
+                onPress={() => setModalPinSetup(true)}
               >
-                <Text style={styles.menuListEmoji}>📈</Text>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.menuListTitle}>লাভ / ক্ষতির হিসাব</Text>
-                  <Text style={styles.menuListSub}>বেচা-কেনা ও খরচের নিট লাভ দেখুন</Text>
-                </View>
-                <Text style={styles.menuListArrow}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.menuListItem}
-                onPress={() => setModalFullReport(true)}
-              >
-                <Text style={styles.menuListEmoji}>📊</Text>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.menuListTitle}>সার্বিক হিসাব রিপোর্ট</Text>
-                  <Text style={styles.menuListSub}>দৈনিক, মাসিক ও বার্ষিক স্টেটমেন্ট তৈরি ও শেয়ার</Text>
+                <Image source={require('./assets/icons/ic_menu_lock.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>পিন লক ও নিরাপত্তা</Text>
+                  <Text style={styles.menuListSub}>{pinEnabled ? 'PIN লক সক্রিয় রয়েছে' : '৪ ডিজিটের গোপন PIN সেট করুন'}</Text>
                 </View>
                 <Text style={styles.menuListArrow}>›</Text>
               </TouchableOpacity>
@@ -873,8 +1174,8 @@
                   setModalBackupRestore(true);
                 }}
               >
-                <Text style={styles.menuListEmoji}>💾</Text>
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <Image source={require('./assets/icons/ic_menu_backup.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>ডাটা ব্যাকআপ ও রিস্টোর</Text>
                   <Text style={styles.menuListSub}>১০০% অফলাইন ডাটা সেভ ও নতুন ফোনে ট্রান্সফার</Text>
                 </View>
@@ -883,24 +1184,16 @@
 
               <TouchableOpacity
                 style={styles.menuListItem}
-                onPress={() => setModalPinSetup(true)}
+                onPress={() => {
+                  Share.share({
+                    message: 'টালিখাতা অ্যাপ দিয়ে আপনার দোকানের সব হিসাব সহজে ও নিরাপদে রাখুন। সম্পূর্ণ ফ্রি ও অফলাইন: https://tallykhata.com',
+                  });
+                }}
               >
-                <Text style={styles.menuListEmoji}>🔒</Text>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.menuListTitle}>পিন লক ও নিরাপত্তা</Text>
-                  <Text style={styles.menuListSub}>{pinEnabled ? 'PIN লক সক্রিয় রয়েছে' : '৪ ডিজিটের গোপন PIN সেট করুন'}</Text>
-                </View>
-                <Text style={styles.menuListArrow}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.menuListItem}
-                onPress={() => setModalSettings(true)}
-              >
-                <Text style={styles.menuListEmoji}>⚙️</Text>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.menuListTitle}>দোকান ও ব্যবসা সেটিংস</Text>
-                  <Text style={styles.menuListSub}>দোকানের নাম, ফোন, ঠিকানা ও প্রারম্ভিক ক্যাশ</Text>
+                <Image source={require('./assets/icons/ic_share.png')} style={{ width: 22, height: 22, tintColor: COLORS.primary }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>রেফার করুন</Text>
+                  <Text style={styles.menuListSub}>অন্যান্য ব্যবসায়ীদের টালিখাতা শেয়ার করুন</Text>
                 </View>
                 <Text style={styles.menuListArrow}>›</Text>
               </TouchableOpacity>
@@ -909,8 +1202,8 @@
                 style={styles.menuListItem}
                 onPress={() => setModalSupport(true)}
               >
-                <Text style={styles.menuListEmoji}>❓</Text>
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <Image source={require('./assets/icons/ic_menu_support.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>ব্যবহার নির্দেশিকা ও হেল্প</Text>
                   <Text style={styles.menuListSub}>সচরাচর জিজ্ঞাসিত প্রশ্ন ও হেল্পলাইন</Text>
                 </View>
@@ -920,7 +1213,7 @@
 
             {/* Offline Guarantee Notice */}
             <View style={styles.offlineNoticeCard}>
-              <Text style={styles.offlineNoticeTitle}>🔒 ১০০% অফলাইন ও নিরাপদ</Text>
+              <Text style={styles.offlineNoticeTitle}>১০০% অফলাইন ও নিরাপদ</Text>
               <Text style={styles.offlineNoticeSub}>
                 আপনার ব্যবসার তথ্য আপনার ফোনেই সুরক্ষিত। কোনো ইন্টারনেট কানেকশন বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।
               </Text>
@@ -936,7 +1229,11 @@
           style={[styles.tabButton, activeTab === 'home' && styles.tabButtonActive]}
           onPress={() => setActiveTab('home')}
         >
-          <Text style={styles.tabIcon}>📖</Text>
+          <Image
+            source={activeTab === 'home' ? require('./assets/nav/nav_home_active.png') : require('./assets/nav/nav_home.png')}
+            style={styles.tabIconImg}
+            resizeMode="contain"
+          />
           <Text style={[styles.tabButtonLabel, activeTab === 'home' && styles.tabButtonLabelActive]}>
             খাতা
           </Text>
@@ -946,7 +1243,11 @@
           style={[styles.tabButton, activeTab === 'cashbox' && styles.tabButtonActive]}
           onPress={() => setActiveTab('cashbox')}
         >
-          <Text style={styles.tabIcon}>💰</Text>
+          <Image
+            source={activeTab === 'cashbox' ? require('./assets/nav/nav_cashbox_active.png') : require('./assets/nav/nav_cashbox.png')}
+            style={styles.tabIconImg}
+            resizeMode="contain"
+          />
           <Text style={[styles.tabButtonLabel, activeTab === 'cashbox' && styles.tabButtonLabelActive]}>
             ক্যাশবক্স
           </Text>
@@ -956,7 +1257,11 @@
           style={[styles.tabButton, activeTab === 'tagada' && styles.tabButtonActive]}
           onPress={() => setActiveTab('tagada')}
         >
-          <Text style={styles.tabIcon}>📢</Text>
+          <Image
+            source={activeTab === 'tagada' ? require('./assets/nav/nav_tagada_active.png') : require('./assets/nav/nav_tagada.png')}
+            style={styles.tabIconImg}
+            resizeMode="contain"
+          />
           <Text style={[styles.tabButtonLabel, activeTab === 'tagada' && styles.tabButtonLabelActive]}>
             তাগাদা
           </Text>
@@ -966,7 +1271,11 @@
           style={[styles.tabButton, activeTab === 'tallypay' && styles.tabButtonActive]}
           onPress={() => setActiveTab('tallypay')}
         >
-          <Text style={styles.tabIcon}>💳</Text>
+          <Image
+            source={activeTab === 'tallypay' ? require('./assets/nav/nav_tallypay_active.png') : require('./assets/nav/nav_tallypay.png')}
+            style={styles.tabIconImg}
+            resizeMode="contain"
+          />
           <Text style={[styles.tabButtonLabel, activeTab === 'tallypay' && styles.tabButtonLabelActive]}>
             টালিপে
           </Text>
@@ -976,7 +1285,11 @@
           style={[styles.tabButton, activeTab === 'menu' && styles.tabButtonActive]}
           onPress={() => setActiveTab('menu')}
         >
-          <Text style={styles.tabIcon}>☰</Text>
+          <Image
+            source={activeTab === 'menu' ? require('./assets/nav/nav_menu_active.png') : require('./assets/nav/nav_menu.png')}
+            style={styles.tabIconImg}
+            resizeMode="contain"
+          />
           <Text style={[styles.tabButtonLabel, activeTab === 'menu' && styles.tabButtonLabelActive]}>
             মেনু
           </Text>
