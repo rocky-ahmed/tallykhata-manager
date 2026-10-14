@@ -170,6 +170,11 @@
             <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
               <View style={styles.voucherContainer}>
                 <View style={styles.voucherHeader}>
+                  <Image
+                    source={require('./assets/ic_tally_khata_logo_reg.png')}
+                    style={{ width: 44, height: 44, marginBottom: 6 }}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.voucherBizName}>{businessName}</Text>
                   <Text style={styles.voucherBizSub}>{businessAddress}</Text>
                   <Text style={styles.voucherBizSub}>মোবাইল: {ownerPhone}</Text>
@@ -558,8 +563,12 @@
 
             {/* QR Visual Card */}
             <View style={styles.qrDisplayContainer}>
-              <Text style={{ fontSize: 90 }}>📱</Text>
-              <Text style={styles.qrCenterBadge}>বাংলা QR</Text>
+              <Image
+                source={require('./assets/ic_bangla_qr.png')}
+                style={{ width: 170, height: 170 }}
+                resizeMode="contain"
+              />
+              <Text style={styles.qrCenterBadge}>বাংলা QR • {businessName}</Text>
             </View>
 
             <Text style={{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', marginTop: 12, lineHeight: 18 }}>
@@ -1221,9 +1230,23 @@
             </View>
 
             <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
-              <View style={styles.supportBanner}>
-                <Text style={styles.supportBannerTitle}>যে কোনো প্রয়োজনে আমরা আছি আপনার পাশে</Text>
-                <Text style={styles.supportBannerSub}>টালিখাতা কাস্টমার কেয়ার হেল্পলাইন: ১৬৭২৬ (সকাল ৯টা - রাত ৯টা)</Text>
+              <View style={[styles.supportBanner, { flexDirection: 'row', alignItems: 'center', padding: 14 }]}>
+                <Image
+                  source={require('./assets/customer_care_lady.png')}
+                  style={{ width: 56, height: 56, borderRadius: 28, marginRight: 14 }}
+                  resizeMode="contain"
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.supportBannerTitle}>টালিখাতা কাস্টমার সাপোর্ট</Text>
+                  <TouchableOpacity onPress={() => Linking.openURL('tel:09612446677')}>
+                    <Text style={{ fontSize: 15, color: COLORS.primary, fontWeight: 'bold', marginTop: 3 }}>
+                      📞 হটলাইন: ০৯৬১২-৪৪৬৬৭৭
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                    সকাল ৯টা - রাত ৯টা (ছুটির দিনসহ)
+                  </Text>
+                </View>
               </View>
 
               <Text style={[styles.sectionHeading, { marginTop: 14 }]}>ব্যবহার নির্দেশিকা (FAQ)</Text>

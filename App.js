@@ -14,6 +14,7 @@ import {
   FlatList,
   Share,
   Dimensions,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -1441,12 +1442,23 @@ function TallyKhataApp() {
           style={styles.headerLeftBiz}
           onPress={() => setModalSettings(true)}
         >
-          <Text style={styles.headerStoreIcon}>🏪</Text>
+          <View style={styles.headerStoreIcon}>
+            <Image
+              source={require('./assets/ic_tally_khata_logo_reg.png')}
+              style={{ width: 24, height: 24 }}
+              resizeMode="contain"
+            />
+          </View>
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={styles.headerBizName} numberOfLines={1}>{businessName}</Text>
               {isGold ? (
                 <View style={styles.headerGoldBadge}>
+                  <Image
+                    source={require('./assets/ic_premium_users.png')}
+                    style={{ width: 14, height: 14, marginRight: 3 }}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.headerGoldBadgeText}>গোল্ড</Text>
                 </View>
               ) : null}
@@ -1612,7 +1624,11 @@ function TallyKhataApp() {
               }}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>🔍</Text>
+                  <Image
+                    source={require('./assets/ic_no_txn_img_customer.png')}
+                    style={{ width: 140, height: 140, marginBottom: 12 }}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.emptyText}>কোনো খাতা পাওয়া যায়নি</Text>
                   <Text style={styles.emptySubText}>নিচের বাটন চেপে নতুন কাস্টমার বা সাপ্লায়ার যোগ করুন</Text>
                 </View>
@@ -1836,7 +1852,14 @@ function TallyKhataApp() {
             <View style={styles.walletCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View>
-                  <Text style={styles.walletCardSub}>টালিপে মার্চেন্ট ওয়ালেট</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Image
+                      source={require('./assets/ic_tally_pay_bn_png.png')}
+                      style={{ width: 85, height: 26, tintColor: '#FFFFFF' }}
+                      resizeMode="contain"
+                    />
+                    <Text style={[styles.walletCardSub, { marginTop: 0 }]}>মার্চেন্ট ওয়ালেট</Text>
+                  </View>
                   <Text style={styles.walletBalanceDisplay}>৳ {formatMoney(walletBalance)}</Text>
                   <Text style={styles.walletMerchantId}>মার্চেন্ট আইডি: TP-{ownerPhone}</Text>
                 </View>
@@ -1844,7 +1867,11 @@ function TallyKhataApp() {
                   style={styles.qrCodeBtn}
                   onPress={() => setModalBanglaQR(true)}
                 >
-                  <Text style={{ fontSize: 28 }}>🔳</Text>
+                  <Image
+                    source={require('./assets/ic_bangla_qr.png')}
+                    style={{ width: 32, height: 32, marginBottom: 4 }}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.qrCodeBtnText}>বাংলা QR</Text>
                 </TouchableOpacity>
               </View>
@@ -2303,6 +2330,11 @@ function TallyKhataApp() {
             <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
               <View style={styles.voucherContainer}>
                 <View style={styles.voucherHeader}>
+                  <Image
+                    source={require('./assets/ic_tally_khata_logo_reg.png')}
+                    style={{ width: 44, height: 44, marginBottom: 6 }}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.voucherBizName}>{businessName}</Text>
                   <Text style={styles.voucherBizSub}>{businessAddress}</Text>
                   <Text style={styles.voucherBizSub}>মোবাইল: {ownerPhone}</Text>
@@ -2691,8 +2723,12 @@ function TallyKhataApp() {
 
             {/* QR Visual Card */}
             <View style={styles.qrDisplayContainer}>
-              <Text style={{ fontSize: 90 }}>📱</Text>
-              <Text style={styles.qrCenterBadge}>বাংলা QR</Text>
+              <Image
+                source={require('./assets/ic_bangla_qr.png')}
+                style={{ width: 170, height: 170 }}
+                resizeMode="contain"
+              />
+              <Text style={styles.qrCenterBadge}>বাংলা QR • {businessName}</Text>
             </View>
 
             <Text style={{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', marginTop: 12, lineHeight: 18 }}>
@@ -3354,9 +3390,23 @@ function TallyKhataApp() {
             </View>
 
             <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
-              <View style={styles.supportBanner}>
-                <Text style={styles.supportBannerTitle}>যে কোনো প্রয়োজনে আমরা আছি আপনার পাশে</Text>
-                <Text style={styles.supportBannerSub}>টালিখাতা কাস্টমার কেয়ার হেল্পলাইন: ১৬৭২৬ (সকাল ৯টা - রাত ৯টা)</Text>
+              <View style={[styles.supportBanner, { flexDirection: 'row', alignItems: 'center', padding: 14 }]}>
+                <Image
+                  source={require('./assets/customer_care_lady.png')}
+                  style={{ width: 56, height: 56, borderRadius: 28, marginRight: 14 }}
+                  resizeMode="contain"
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.supportBannerTitle}>টালিখাতা কাস্টমার সাপোর্ট</Text>
+                  <TouchableOpacity onPress={() => Linking.openURL('tel:09612446677')}>
+                    <Text style={{ fontSize: 15, color: COLORS.primary, fontWeight: 'bold', marginTop: 3 }}>
+                      📞 হটলাইন: ০৯৬১২-৪৪৬৬৭৭
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                    সকাল ৯টা - রাত ৯টা (ছুটির দিনসহ)
+                  </Text>
+                </View>
               </View>
 
               <Text style={[styles.sectionHeading, { marginTop: 14 }]}>ব্যবহার নির্দেশিকা (FAQ)</Text>

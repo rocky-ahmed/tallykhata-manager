@@ -268,12 +268,23 @@
           style={styles.headerLeftBiz}
           onPress={() => setModalSettings(true)}
         >
-          <Text style={styles.headerStoreIcon}>🏪</Text>
+          <View style={styles.headerStoreIcon}>
+            <Image
+              source={require('./assets/ic_tally_khata_logo_reg.png')}
+              style={{ width: 24, height: 24 }}
+              resizeMode="contain"
+            />
+          </View>
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={styles.headerBizName} numberOfLines={1}>{businessName}</Text>
               {isGold ? (
                 <View style={styles.headerGoldBadge}>
+                  <Image
+                    source={require('./assets/ic_premium_users.png')}
+                    style={{ width: 14, height: 14, marginRight: 3 }}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.headerGoldBadgeText}>গোল্ড</Text>
                 </View>
               ) : null}
@@ -439,7 +450,11 @@
               }}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>🔍</Text>
+                  <Image
+                    source={require('./assets/ic_no_txn_img_customer.png')}
+                    style={{ width: 140, height: 140, marginBottom: 12 }}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.emptyText}>কোনো খাতা পাওয়া যায়নি</Text>
                   <Text style={styles.emptySubText}>নিচের বাটন চেপে নতুন কাস্টমার বা সাপ্লায়ার যোগ করুন</Text>
                 </View>
@@ -663,7 +678,14 @@
             <View style={styles.walletCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View>
-                  <Text style={styles.walletCardSub}>টালিপে মার্চেন্ট ওয়ালেট</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Image
+                      source={require('./assets/ic_tally_pay_bn_png.png')}
+                      style={{ width: 85, height: 26, tintColor: '#FFFFFF' }}
+                      resizeMode="contain"
+                    />
+                    <Text style={[styles.walletCardSub, { marginTop: 0 }]}>মার্চেন্ট ওয়ালেট</Text>
+                  </View>
                   <Text style={styles.walletBalanceDisplay}>৳ {formatMoney(walletBalance)}</Text>
                   <Text style={styles.walletMerchantId}>মার্চেন্ট আইডি: TP-{ownerPhone}</Text>
                 </View>
@@ -671,7 +693,11 @@
                   style={styles.qrCodeBtn}
                   onPress={() => setModalBanglaQR(true)}
                 >
-                  <Text style={{ fontSize: 28 }}>🔳</Text>
+                  <Image
+                    source={require('./assets/ic_bangla_qr.png')}
+                    style={{ width: 32, height: 32, marginBottom: 4 }}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.qrCodeBtnText}>বাংলা QR</Text>
                 </TouchableOpacity>
               </View>
