@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Component } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,14 +12,112 @@ import {
   Linking,
   StatusBar,
   FlatList,
-  Share
+  Share,
+  Dimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = 'tallykhata_offline_store_v3';
+// =========================================================================
+// 1. AUTHENTIC TALLYKHATA BRAND IDENTITY & CONSTANTS
+// =========================================================================
+const STORAGE_KEY = 'tallykhata_offline_store_v4';
+
+const COLORS = {
+  primary: '#B81414',        // Authentic TallyKhata Crimson Red
+  primaryDark: '#991111',
+  primaryLight: '#FFF0F1',   // Soft peach-red header tint
+  accent: '#B82329',
+  green: '#0F8A0F',          // Authentic TallyKhata India Green (পেলাম / জমা)
+  greenLight: '#EEF6F3',
+  red: '#DC2626',            // Authentic TallyKhata Red (দিলাম / বাকি)
+  redLight: '#FEF2F2',
+  gold: '#F59E0B',           // Gold Member / Verification Badge
+  goldLight: '#FEF3C7',
+  blue: '#0284C7',
+  blueLight: '#E0F2FE',
+  purple: '#7C3AED',
+  bg: '#F5F6F8',
+  card: '#FFFFFF',
+  border: '#E5E7EB',
+  borderLight: '#F3F4F6',
+  text: '#1A1A1A',
+  textMuted: '#6B7280',
+  textSubtle: '#9CA3AF',
+  white: '#FFFFFF',
+};
 
 // =========================================================================
-// 1. CRASH-PROOF ERROR BOUNDARY (Expo Go Safety Guard)
+// 2. SAFE UTILS & BENGALI FORMATTERS
+// =========================================================================
+const formatMoney = (amount) => {
+  if (amount === undefined || amount === null || isNaN(amount)) return '০';
+  const num = Math.round(Number(amount));
+  const isNeg = num < 0;
+  const absStr = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return isNeg ? '-' + absStr : absStr;
+};
+
+const getTodayDate = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getYesterdayDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getTimeString = () => {
+  const d = new Date();
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${ampm}`;
+};
+
+const formatDisplayDate = (dateStr) => {
+  if (!dateStr) return '';
+  const today = getTodayDate();
+  const yest = getYesterdayDate();
+  if (dateStr === today) return 'আজ';
+  if (dateStr === yest) return 'গতকাল';
+  return dateStr;
+};
+
+// Built-in Calculator Evaluator for Transaction Screen
+const safeEvalCalc = (expr) => {
+  if (!expr) return 0;
+  try {
+    const clean = expr.replace(/×/g, '*').replace(/÷/g, '/').replace(/[^0-9+\-*/.]/g, '');
+    if (!clean) return 0;
+    // Tokenize
+    const tokens = clean.match(/(\d+\.?\d*|[+\-*/])/g);
+    if (!tokens) return 0;
+    let total = parseFloat(tokens[0]) || 0;
+    for (let i = 1; i < tokens.length; i += 2) {
+      const op = tokens[i];
+      const val = parseFloat(tokens[i + 1]) || 0;
+      if (op === '+') total += val;
+      else if (op === '-') total -= val;
+      else if (op === '*') total *= val;
+      else if (op === '/') total = val !== 0 ? total / val : total;
+    }
+    return isNaN(total) ? 0 : Math.round(total * 100) / 100;
+  } catch (e) {
+    return 0;
+  }
+};
+
+// =========================================================================
+// 3. ERROR BOUNDARY (Expo Go Safety Guard)
 // =========================================================================
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -46,7 +144,7 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <SafeAreaView style={styles.errorSafeContainer}>
-          <StatusBar barStyle="light-content" backgroundColor="#b91c1c" />
+          <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
           <View style={styles.errorCard}>
             <Text style={styles.errorIcon}>⚠️</Text>
             <Text style={styles.errorHeading}>একটি সমস্যা হয়েছে</Text>
@@ -74,100 +172,167 @@ class ErrorBoundary extends Component {
 }
 
 // =========================================================================
-// 2. SAFE UTILS & BENGALI FORMATTERS
+// 4. SEED DATA & AUTHENTIC TALLYKHATA FAQS
 // =========================================================================
-const formatMoney = (amount) => {
-  if (amount === undefined || amount === null || isNaN(amount)) return '০';
-  const num = Math.round(Number(amount));
-  const isNeg = num < 0;
-  const absStr = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return isNeg ? '-' + absStr : absStr;
-};
-
-const getTodayDate = () => {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return year + '-' + month + '-' + day;
-};
-
-const getTimeString = () => {
-  const d = new Date();
-  let hours = d.getHours();
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12 || 12;
-  return hours + ':' + minutes + ' ' + ampm;
-};
-
-// Initial Seed Data (if storage empty)
 const INITIAL_ACCOUNTS = [
-  { id: '1', name: 'মো: রফিকুল ইসলাম', phone: '01711223344', type: 1, balance: 3200, address: 'বাজার মোড়' },
-  { id: '2', name: 'আলমগীর স্টোর', phone: '01812345678', type: 1, balance: 1450, address: 'পশ্চিম পাড়া' },
-  { id: '3', name: 'মেসার্স ভাই ভাই ট্রেডার্স', phone: '01911998877', type: 2, balance: 5000, address: 'পাইকারি আড়ৎ' },
+  { id: '1', name: 'মো: রফিকুল ইসলাম', phone: '01711223344', type: 1, balance: 3200, address: 'বাজার মোড়', createDate: getTodayDate() },
+  { id: '2', name: 'আলমগীর স্টোর', phone: '01812345678', type: 1, balance: 1450, address: 'পশ্চিম পাড়া', createDate: getTodayDate() },
+  { id: '3', name: 'মেসার্স ভাই ভাই ট্রেডার্স', phone: '01911998877', type: 2, balance: 5000, address: 'পাইকারি আড়ৎ', createDate: getTodayDate() },
+  { id: '4', name: 'হাজী জেনারেল স্টোর', phone: '01622334455', type: 1, balance: 0, address: 'দক্ষিণ বাজার', createDate: getTodayDate() },
 ];
 
 const INITIAL_JOURNALS = [
-  { id: '1', accountId: '1', type: 'given', amount: 3200, desc: 'বাকিতে চাল ও ডাল বিক্রয়', date: getTodayDate(), time: '10:30 AM' },
-  { id: '2', accountId: '2', type: 'given', amount: 1450, desc: 'মালামাল বাকি বিক্রি', date: getTodayDate(), time: '11:15 AM' },
-  { id: '3', accountId: '3', type: 'given', amount: 5000, desc: 'পাইকারি মাল ক্রয় বাবদ পাওনা', date: getTodayDate(), time: '02:00 PM' },
+  { id: '1', accountId: '1', type: 'given', amount: 3200, desc: 'বাকিতে চাল ও ডাল বিক্রয়', date: getTodayDate(), time: '10:30 AM', runningBalance: 3200 },
+  { id: '2', accountId: '2', type: 'given', amount: 1450, desc: 'মালামাল বাকি বিক্রি', date: getTodayDate(), time: '11:15 AM', runningBalance: 1450 },
+  { id: '3', accountId: '3', type: 'given', amount: 5000, desc: 'পাইকারি মাল ক্রয় বাবদ দেনা', date: getTodayDate(), time: '02:00 PM', runningBalance: 5000 },
 ];
 
 const INITIAL_CASH_ENTRIES = [
   { id: '1', category: 'sale', type: 'in', amount: 4500, desc: 'সকালের নগদ বিক্রি', date: getTodayDate(), time: '09:00 AM' },
   { id: '2', category: 'cost', type: 'out', amount: 250, desc: 'দোকান খরচ ও নাস্তা', date: getTodayDate(), time: '11:00 AM' },
-  { id: '3', category: 'malik_in', type: 'in', amount: 2000, desc: 'মালিকের দেওয়া নগদ টাকা', date: getTodayDate(), time: '08:30 AM' },
+  { id: '3', category: 'malik_in', type: 'in', amount: 2000, desc: 'মালিকের দেওয়া নগদ টাকা (জমা)', date: getTodayDate(), time: '08:30 AM' },
 ];
 
 const INITIAL_INVENTORY = [
-  { id: '1', name: 'মিনিকেট চাল', unit: 'কেজি', buyPrice: 65, sellPrice: 72, stock: 120 },
-  { id: '2', name: 'তীর সয়াবিন তেল', unit: 'লিটার', buyPrice: 175, sellPrice: 190, stock: 45 },
-  { id: '3', name: 'চিনি (প্যাকেট)', unit: 'কেজি', buyPrice: 130, sellPrice: 140, stock: 60 },
+  { id: '1', name: 'মিনিকেট চাল (৫০ কেজি)', unit: 'বস্তা', buyPrice: 3200, sellPrice: 3450, stock: 25 },
+  { id: '2', name: 'তীর সয়াবিন তেল (৫ লিটার)', unit: 'বোতল', buyPrice: 820, sellPrice: 875, stock: 40 },
+  { id: '3', name: 'চিনি (প্যাকেট)', unit: 'কেজি', buyPrice: 130, sellPrice: 140, stock: 65 },
   { id: '4', name: 'মসুর ডাল (দেশি)', unit: 'কেজি', buyPrice: 135, sellPrice: 150, stock: 8 },
 ];
 
 const INITIAL_NOTES = [
-  { id: '1', text: 'রবিবার সকালে আড়ৎ থেকে চাল ডেলিভারি আনতে হবে', isComplete: false, date: getTodayDate() },
+  { id: '1', text: 'রবিবার সকালে আড়ৎ থেকে চাল ও তেল ডেলিভারি আসবে', isComplete: false, date: getTodayDate() },
   { id: '2', text: 'বিদ্যুৎ বিল ও দোকান ভাড়া পরিশোধ করা হয়েছে', isComplete: true, date: getTodayDate() },
 ];
 
-// =========================================================================
-// 3. MAIN COMPONENT (TallyKhata Offline)
-// =========================================================================
-function TallyKhataApp() {
-  // Navigation Screens: 'home' | 'account_ledger'
-  const [currentScreen, setCurrentScreen] = useState('home');
-  // Bottom Tabs: 'ledger' | 'cashbox' | 'stock' | 'tagada' | 'reports' | 'settings'
-  const [activeTab, setActiveTab] = useState('ledger');
+const INITIAL_WALLET_TXNS = [
+  { id: 'w1', title: 'অ্যাড মানি (বিকাশ)', amount: 2500, type: 'in', date: getTodayDate(), time: '10:00 AM' },
+  { id: 'w2', title: 'মোবাইল রিচার্জ (01711223344)', amount: 100, type: 'out', date: getTodayDate(), time: '12:30 PM' },
+];
 
-  // Business Metadata
+const AUTHENTIC_FAQS = [
+  {
+    q: '১. টালিখাতা কি?',
+    a: 'টালিখাতা ব্যবসার হিসাব রাখার সহজ ও নিরাপদ মোবাইল অ্যাপ। এতে কাস্টমার-সাপ্লায়ারের বাকি, ক্যাশবক্সের হিসাব, স্টক ও ডিজিটাল ভাউচার ১০০% অফলাইনে রাখা যায়। কোনো ইন্টারনেট বা মাসিক ফি ছাড়াই আজীবন ফ্রি।'
+  },
+  {
+    q: '২. ক্যাশবক্স কি ও কীভাবে কাজ করে?',
+    a: 'ক্যাশবক্স হলো দোকানের নগদ টাকার ডিজিটাল ক্যাশ ড্রয়ার। সারাদিনের নগদ বেচা, কেনা, দোকানের খরচ এবং মালিক দিল/মালিক নিল এন্ট্রি দিয়ে দিনশেষে আসল ক্যাশের সাথে হিসাব মিলিয়ে ফেলা যায়।'
+  },
+  {
+    q: '৩. মালিক দিল এবং মালিক নিল বলতে কি বুঝি?',
+    a: 'ব্যবসার ক্যাশে মালিক যখন ব্যক্তিগত টাকা দেন তা হলো "মালিক দিল" (ক্যাশ বৃদ্ধি)। আর দোকান থেকে ব্যক্তিগত প্রয়োজনে টাকা নিলে তা হলো "মালিক নিল" (ক্যাশ হ্রাস)।'
+  },
+  {
+    q: '৪. বাকির কাস্টমার কীভাবে যোগ করবো?',
+    a: 'হোম পেজের নিচে "+ নতুন কাস্টমার" বাটনে চাপ দিন। কাস্টমারের নাম, মোবাইল নম্বর এবং পূর্বের বাকি থাকলে তা লিখে "খাতা খুলুন" চাপলেই নতুন খাতা তৈরি হবে।'
+  },
+  {
+    q: '৫. এন্ট্রি দিতে গিয়ে ভুল হলে কীভাবে সংশোধন করবো?',
+    a: 'যেকোনো লেনদেনের ওপর ট্যাপ করলে ডিজিটাল রশিদ ওপেন হবে। সেখান থেকে "✏️ সংশোধন" চেপে টাকার পরিমাণ বা বিবরণ পরিবর্তন করা যাবে অথবা "🗑️ মুছুন" চেপে ডিলিট করা যাবে।'
+  },
+  {
+    q: '৬. তাগাদা মেসেজ কীভাবে পাঠাবো?',
+    a: 'তাগাদা ট্যাবে গিয়ে বকেয়া কাস্টমারের নামের পাশে "SMS" বা "WhatsApp" বাটনে চাপ দিন। স্বয়ংক্রিয়ভাবে দোকানের নাম ও বকেয়া টাকাসহ মেসেজ প্রস্তুত হয়ে যাবে।'
+  },
+  {
+    q: '৭. ডাটা ব্যাকআপ কীভাবে হয় ও ফোন হারালে কি হবে?',
+    a: 'মেনু থেকে "ডাটা ব্যাকআপ ও রিস্টোর"-এ গিয়ে "ব্যাকআপ কপি করুন" চেপে ব্যাকআপটি আপনার জিমেইল, ড্রাইভ বা হোয়াটসঅ্যাপে সেভ করে রাখুন। নতুন ফোনে সেই টেক্সট পেস্ট করে ১ সেকেন্ডে সব খাতা ফেরত পাবেন।'
+  },
+  {
+    q: '৮. অ্যাপটি ব্যবহারের জন্য ইন্টারনেট সংযোগ দরকার কি?',
+    a: 'না, টালিখাতা ১০০% সম্পূর্ণ অফলাইন অ্যাপ। কোনো ইন্টারনেট কানেকশন ছাড়াও সব হিসাব, ক্যালকুলেটর ও রশিদ ব্যবহার করা যায়।'
+  }
+];
+
+
+function TallyKhataApp() {
+  // Navigation & Tabs
+  const [currentScreen, setCurrentScreen] = useState('home'); // 'home' | 'account_ledger'
+  const [activeTab, setActiveTab] = useState('home');         // 'home' | 'cashbox' | 'tagada' | 'tallypay' | 'menu'
+
+  // Business Profile
   const [businessName, setBusinessName] = useState('আমার ব্যবসা প্রতিষ্ঠান');
   const [ownerName, setOwnerName] = useState('স্বত্বাধিকারী');
   const [ownerPhone, setOwnerPhone] = useState('01700000000');
   const [businessAddress, setBusinessAddress] = useState('বাজার রোড, ঢাকা');
+  const [openingBalance, setOpeningBalance] = useState(3000);
+  const [isGold] = useState(true);
 
-  // Core Relational Entities
+  // Core Data Collections
   const [accounts, setAccounts] = useState(INITIAL_ACCOUNTS);
   const [journals, setJournals] = useState(INITIAL_JOURNALS);
   const [cashEntries, setCashEntries] = useState(INITIAL_CASH_ENTRIES);
   const [inventory, setInventory] = useState(INITIAL_INVENTORY);
   const [notes, setNotes] = useState(INITIAL_NOTES);
-  const [openingBalance, setOpeningBalance] = useState(3000);
+  const [walletBalance, setWalletBalance] = useState(1500);
+  const [walletTxns, setWalletTxns] = useState(INITIAL_WALLET_TXNS);
+  const [tagadaLogs, setTagadaLogs] = useState([]);
 
-  // Selected State for Detailed Views
+  // App Security (PIN Lock)
+  const [pinEnabled, setPinEnabled] = useState(false);
+  const [appPin, setAppPin] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+
+  // Selected Entities
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedVoucherTxn, setSelectedVoucherTxn] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // Search & Filtering
+  // Search, Filters & Tabs on Home
+  const [accountTab, setAccountTab] = useState('customer'); // 'customer' | 'supplier' | 'all'
+  const [accountFilter, setAccountFilter] = useState('all'); // 'all' | 'due' | 'highest' | 'recent'
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState('all'); // 'all', '1' (Customer), '2' (Supplier)
-  const [reportPeriod, setReportPeriod] = useState('today');
-  const [cashCategoryFilter, setCashCategoryFilter] = useState('all');
+  const [cashFilter, setCashFilter] = useState('all');
 
-  // Modals
+  // Calculator & Transaction Entry State
+  const [txnType, setTxnType] = useState('given'); // 'given' (দিলাম / লাল) | 'received' (পেলাম / সবুজ)
+  const [calcExpr, setCalcExpr] = useState('');
+  const [calcDisplay, setCalcDisplay] = useState('০');
+  const [txnDesc, setTxnDesc] = useState('');
+  const [txnDate, setTxnDate] = useState(getTodayDate());
+
+  // Edit Transaction State
+  const [editTxnId, setEditTxnId] = useState(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+
+  // Account Form State
+  const [accName, setAccName] = useState('');
+  const [accPhone, setAccPhone] = useState('');
+  const [accAddress, setAccAddress] = useState('');
+  const [accType, setAccType] = useState(1); // 1 = Customer, 2 = Supplier
+  const [accInitialBal, setAccInitialBal] = useState('');
+
+  // Cashbox Form State
+  const [cashCategory, setCashCategory] = useState('sale');
+  const [cashAmount, setCashAmount] = useState('');
+  const [cashDesc, setCashDesc] = useState('');
+  const [countedCash, setCountedCash] = useState('');
+
+  // Stock Form State
+  const [prodName, setProdName] = useState('');
+  const [prodUnit, setProdUnit] = useState('কেজি');
+  const [prodBuyPrice, setProdBuyPrice] = useState('');
+  const [prodSellPrice, setProdSellPrice] = useState('');
+  const [prodStock, setProdStock] = useState('');
+  const [stockAdjustType, setStockAdjustType] = useState('in');
+  const [stockAdjustQty, setStockAdjustQty] = useState('');
+
+  // Business Notes Form
+  const [newNoteText, setNewNoteText] = useState('');
+
+  // TallyPay Wallet Forms
+  const [addMoneyAmount, setAddMoneyAmount] = useState('');
+  const [addMoneyMethod, setAddMoneyMethod] = useState('bKash');
+  const [rechargePhone, setRechargePhone] = useState('');
+  const [rechargeOperator, setRechargeOperator] = useState('Grameenphone');
+  const [rechargeAmount, setRechargeAmount] = useState('');
+
+  // Modals Visibility
   const [modalAddAccount, setModalAddAccount] = useState(false);
+  const [modalEditAccount, setModalEditAccount] = useState(false);
   const [modalAddTxn, setModalAddTxn] = useState(false);
   const [modalEditTxn, setModalEditTxn] = useState(false);
   const [modalVoucher, setModalVoucher] = useState(false);
@@ -176,47 +341,20 @@ function TallyKhataApp() {
   const [modalAddStock, setModalAddStock] = useState(false);
   const [modalAdjustStock, setModalAdjustStock] = useState(false);
   const [modalTagada, setModalTagada] = useState(false);
+  const [modalBanglaQR, setModalBanglaQR] = useState(false);
+  const [modalAddMoney, setModalAddMoney] = useState(false);
+  const [modalMobileRecharge, setModalMobileRecharge] = useState(false);
+  const [modalNotes, setModalNotes] = useState(false);
+  const [modalProfitLoss, setModalProfitLoss] = useState(false);
+  const [modalFullReport, setModalFullReport] = useState(false);
+  const [modalSettings, setModalSettings] = useState(false);
   const [modalBackupRestore, setModalBackupRestore] = useState(false);
-
-  // Form Field States
-  const [accName, setAccName] = useState('');
-  const [accPhone, setAccPhone] = useState('');
-  const [accAddress, setAccAddress] = useState('');
-  const [accType, setAccType] = useState(1);
-  const [accInitialBal, setAccInitialBal] = useState('');
-
-  const [txnType, setTxnType] = useState('given');
-  const [txnAmount, setTxnAmount] = useState('');
-  const [txnDesc, setTxnDesc] = useState('');
-
-  const [editTxnId, setEditTxnId] = useState(null);
-  const [editTxnAmount, setEditTxnAmount] = useState('');
-  const [editTxnDesc, setEditTxnDesc] = useState('');
-
-  const [cashCategory, setCashCategory] = useState('sale');
-  const [cashAmount, setCashAmount] = useState('');
-  const [cashDesc, setCashDesc] = useState('');
-
-  const [countedCash, setCountedCash] = useState('');
-
-  const [prodName, setProdName] = useState('');
-  const [prodUnit, setProdUnit] = useState('কেজি');
-  const [prodBuyPrice, setProdBuyPrice] = useState('');
-  const [prodSellPrice, setProdSellPrice] = useState('');
-  const [prodStock, setProdStock] = useState('');
-
-  const [stockAdjustType, setStockAdjustType] = useState('in');
-  const [stockAdjustQty, setStockAdjustQty] = useState('');
-
-  const [tempBizName, setTempBizName] = useState(businessName);
-  const [tempOwnerName, setTempOwnerName] = useState(ownerName);
-  const [tempOwnerPhone, setTempOwnerPhone] = useState(ownerPhone);
-  const [tempBizAddress, setTempBizAddress] = useState(businessAddress);
-  const [tempOpeningBal, setTempOpeningBal] = useState(String(openingBalance));
-
+  const [modalInbox, setModalInbox] = useState(false);
+  const [modalSupport, setModalSupport] = useState(false);
+  const [modalPinSetup, setModalPinSetup] = useState(false);
   const [backupJsonText, setBackupJsonText] = useState('');
 
-  // --- PERSISTENCE ---
+  // --- PERSISTENCE: LOAD & SAVE ---
   useEffect(() => {
     loadSavedData();
   }, []);
@@ -231,29 +369,40 @@ function TallyKhataApp() {
         if (Array.isArray(d.cashEntries)) setCashEntries(d.cashEntries);
         if (Array.isArray(d.inventory)) setInventory(d.inventory);
         if (Array.isArray(d.notes)) setNotes(d.notes);
+        if (Array.isArray(d.walletTxns)) setWalletTxns(d.walletTxns);
+        if (d.walletBalance !== undefined) setWalletBalance(Number(d.walletBalance));
         if (d.businessName) setBusinessName(d.businessName);
         if (d.ownerName) setOwnerName(d.ownerName);
         if (d.ownerPhone) setOwnerPhone(d.ownerPhone);
         if (d.businessAddress) setBusinessAddress(d.businessAddress);
         if (d.openingBalance !== undefined) setOpeningBalance(Number(d.openingBalance));
+        if (d.pinEnabled && d.appPin) {
+          setPinEnabled(true);
+          setAppPin(d.appPin);
+          setIsLocked(true);
+        }
       }
     } catch (e) {
       console.log('Error loading saved data:', e);
     }
   };
 
-  const persistData = async (newAcc, newJourn, newCash, newInv, newNts, newBiz, newOwn, newPhn, newAddr, newOpBal) => {
+  const persistData = async (overrides = {}) => {
     const payload = {
-      accounts: newAcc !== undefined ? newAcc : accounts,
-      journals: newJourn !== undefined ? newJourn : journals,
-      cashEntries: newCash !== undefined ? newCash : cashEntries,
-      inventory: newInv !== undefined ? newInv : inventory,
-      notes: newNts !== undefined ? newNts : notes,
-      businessName: newBiz !== undefined ? newBiz : businessName,
-      ownerName: newOwn !== undefined ? newOwn : ownerName,
-      ownerPhone: newPhn !== undefined ? newPhn : ownerPhone,
-      businessAddress: newAddr !== undefined ? newAddr : businessAddress,
-      openingBalance: newOpBal !== undefined ? newOpBal : openingBalance,
+      accounts: overrides.accounts !== undefined ? overrides.accounts : accounts,
+      journals: overrides.journals !== undefined ? overrides.journals : journals,
+      cashEntries: overrides.cashEntries !== undefined ? overrides.cashEntries : cashEntries,
+      inventory: overrides.inventory !== undefined ? overrides.inventory : inventory,
+      notes: overrides.notes !== undefined ? overrides.notes : notes,
+      walletBalance: overrides.walletBalance !== undefined ? overrides.walletBalance : walletBalance,
+      walletTxns: overrides.walletTxns !== undefined ? overrides.walletTxns : walletTxns,
+      businessName: overrides.businessName !== undefined ? overrides.businessName : businessName,
+      ownerName: overrides.ownerName !== undefined ? overrides.ownerName : ownerName,
+      ownerPhone: overrides.ownerPhone !== undefined ? overrides.ownerPhone : ownerPhone,
+      businessAddress: overrides.businessAddress !== undefined ? overrides.businessAddress : businessAddress,
+      openingBalance: overrides.openingBalance !== undefined ? overrides.openingBalance : openingBalance,
+      pinEnabled: overrides.pinEnabled !== undefined ? overrides.pinEnabled : pinEnabled,
+      appPin: overrides.appPin !== undefined ? overrides.appPin : appPin,
     };
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -262,7 +411,7 @@ function TallyKhataApp() {
     }
   };
 
-  // --- FINANCIAL TOTALS ---
+  // --- FINANCIAL CALCULATIONS & DOUBLE-ENTRY SYNC ---
   let totalCustomerDue = 0;
   let totalSupplierDue = 0;
   (accounts || []).forEach((a) => {
@@ -274,16 +423,24 @@ function TallyKhataApp() {
   let totalCash = Number(openingBalance) || 0;
   let todayCashIn = 0;
   let todayCashOut = 0;
+  let todaySales = 0;
+  let todayCosts = 0;
   const todayStr = getTodayDate();
 
   (cashEntries || []).forEach((c) => {
     const amt = Number(c.amount) || 0;
     if (c.type === 'in') {
       totalCash += amt;
-      if (c.date === todayStr) todayCashIn += amt;
+      if (c.date === todayStr) {
+        todayCashIn += amt;
+        if (c.category === 'sale') todaySales += amt;
+      }
     } else {
       totalCash -= amt;
-      if (c.date === todayStr) todayCashOut += amt;
+      if (c.date === todayStr) {
+        todayCashOut += amt;
+        if (c.category === 'cost') todayCosts += amt;
+      }
     }
   });
 
@@ -295,58 +452,56 @@ function TallyKhataApp() {
     totalStockSaleValue += qty * (Number(item.sellPrice) || 0);
   });
 
-  // --- HANDLER: ACCOUNT ---
-  const handleSaveAccount = () => {
-    if (!accName.trim()) {
-      Alert.alert('সতর্কতা', 'দয়া করে কাস্টমার বা সাপ্লায়ারের নাম লিখুন');
+  // --- CALCULATOR ENGINE HANDLER ---
+  const handleCalcPress = (btn) => {
+    if (btn === 'C') {
+      setCalcExpr('');
+      setCalcDisplay('০');
       return;
     }
-    const bal = parseFloat(accInitialBal) || 0;
-    const newAcc = {
-      id: Date.now().toString(),
-      name: accName.trim(),
-      phone: accPhone.trim(),
-      address: accAddress.trim(),
-      type: accType,
-      balance: bal,
-      createDate: getTodayDate(),
-    };
-    const updatedAccounts = [newAcc, ...accounts];
-    setAccounts(updatedAccounts);
-
-    let updatedJournals = journals;
-    if (bal > 0) {
-      const initJ = {
-        id: (Date.now() + 1).toString(),
-        accountId: newAcc.id,
-        type: 'given',
-        amount: bal,
-        desc: 'পূর্বের বাকি (জের)',
-        date: getTodayDate(),
-        time: getTimeString(),
-      };
-      updatedJournals = [initJ, ...journals];
-      setJournals(updatedJournals);
+    if (btn === '⌫') {
+      if (!calcExpr) return;
+      const nextExpr = calcExpr.slice(0, -1);
+      setCalcExpr(nextExpr);
+      const res = safeEvalCalc(nextExpr);
+      setCalcDisplay(res ? formatMoney(res) : '০');
+      return;
     }
-
-    persistData(updatedAccounts, updatedJournals);
-    setAccName('');
-    setAccPhone('');
-    setAccAddress('');
-    setAccInitialBal('');
-    setModalAddAccount(false);
+    if (btn === '=') {
+      const res = safeEvalCalc(calcExpr);
+      setCalcExpr(String(res));
+      setCalcDisplay(formatMoney(res));
+      return;
+    }
+    const nextExpr = calcExpr + btn;
+    setCalcExpr(nextExpr);
+    const res = safeEvalCalc(nextExpr);
+    setCalcDisplay(res ? formatMoney(res) : '০');
   };
 
-  const handleOpenAccount = (acc) => {
-    setSelectedAccount(acc);
-    setCurrentScreen('account_ledger');
+  const handleQuickChipAdd = (val) => {
+    const currentNum = safeEvalCalc(calcExpr) || 0;
+    const nextTotal = currentNum + val;
+    setCalcExpr(String(nextTotal));
+    setCalcDisplay(formatMoney(nextTotal));
   };
 
-  // --- HANDLER: TRANSACTIONS ---
+  // --- HANDLER: OPEN TRANSACTION ENTRY MODAL ---
+  const handleOpenAddTxn = (type) => {
+    setTxnType(type);
+    setCalcExpr('');
+    setCalcDisplay('০');
+    setTxnDesc('');
+    setTxnDate(getTodayDate());
+    setModalAddTxn(true);
+  };
+
+  // --- HANDLER: SAVE TRANSACTION (WITH CASHBOX SYNC) ---
   const handleSaveTransaction = () => {
-    const amt = parseFloat(txnAmount);
+    if (!selectedAccount) return;
+    const amt = safeEvalCalc(calcExpr);
     if (!amt || amt <= 0) {
-      Alert.alert('সতর্কতা', 'সঠিক টাকার পরিমাণ লিখুন');
+      Alert.alert('সতর্কতা', 'সঠিক টাকার পরিমাণ দিন');
       return;
     }
 
@@ -365,64 +520,74 @@ function TallyKhataApp() {
     setSelectedAccount(updatedAccountObj);
     setAccounts(updatedAccounts);
 
-    const newJ = {
-      id: Date.now().toString(),
+    const txnId = Date.now().toString();
+    const defaultDesc = txnType === 'given'
+      ? (isCust ? 'বাকি বিক্রি' : 'মাল ক্রয় বাবদ দেনা')
+      : (isCust ? 'বাকি আদায় (জমা)' : 'টাকা পরিশোধ');
+
+    const newJournal = {
+      id: txnId,
       accountId: selectedAccount.id,
       type: txnType,
       amount: amt,
-      desc: txnDesc.trim() || (txnType === 'given' ? (isCust ? 'বাকি বিক্রি' : 'মাল ক্রয় বাবদ দেনা') : (isCust ? 'বাকি আদায়' : 'টাকা পরিশোধ')),
-      date: getTodayDate(),
+      desc: txnDesc.trim() || defaultDesc,
+      date: txnDate,
       time: getTimeString(),
       runningBalance: newBal,
     };
-    const updatedJournals = [newJ, ...journals];
+    const updatedJournals = [newJournal, ...journals];
     setJournals(updatedJournals);
 
+    // Automatic Cashbox Double-Entry
     let updatedCash = cashEntries;
     if (isCust && txnType === 'received') {
+      // Customer paid cash -> Cash In
       const cashEntry = {
-        id: (Date.now() + 2).toString(),
-        category: 'sale',
+        id: 'c_' + txnId,
+        linkedTxnId: txnId,
+        category: 'baki_aday',
         type: 'in',
         amount: amt,
-        desc: selectedAccount.name + ' (বাকি আদায়)',
-        date: getTodayDate(),
+        desc: `${selectedAccount.name} (বাকি আদায়)`,
+        date: txnDate,
         time: getTimeString(),
       };
       updatedCash = [cashEntry, ...cashEntries];
       setCashEntries(updatedCash);
     } else if (!isCust && txnType === 'given') {
+      // Supplier paid cash -> Cash Out
       const cashEntry = {
-        id: (Date.now() + 2).toString(),
-        category: 'buy',
+        id: 'c_' + txnId,
+        linkedTxnId: txnId,
+        category: 'supplier_pay',
         type: 'out',
         amount: amt,
-        desc: selectedAccount.name + ' (সাপ্লায়ার দেনা পরিশোধ)',
-        date: getTodayDate(),
+        desc: `${selectedAccount.name} (পাওনা পরিশোধ)`,
+        date: txnDate,
         time: getTimeString(),
       };
       updatedCash = [cashEntry, ...cashEntries];
       setCashEntries(updatedCash);
     }
 
-    persistData(updatedAccounts, updatedJournals, updatedCash);
-    setTxnAmount('');
-    setTxnDesc('');
+    persistData({ accounts: updatedAccounts, journals: updatedJournals, cashEntries: updatedCash });
     setModalAddTxn(false);
   };
 
+  // --- HANDLER: EDIT TRANSACTION (WITH RECALCULATION & CASH SYNC) ---
   const handleOpenEditTxn = (txn) => {
     setEditTxnId(txn.id);
-    setEditTxnAmount(String(txn.amount));
-    setEditTxnDesc(txn.desc || '');
+    setEditAmount(String(txn.amount));
+    setEditDesc(txn.desc || '');
     setModalVoucher(false);
     setModalEditTxn(true);
   };
 
   const handleUpdateTransaction = () => {
-    const amt = parseFloat(editTxnAmount);
+    if (!selectedAccount) return;
+    const amt = parseFloat(editAmount);
     if (!amt || amt <= 0) {
-      Alert.alert('সতর্কতা', 'সঠিক টাকার পরিমাণ লিখুন');
+      Alert.alert('সতর্কতা', 'সঠিক টাকার পরিমাণ দিন');
       return;
     }
     const targetTxn = journals.find((j) => j.id === editTxnId);
@@ -431,7 +596,6 @@ function TallyKhataApp() {
     const diff = amt - targetTxn.amount;
     const isCust = selectedAccount.type === 1;
     let newBal = selectedAccount.balance;
-
     if (isCust) {
       newBal = targetTxn.type === 'given' ? newBal + diff : newBal - diff;
     } else {
@@ -443,19 +607,27 @@ function TallyKhataApp() {
       a.id === selectedAccount.id ? updatedAccountObj : a
     );
     const updatedJournals = journals.map((j) =>
-      j.id === editTxnId ? { ...j, amount: amt, desc: editTxnDesc.trim() || j.desc } : j
+      j.id === editTxnId ? { ...j, amount: amt, desc: editDesc.trim() || j.desc } : j
+    );
+
+    // Update synced cash entry if present
+    const updatedCash = cashEntries.map((c) =>
+      c.linkedTxnId === editTxnId ? { ...c, amount: amt } : c
     );
 
     setSelectedAccount(updatedAccountObj);
     setAccounts(updatedAccounts);
     setJournals(updatedJournals);
-    persistData(updatedAccounts, updatedJournals);
+    setCashEntries(updatedCash);
+    persistData({ accounts: updatedAccounts, journals: updatedJournals, cashEntries: updatedCash });
 
     setModalEditTxn(false);
     setEditTxnId(null);
   };
 
+  // --- HANDLER: DELETE TRANSACTION (WITH CASH SYNC) ---
   const handleDeleteTransaction = (txnId) => {
+    if (!selectedAccount) return;
     Alert.alert(
       'লেনদেন মুছবেন?',
       'এই লেনদেনটি মুছে ফেললে খাতার ব্যালেন্স স্বয়ংক্রিয়ভাবে পুনর্গণনা হবে।',
@@ -481,11 +653,13 @@ function TallyKhataApp() {
               a.id === selectedAccount.id ? updatedAccountObj : a
             );
             const updatedJournals = journals.filter((j) => j.id !== txnId);
+            const updatedCash = cashEntries.filter((c) => c.linkedTxnId !== txnId);
 
             setSelectedAccount(updatedAccountObj);
             setAccounts(updatedAccounts);
             setJournals(updatedJournals);
-            persistData(updatedAccounts, updatedJournals);
+            setCashEntries(updatedCash);
+            persistData({ accounts: updatedAccounts, journals: updatedJournals, cashEntries: updatedCash });
             setModalVoucher(false);
           },
         },
@@ -493,10 +667,83 @@ function TallyKhataApp() {
     );
   };
 
+  // --- HANDLER: CREATE / EDIT / DELETE ACCOUNT ---
+  const handleSaveAccount = () => {
+    if (!accName.trim()) {
+      Alert.alert('সতর্কতা', 'দয়া করে নাম লিখুন');
+      return;
+    }
+    const bal = parseFloat(accInitialBal) || 0;
+    const newId = Date.now().toString();
+    const newAcc = {
+      id: newId,
+      name: accName.trim(),
+      phone: accPhone.trim(),
+      address: accAddress.trim(),
+      type: accType,
+      balance: bal,
+      createDate: getTodayDate(),
+    };
+    const updatedAccounts = [newAcc, ...accounts];
+    setAccounts(updatedAccounts);
+
+    let updatedJournals = journals;
+    if (bal > 0) {
+      const initJ = {
+        id: (Date.now() + 1).toString(),
+        accountId: newId,
+        type: 'given',
+        amount: bal,
+        desc: 'পূর্বের বাকি (জের)',
+        date: getTodayDate(),
+        time: getTimeString(),
+        runningBalance: bal,
+      };
+      updatedJournals = [initJ, ...journals];
+      setJournals(updatedJournals);
+    }
+
+    persistData({ accounts: updatedAccounts, journals: updatedJournals });
+    setAccName('');
+    setAccPhone('');
+    setAccAddress('');
+    setAccInitialBal('');
+    setModalAddAccount(false);
+  };
+
+  const handleOpenEditAccount = () => {
+    if (!selectedAccount) return;
+    setAccName(selectedAccount.name || '');
+    setAccPhone(selectedAccount.phone || '');
+    setAccAddress(selectedAccount.address || '');
+    setModalEditAccount(true);
+  };
+
+  const handleUpdateAccount = () => {
+    if (!selectedAccount) return;
+    if (!accName.trim()) {
+      Alert.alert('সতর্কতা', 'দয়া করে নাম লিখুন');
+      return;
+    }
+    const updated = {
+      ...selectedAccount,
+      name: accName.trim(),
+      phone: accPhone.trim(),
+      address: accAddress.trim(),
+    };
+    const updatedList = accounts.map((a) => (a.id === selectedAccount.id ? updated : a));
+    setSelectedAccount(updated);
+    setAccounts(updatedList);
+    persistData({ accounts: updatedList });
+    setModalEditAccount(false);
+    Alert.alert('সফল', 'হিসাবের তথ্য সফলভাবে আপডেট হয়েছে।');
+  };
+
   const handleDeleteAccount = () => {
+    if (!selectedAccount) return;
     Alert.alert(
       'খাতা মুছে ফেলবেন?',
-      (selectedAccount?.name || 'এই কাস্টমার') + '-এর সম্পূর্ণ খাতা এবং সকল লেনদেন মুছে যাবে।',
+      `${selectedAccount?.name || 'এই হিসাব'}-এর সম্পূর্ণ খাতা এবং সকল লেনদেন মুছে যাবে।`,
       [
         { text: 'বাতিল', style: 'cancel' },
         {
@@ -507,7 +754,8 @@ function TallyKhataApp() {
             const updatedJournals = journals.filter((j) => j.accountId !== selectedAccount.id);
             setAccounts(updatedAccounts);
             setJournals(updatedJournals);
-            persistData(updatedAccounts, updatedJournals);
+            setSelectedAccount(null);
+            persistData({ accounts: updatedAccounts, journals: updatedJournals });
             setCurrentScreen('home');
           },
         },
@@ -515,67 +763,13 @@ function TallyKhataApp() {
     );
   };
 
-  // --- HANDLER: TAGADA & MESSAGES ---
-  const generateTagadaMessage = (account) => {
-    const acc = account || selectedAccount;
-    if (!acc) return '';
-    return (
-      'আসসালামু আলাইকুম ' +
-      (acc.name || 'সম্মানিত গ্রাহক') +
-      ',\n' +
-      businessName +
-      '-এ আপনার বকেয়া হিসাব বাবদ ৳ ' +
-      formatMoney(acc.balance) +
-      ' টাকা পাওনা রয়েছে। অনুগ্রহ করে বকেয়া পরিশোধ করার জন্য অনুরোধ করা হলো।\nযোগাযোগ: ' +
-      ownerPhone +
-      '\nধন্যবাদ।'
-    );
-  };
-
-  const handleSendSMS = (account) => {
-    const acc = account || selectedAccount;
-    if (!acc) return;
-    const text = generateTagadaMessage(acc);
-    const phone = acc.phone ? acc.phone.replace(/[^0-9+]/g, '') : '';
-    const url = 'sms:' + phone + '?body=' + encodeURIComponent(text);
-    Linking.openURL(url).catch(() => {
-      Share.share({ message: text });
-    });
-    setModalTagada(false);
-  };
-
-  const handleSendWhatsApp = (account) => {
-    const acc = account || selectedAccount;
-    if (!acc) return;
-    const text = generateTagadaMessage(acc);
-    let phone = acc.phone ? acc.phone.replace(/[^0-9]/g, '') : '';
-    if (phone.startsWith('01')) phone = '88' + phone;
-    const url = 'whatsapp://send?phone=' + phone + '&text=' + encodeURIComponent(text);
-    Linking.openURL(url).catch(() => {
-      Share.share({ message: text });
-    });
-    setModalTagada(false);
-  };
-
-  const handleMakeCall = (phone) => {
-    if (!phone) {
-      Alert.alert('সতর্কতা', 'কোনো মোবাইল নম্বর দেওয়া নেই');
-      return;
-    }
-    const clean = phone.replace(/[^0-9+]/g, '');
-    Linking.openURL('tel:' + clean).catch(() => {
-      Alert.alert('কল ব্যর্থ', 'কল অ্যাপ ওপেন করা যায়নি');
-    });
-  };
-
-  // --- HANDLER: CASHBOX ---
+  // --- HANDLER: CASHBOX ENTRY & RECONCILE ---
   const handleSaveCashEntry = () => {
     const amt = parseFloat(cashAmount);
     if (!amt || amt <= 0) {
       Alert.alert('সতর্কতা', 'সঠিক টাকার পরিমাণ লিখুন');
       return;
     }
-
     const isIn = cashCategory === 'sale' || cashCategory === 'malik_in';
     const type = isIn ? 'in' : 'out';
 
@@ -598,8 +792,7 @@ function TallyKhataApp() {
 
     const updated = [newEntry, ...cashEntries];
     setCashEntries(updated);
-    persistData(undefined, undefined, updated);
-
+    persistData({ cashEntries: updated });
     setCashAmount('');
     setCashDesc('');
     setModalAddCash(false);
@@ -614,13 +807,42 @@ function TallyKhataApp() {
         onPress: () => {
           const updated = cashEntries.filter((c) => c.id !== id);
           setCashEntries(updated);
-          persistData(undefined, undefined, updated);
+          persistData({ cashEntries: updated });
         },
       },
     ]);
   };
 
-  // --- HANDLER: INVENTORY ---
+  const handleSaveReconciliation = () => {
+    const counted = parseFloat(countedCash);
+    if (isNaN(counted)) {
+      Alert.alert('সতর্কতা', 'ড্রয়ারের আসল ক্যাশ টাকার পরিমাণ লিখুন');
+      return;
+    }
+    const diff = counted - totalCash;
+    if (diff === 0) {
+      Alert.alert('সফল', 'ক্যাশবক্স পুরোপুরি মিলে গেছে! কোনো গরমিল নেই।');
+      setModalReconcileCash(false);
+      return;
+    }
+    // Record adjustment
+    const adjEntry = {
+      id: Date.now().toString(),
+      category: diff > 0 ? 'malik_in' : 'cost',
+      type: diff > 0 ? 'in' : 'out',
+      amount: Math.abs(diff),
+      desc: diff > 0 ? 'ক্যাশ সমন্বয় (উদ্বৃত্ত জমা)' : 'ক্যাশ সমন্বয় (ঘাটতি সমন্বয়)',
+      date: getTodayDate(),
+      time: getTimeString(),
+    };
+    const updated = [adjEntry, ...cashEntries];
+    setCashEntries(updated);
+    persistData({ cashEntries: updated });
+    setModalReconcileCash(false);
+    Alert.alert('সফল', 'ক্যাশবক্স সমন্বয় রেকর্ড সম্পন্ন হয়েছে।');
+  };
+
+  // --- HANDLER: STOCK INVENTORY ---
   const handleSaveProduct = () => {
     if (!prodName.trim()) {
       Alert.alert('সতর্কতা', 'পণ্যের নাম লিখুন');
@@ -636,7 +858,7 @@ function TallyKhataApp() {
     };
     const updated = [newP, ...inventory];
     setInventory(updated);
-    persistData(undefined, undefined, undefined, updated);
+    persistData({ inventory: updated });
     setProdName('');
     setProdBuyPrice('');
     setProdSellPrice('');
@@ -645,9 +867,10 @@ function TallyKhataApp() {
   };
 
   const handleAdjustStock = () => {
+    if (!selectedProduct) return;
     const qty = parseFloat(stockAdjustQty);
     if (!qty || qty <= 0) {
-      Alert.alert('সতর্কতা', 'সঠিক পরিমাণ লিখুন');
+      Alert.alert('সতর্কতা', 'সঠিক পরিমাণ দিন');
       return;
     }
     const diff = stockAdjustType === 'in' ? qty : -qty;
@@ -655,7 +878,7 @@ function TallyKhataApp() {
       p.id === selectedProduct.id ? { ...p, stock: Math.max(0, p.stock + diff) } : p
     );
     setInventory(updated);
-    persistData(undefined, undefined, undefined, updated);
+    persistData({ inventory: updated });
     setStockAdjustQty('');
     setModalAdjustStock(false);
     setSelectedProduct(null);
@@ -670,33 +893,151 @@ function TallyKhataApp() {
         onPress: () => {
           const updated = inventory.filter((p) => p.id !== id);
           setInventory(updated);
-          persistData(undefined, undefined, undefined, updated);
+          persistData({ inventory: updated });
         },
       },
     ]);
   };
 
-  // --- HANDLER: SETTINGS & BACKUP ---
-  const handleSaveSettings = () => {
-    const bName = tempBizName.trim() || businessName;
-    const oName = tempOwnerName.trim() || ownerName;
-    const oPhone = tempOwnerPhone.trim() || ownerPhone;
-    const bAddr = tempBizAddress.trim() || businessAddress;
-    const opBal = parseFloat(tempOpeningBal) || openingBalance;
-
-    setBusinessName(bName);
-    setOwnerName(oName);
-    setOwnerPhone(oPhone);
-    setBusinessAddress(bAddr);
-    setOpeningBalance(opBal);
-
-    persistData(undefined, undefined, undefined, undefined, undefined, bName, oName, oPhone, bAddr, opBal);
-    Alert.alert('সফল', 'ব্যবসার তথ্য সফলভাবে সংরক্ষিত হয়েছে');
+  // --- HANDLER: BUSINESS NOTES ---
+  const handleAddNote = () => {
+    if (!newNoteText.trim()) return;
+    const newN = {
+      id: Date.now().toString(),
+      text: newNoteText.trim(),
+      isComplete: false,
+      date: getTodayDate(),
+    };
+    const updated = [newN, ...notes];
+    setNotes(updated);
+    persistData({ notes: updated });
+    setNewNoteText('');
   };
 
+  const handleToggleNote = (id) => {
+    const updated = notes.map((n) => (n.id === id ? { ...n, isComplete: !n.isComplete } : n));
+    setNotes(updated);
+    persistData({ notes: updated });
+  };
+
+  const handleDeleteNote = (id) => {
+    const updated = notes.filter((n) => n.id !== id);
+    setNotes(updated);
+    persistData({ notes: updated });
+  };
+
+  // --- HANDLER: TALLYPAY WALLET ---
+  const handleAddMoney = () => {
+    const amt = parseFloat(addMoneyAmount);
+    if (!amt || amt <= 0) {
+      Alert.alert('সতর্কতা', 'টাকার পরিমাণ দিন');
+      return;
+    }
+    const newBal = walletBalance + amt;
+    const newTxn = {
+      id: 'w_' + Date.now(),
+      title: `অ্যাড মানি (${addMoneyMethod})`,
+      amount: amt,
+      type: 'in',
+      date: getTodayDate(),
+      time: getTimeString(),
+    };
+    const updatedTxns = [newTxn, ...walletTxns];
+    setWalletBalance(newBal);
+    setWalletTxns(updatedTxns);
+    persistData({ walletBalance: newBal, walletTxns: updatedTxns });
+    setAddMoneyAmount('');
+    setModalAddMoney(false);
+    Alert.alert('সফল', `৳ ${formatMoney(amt)} টাকা ওয়ালেটে সফলভাবে যোগ হয়েছে!`);
+  };
+
+  const handleMobileRecharge = () => {
+    const amt = parseFloat(rechargeAmount);
+    if (!amt || amt <= 0) {
+      Alert.alert('সতর্কতা', 'সঠিক রিচার্জের পরিমাণ দিন');
+      return;
+    }
+    if (walletBalance < amt) {
+      Alert.alert('ব্যর্থ', 'ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই। প্রথমে অ্যাড মানি করুন।');
+      return;
+    }
+    const cleanPh = rechargePhone.replace(/[^0-9]/g, '');
+    if (cleanPh.length < 11) {
+      Alert.alert('সতর্কতা', 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন');
+      return;
+    }
+    const newBal = walletBalance - amt;
+    const newTxn = {
+      id: 'w_' + Date.now(),
+      title: `রিচার্জ (${rechargeOperator} - ${cleanPh})`,
+      amount: amt,
+      type: 'out',
+      date: getTodayDate(),
+      time: getTimeString(),
+    };
+    const updatedTxns = [newTxn, ...walletTxns];
+    setWalletBalance(newBal);
+    setWalletTxns(updatedTxns);
+    persistData({ walletBalance: newBal, walletTxns: updatedTxns });
+    setRechargePhone('');
+    setRechargeAmount('');
+    setModalMobileRecharge(false);
+    Alert.alert('সফল', `${cleanPh} নম্বরে ৳ ${formatMoney(amt)} রিচার্জ সফল হয়েছে!`);
+  };
+
+  // --- HANDLER: TAGADA REMINDER TEMPLATES ---
+  const generateTagadaMessage = (account) => {
+    const acc = account || selectedAccount;
+    if (!acc) return '';
+    return (
+      `আসসালামু আলাইকুম ${(acc.name || 'সম্মানিত গ্রাহক')},\n` +
+      `${businessName}-এ আপনার বকেয়া হিসাব বাবদ মোট ৳ ${formatMoney(acc.balance)} টাকা পাওনা রয়েছে। ` +
+      `অনুগ্রহ করে বকেয়া পরিশোধ করার জন্য অনুরোধ করা হলো। ধন্যবাদ।\n` +
+      `যোগাযোগ: ${ownerPhone}`
+    );
+  };
+
+  const handleSendTagadaSMS = (account) => {
+    const acc = account || selectedAccount;
+    if (!acc) return;
+    const text = generateTagadaMessage(acc);
+    const phone = acc.phone ? acc.phone.replace(/[^0-9+]/g, '') : '';
+    const url = `sms:${phone}?body=${encodeURIComponent(text)}`;
+    Linking.openURL(url).catch(() => {
+      Share.share({ message: text });
+    });
+    setModalTagada(false);
+  };
+
+  const handleSendTagadaWhatsApp = (account) => {
+    const acc = account || selectedAccount;
+    if (!acc) return;
+    const text = generateTagadaMessage(acc);
+    let phone = acc.phone ? acc.phone.replace(/[^0-9]/g, '') : '';
+    if (phone.startsWith('01')) phone = '88' + phone;
+    const url = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(text)}`;
+    Linking.openURL(url).catch(() => {
+      Share.share({ message: text });
+    });
+    setModalTagada(false);
+  };
+
+  const handleMakeCall = (phone) => {
+    if (!phone) {
+      Alert.alert('সতর্কতা', 'কোনো মোবাইল নম্বর নেই');
+      return;
+    }
+    const clean = phone.replace(/[^0-9+]/g, '');
+    Linking.openURL(`tel:${clean}`).catch(() => {
+      Alert.alert('কল ব্যর্থ', 'কল অ্যাপ ওপেন করা যায়নি');
+    });
+  };
+
+  // --- HANDLER: BACKUP & RESTORE ---
   const handleExportBackup = () => {
     const backupObj = {
-      version: '3.0',
+      version: '4.0',
+      appName: 'TallyKhata Offline',
       exportDate: new Date().toISOString(),
       businessName,
       ownerName,
@@ -708,6 +1049,8 @@ function TallyKhataApp() {
       cashEntries,
       inventory,
       notes,
+      walletBalance,
+      walletTxns,
     };
     const jsonStr = JSON.stringify(backupObj, null, 2);
     setBackupJsonText(jsonStr);
@@ -716,7 +1059,7 @@ function TallyKhataApp() {
 
   const handleShareBackup = () => {
     Share.share({
-      title: 'TallyKhata Backup - ' + businessName,
+      title: `TallyKhata Backup - ${businessName}`,
       message: backupJsonText,
     });
   };
@@ -724,7 +1067,7 @@ function TallyKhataApp() {
   const handleImportBackup = () => {
     try {
       if (!backupJsonText.trim()) {
-        Alert.alert('সতর্কতা', 'দয়া করে পূর্বে সংরক্ষিত ব্যাকআপ JSON টেক্সট পেস্ট করুন');
+        Alert.alert('সতর্কতা', 'দয়া করে ব্যাকআপ JSON ডাটা পেস্ট করুন');
         return;
       }
       const data = JSON.parse(backupJsonText);
@@ -742,24 +1085,26 @@ function TallyKhataApp() {
       if (data.ownerPhone) setOwnerPhone(data.ownerPhone);
       if (data.businessAddress) setBusinessAddress(data.businessAddress);
       if (data.openingBalance !== undefined) setOpeningBalance(data.openingBalance);
+      if (data.walletBalance !== undefined) setWalletBalance(data.walletBalance);
 
-      persistData(
-        data.accounts,
-        data.journals,
-        data.cashEntries,
-        data.inventory,
-        data.notes,
-        data.businessName,
-        data.ownerName,
-        data.ownerPhone,
-        data.businessAddress,
-        data.openingBalance
-      );
+      persistData({
+        accounts: data.accounts,
+        journals: data.journals,
+        cashEntries: data.cashEntries,
+        inventory: data.inventory,
+        notes: data.notes,
+        businessName: data.businessName,
+        ownerName: data.ownerName,
+        ownerPhone: data.ownerPhone,
+        businessAddress: data.businessAddress,
+        openingBalance: data.openingBalance,
+        walletBalance: data.walletBalance,
+      });
 
       setModalBackupRestore(false);
       Alert.alert('সফল', 'ডাটা সফলভাবে ব্যাকআপ থেকে পুনরুদ্ধার করা হয়েছে!');
     } catch (e) {
-      Alert.alert('ব্যর্থ', 'JSON ফরম্যাট সঠিক নয়। দয়া করে সঠিক ডাটা পেস্ট করুন।');
+      Alert.alert('ব্যর্থ', 'JSON ফরম্যাট সঠিক নয়। সঠিক ডাটা পেস্ট করুন।');
     }
   };
 
@@ -769,45 +1114,125 @@ function TallyKhataApp() {
     const isCust = account.type === 1;
     const isGiven = txn.type === 'given';
     return (
-      '=================================\n' +
-      '       ' + businessName + '\n' +
-      '     ' + businessAddress + '\n' +
-      '     মোবাইল: ' + ownerPhone + '\n' +
-      '=================================\n' +
-      'রসিদ নং: TK-' + txn.id.slice(-6) + '\n' +
-      'তারিখ: ' + txn.date + '  ' + (txn.time || '') + '\n' +
-      '---------------------------------\n' +
-      (isCust ? 'কাস্টমার: ' : 'সাপ্লায়ার: ') + account.name + '\n' +
-      'মোবাইল: ' + (account.phone || 'দেওয়া নেই') + '\n' +
-      '---------------------------------\n' +
-      'লেনদেনের ধরন: ' + (isGiven ? (isCust ? 'বাকি বিক্রি' : 'মাল ক্রয়') : (isCust ? 'বাকি আদায় (জমা)' : 'টাকা পরিশোধ')) + '\n' +
-      'বিবরণ: ' + (txn.desc || 'সাধারণ লেনদেন') + '\n' +
-      'টাকার পরিমাণ: ৳ ' + formatMoney(txn.amount) + '\n' +
-      '---------------------------------\n' +
-      'বর্তমান সর্বমোট বকেয়া: ৳ ' + formatMoney(account.balance) + '\n' +
-      '=================================\n' +
-      '১০০% সঠিক ও ডিজিটাল টালিখাতা হিসাব।\nধন্যবাদ, আবার আসবেন।'
+      `=================================\n` +
+      `       ${businessName}\n` +
+      `     ${businessAddress}\n` +
+      `     মোবাইল: ${ownerPhone}\n` +
+      `=================================\n` +
+      `রসিদ নং: TK-${txn.id.slice(-6)}\n` +
+      `তারিখ: ${txn.date}  ${txn.time || ''}\n` +
+      `---------------------------------\n` +
+      `${isCust ? 'কাস্টমার: ' : 'সাপ্লায়ার: '} ${account.name}\n` +
+      `মোবাইল: ${account.phone || 'দেওয়া নেই'}\n` +
+      `---------------------------------\n` +
+      `লেনদেনের ধরন: ${isGiven ? (isCust ? 'বাকি বিক্রি' : 'মাল ক্রয়') : (isCust ? 'বাকি আদায় (জমা)' : 'টাকা পরিশোধ')}\n` +
+      `বিবরণ: ${txn.desc || 'সাধারণ লেনদেন'}\n` +
+      `টাকার পরিমাণ: ৳ ${formatMoney(txn.amount)}\n` +
+      `---------------------------------\n` +
+      `বর্তমান সর্বমোট বকেয়া: ৳ ${formatMoney(account.balance)}\n` +
+      `=================================\n` +
+      `১০০% সঠিক ও ডিজিটাল টালিখাতা হিসাব।\nধন্যবাদ, আবার আসবেন।`
     );
   };
 
-  // Filter Accounts
-  const filteredAccounts = (accounts || []).filter((a) => {
-    const q = searchQuery.toLowerCase();
-    const nameMatch = (a.name || '').toLowerCase().includes(q);
-    const phoneMatch = (a.phone || '').includes(q);
-    const typeMatch = filterType === 'all' || String(a.type) === filterType;
-    return (nameMatch || phoneMatch) && typeMatch;
-  });
+  // --- FILTERED ACCOUNTS FOR TAB 1 ---
+  const filteredAccounts = useMemo(() => {
+    return (accounts || []).filter((a) => {
+      // Type matching
+      if (accountTab === 'customer' && a.type !== 1) return false;
+      if (accountTab === 'supplier' && a.type !== 2) return false;
 
-  const dueCustomers = (accounts || []).filter((a) => a.type === 1 && Number(a.balance) > 0);
+      // Filter matching
+      if (accountFilter === 'due' && (Number(a.balance) || 0) <= 0) return false;
 
-  const filteredCashEntries = (cashEntries || []).filter((c) => {
-    if (cashCategoryFilter === 'all') return true;
-    return c.category === cashCategoryFilter;
-  });
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const mName = (a.name || '').toLowerCase().includes(q);
+        const mPhone = (a.phone || '').includes(q);
+        if (!mName && !mPhone) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      if (accountFilter === 'highest') {
+        return (Number(b.balance) || 0) - (Number(a.balance) || 0);
+      }
+      return 0; // default order
+    });
+  }, [accounts, accountTab, accountFilter, searchQuery]);
+
+  const dueCustomers = useMemo(() => {
+    return (accounts || []).filter((a) => a.type === 1 && (Number(a.balance) || 0) > 0);
+  }, [accounts]);
+
+  const filteredCashEntries = useMemo(() => {
+    if (cashFilter === 'all') return cashEntries || [];
+    return (cashEntries || []).filter((c) => c.category === cashFilter);
+  }, [cashEntries, cashFilter]);
+
 
   // =========================================================================
-  // VIEW A: CUSTOMER / SUPPLIER DETAILED LEDGER SCREEN
+  // VIEW: PIN SECURITY LOCK SCREEN
+  // =========================================================================
+  if (pinEnabled && isLocked) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: COLORS.primary }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
+        <View style={styles.pinLockContainer}>
+          <Text style={styles.pinLockIcon}>🔒</Text>
+          <Text style={styles.pinLockTitle}>টালিখাতা লক</Text>
+          <Text style={styles.pinLockSub}>অ্যাপটি খুলতে আপনার ৪ ডিজিটের পিন দিন</Text>
+
+          <View style={styles.pinDotsRow}>
+            {[0, 1, 2, 3].map((idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.pinDot,
+                  pinInput.length > idx && styles.pinDotFilled,
+                ]}
+              />
+            ))}
+          </View>
+
+          <View style={styles.pinKeypad}>
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => (
+              <TouchableOpacity
+                key={k}
+                style={styles.pinKeyBtn}
+                onPress={() => {
+                  if (k === 'C') {
+                    setPinInput('');
+                  } else if (k === '⌫') {
+                    setPinInput((prev) => prev.slice(0, -1));
+                  } else {
+                    if (pinInput.length < 4) {
+                      const next = pinInput + k;
+                      setPinInput(next);
+                      if (next.length === 4) {
+                        if (next === appPin) {
+                          setIsLocked(false);
+                          setPinInput('');
+                        } else {
+                          Alert.alert('ভুল PIN', 'সঠিক PIN দিয়ে চেষ্টা করুন।');
+                          setPinInput('');
+                        }
+                      }
+                    }
+                  }
+                }}
+              >
+                <Text style={styles.pinKeyText}>{k}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // =========================================================================
+  // VIEW A: CUSTOMER / SUPPLIER ACCOUNT LEDGER SCREEN
   // =========================================================================
   if (currentScreen === 'account_ledger' && selectedAccount) {
     const isCustomer = selectedAccount.type === 1;
@@ -815,14 +1240,20 @@ function TallyKhataApp() {
 
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#006847" />
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
 
-        {/* Top Header */}
+        {/* Ledger Top Header */}
         <View style={styles.ledgerHeaderNav}>
           <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentScreen('home')}>
-            <Text style={styles.backBtnText}>← টালি খাতা</Text>
+            <Text style={styles.backBtnText}>← খাতা</Text>
           </TouchableOpacity>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={styles.ledgerHeaderTitleBox}>
+            <Text style={styles.ledgerHeaderName} numberOfLines={1}>{selectedAccount.name}</Text>
+            <Text style={styles.ledgerHeaderSub}>
+              {isCustomer ? 'কাস্টমার হিসাব' : 'সাপ্লায়ার হিসাব'}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
             {selectedAccount.phone ? (
               <TouchableOpacity
                 style={styles.headerIconBtn}
@@ -831,11 +1262,16 @@ function TallyKhataApp() {
                 <Text style={{ fontSize: 16 }}>📞</Text>
               </TouchableOpacity>
             ) : null}
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => setModalTagada(true)}
-            >
-              <Text style={{ fontSize: 16 }}>💬</Text>
+            {isCustomer ? (
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => setModalTagada(true)}
+              >
+                <Text style={{ fontSize: 16 }}>📢</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={styles.headerIconBtn} onPress={handleOpenEditAccount}>
+              <Text style={{ fontSize: 16 }}>✏️</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.deleteAccBtn} onPress={handleDeleteAccount}>
               <Text style={styles.deleteAccBtnText}>মুছুন</Text>
@@ -845,8 +1281,10 @@ function TallyKhataApp() {
 
         {/* Account Profile Card */}
         <View style={styles.accountProfileCard}>
-          <View style={styles.profileAvatar}>
-            <Text style={styles.profileAvatarText}>{(selectedAccount.name || 'খ')[0]}</Text>
+          <View style={[styles.profileAvatar, { backgroundColor: isCustomer ? COLORS.redLight : COLORS.greenLight }]}>
+            <Text style={[styles.profileAvatarText, { color: isCustomer ? COLORS.primary : COLORS.green }]}>
+              {(selectedAccount.name || 'খ')[0]}
+            </Text>
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.profileName}>{selectedAccount.name}</Text>
@@ -858,24 +1296,26 @@ function TallyKhataApp() {
             ) : null}
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={[styles.profileDueLabel, { color: isCustomer ? '#dc2626' : '#15803d' }]}>
-              {isCustomer ? 'মোট বাকি (পাবো)' : 'মোট দেনা (দেবো)'}
+            <Text style={[styles.profileDueLabel, { color: isCustomer ? COLORS.primary : COLORS.green }]}>
+              {isCustomer ? 'মোট পাবো (বাকি)' : 'মোট দেবো (দেনা)'}
             </Text>
-            <Text style={[styles.profileDueAmount, { color: isCustomer ? '#dc2626' : '#15803d' }]}>
+            <Text style={[styles.profileDueAmount, { color: isCustomer ? COLORS.primary : COLORS.green }]}>
               ৳ {formatMoney(selectedAccount.balance)}
             </Text>
           </View>
         </View>
 
-        {/* Quick Actions Bar */}
+        {/* Quick Action Chips */}
         <View style={styles.ledgerQuickActions}>
-          <TouchableOpacity
-            style={styles.quickActionItem}
-            onPress={() => setModalTagada(true)}
-          >
-            <Text style={styles.quickActionEmoji}>💬</Text>
-            <Text style={styles.quickActionLabel}>তাগাদা পাঠান</Text>
-          </TouchableOpacity>
+          {isCustomer ? (
+            <TouchableOpacity
+              style={styles.quickActionItem}
+              onPress={() => setModalTagada(true)}
+            >
+              <Text style={styles.quickActionEmoji}>📢</Text>
+              <Text style={styles.quickActionLabel}>তাগাদা পাঠান</Text>
+            </TouchableOpacity>
+          ) : null}
           {selectedAccount.phone ? (
             <TouchableOpacity
               style={styles.quickActionItem}
@@ -889,34 +1329,39 @@ function TallyKhataApp() {
             style={styles.quickActionItem}
             onPress={() => {
               const fullStatement =
-                'খাতা: ' + selectedAccount.name + '\n' +
-                'বর্তমান বকেয়া: ৳ ' + formatMoney(selectedAccount.balance) + '\n' +
-                'মোট লেনদেন: ' + accountJournals.length + ' টি\n' +
-                'দোকান: ' + businessName + ' (' + ownerPhone + ')';
+                `=== ${businessName} ===\n` +
+                `হিসাব খাতা: ${selectedAccount.name}\n` +
+                `মোবাইল: ${selectedAccount.phone || 'দেওয়া নেই'}\n` +
+                `বর্তমান বকেয়া: ৳ ${formatMoney(selectedAccount.balance)}\n` +
+                `মোট লেনদেন: ${accountJournals.length} টি\n` +
+                `যোগাযোগ: ${ownerPhone}`;
               Share.share({ message: fullStatement });
             }}
           >
             <Text style={styles.quickActionEmoji}>📄</Text>
-            <Text style={styles.quickActionLabel}>হিসাব শেয়ার</Text>
+            <Text style={styles.quickActionLabel}>স্টেটমেন্ট শেয়ার</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Ledger Table Header */}
+        {/* Ledger Table Column Headers */}
         <View style={styles.ledgerTableHeader}>
           <Text style={[styles.ledgerColHeader, { flex: 1.4 }]}>তারিখ ও বিবরণ</Text>
-          <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: '#dc2626' }]}>
+          <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: COLORS.red }]}>
             দিলাম (-)
           </Text>
-          <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: '#16a34a' }]}>
+          <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: COLORS.green }]}>
             পেলাম (+)
+          </Text>
+          <Text style={[styles.ledgerColHeader, { flex: 1.1, textAlign: 'right', color: COLORS.textMuted }]}>
+            ব্যালেন্স
           </Text>
         </View>
 
-        {/* Ledger Transaction Rows */}
+        {/* Ledger Transactions List */}
         <FlatList
           data={accountJournals}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 110 }}
           renderItem={({ item }) => {
             const isGiven = item.type === 'given';
             return (
@@ -930,7 +1375,7 @@ function TallyKhataApp() {
                 <View style={{ flex: 1.4 }}>
                   <Text style={styles.ledgerRowDesc}>{item.desc || 'সাধারণ লেনদেন'}</Text>
                   <Text style={styles.ledgerRowDate}>
-                    {item.date} {item.time ? '• ' + item.time : ''}
+                    {formatDisplayDate(item.date)} {item.time ? '• ' + item.time : ''}
                   </Text>
                 </View>
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
@@ -947,6 +1392,11 @@ function TallyKhataApp() {
                     <Text style={styles.dashMuted}>-</Text>
                   )}
                 </View>
+                <View style={{ flex: 1.1, alignItems: 'flex-end' }}>
+                  <Text style={styles.ledgerRowBalance}>
+                    ৳ {formatMoney(item.runningBalance !== undefined ? item.runningBalance : selectedAccount.balance)}
+                  </Text>
+                </View>
               </TouchableOpacity>
             );
           }}
@@ -959,357 +1409,201 @@ function TallyKhataApp() {
           }
         />
 
-        {/* Bottom Entry Bar */}
+        {/* Bottom Dual Entry Bar (দিলাম / পেলাম) */}
         <View style={styles.ledgerBottomBar}>
           <TouchableOpacity
-            style={[styles.bigEntryBtn, { backgroundColor: '#dc2626' }]}
-            onPress={() => {
-              setTxnType('given');
-              setModalAddTxn(true);
-            }}
+            style={[styles.bigEntryBtn, { backgroundColor: COLORS.primary }]}
+            onPress={() => handleOpenAddTxn('given')}
           >
             <Text style={styles.bigEntryBtnText}>- দিলাম (বাকি)</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.bigEntryBtn, { backgroundColor: '#15803d' }]}
-            onPress={() => {
-              setTxnType('received');
-              setModalAddTxn(true);
-            }}
+            style={[styles.bigEntryBtn, { backgroundColor: COLORS.green }]}
+            onPress={() => handleOpenAddTxn('received')}
           >
             <Text style={styles.bigEntryBtnText}>+ পেলাম (জমা)</Text>
           </TouchableOpacity>
         </View>
-
-        {/* --- MODAL: ADD TRANSACTION --- */}
-        <Modal visible={modalAddTxn} animationType="fade" transparent onRequestClose={() => setModalAddTxn(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={[styles.modalCardTitle, { color: txnType === 'given' ? '#dc2626' : '#15803d' }]}>
-                {txnType === 'given' ? '- দিলাম (টাকা বা পণ্য বাকি)' : '+ পেলাম (নগদ বা জমা আদায়)'}
-              </Text>
-              <TextInput
-                style={styles.modalBigInput}
-                placeholder="৳ টাকার পরিমাণ"
-                keyboardType="numeric"
-                autoFocus
-                value={txnAmount}
-                onChangeText={setTxnAmount}
-              />
-              <View style={styles.quickChipRow}>
-                {['১০০', '৫০০', '১০০০', '২০০০'].map((chip, idx) => {
-                  const val = [100, 500, 1000, 2000][idx];
-                  return (
-                    <TouchableOpacity
-                      key={chip}
-                      style={styles.quickChip}
-                      onPress={() => {
-                        const cur = parseFloat(txnAmount) || 0;
-                        setTxnAmount(String(cur + val));
-                      }}
-                    >
-                      <Text style={styles.quickChipText}>+{chip}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <TextInput
-                style={styles.modalSimpleInput}
-                placeholder="বিবরণ (যেমন: চাল, তেল, নগদ ইত্যাদি)"
-                value={txnDesc}
-                onChangeText={setTxnDesc}
-              />
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalAddTxn(false)}>
-                  <Text style={styles.modalBtnCancelText}>বাতিল</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalBtnSubmit, { backgroundColor: txnType === 'given' ? '#dc2626' : '#15803d' }]}
-                  onPress={handleSaveTransaction}
-                >
-                  <Text style={styles.modalBtnSubmitText}>নিশ্চিত করুন</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* --- MODAL: EDIT TRANSACTION --- */}
-        <Modal visible={modalEditTxn} animationType="fade" transparent onRequestClose={() => setModalEditTxn(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalCardTitle}>লেনদেন সংশোধন (এডিট)</Text>
-              <TextInput
-                style={styles.modalBigInput}
-                placeholder="টাকার পরিমাণ"
-                keyboardType="numeric"
-                value={editTxnAmount}
-                onChangeText={setEditTxnAmount}
-              />
-              <TextInput
-                style={styles.modalSimpleInput}
-                placeholder="বিবরণ"
-                value={editTxnDesc}
-                onChangeText={setEditTxnDesc}
-              />
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalEditTxn(false)}>
-                  <Text style={styles.modalBtnCancelText}>বাতিল</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalBtnSubmit, { backgroundColor: '#006847' }]}
-                  onPress={handleUpdateTransaction}
-                >
-                  <Text style={styles.modalBtnSubmitText}>আপডেট করুন</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* --- MODAL: DIGITAL VOUCHER / RECEIPT MEMO --- */}
-        <Modal visible={modalVoucher} animationType="slide" transparent onRequestClose={() => setModalVoucher(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { maxHeight: '90%' }]}>
-              <View style={styles.voucherTop}>
-                <Text style={styles.voucherTitle}>🧾 ডিজিটাল ভাউচার রসিদ</Text>
-                <TouchableOpacity onPress={() => setModalVoucher(false)}>
-                  <Text style={{ fontSize: 18, color: '#6b7280' }}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ marginVertical: 12 }}>
-                <View style={styles.voucherPaper}>
-                  <Text style={styles.voucherBizName}>{businessName}</Text>
-                  <Text style={styles.voucherBizSub}>{businessAddress}</Text>
-                  <Text style={styles.voucherBizSub}>মোবাইল: {ownerPhone}</Text>
-                  <View style={styles.voucherDivider} />
-                  <View style={styles.voucherDetailRow}>
-                    <Text style={styles.voucherLabel}>রসিদ নম্বর:</Text>
-                    <Text style={styles.voucherVal}>TK-{selectedVoucherTxn?.id?.slice(-6)}</Text>
-                  </View>
-                  <View style={styles.voucherDetailRow}>
-                    <Text style={styles.voucherLabel}>তারিখ ও সময়:</Text>
-                    <Text style={styles.voucherVal}>{selectedVoucherTxn?.date} {selectedVoucherTxn?.time || ''}</Text>
-                  </View>
-                  <View style={styles.voucherDetailRow}>
-                    <Text style={styles.voucherLabel}>গ্রাহকের নাম:</Text>
-                    <Text style={styles.voucherVal}>{selectedAccount?.name}</Text>
-                  </View>
-                  <View style={styles.voucherDetailRow}>
-                    <Text style={styles.voucherLabel}>লেনদেনের ধরন:</Text>
-                    <Text style={[styles.voucherVal, { color: selectedVoucherTxn?.type === 'given' ? '#dc2626' : '#15803d' }]}>
-                      {selectedVoucherTxn?.type === 'given' ? 'দিলাম (বাকি বিক্রি)' : 'পেলাম (জমা আদায়)'}
-                    </Text>
-                  </View>
-                  <View style={styles.voucherDetailRow}>
-                    <Text style={styles.voucherLabel}>বিবরণ:</Text>
-                    <Text style={styles.voucherVal}>{selectedVoucherTxn?.desc || 'সাধারণ লেনদেন'}</Text>
-                  </View>
-                  <View style={styles.voucherDivider} />
-                  <View style={styles.voucherDetailRow}>
-                    <Text style={[styles.voucherLabel, { fontSize: 16, fontWeight: 'bold' }]}>টাকার পরিমাণ:</Text>
-                    <Text style={[styles.voucherVal, { fontSize: 18, fontWeight: 'bold', color: selectedVoucherTxn?.type === 'given' ? '#dc2626' : '#15803d' }]}>
-                      ৳ {formatMoney(selectedVoucherTxn?.amount)}
-                    </Text>
-                  </View>
-                  <View style={styles.voucherDetailRow}>
-                    <Text style={styles.voucherLabel}>বর্তমান সর্বমোট বাকি:</Text>
-                    <Text style={[styles.voucherVal, { fontWeight: 'bold' }]}>
-                      ৳ {formatMoney(selectedAccount?.balance)}
-                    </Text>
-                  </View>
-                </View>
-              </ScrollView>
-              <View style={styles.voucherActionRow}>
-                <TouchableOpacity
-                  style={[styles.voucherBtn, { backgroundColor: '#0284c7' }]}
-                  onPress={() => {
-                    const txt = renderVoucherText(selectedVoucherTxn, selectedAccount);
-                    Share.share({ message: txt });
-                  }}
-                >
-                  <Text style={styles.voucherBtnText}>📤 শেয়ার / কপি</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.voucherBtn, { backgroundColor: '#f59e0b' }]}
-                  onPress={() => handleOpenEditTxn(selectedVoucherTxn)}
-                >
-                  <Text style={styles.voucherBtnText}>✏️ সংশোধন</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.voucherBtn, { backgroundColor: '#ef4444' }]}
-                  onPress={() => handleDeleteTransaction(selectedVoucherTxn.id)}
-                >
-                  <Text style={styles.voucherBtnText}>🗑️ মুছুন</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* --- MODAL: TAGADA REMINDER --- */}
-        <Modal visible={modalTagada} animationType="fade" transparent onRequestClose={() => setModalTagada(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalCardTitle}>💬 বকেয়া তাগাদা বার্তা</Text>
-              <View style={styles.tagadaMessageBox}>
-                <Text style={styles.tagadaMessageContent}>{generateTagadaMessage(selectedAccount)}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-                <TouchableOpacity
-                  style={[styles.tagadaShareBtn, { backgroundColor: '#0284c7' }]}
-                  onPress={() => handleSendSMS(selectedAccount)}
-                >
-                  <Text style={styles.tagadaShareBtnText}>📱 সাধারণ SMS</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.tagadaShareBtn, { backgroundColor: '#15803d' }]}
-                  onPress={() => handleSendWhatsApp(selectedAccount)}
-                >
-                  <Text style={styles.tagadaShareBtnText}>💬 WhatsApp</Text>
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                style={[styles.modalBtnCancel, { marginTop: 12 }]}
-                onPress={() => setModalTagada(false)}
-              >
-                <Text style={styles.modalBtnCancelText}>বন্ধ করুন</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
       </SafeAreaView>
     );
   }
 
   // =========================================================================
-  // VIEW B: MAIN HOME SCREEN
+  // VIEW B: MAIN HOME VIEW (WITH 5 AUTHENTIC TABS)
   // =========================================================================
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#006847" />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
 
-      {/* Main Top Header Bar */}
-      <View style={styles.mainHeader}>
-        <View style={styles.headerLeft}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoBadgeText}>ট</Text>
-          </View>
-          <View>
-            <Text style={styles.appNameTitle}>টালি খাতা</Text>
-            <Text style={styles.appSubTitle}>{businessName} • ১০০% অফলাইন</Text>
-          </View>
-        </View>
+      {/* --- AUTHENTIC TALLYKHATA TOP HEADER BAR --- */}
+      <View style={styles.topHeaderBar}>
         <TouchableOpacity
-          style={styles.settingsHeaderBtn}
-          onPress={() => {
-            setTempBizName(businessName);
-            setTempOwnerName(ownerName);
-            setTempOwnerPhone(ownerPhone);
-            setTempBizAddress(businessAddress);
-            setTempOpeningBal(String(openingBalance));
-            setActiveTab('settings');
-          }}
+          style={styles.headerLeftBiz}
+          onPress={() => setModalSettings(true)}
         >
-          <Text style={styles.settingsHeaderBtnText}>⚙️ দোকান</Text>
+          <Text style={styles.headerStoreIcon}>🏪</Text>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.headerBizName} numberOfLines={1}>{businessName}</Text>
+              {isGold ? (
+                <View style={styles.headerGoldBadge}>
+                  <Text style={styles.headerGoldBadgeText}>গোল্ড</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.headerBizPhone}>{ownerPhone}</Text>
+          </View>
         </TouchableOpacity>
+
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            style={styles.headerVerifyBtn}
+            onPress={() => Alert.alert('ভেরিফাইড মার্চেন্ট', 'আপনার টালিখাতা অ্যাকাউন্ট ১০০% ভেরিফাইড ও সুরক্ষিত।')}
+          >
+            <Text style={styles.headerVerifyText}>✓ ভেরিফাই</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerIconTouch}
+            onPress={() => setModalInbox(true)}
+          >
+            <Text style={styles.headerActionIcon}>🔔</Text>
+            <View style={styles.headerRedDot} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerIconTouch}
+            onPress={() => setModalSupport(true)}
+          >
+            <Text style={styles.headerActionIcon}>🎧</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Top 3 Metric Cards */}
+      {/* --- DASHBOARD SUMMARY CARDS (পাবো ও দিবো) --- */}
       <View style={styles.dashboardRow}>
-        <View style={[styles.dashboardCard, { borderBottomColor: '#dc2626' }]}>
-          <Text style={styles.dashLabel}>মোট পাবো</Text>
-          <Text style={[styles.dashAmount, { color: '#dc2626' }]}>
+        <View style={[styles.dashboardCard, { borderBottomColor: COLORS.primary }]}>
+          <Text style={styles.dashLabel}>মোট পাবো (বাকি)</Text>
+          <Text style={[styles.dashAmount, { color: COLORS.primary }]}>
             ৳ {formatMoney(totalCustomerDue)}
           </Text>
         </View>
-        <View style={[styles.dashboardCard, { borderBottomColor: '#15803d' }]}>
-          <Text style={styles.dashLabel}>মোট দেবো</Text>
-          <Text style={[styles.dashAmount, { color: '#15803d' }]}>
+        <View style={[styles.dashboardCard, { borderBottomColor: COLORS.green }]}>
+          <Text style={styles.dashLabel}>মোট দেবো (দেনা)</Text>
+          <Text style={[styles.dashAmount, { color: COLORS.green }]}>
             ৳ {formatMoney(totalSupplierDue)}
-          </Text>
-        </View>
-        <View style={[styles.dashboardCard, { borderBottomColor: '#006847' }]}>
-          <Text style={styles.dashLabel}>ক্যাশ বাক্স</Text>
-          <Text style={[styles.dashAmount, { color: '#006847' }]}>
-            ৳ {formatMoney(totalCash)}
           </Text>
         </View>
       </View>
 
-      {/* TAB CONTENT AREA */}
+      {/* --- TAB CONTENT CONTAINER --- */}
       <View style={{ flex: 1 }}>
-        {/* --- TAB 1: LEDGER (খাতা) --- */}
-        {activeTab === 'ledger' && (
+
+        {/* ===================================================================
+            TAB 1: HOME / KHATA (কাস্টমার ও সাপ্লায়ার তালিকা)
+           =================================================================== */}
+        {activeTab === 'home' && (
           <View style={{ flex: 1 }}>
+            {/* Customer vs Supplier Tabs */}
+            <View style={styles.homeTabSelectorRow}>
+              <TouchableOpacity
+                style={[styles.homeTabBtn, accountTab === 'customer' && styles.homeTabBtnActive]}
+                onPress={() => setAccountTab('customer')}
+              >
+                <Text style={[styles.homeTabBtnText, accountTab === 'customer' && styles.homeTabBtnTextActive]}>
+                  কাস্টমার ({accounts.filter((a) => a.type === 1).length})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.homeTabBtn, accountTab === 'supplier' && styles.homeTabBtnActive]}
+                onPress={() => setAccountTab('supplier')}
+              >
+                <Text style={[styles.homeTabBtnText, accountTab === 'supplier' && styles.homeTabBtnTextActive]}>
+                  সাপ্লায়ার ({accounts.filter((a) => a.type === 2).length})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.homeTabBtn, accountTab === 'all' && styles.homeTabBtnActive]}
+                onPress={() => setAccountTab('all')}
+              >
+                <Text style={[styles.homeTabBtnText, accountTab === 'all' && styles.homeTabBtnTextActive]}>
+                  সকল ({accounts.length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Search & Filter Bar */}
             <View style={styles.searchBarRow}>
               <TextInput
                 style={styles.searchTextInput}
                 placeholder="🔍 নাম বা মোবাইল নম্বর দিয়ে খুঁজুন..."
+                placeholderTextColor={COLORS.textSubtle}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
+              {searchQuery ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 6 }}>
+                  <Text style={{ fontSize: 16, color: COLORS.textMuted }}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
 
+            {/* Filter Pills */}
             <View style={styles.filterPillRow}>
-              <TouchableOpacity
-                style={[styles.filterPill, filterType === 'all' && styles.filterPillActive]}
-                onPress={() => setFilterType('all')}
-              >
-                <Text style={[styles.filterPillText, filterType === 'all' && styles.filterPillTextActive]}>
-                  সকল খাতা ({accounts.length})
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterPill, filterType === '1' && styles.filterPillActive]}
-                onPress={() => setFilterType('1')}
-              >
-                <Text style={[styles.filterPillText, filterType === '1' && styles.filterPillTextActive]}>
-                  কাস্টমার ({accounts.filter((a) => a.type === 1).length})
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterPill, filterType === '2' && styles.filterPillActive]}
-                onPress={() => setFilterType('2')}
-              >
-                <Text style={[styles.filterPillText, filterType === '2' && styles.filterPillTextActive]}>
-                  সাপ্লায়ার ({accounts.filter((a) => a.type === 2).length})
-                </Text>
-              </TouchableOpacity>
+              {[
+                { id: 'all', label: 'সব' },
+                { id: 'due', label: 'বাকি আছে' },
+                { id: 'highest', label: 'সর্বোচ্চ বাকি' },
+              ].map((f) => (
+                <TouchableOpacity
+                  key={f.id}
+                  style={[styles.filterPill, accountFilter === f.id && styles.filterPillActive]}
+                  onPress={() => setAccountFilter(f.id)}
+                >
+                  <Text style={[styles.filterPillText, accountFilter === f.id && styles.filterPillTextActive]}>
+                    {f.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
+            {/* Accounts FlatList */}
             <FlatList
               data={filteredAccounts}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: 90, paddingHorizontal: 12 }}
+              contentContainerStyle={{ paddingBottom: 95, paddingHorizontal: 12 }}
               renderItem={({ item }) => {
                 const isCust = item.type === 1;
+                const hasDue = Number(item.balance) > 0;
                 return (
                   <TouchableOpacity
                     style={styles.accountCardItem}
-                    onPress={() => handleOpenAccount(item)}
+                    onPress={() => {
+                      setSelectedAccount(item);
+                      setCurrentScreen('account_ledger');
+                    }}
                   >
-                    <View style={[styles.accAvatarCircle, { backgroundColor: isCust ? '#fee2e2' : '#dcfce7' }]}>
-                      <Text style={[styles.accAvatarLetter, { color: isCust ? '#dc2626' : '#15803d' }]}>
+                    <View style={[styles.accAvatarCircle, { backgroundColor: isCust ? COLORS.redLight : COLORS.greenLight }]}>
+                      <Text style={[styles.accAvatarLetter, { color: isCust ? COLORS.primary : COLORS.green }]}>
                         {(item.name || 'খ')[0]}
                       </Text>
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={styles.accCardName}>{item.name}</Text>
                       <Text style={styles.accCardPhone}>
-                        {item.phone ? '📱 ' + item.phone : 'মোবাইল নম্বর নেই'}
+                        {item.phone ? '📱 ' + item.phone : 'মোবাইল নেই'}
                       </Text>
+                      {item.address ? (
+                        <Text style={styles.accCardAddress} numberOfLines={1}>📍 {item.address}</Text>
+                      ) : null}
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.accTypeBadge, { color: isCust ? '#dc2626' : '#15803d' }]}>
-                        {isCust ? 'পাবো (বাকি)' : 'দেবো (পাওনা)'}
+                      <Text style={[styles.accTypeBadge, { color: isCust ? COLORS.primary : COLORS.green }]}>
+                        {isCust ? (hasDue ? 'পাবো (বাকি)' : 'হিসাব সমান') : (hasDue ? 'দেবো (পাওনা)' : 'হিসাব সমান')}
                       </Text>
-                      <Text
-                        style={[
-                          styles.accBalanceValue,
-                          { color: isCust ? '#dc2626' : '#15803d' },
-                        ]}
-                      >
+                      <Text style={[styles.accBalanceValue, { color: isCust ? COLORS.primary : COLORS.green }]}>
                         ৳ {formatMoney(item.balance)}
                       </Text>
                     </View>
@@ -1320,24 +1614,36 @@ function TallyKhataApp() {
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyIcon}>🔍</Text>
                   <Text style={styles.emptyText}>কোনো খাতা পাওয়া যায়নি</Text>
-                  <Text style={styles.emptySubText}>নিচের '+ নতুন খাতা' বাটনে চাপ দিয়ে যোগ করুন</Text>
+                  <Text style={styles.emptySubText}>নিচের বাটন চেপে নতুন কাস্টমার বা সাপ্লায়ার যোগ করুন</Text>
                 </View>
               }
             />
 
-            <TouchableOpacity style={styles.floatingAddBtn} onPress={() => setModalAddAccount(true)}>
-              <Text style={styles.floatingAddBtnText}>+ নতুন খাতা খুলুন</Text>
+            {/* Floating Action Button: New Account */}
+            <TouchableOpacity
+              style={styles.floatingAddBtn}
+              onPress={() => {
+                setAccType(accountTab === 'supplier' ? 2 : 1);
+                setModalAddAccount(true);
+              }}
+            >
+              <Text style={styles.floatingAddBtnText}>
+                {accountTab === 'supplier' ? '+ নতুন সাপ্লায়ার' : '+ নতুন কাস্টমার'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* --- TAB 2: CASHBOX (ক্যাশবক্স) --- */}
+        {/* ===================================================================
+            TAB 2: CASHBOX (ক্যাশবক্স)
+           =================================================================== */}
         {activeTab === 'cashbox' && (
-          <View style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
+            {/* Cash Dashboard Card */}
             <View style={styles.cashTopCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View>
-                  <Text style={styles.cashTopCardSub}>ক্যাশ বাক্সে বর্তমান টাকা</Text>
+                  <Text style={styles.cashTopCardSub}>ক্যাশ বাক্সে বর্তমান নগদ টাকা</Text>
                   <Text style={styles.cashTotalDisplay}>৳ {formatMoney(totalCash)}</Text>
                 </View>
                 <TouchableOpacity
@@ -1354,211 +1660,140 @@ function TallyKhataApp() {
               <View style={styles.cashTodayStatsRow}>
                 <View style={styles.cashTodayStatItem}>
                   <Text style={styles.cashTodayStatLabel}>আজকের ক্যাশ ইন (+)</Text>
-                  <Text style={[styles.cashTodayStatVal, { color: '#15803d' }]}>
+                  <Text style={[styles.cashTodayStatVal, { color: COLORS.green }]}>
                     + ৳ {formatMoney(todayCashIn)}
                   </Text>
                 </View>
-                <View style={[styles.cashTodayStatItem, { borderLeftWidth: 1, borderColor: '#e5e7eb' }]}>
+                <View style={[styles.cashTodayStatItem, { borderLeftWidth: 1, borderColor: COLORS.border }]}>
                   <Text style={styles.cashTodayStatLabel}>আজকের ক্যাশ আউট (-)</Text>
-                  <Text style={[styles.cashTodayStatVal, { color: '#dc2626' }]}>
+                  <Text style={[styles.cashTodayStatVal, { color: COLORS.red }]}>
                     - ৳ {formatMoney(todayCashOut)}
                   </Text>
                 </View>
               </View>
             </View>
 
-            <View style={styles.cashCategoryPillRow}>
+            {/* Quick Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 12, marginTop: 12 }}>
+              <TouchableOpacity
+                style={[styles.cashActionBigBtn, { backgroundColor: COLORS.green }]}
+                onPress={() => {
+                  setCashCategory('sale');
+                  setModalAddCash(true);
+                }}
+              >
+                <Text style={styles.cashActionBigBtnText}>+ ক্যাশ বেচা</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.cashActionBigBtn, { backgroundColor: COLORS.primary }]}
+                onPress={() => {
+                  setCashCategory('cost');
+                  setModalAddCash(true);
+                }}
+              >
+                <Text style={styles.cashActionBigBtnText}>- দোকান খরচ</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Cash Categories Breakdown List (Matching Authentic Layout) */}
+            <View style={styles.cashAccountsSection}>
+              <Text style={styles.sectionHeading}>ক্যাশবক্সের হিসাব সমূহ</Text>
+
               {[
-                { key: 'all', label: 'সকল ক্যাশ' },
-                { key: 'sale', label: '🛒 ক্যাশ বেচা' },
-                { key: 'buy', label: '📦 ক্যাশ কেনা' },
-                { key: 'cost', label: '🧾 খরচ' },
-                { key: 'malik_in', label: '📥 মালিক দিল' },
-                { key: 'malik_out', label: '📤 মালিক নিল' },
+                { cat: 'sale', label: '🛒 ক্যাশ বেচা', isIn: true, color: COLORS.green },
+                { cat: 'buy', label: '📦 ক্যাশ কেনা', isIn: false, color: COLORS.red },
+                { cat: 'cost', label: '🧾 দোকানের খরচ', isIn: false, color: COLORS.red },
+                { cat: 'malik_in', label: '📥 মালিক দিল (ক্যাশ জমা)', isIn: true, color: COLORS.green },
+                { cat: 'malik_out', label: '📤 মালিক নিল (ক্যাশ উত্তোলন)', isIn: false, color: COLORS.red },
+                { cat: 'baki_aday', label: '💰 বাকি আদায়', isIn: true, color: COLORS.green },
+                { cat: 'supplier_pay', label: '🤝 পাওনাদার পরিশোধ', isIn: false, color: COLORS.red },
+              ].map((item) => {
+                const catEntries = (cashEntries || []).filter((c) => c.category === item.cat);
+                const sum = catEntries.reduce((acc, cur) => acc + (Number(cur.amount) || 0), 0);
+                return (
+                  <TouchableOpacity
+                    key={item.cat}
+                    style={styles.cashAccountRow}
+                    onPress={() => {
+                      setCashFilter(item.cat);
+                    }}
+                  >
+                    <Text style={styles.cashAccountRowLabel}>{item.label}</Text>
+                    <Text style={[styles.cashAccountRowVal, { color: item.color }]}>
+                      {item.isIn ? '+' : '-'} ৳ {formatMoney(sum)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Category Filter Pills */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 12, marginTop: 14 }}>
+              {[
+                { key: 'all', label: 'সকল এন্ট্রি' },
+                { key: 'sale', label: 'বেচা' },
+                { key: 'buy', label: 'কেনা' },
+                { key: 'cost', label: 'খরচ' },
+                { key: 'malik_in', label: 'মালিক দিল' },
+                { key: 'malik_out', label: 'মালিক নিল' },
               ].map((c) => (
                 <TouchableOpacity
                   key={c.key}
-                  style={[styles.filterPill, cashCategoryFilter === c.key && styles.filterPillActive]}
-                  onPress={() => setCashCategoryFilter(c.key)}
+                  style={[styles.filterPill, cashFilter === c.key && styles.filterPillActive]}
+                  onPress={() => setCashFilter(c.key)}
                 >
-                  <Text style={[styles.filterPillText, cashCategoryFilter === c.key && styles.filterPillTextActive]}>
+                  <Text style={[styles.filterPillText, cashFilter === c.key && styles.filterPillTextActive]}>
                     {c.label}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
 
-            <FlatList
-              data={filteredCashEntries}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 90 }}
-              renderItem={({ item }) => {
+            {/* Cash Transactions List */}
+            <View style={{ paddingHorizontal: 12, marginTop: 10 }}>
+              {filteredCashEntries.map((item) => {
                 const isIn = item.type === 'in';
                 return (
-                  <TouchableOpacity
-                    style={styles.cashHistoryCard}
-                    onLongPress={() => handleDeleteCashEntry(item.id)}
-                  >
-                    <View style={[styles.cashTypeCircle, { backgroundColor: isIn ? '#dcfce7' : '#fee2e2' }]}>
-                      <Text style={{ fontSize: 16 }}>{isIn ? '📥' : '📤'}</Text>
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.cashEntryDesc}>{item.desc}</Text>
-                      <Text style={styles.cashEntryDate}>
-                        {item.date} {item.time ? '• ' + item.time : ''}
+                  <View key={item.id} style={styles.cashItemRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cashItemDesc}>{item.desc}</Text>
+                      <Text style={styles.cashItemDate}>
+                        {formatDisplayDate(item.date)} {item.time ? '• ' + item.time : ''}
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text
-                        style={[
-                          styles.cashEntryAmount,
-                          { color: isIn ? '#15803d' : '#dc2626' },
-                        ]}
-                      >
+                      <Text style={[styles.cashItemAmount, { color: isIn ? COLORS.green : COLORS.red }]}>
                         {isIn ? '+' : '-'} ৳ {formatMoney(item.amount)}
                       </Text>
                       <TouchableOpacity onPress={() => handleDeleteCashEntry(item.id)}>
-                        <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>মুছুন</Text>
+                        <Text style={{ fontSize: 11, color: COLORS.textSubtle, marginTop: 2 }}>মুছুন</Text>
                       </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>💰</Text>
-                  <Text style={styles.emptyText}>কোনো ক্যাশ এন্ট্রি নেই</Text>
-                  <Text style={styles.emptySubText}>নিচের '+ ক্যাশ এন্ট্রি' বাটনে চাপ দিয়ে যোগ করুন</Text>
-                </View>
-              }
-            />
-
-            <TouchableOpacity
-              style={styles.floatingAddBtn}
-              onPress={() => {
-                setCashCategory('sale');
-                setModalAddCash(true);
-              }}
-            >
-              <Text style={styles.floatingAddBtnText}>+ ক্যাশ এন্ট্রি দিন</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* --- TAB 3: STOCK (স্টক) --- */}
-        {activeTab === 'stock' && (
-          <View style={{ flex: 1 }}>
-            <View style={styles.stockSummaryCard}>
-              <View style={styles.stockSummaryItem}>
-                <Text style={styles.stockSummaryLabel}>পণ্যের ধরন</Text>
-                <Text style={styles.stockSummaryVal}>{inventory.length} টি</Text>
-              </View>
-              <View style={[styles.stockSummaryItem, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#e5e7eb' }]}>
-                <Text style={styles.stockSummaryLabel}>মোট স্টক ক্রয়মূল্য</Text>
-                <Text style={[styles.stockSummaryVal, { color: '#006847' }]}>৳ {formatMoney(totalStockCost)}</Text>
-              </View>
-              <View style={styles.stockSummaryItem}>
-                <Text style={styles.stockSummaryLabel}>আনুমানিক বিক্রয়মূল্য</Text>
-                <Text style={[styles.stockSummaryVal, { color: '#15803d' }]}>৳ {formatMoney(totalStockSaleValue)}</Text>
-              </View>
-            </View>
-
-            <FlatList
-              data={inventory}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 90 }}
-              renderItem={({ item }) => {
-                const profitPerUnit = (item.sellPrice || 0) - (item.buyPrice || 0);
-                const isLow = (item.stock || 0) <= 10;
-                return (
-                  <View style={styles.stockCardItem}>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={styles.stockItemName}>{item.name}</Text>
-                        {isLow ? (
-                          <View style={styles.lowStockBadge}>
-                            <Text style={styles.lowStockBadgeText}>স্বল্প স্টক!</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      <Text style={styles.stockItemSub}>
-                        ক্রয়: ৳ {formatMoney(item.buyPrice)} • বিক্রয়: ৳ {formatMoney(item.sellPrice)} / {item.unit}
-                      </Text>
-                      <Text style={styles.stockProfitText}>
-                        লাভ: ৳ {formatMoney(profitPerUnit)} প্রতি {item.unit}
-                      </Text>
-                    </View>
-
-                    <View style={{ alignItems: 'flex-end', marginLeft: 10 }}>
-                      <Text style={[styles.stockQtyText, isLow && { color: '#dc2626' }]}>
-                        {item.stock} {item.unit}
-                      </Text>
-                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-                        <TouchableOpacity
-                          style={styles.stockAdjustBtn}
-                          onPress={() => {
-                            setSelectedProduct(item);
-                            setStockAdjustType('in');
-                            setModalAdjustStock(true);
-                          }}
-                        >
-                          <Text style={styles.stockAdjustBtnText}>+ ইন</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.stockAdjustBtn, { backgroundColor: '#dc2626' }]}
-                          onPress={() => {
-                            setSelectedProduct(item);
-                            setStockAdjustType('out');
-                            setModalAdjustStock(true);
-                          }}
-                        >
-                          <Text style={styles.stockAdjustBtnText}>- আউট</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={{ padding: 4 }}
-                          onPress={() => handleDeleteProduct(item.id)}
-                        >
-                          <Text style={{ fontSize: 16 }}>🗑️</Text>
-                        </TouchableOpacity>
-                      </View>
                     </View>
                   </View>
                 );
-              }}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>📦</Text>
-                  <Text style={styles.emptyText}>কোনো পণ্য যোগ করা হয়নি</Text>
-                  <Text style={styles.emptySubText}>নিচের '+ নতুন পণ্য' বাটনে চাপ দিয়ে পণ্য যোগ করুন</Text>
-                </View>
-              }
-            />
-
-            <TouchableOpacity style={styles.floatingAddBtn} onPress={() => setModalAddStock(true)}>
-              <Text style={styles.floatingAddBtnText}>+ নতুন পণ্য যোগ করুন</Text>
-            </TouchableOpacity>
-          </View>
+              })}
+            </View>
+          </ScrollView>
         )}
 
-        {/* --- TAB 4: TAGADA (তাগাদা) --- */}
+        {/* ===================================================================
+            TAB 3: TAGADA (তাগাদা বার্তা কালেকশন)
+           =================================================================== */}
         {activeTab === 'tagada' && (
-          <View style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
             <View style={styles.tagadaHeaderCard}>
               <Text style={styles.tagadaHeaderTitle}>📢 বকেয়া তাগাদা কালেকশন</Text>
               <Text style={styles.tagadaHeaderSub}>
-                যেসব কাস্টমারের কাছে বাকি রয়েছে তাদের সরাসরি SMS বা WhatsApp-এ তাগাদা পাঠান।
+                যেসব কাস্টমারের কাছে বাকি রয়েছে তাদের সরাসরি SMS বা WhatsApp-এ স্বয়ংক্রিয় তাগাদা পাঠান।
               </Text>
               <Text style={styles.tagadaHeaderCount}>
-                বকেয়া কাস্টমার সংখ্যা: {dueCustomers.length} জন (মোট ৳ {formatMoney(totalCustomerDue)})
+                বকেয়া কাস্টমার: {dueCustomers.length} জন (মোট বাকি ৳ {formatMoney(totalCustomerDue)})
               </Text>
             </View>
 
-            <FlatList
-              data={dueCustomers}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 30 }}
-              renderItem={({ item }) => (
-                <View style={styles.tagadaCardItem}>
+            <View style={{ paddingHorizontal: 12, marginTop: 12 }}>
+              {dueCustomers.map((item) => (
+                <View key={item.id} style={styles.tagadaCardItem}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.tagadaCustName}>{item.name}</Text>
                     <Text style={styles.tagadaCustPhone}>📱 {item.phone || 'মোবাইল নেই'}</Text>
@@ -1566,239 +1801,290 @@ function TallyKhataApp() {
                   </View>
                   <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                     <TouchableOpacity
-                      style={[styles.tagadaActionBtn, { backgroundColor: '#0284c7' }]}
-                      onPress={() => handleSendSMS(item)}
+                      style={[styles.tagadaActionBtn, { backgroundColor: COLORS.blue }]}
+                      onPress={() => handleSendTagadaSMS(item)}
                     >
                       <Text style={styles.tagadaActionBtnText}>SMS</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.tagadaActionBtn, { backgroundColor: '#15803d' }]}
-                      onPress={() => handleSendWhatsApp(item)}
+                      style={[styles.tagadaActionBtn, { backgroundColor: COLORS.green }]}
+                      onPress={() => handleSendTagadaWhatsApp(item)}
                     >
                       <Text style={styles.tagadaActionBtnText}>WhatsApp</Text>
                     </TouchableOpacity>
-                    {item.phone ? (
-                      <TouchableOpacity
-                        style={[styles.tagadaActionBtn, { backgroundColor: '#4b5563' }]}
-                        onPress={() => handleMakeCall(item.phone)}
-                      >
-                        <Text style={styles.tagadaActionBtnText}>কল</Text>
-                      </TouchableOpacity>
-                    ) : null}
                   </View>
                 </View>
-              )}
-              ListEmptyComponent={
+              ))}
+
+              {dueCustomers.length === 0 && (
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyIcon}>🎉</Text>
-                  <Text style={styles.emptyText}>কোনো কাস্টমারের কাছে বকেয়া নেই</Text>
-                  <Text style={styles.emptySubText}>সকল বাকি আদায় হয়েছে!</Text>
+                  <Text style={styles.emptyText}>কোনো কাস্টমারের কাছে বাকি নেই!</Text>
+                  <Text style={styles.emptySubText}>সব কাস্টমারের বকেয়া পরিশোধ রয়েছে।</Text>
                 </View>
-              }
-            />
-          </View>
-        )}
-
-        {/* --- TAB 5: REPORTS (রিপোর্ট) --- */}
-        {activeTab === 'reports' && (
-          <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 30 }}>
-            <View style={styles.filterPillRow}>
-              {[
-                { key: 'today', label: 'আজকের' },
-                { key: 'week', label: 'এই সপ্তাহের' },
-                { key: 'month', label: 'এই মাসের' },
-                { key: 'all', label: 'সার্বিক (সব)' },
-              ].map((p) => (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[styles.filterPill, reportPeriod === p.key && styles.filterPillActive]}
-                  onPress={() => setReportPeriod(p.key)}
-                >
-                  <Text style={[styles.filterPillText, reportPeriod === p.key && styles.filterPillTextActive]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              )}
             </View>
-
-            <View style={styles.reportCard}>
-              <Text style={styles.reportCardHeading}>📊 আর্থিক সারাংশ বিবরণী</Text>
-              <View style={styles.reportDivider} />
-
-              <View style={styles.reportItemRow}>
-                <Text style={styles.reportItemTitle}>মোট কাস্টমার বাকি (পাবো):</Text>
-                <Text style={[styles.reportItemValue, { color: '#dc2626' }]}>
-                  ৳ {formatMoney(totalCustomerDue)}
-                </Text>
-              </View>
-
-              <View style={styles.reportItemRow}>
-                <Text style={styles.reportItemTitle}>মোট সাপ্লায়ার দেনা (দেবো):</Text>
-                <Text style={[styles.reportItemValue, { color: '#15803d' }]}>
-                  ৳ {formatMoney(totalSupplierDue)}
-                </Text>
-              </View>
-
-              <View style={styles.reportItemRow}>
-                <Text style={styles.reportItemTitle}>ক্যাশ বাক্সে বর্তমান টাকা:</Text>
-                <Text style={[styles.reportItemValue, { color: '#006847' }]}>
-                  ৳ {formatMoney(totalCash)}
-                </Text>
-              </View>
-
-              <View style={styles.reportItemRow}>
-                <Text style={styles.reportItemTitle}>ইনভেন্টরি স্টকের ক্রয়মূল্য:</Text>
-                <Text style={styles.reportItemValue}>
-                  ৳ {formatMoney(totalStockCost)}
-                </Text>
-              </View>
-
-              <View style={styles.reportDivider} />
-
-              <View style={styles.reportItemRow}>
-                <Text style={[styles.reportItemTitle, { fontWeight: 'bold' }]}>মোট সম্পদ (ক্যাশ + বাকি + স্টক):</Text>
-                <Text style={[styles.reportItemValue, { fontWeight: 'bold', color: '#006847' }]}>
-                  ৳ {formatMoney(totalCash + totalCustomerDue + totalStockCost)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.reportCard}>
-              <Text style={styles.reportCardHeading}>📁 খাতা ও লেনদেন পরিসংখ্যান</Text>
-              <View style={styles.reportDivider} />
-
-              <View style={styles.reportItemRow}>
-                <Text style={styles.reportItemTitle}>মোট খাতার সংখ্যা:</Text>
-                <Text style={styles.reportItemValue}>{accounts.length} টি</Text>
-              </View>
-              <View style={styles.reportItemRow}>
-                <Text style={styles.reportItemTitle}>মোট কাস্টমার সংখ্যা:</Text>
-                <Text style={styles.reportItemValue}>{accounts.filter((a) => a.type === 1).length} জন</Text>
-              </View>
-              <View style={styles.reportItemRow}>
-                <Text style={styles.reportItemTitle}>মোট সাপ্লায়ার সংখ্যা:</Text>
-                <Text style={styles.reportItemValue}>{accounts.filter((a) => a.type === 2).length} জন</Text>
-              </View>
-              <View style={styles.reportItemRow}>
-                <Text style={styles.reportItemTitle}>মোট সম্পন্ন লেনদেন:</Text>
-                <Text style={styles.reportItemValue}>{journals.length} টি</Text>
-              </View>
-              <View style={styles.reportItemRow}>
-                <Text style={styles.reportItemTitle}>ক্যাশ এন্ট্রি সংখ্যা:</Text>
-                <Text style={styles.reportItemValue}>{cashEntries.length} টি</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.shareReportBtn}
-              onPress={() => {
-                const rep =
-                  '=== ' + businessName + ' - সার্বিক হিসাব রিপোর্ট ===\n' +
-                  'মোট বাকি পাবো: ৳ ' + formatMoney(totalCustomerDue) + '\n' +
-                  'মোট দেনা দেবো: ৳ ' + formatMoney(totalSupplierDue) + '\n' +
-                  'ক্যাশ বাক্সে আছে: ৳ ' + formatMoney(totalCash) + '\n' +
-                  'স্টক মূল্য: ৳ ' + formatMoney(totalStockCost) + '\n' +
-                  'মোট সম্পদ: ৳ ' + formatMoney(totalCash + totalCustomerDue + totalStockCost) + '\n' +
-                  'তারিখ: ' + getTodayDate();
-                Share.share({ message: rep });
-              }}
-            >
-              <Text style={styles.shareReportBtnText}>📤 সম্পূর্ণ রিপোর্ট শেয়ার করুন</Text>
-            </TouchableOpacity>
           </ScrollView>
         )}
 
-        {/* --- TAB 6: SETTINGS (দোকান সেটিংস) --- */}
-        {activeTab === 'settings' && (
-          <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 30 }}>
-            <View style={styles.settingsCard}>
-              <Text style={styles.settingsHeading}>🏪 ব্যবসার তথ্য</Text>
-              <Text style={styles.inputLabel}>দোকান বা ব্যবসা প্রতিষ্ঠানের নাম</Text>
-              <TextInput
-                style={styles.modalSimpleInput}
-                value={tempBizName}
-                onChangeText={setTempBizName}
-                placeholder="দোকানের নাম"
-              />
-              <Text style={styles.inputLabel}>মালিক / স্বত্বাধিকারীর নাম</Text>
-              <TextInput
-                style={styles.modalSimpleInput}
-                value={tempOwnerName}
-                onChangeText={setTempOwnerName}
-                placeholder="মালিকের নাম"
-              />
-              <Text style={styles.inputLabel}>মোবাইল নম্বর</Text>
-              <TextInput
-                style={styles.modalSimpleInput}
-                value={tempOwnerPhone}
-                onChangeText={setTempOwnerPhone}
-                keyboardType="phone-pad"
-                placeholder="মোবাইল নম্বর"
-              />
-              <Text style={styles.inputLabel}>দোকানের ঠিকানা</Text>
-              <TextInput
-                style={styles.modalSimpleInput}
-                value={tempBizAddress}
-                onChangeText={setTempBizAddress}
-                placeholder="দোকানের ঠিকানা"
-              />
-              <Text style={styles.inputLabel}>প্রারম্ভিক ক্যাশ ব্যালেন্স (৳)</Text>
-              <TextInput
-                style={styles.modalSimpleInput}
-                value={tempOpeningBal}
-                onChangeText={setTempOpeningBal}
-                keyboardType="numeric"
-                placeholder="প্রারম্ভিক ক্যাশ"
-              />
-              <TouchableOpacity style={styles.saveSettingsBtn} onPress={handleSaveSettings}>
-                <Text style={styles.saveSettingsBtnText}>সেভ করুন</Text>
+        {/* ===================================================================
+            TAB 4: TALLYPAY (টালিপে ডিজিটাল ওয়ালেট ও বাংলা কিউআর)
+           =================================================================== */}
+        {activeTab === 'tallypay' && (
+          <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
+            {/* Wallet Balance Card */}
+            <View style={styles.walletCard}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={styles.walletCardSub}>টালিপে মার্চেন্ট ওয়ালেট</Text>
+                  <Text style={styles.walletBalanceDisplay}>৳ {formatMoney(walletBalance)}</Text>
+                  <Text style={styles.walletMerchantId}>মার্চেন্ট আইডি: TP-{ownerPhone}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.qrCodeBtn}
+                  onPress={() => setModalBanglaQR(true)}
+                >
+                  <Text style={{ fontSize: 28 }}>🔳</Text>
+                  <Text style={styles.qrCodeBtnText}>বাংলা QR</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Quick Service Actions */}
+            <View style={styles.walletActionRow}>
+              <TouchableOpacity
+                style={styles.walletServiceBtn}
+                onPress={() => setModalAddMoney(true)}
+              >
+                <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.blueLight }]}>
+                  <Text style={{ fontSize: 22 }}>💳</Text>
+                </View>
+                <Text style={styles.walletServiceLabel}>অ্যাড মানি</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.walletServiceBtn}
+                onPress={() => {
+                  Alert.alert(
+                    'মানি আউট',
+                    `আপনার টালিপে ওয়ালেটের ৳ ${formatMoney(walletBalance)} টাকা ব্যাংক বা পার্সোনাল বিকাশ/নগদে স্থানান্তর করতে চান?`,
+                    [
+                      { text: 'বাতিল', style: 'cancel' },
+                      {
+                        text: 'উত্তোলন করুন',
+                        onPress: () => {
+                          if (walletBalance <= 0) {
+                            Alert.alert('ব্যর্থ', 'উত্তোলন করার মতো ব্যালেন্স নেই।');
+                            return;
+                          }
+                          const newTxn = {
+                            id: 'w_' + Date.now(),
+                            title: 'মানি আউট (ব্যাংক একাউন্ট)',
+                            amount: walletBalance,
+                            type: 'out',
+                            date: getTodayDate(),
+                            time: getTimeString(),
+                          };
+                          setWalletBalance(0);
+                          setWalletTxns([newTxn, ...walletTxns]);
+                          persistData({ walletBalance: 0, walletTxns: [newTxn, ...walletTxns] });
+                          Alert.alert('সফল', 'মানি আউট সফল হয়েছে।');
+                        },
+                      },
+                    ]
+                  );
+                }}
+              >
+                <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.greenLight }]}>
+                  <Text style={{ fontSize: 22 }}>🏦</Text>
+                </View>
+                <Text style={styles.walletServiceLabel}>মানি আউট</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.walletServiceBtn}
+                onPress={() => setModalMobileRecharge(true)}
+              >
+                <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.redLight }]}>
+                  <Text style={{ fontSize: 22 }}>📱</Text>
+                </View>
+                <Text style={styles.walletServiceLabel}>মোবাইল রিচার্জ</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.walletServiceBtn}
+                onPress={() => setModalBanglaQR(true)}
+              >
+                <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.goldLight }]}>
+                  <Text style={{ fontSize: 22 }}>📷</Text>
+                </View>
+                <Text style={styles.walletServiceLabel}>কিউআর পেমেন্ট</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.settingsCard}>
-              <Text style={styles.settingsHeading}>💾 ১০০% অফলাইন ডাটা ব্যাকআপ</Text>
-              <Text style={styles.settingsSubText}>
-                আপনার খাতার সমস্ত হিসাব আপনার ফোনেই সুরক্ষিত থাকে। অন্য ফোনে ডাটা নিতে বা নিরাপদে সেভ রাখতে ব্যাকআপ কপি করে রাখুন।
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                <TouchableOpacity
-                  style={[styles.backupActionBtn, { backgroundColor: '#006847' }]}
-                  onPress={handleExportBackup}
-                >
-                  <Text style={styles.backupActionBtnText}>📥 ব্যাকআপ নিন</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.backupActionBtn, { backgroundColor: '#0284c7' }]}
-                  onPress={() => {
-                    setBackupJsonText('');
-                    setModalBackupRestore(true);
-                  }}
-                >
-                  <Text style={styles.backupActionBtnText}>📤 ব্যাকআপ রিস্টোর</Text>
-                </TouchableOpacity>
+            {/* Wallet Transaction History */}
+            <View style={{ paddingHorizontal: 12, marginTop: 16 }}>
+              <Text style={styles.sectionHeading}>সাম্প্রতিক ওয়ালেট লেনদেন</Text>
+              {walletTxns.map((w) => (
+                <View key={w.id} style={styles.cashItemRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cashItemDesc}>{w.title}</Text>
+                    <Text style={styles.cashItemDate}>{formatDisplayDate(w.date)} • {w.time}</Text>
+                  </View>
+                  <Text style={[styles.cashItemAmount, { color: w.type === 'in' ? COLORS.green : COLORS.red }]}>
+                    {w.type === 'in' ? '+' : '-'} ৳ {formatMoney(w.amount)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        )}
+
+        {/* ===================================================================
+            TAB 5: MENU / MORE (মেনু / আরও - সেটিংস ও টুলস)
+           =================================================================== */}
+        {activeTab === 'menu' && (
+          <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
+            {/* Merchant Shop Profile Header */}
+            <View style={styles.menuProfileHeader}>
+              <View style={styles.menuStoreAvatar}>
+                <Text style={{ fontSize: 32 }}>🏪</Text>
               </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.menuBizName}>{businessName}</Text>
+                <Text style={styles.menuOwnerInfo}>{ownerName} • {ownerPhone}</Text>
+                <Text style={styles.menuBizAddress} numberOfLines={1}>{businessAddress}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.menuEditBizBtn}
+                onPress={() => setModalSettings(true)}
+              >
+                <Text style={styles.menuEditBizBtnText}>এডিট</Text>
+              </TouchableOpacity>
             </View>
 
-            <View style={[styles.settingsCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
-              <Text style={{ fontWeight: 'bold', color: '#166534', fontSize: 14 }}>
-                🔒 কোনো লগইন বা সাবস্ক্রিপশন প্রয়োজন নেই
-              </Text>
-              <Text style={{ fontSize: 12, color: '#15803d', marginTop: 4, lineHeight: 18 }}>
-                এই অ্যাপটি সম্পূর্ণ বিজ্ঞাপনমুক্ত ও ১০০% অফলাইন। কোনো ইন্টারনেট সংযোগ ছাড়াও নির্বিঘ্নে আজীবন ব্যবহার করতে পারবেন।
+            {/* Menu List of Authentic Features */}
+            <View style={styles.menuListContainer}>
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalAddStock(true)}
+              >
+                <Text style={styles.menuListEmoji}>📦</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.menuListTitle}>স্টক ও পণ্য হিসাব</Text>
+                  <Text style={styles.menuListSub}>মোট {inventory.length} টি পণ্য • স্টক মূল্য ৳ {formatMoney(totalStockCost)}</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalNotes(true)}
+              >
+                <Text style={styles.menuListEmoji}>📝</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.menuListTitle}>ব্যবসার নোট ও রিমাইন্ডার</Text>
+                  <Text style={styles.menuListSub}>প্রয়োজনীয় কাজ ও মেমো লিখে রাখুন</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalProfitLoss(true)}
+              >
+                <Text style={styles.menuListEmoji}>📈</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.menuListTitle}>লাভ / ক্ষতির হিসাব</Text>
+                  <Text style={styles.menuListSub}>বেচা-কেনা ও খরচের নিট লাভ দেখুন</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalFullReport(true)}
+              >
+                <Text style={styles.menuListEmoji}>📊</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.menuListTitle}>সার্বিক হিসাব রিপোর্ট</Text>
+                  <Text style={styles.menuListSub}>দৈনিক, মাসিক ও বার্ষিক স্টেটমেন্ট তৈরি ও শেয়ার</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => {
+                  setBackupJsonText('');
+                  setModalBackupRestore(true);
+                }}
+              >
+                <Text style={styles.menuListEmoji}>💾</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.menuListTitle}>ডাটা ব্যাকআপ ও রিস্টোর</Text>
+                  <Text style={styles.menuListSub}>১০০% অফলাইন ডাটা সেভ ও নতুন ফোনে ট্রান্সফার</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalPinSetup(true)}
+              >
+                <Text style={styles.menuListEmoji}>🔒</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.menuListTitle}>পিন লক ও নিরাপত্তা</Text>
+                  <Text style={styles.menuListSub}>{pinEnabled ? 'PIN লক সক্রিয় রয়েছে' : '৪ ডিজিটের গোপন PIN সেট করুন'}</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalSettings(true)}
+              >
+                <Text style={styles.menuListEmoji}>⚙️</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.menuListTitle}>দোকান ও ব্যবসা সেটিংস</Text>
+                  <Text style={styles.menuListSub}>দোকানের নাম, ফোন, ঠিকানা ও প্রারম্ভিক ক্যাশ</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalSupport(true)}
+              >
+                <Text style={styles.menuListEmoji}>❓</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.menuListTitle}>ব্যবহার নির্দেশিকা ও হেল্প</Text>
+                  <Text style={styles.menuListSub}>সচরাচর জিজ্ঞাসিত প্রশ্ন ও হেল্পলাইন</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Offline Guarantee Notice */}
+            <View style={styles.offlineNoticeCard}>
+              <Text style={styles.offlineNoticeTitle}>🔒 ১০০% অফলাইন ও নিরাপদ</Text>
+              <Text style={styles.offlineNoticeSub}>
+                আপনার ব্যবসার তথ্য আপনার ফোনেই সুরক্ষিত। কোনো ইন্টারনেট কানেকশন বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।
               </Text>
             </View>
           </ScrollView>
         )}
+
       </View>
 
-      {/* BOTTOM TAB BAR */}
+      {/* --- AUTHENTIC 5-TAB BOTTOM NAVIGATION BAR --- */}
       <View style={styles.bottomTabBar}>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'ledger' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('ledger')}
+          style={[styles.tabButton, activeTab === 'home' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('home')}
         >
-          <Text style={styles.tabIcon}>📒</Text>
-          <Text style={[styles.tabButtonLabel, activeTab === 'ledger' && styles.tabButtonLabelActive]}>
+          <Text style={styles.tabIcon}>📖</Text>
+          <Text style={[styles.tabButtonLabel, activeTab === 'home' && styles.tabButtonLabelActive]}>
             খাতা
           </Text>
         </TouchableOpacity>
@@ -1814,16 +2100,6 @@ function TallyKhataApp() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'stock' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('stock')}
-        >
-          <Text style={styles.tabIcon}>📦</Text>
-          <Text style={[styles.tabButtonLabel, activeTab === 'stock' && styles.tabButtonLabelActive]}>
-            স্টক
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={[styles.tabButton, activeTab === 'tagada' && styles.tabButtonActive]}
           onPress={() => setActiveTab('tagada')}
         >
@@ -1834,41 +2110,364 @@ function TallyKhataApp() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'reports' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('reports')}
+          style={[styles.tabButton, activeTab === 'tallypay' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('tallypay')}
         >
-          <Text style={styles.tabIcon}>📊</Text>
-          <Text style={[styles.tabButtonLabel, activeTab === 'reports' && styles.tabButtonLabelActive]}>
-            রিপোর্ট
+          <Text style={styles.tabIcon}>💳</Text>
+          <Text style={[styles.tabButtonLabel, activeTab === 'tallypay' && styles.tabButtonLabelActive]}>
+            টালিপে
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'settings' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('settings')}
+          style={[styles.tabButton, activeTab === 'menu' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('menu')}
         >
-          <Text style={styles.tabIcon}>⚙️</Text>
-          <Text style={[styles.tabButtonLabel, activeTab === 'settings' && styles.tabButtonLabelActive]}>
-            দোকান
+          <Text style={styles.tabIcon}>☰</Text>
+          <Text style={[styles.tabButtonLabel, activeTab === 'menu' && styles.tabButtonLabelActive]}>
+            মেনু
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* ===================================================================
-          GLOBAL MODALS
-         =================================================================== */}
 
-      {/* --- MODAL: CREATE ACCOUNT --- */}
+      {/* ===================================================================
+          MODAL: ADD TRANSACTION WITH AUTHENTIC BUILT-IN CALCULATOR KEYPAD
+         =================================================================== */}
+      <Modal visible={modalAddTxn} animationType="slide" transparent onRequestClose={() => setModalAddTxn(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '95%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalCardTitle, { color: txnType === 'given' ? COLORS.primary : COLORS.green }]}>
+                {txnType === 'given' ? '- দিলাম (টাকা বা পণ্য বাকি)' : '+ পেলাম (নগদ বা জমা আদায়)'}
+              </Text>
+              <TouchableOpacity onPress={() => setModalAddTxn(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Large Calculator Display */}
+            <View style={[styles.calcDisplayBox, { borderColor: txnType === 'given' ? COLORS.primary : COLORS.green }]}>
+              <Text style={styles.calcExprText}>{calcExpr || '০'}</Text>
+              <Text style={[styles.calcTotalText, { color: txnType === 'given' ? COLORS.primary : COLORS.green }]}>
+                ৳ {calcDisplay}
+              </Text>
+            </View>
+
+            {/* Quick Amount Add Chips */}
+            <View style={styles.quickChipRow}>
+              {[
+                { label: '+১০০', val: 100 },
+                { label: '+৫০০', val: 500 },
+                { label: '+১,০০০', val: 1000 },
+                { label: '+২,০০০', val: 2000 },
+                { label: '+৫,০০০', val: 5000 },
+              ].map((c) => (
+                <TouchableOpacity
+                  key={c.label}
+                  style={styles.quickChip}
+                  onPress={() => handleQuickChipAdd(c.val)}
+                >
+                  <Text style={styles.quickChipText}>{c.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Built-in Keypad Grid */}
+            <View style={styles.keypadGrid}>
+              {[
+                ['7', '8', '9', '÷'],
+                ['4', '5', '6', '×'],
+                ['1', '2', '3', '-'],
+                ['C', '0', '.', '+'],
+                ['⌫', '00', '='],
+              ].map((row, rIdx) => (
+                <View key={rIdx} style={styles.keypadRow}>
+                  {row.map((btn) => {
+                    const isOp = ['÷', '×', '-', '+', '='].includes(btn);
+                    const isSpecial = ['C', '⌫'].includes(btn);
+                    return (
+                      <TouchableOpacity
+                        key={btn}
+                        style={[
+                          styles.keypadBtn,
+                          isOp && styles.keypadBtnOp,
+                          isSpecial && styles.keypadBtnSpecial,
+                          btn === '=' && { backgroundColor: txnType === 'given' ? COLORS.primary : COLORS.green, flex: 2 },
+                        ]}
+                        onPress={() => handleCalcPress(btn)}
+                      >
+                        <Text
+                          style={[
+                            styles.keypadBtnText,
+                            isOp && styles.keypadBtnTextOp,
+                            isSpecial && styles.keypadBtnTextSpecial,
+                            btn === '=' && { color: COLORS.white },
+                          ]}
+                        >
+                          {btn}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+
+            {/* Transaction Note / Description Input */}
+            <TextInput
+              style={styles.modalSimpleInput}
+              placeholder="বিবরণ (যেমন: চাল, তেল, নগদ ইত্যাদি)"
+              placeholderTextColor={COLORS.textSubtle}
+              value={txnDesc}
+              onChangeText={setTxnDesc}
+            />
+
+            {/* Quick Suggestion Chips for Note */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {['চাল', 'ডাল', 'তেল', 'চিনি', 'নগদ বাকি', 'নগদ জমা', 'পূর্বের বাকি'].map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  style={styles.descChip}
+                  onPress={() => setTxnDesc((prev) => (prev ? prev + ', ' + s : s))}
+                >
+                  <Text style={styles.descChipText}>+{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Modal Action Buttons */}
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalAddTxn(false)}>
+                <Text style={styles.modalBtnCancelText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: txnType === 'given' ? COLORS.primary : COLORS.green }]}
+                onPress={handleSaveTransaction}
+              >
+                <Text style={styles.modalBtnSubmitText}>নিশ্চিত করি</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: EDIT TRANSACTION
+         =================================================================== */}
+      <Modal visible={modalEditTxn} animationType="fade" transparent onRequestClose={() => setModalEditTxn(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalCardTitle}>লেনদেন সংশোধন (এডিট)</Text>
+            <TextInput
+              style={styles.modalBigInput}
+              placeholder="টাকার পরিমাণ"
+              keyboardType="numeric"
+              value={editAmount}
+              onChangeText={setEditAmount}
+            />
+            <TextInput
+              style={styles.modalSimpleInput}
+              placeholder="বিবরণ"
+              value={editDesc}
+              onChangeText={setEditDesc}
+            />
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalEditTxn(false)}>
+                <Text style={styles.modalBtnCancelText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
+                onPress={handleUpdateTransaction}
+              >
+                <Text style={styles.modalBtnSubmitText}>আপডেট করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: DIGITAL VOUCHER / MEMO (ডিজিটাল রশিদ)
+         =================================================================== */}
+      <Modal visible={modalVoucher} animationType="slide" transparent onRequestClose={() => setModalVoucher(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>🧾 ডিজিটাল ভাউচার (রশিদ)</Text>
+              <TouchableOpacity onPress={() => setModalVoucher(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
+              <View style={styles.voucherContainer}>
+                <View style={styles.voucherHeader}>
+                  <Text style={styles.voucherBizName}>{businessName}</Text>
+                  <Text style={styles.voucherBizSub}>{businessAddress}</Text>
+                  <Text style={styles.voucherBizSub}>মোবাইল: {ownerPhone}</Text>
+                  <View style={styles.voucherBadge}>
+                    <Text style={styles.voucherBadgeText}>১০০% ডিজিটাল হিসাব রশিদ</Text>
+                  </View>
+                </View>
+
+                <View style={styles.voucherDivider} />
+
+                <View style={styles.voucherDetailRow}>
+                  <Text style={styles.voucherLabel}>রশিদ নং:</Text>
+                  <Text style={styles.voucherVal}>TK-{selectedVoucherTxn?.id ? selectedVoucherTxn.id.slice(-6) : '000000'}</Text>
+                </View>
+                <View style={styles.voucherDetailRow}>
+                  <Text style={styles.voucherLabel}>তারিখ ও সময়:</Text>
+                  <Text style={styles.voucherVal}>
+                    {selectedVoucherTxn?.date} {selectedVoucherTxn?.time ? '• ' + selectedVoucherTxn.time : ''}
+                  </Text>
+                </View>
+
+                <View style={styles.voucherDivider} />
+
+                <View style={styles.voucherDetailRow}>
+                  <Text style={styles.voucherLabel}>
+                    {selectedAccount?.type === 1 ? 'কাস্টমার:' : 'সাপ্লায়ার:'}
+                  </Text>
+                  <Text style={[styles.voucherVal, { fontWeight: 'bold' }]}>{selectedAccount?.name}</Text>
+                </View>
+                <View style={styles.voucherDetailRow}>
+                  <Text style={styles.voucherLabel}>মোবাইল:</Text>
+                  <Text style={styles.voucherVal}>{selectedAccount?.phone || 'দেওয়া নেই'}</Text>
+                </View>
+
+                <View style={styles.voucherDivider} />
+
+                <View style={styles.voucherDetailRow}>
+                  <Text style={styles.voucherLabel}>লেনদেনের ধরন:</Text>
+                  <Text style={[styles.voucherVal, { color: selectedVoucherTxn?.type === 'given' ? COLORS.primary : COLORS.green, fontWeight: 'bold' }]}>
+                    {selectedVoucherTxn?.type === 'given' ? 'দিলাম (বাকি বিক্রি)' : 'পেলাম (জমা আদায়)'}
+                  </Text>
+                </View>
+                <View style={styles.voucherDetailRow}>
+                  <Text style={styles.voucherLabel}>বিবরণ:</Text>
+                  <Text style={styles.voucherVal}>{selectedVoucherTxn?.desc || 'সাধারণ লেনদেন'}</Text>
+                </View>
+
+                <View style={styles.voucherDivider} />
+
+                <View style={styles.voucherDetailRow}>
+                  <Text style={[styles.voucherLabel, { fontSize: 16, fontWeight: 'bold' }]}>টাকার পরিমাণ:</Text>
+                  <Text style={[styles.voucherVal, { fontSize: 18, fontWeight: 'bold', color: selectedVoucherTxn?.type === 'given' ? COLORS.primary : COLORS.green }]}>
+                    ৳ {formatMoney(selectedVoucherTxn?.amount)}
+                  </Text>
+                </View>
+                <View style={styles.voucherDetailRow}>
+                  <Text style={styles.voucherLabel}>সর্বমোট বর্তমান বাকি:</Text>
+                  <Text style={[styles.voucherVal, { fontWeight: 'bold' }]}>
+                    ৳ {formatMoney(selectedAccount?.balance)}
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.voucherActionRow}>
+              <TouchableOpacity
+                style={[styles.voucherBtn, { backgroundColor: COLORS.blue }]}
+                onPress={() => {
+                  const txt = renderVoucherText(selectedVoucherTxn, selectedAccount);
+                  Share.share({ message: txt });
+                }}
+              >
+                <Text style={styles.voucherBtnText}>📤 শেয়ার</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.voucherBtn, { backgroundColor: COLORS.gold }]}
+                onPress={() => handleOpenEditTxn(selectedVoucherTxn)}
+              >
+                <Text style={styles.voucherBtnText}>✏️ সংশোধন</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.voucherBtn, { backgroundColor: COLORS.red }]}
+                onPress={() => { if (selectedVoucherTxn?.id) handleDeleteTransaction(selectedVoucherTxn.id); }}
+              >
+                <Text style={styles.voucherBtnText}>🗑️ মুছুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: EDIT ACCOUNT (CUSTOMER / SUPPLIER)
+         =================================================================== */}
+      <Modal visible={modalEditAccount} animationType="slide" transparent onRequestClose={() => setModalEditAccount(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>
+                {selectedAccount?.type === 1 ? '✏️ কাস্টমার তথ্য এডিট' : '✏️ সাপ্লায়ার তথ্য এডিট'}
+              </Text>
+              <TouchableOpacity onPress={() => setModalEditAccount(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>নাম *</Text>
+            <TextInput
+              style={styles.modalSimpleInput}
+              value={accName}
+              onChangeText={setAccName}
+              placeholder="নাম লিখুন"
+              placeholderTextColor={COLORS.textSubtle}
+            />
+
+            <Text style={styles.inputLabel}>মোবাইল নম্বর</Text>
+            <TextInput
+              style={styles.modalSimpleInput}
+              value={accPhone}
+              onChangeText={setAccPhone}
+              placeholder="01XXXXXXXXX"
+              placeholderTextColor={COLORS.textSubtle}
+              keyboardType="phone-pad"
+            />
+
+            <Text style={styles.inputLabel}>ঠিকানা / এলাকা</Text>
+            <TextInput
+              style={styles.modalSimpleInput}
+              value={accAddress}
+              onChangeText={setAccAddress}
+              placeholder="ঠিকানা (ঐচ্ছিক)"
+              placeholderTextColor={COLORS.textSubtle}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalEditAccount(false)}>
+                <Text style={styles.modalBtnCancelText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalBtnSubmit} onPress={handleUpdateAccount}>
+                <Text style={styles.modalBtnSubmitText}>সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: CREATE ACCOUNT (CUSTOMER / SUPPLIER)
+         =================================================================== */}
       <Modal visible={modalAddAccount} animationType="slide" transparent onRequestClose={() => setModalAddAccount(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalCardTitle}>নতুন খাতা খুলুন</Text>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>নতুন খাতা খুলুন</Text>
+              <TouchableOpacity onPress={() => setModalAddAccount(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.accTypeToggleRow}>
               <TouchableOpacity
                 style={[styles.accTypeToggleBtn, accType === 1 && styles.accTypeToggleBtnActiveRed]}
                 onPress={() => setAccType(1)}
               >
-                <Text style={[styles.accTypeToggleText, accType === 1 && { color: '#fff' }]}>
+                <Text style={[styles.accTypeToggleText, accType === 1 && { color: COLORS.white }]}>
                   কাস্টমার (বাকি)
                 </Text>
               </TouchableOpacity>
@@ -1876,7 +2475,7 @@ function TallyKhataApp() {
                 style={[styles.accTypeToggleBtn, accType === 2 && styles.accTypeToggleBtnActiveGreen]}
                 onPress={() => setAccType(2)}
               >
-                <Text style={[styles.accTypeToggleText, accType === 2 && { color: '#fff' }]}>
+                <Text style={[styles.accTypeToggleText, accType === 2 && { color: COLORS.white }]}>
                   সাপ্লায়ার (মহাজন)
                 </Text>
               </TouchableOpacity>
@@ -1885,12 +2484,14 @@ function TallyKhataApp() {
             <TextInput
               style={styles.modalSimpleInput}
               placeholder="কাস্টমার / সাপ্লায়ারের নাম *"
+              placeholderTextColor={COLORS.textSubtle}
               value={accName}
               onChangeText={setAccName}
             />
             <TextInput
               style={styles.modalSimpleInput}
               placeholder="মোবাইল নম্বর (ঐচ্ছিক)"
+              placeholderTextColor={COLORS.textSubtle}
               keyboardType="phone-pad"
               value={accPhone}
               onChangeText={setAccPhone}
@@ -1898,12 +2499,14 @@ function TallyKhataApp() {
             <TextInput
               style={styles.modalSimpleInput}
               placeholder="ঠিকানা / এলাকা (ঐচ্ছিক)"
+              placeholderTextColor={COLORS.textSubtle}
               value={accAddress}
               onChangeText={setAccAddress}
             />
             <TextInput
               style={styles.modalSimpleInput}
               placeholder="পূর্বের বাকি ব্যালেন্স (যদি থাকে)"
+              placeholderTextColor={COLORS.textSubtle}
               keyboardType="numeric"
               value={accInitialBal}
               onChangeText={setAccInitialBal}
@@ -1914,7 +2517,7 @@ function TallyKhataApp() {
                 <Text style={styles.modalBtnCancelText}>বাতিল</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: '#006847' }]}
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
                 onPress={handleSaveAccount}
               >
                 <Text style={styles.modalBtnSubmitText}>খাতা খুলুন</Text>
@@ -1924,17 +2527,24 @@ function TallyKhataApp() {
         </View>
       </Modal>
 
-      {/* --- MODAL: CASH ENTRY --- */}
+      {/* ===================================================================
+          MODAL: CASH ENTRY (CASHBOX)
+         =================================================================== */}
       <Modal visible={modalAddCash} animationType="slide" transparent onRequestClose={() => setModalAddCash(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalCardTitle}>ক্যাশ বাক্সের এন্ট্রি</Text>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>ক্যাশ বাক্সের এন্ট্রি</Text>
+              <TouchableOpacity onPress={() => setModalAddCash(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               {[
                 { key: 'sale', label: '🛒 ক্যাশ বেচা (+)' },
                 { key: 'buy', label: '📦 ক্যাশ কেনা (-)' },
-                { key: 'cost', label: '🧾 খরচ (-)' },
+                { key: 'cost', label: '🧾 দোকান খরচ (-)' },
                 { key: 'malik_in', label: '📥 মালিক দিল (+)' },
                 { key: 'malik_out', label: '📤 মালিক নিল (-)' },
               ].map((c) => (
@@ -1953,6 +2563,7 @@ function TallyKhataApp() {
             <TextInput
               style={styles.modalBigInput}
               placeholder="৳ টাকার পরিমাণ *"
+              placeholderTextColor={COLORS.textSubtle}
               keyboardType="numeric"
               autoFocus
               value={cashAmount}
@@ -1960,7 +2571,8 @@ function TallyKhataApp() {
             />
             <TextInput
               style={styles.modalSimpleInput}
-              placeholder="বিবরণ (যেমন: নগদ পণ্য বিক্রয়, নাস্তা, কারেন্ট বিল)"
+              placeholder="বিবরণ (যেমন: পণ্য বিক্রয়, নাস্তা, কারেন্ট বিল)"
+              placeholderTextColor={COLORS.textSubtle}
               value={cashDesc}
               onChangeText={setCashDesc}
             />
@@ -1972,7 +2584,7 @@ function TallyKhataApp() {
               <TouchableOpacity
                 style={[
                   styles.modalBtnSubmit,
-                  { backgroundColor: cashCategory === 'sale' || cashCategory === 'malik_in' ? '#15803d' : '#dc2626' },
+                  { backgroundColor: cashCategory === 'sale' || cashCategory === 'malik_in' ? COLORS.green : COLORS.primary },
                 ]}
                 onPress={handleSaveCashEntry}
               >
@@ -1983,22 +2595,31 @@ function TallyKhataApp() {
         </View>
       </Modal>
 
-      {/* --- MODAL: RECONCILE CASH --- */}
+      {/* ===================================================================
+          MODAL: RECONCILE CASH (ক্যাশবক্স মিলানো)
+         =================================================================== */}
       <Modal visible={modalReconcileCash} animationType="slide" transparent onRequestClose={() => setModalReconcileCash(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalCardTitle}>⚖️ দিনশেষে ক্যাশবক্স মিলানো</Text>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>⚖️ দিনশেষে ক্যাশবক্স মিলানো</Text>
+              <TouchableOpacity onPress={() => setModalReconcileCash(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.reconcileBox}>
               <View style={styles.reconcileRow}>
                 <Text style={styles.reconcileLabel}>খাতার হিসাব অনুযায়ী ক্যাশ:</Text>
-                <Text style={[styles.reconcileVal, { color: '#006847' }]}>৳ {formatMoney(totalCash)}</Text>
+                <Text style={[styles.reconcileVal, { color: COLORS.primary }]}>৳ {formatMoney(totalCash)}</Text>
               </View>
-              <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4 }}>
                 আপনার ড্রয়ারে গুনে পাওয়া আসল ক্যাশ টাকার পরিমাণ নিচে লিখুন:
               </Text>
               <TextInput
                 style={[styles.modalBigInput, { marginTop: 10 }]}
                 placeholder="ড্রয়ারের আসল ক্যাশ টাকা"
+                placeholderTextColor={COLORS.textSubtle}
                 keyboardType="numeric"
                 autoFocus
                 value={countedCash}
@@ -2011,20 +2632,20 @@ function TallyKhataApp() {
                     const diff = counted - totalCash;
                     if (diff === 0) {
                       return (
-                        <Text style={{ color: '#15803d', fontWeight: 'bold' }}>
+                        <Text style={{ color: COLORS.green, fontWeight: 'bold' }}>
                           ✅ কোনো গরমিল নেই! খাতার হিসাব এবং ড্রয়ারের টাকা পুরোপুরি মিলে গেছে।
                         </Text>
                       );
                     } else if (diff > 0) {
                       return (
-                        <Text style={{ color: '#0284c7', fontWeight: 'bold' }}>
+                        <Text style={{ color: COLORS.blue, fontWeight: 'bold' }}>
                           ℹ️ ড্রয়ারে ৳ {formatMoney(diff)} টাকা বেশি রয়েছে।
                         </Text>
                       );
                     } else {
                       return (
-                        <Text style={{ color: '#dc2626', fontWeight: 'bold' }}>
-                          ⚠️ ড্রয়ারে ৳ {formatMoney(Math.abs(diff))} টাকা ঘাটতি (কম) রয়েছে!
+                        <Text style={{ color: COLORS.red, fontWeight: 'bold' }}>
+                          ⚠️ ড্রয়ারে ৳ {formatMoney(Math.abs(diff))} টাকা ঘাটতি রয়েছে!
                         </Text>
                       );
                     }
@@ -2032,71 +2653,308 @@ function TallyKhataApp() {
                 </View>
               ) : null}
             </View>
-            <TouchableOpacity
-              style={[styles.modalBtnCancel, { marginTop: 12 }]}
-              onPress={() => setModalReconcileCash(false)}
-            >
-              <Text style={styles.modalBtnCancelText}>বন্ধ করুন</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* --- MODAL: ADD PRODUCT --- */}
-      <Modal visible={modalAddStock} animationType="slide" transparent onRequestClose={() => setModalAddStock(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalCardTitle}>নতুন পণ্য যোগ করুন</Text>
-            <TextInput
-              style={styles.modalSimpleInput}
-              placeholder="পণ্যের নাম * (যেমন: মিনিকেট চাল)"
-              value={prodName}
-              onChangeText={setProdName}
-            />
-            <TextInput
-              style={styles.modalSimpleInput}
-              placeholder="একক (কেজি, লিটার, পিস, বস্তা, প্যাকেট)"
-              value={prodUnit}
-              onChangeText={setProdUnit}
-            />
-            <TextInput
-              style={styles.modalSimpleInput}
-              placeholder="ক্রয়মূল্য (৳)"
-              keyboardType="numeric"
-              value={prodBuyPrice}
-              onChangeText={setProdBuyPrice}
-            />
-            <TextInput
-              style={styles.modalSimpleInput}
-              placeholder="বিক্রয়মূল্য (৳)"
-              keyboardType="numeric"
-              value={prodSellPrice}
-              onChangeText={setProdSellPrice}
-            />
-            <TextInput
-              style={styles.modalSimpleInput}
-              placeholder="বর্তমান স্টক পরিমাণ"
-              keyboardType="numeric"
-              value={prodStock}
-              onChangeText={setProdStock}
-            />
 
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalAddStock(false)}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalReconcileCash(false)}>
                 <Text style={styles.modalBtnCancelText}>বাতিল</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: '#006847' }]}
-                onPress={handleSaveProduct}
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
+                onPress={handleSaveReconciliation}
               >
-                <Text style={styles.modalBtnSubmitText}>পণ্য যোগ করুন</Text>
+                <Text style={styles.modalBtnSubmitText}>সমন্বয় সংরক্ষণ</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* --- MODAL: ADJUST STOCK --- */}
+      {/* ===================================================================
+          MODAL: BANGLA QR (বাংলা কিউআর)
+         =================================================================== */}
+      <Modal visible={modalBanglaQR} animationType="slide" transparent onRequestClose={() => setModalBanglaQR(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { alignItems: 'center' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>🔳 বাংলা QR কোড</Text>
+              <TouchableOpacity onPress={() => setModalBanglaQR(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.primary, marginTop: 8 }}>
+              {businessName}
+            </Text>
+            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 16 }}>
+              মার্চেন্ট আইডি: TP-{ownerPhone}
+            </Text>
+
+            {/* QR Visual Card */}
+            <View style={styles.qrDisplayContainer}>
+              <Text style={{ fontSize: 90 }}>📱</Text>
+              <Text style={styles.qrCenterBadge}>বাংলা QR</Text>
+            </View>
+
+            <Text style={{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', marginTop: 12, lineHeight: 18 }}>
+              কাস্টমার তার বিকাশ, নগদ, রকেট বা যেকোনো ব্যাংক অ্যাপ দিয়ে এই কিউআর স্ক্যান করে সরাসরি পেমেন্ট করতে পারবেন।
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, width: '100%' }}>
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.blue, flex: 1 }]}
+                onPress={() => {
+                  Share.share({
+                    message: `=== ${businessName} (বাংলা QR) ===\nমার্চেন্ট আইডি: TP-${ownerPhone}\nবিকাশ/নগদ/রকেট বা ব্যাংক দিয়ে পেমেন্ট করুন।`,
+                  });
+                }}
+              >
+                <Text style={styles.modalBtnSubmitText}>📤 শেয়ার কিউআর</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnCancel, { flex: 1 }]}
+                onPress={() => setModalBanglaQR(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>বন্ধ করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: TALLYPAY ADD MONEY
+         =================================================================== */}
+      <Modal visible={modalAddMoney} animationType="slide" transparent onRequestClose={() => setModalAddMoney(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>💳 ওয়ালেটে অ্যাড মানি</Text>
+              <TouchableOpacity onPress={() => setModalAddMoney(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 8 }}>পেমেন্ট মাধ্যম বেছে নিন:</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              {['bKash', 'Nagad', 'Rocket', 'Bank Card'].map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.paymentMethodChip, addMoneyMethod === m && styles.paymentMethodChipActive]}
+                  onPress={() => setAddMoneyMethod(m)}
+                >
+                  <Text style={[styles.paymentMethodChipText, addMoneyMethod === m && styles.paymentMethodChipTextActive]}>
+                    {m}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              style={styles.modalBigInput}
+              placeholder="৳ টাকার পরিমাণ"
+              keyboardType="numeric"
+              autoFocus
+              value={addMoneyAmount}
+              onChangeText={setAddMoneyAmount}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalAddMoney(false)}>
+                <Text style={styles.modalBtnCancelText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.green }]}
+                onPress={handleAddMoney}
+              >
+                <Text style={styles.modalBtnSubmitText}>অ্যাড মানি করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: TALLYPAY MOBILE RECHARGE
+         =================================================================== */}
+      <Modal visible={modalMobileRecharge} animationType="slide" transparent onRequestClose={() => setModalMobileRecharge(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>📱 মোবাইল রিচার্জ</Text>
+              <TouchableOpacity onPress={() => setModalMobileRecharge(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 8 }}>অপারেটর নির্বাচন করুন:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {['Grameenphone', 'Banglalink', 'Robi', 'Airtel', 'Teletalk'].map((op) => (
+                <TouchableOpacity
+                  key={op}
+                  style={[styles.paymentMethodChip, rechargeOperator === op && styles.paymentMethodChipActive]}
+                  onPress={() => setRechargeOperator(op)}
+                >
+                  <Text style={[styles.paymentMethodChipText, rechargeOperator === op && styles.paymentMethodChipTextActive]}>
+                    {op}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TextInput
+              style={styles.modalSimpleInput}
+              placeholder="মোবাইল নম্বর (01XXXXXXXXX)"
+              keyboardType="phone-pad"
+              value={rechargePhone}
+              onChangeText={setRechargePhone}
+            />
+            <TextInput
+              style={styles.modalBigInput}
+              placeholder="৳ রিচার্জ পরিমাণ"
+              keyboardType="numeric"
+              value={rechargeAmount}
+              onChangeText={setRechargeAmount}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalMobileRecharge(false)}>
+                <Text style={styles.modalBtnCancelText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
+                onPress={handleMobileRecharge}
+              >
+                <Text style={styles.modalBtnSubmitText}>রিচার্জ করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: STOCK INVENTORY (পণ্য ও স্টক)
+         =================================================================== */}
+      <Modal visible={modalAddStock} animationType="slide" transparent onRequestClose={() => setModalAddStock(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>📦 স্টক ও পণ্য তালিকা</Text>
+              <TouchableOpacity onPress={() => setModalAddStock(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingBottom: 10 }}>
+              <View style={styles.stockSummaryRow}>
+                <View style={styles.stockSummaryBox}>
+                  <Text style={styles.stockSummaryBoxLabel}>মোট পণ্য</Text>
+                  <Text style={styles.stockSummaryBoxVal}>{inventory.length} টি</Text>
+                </View>
+                <View style={[styles.stockSummaryBox, { borderColor: COLORS.primary }]}>
+                  <Text style={styles.stockSummaryBoxLabel}>স্টক ক্রয়মূল্য</Text>
+                  <Text style={[styles.stockSummaryBoxVal, { color: COLORS.primary }]}>৳ {formatMoney(totalStockCost)}</Text>
+                </View>
+                <View style={[styles.stockSummaryBox, { borderColor: COLORS.green }]}>
+                  <Text style={styles.stockSummaryBoxLabel}>আনুমানিক বিক্রয়</Text>
+                  <Text style={[styles.stockSummaryBoxVal, { color: COLORS.green }]}>৳ {formatMoney(totalStockSaleValue)}</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.sectionHeading, { marginTop: 12 }]}>নতুন পণ্য যোগ করুন</Text>
+              <TextInput
+                style={styles.modalSimpleInput}
+                placeholder="পণ্যের নাম (যেমন: মিনিকেট চাল)"
+                value={prodName}
+                onChangeText={setProdName}
+              />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TextInput
+                  style={[styles.modalSimpleInput, { flex: 1 }]}
+                  placeholder="একক (কেজি/লিটার/পিস)"
+                  value={prodUnit}
+                  onChangeText={setProdUnit}
+                />
+                <TextInput
+                  style={[styles.modalSimpleInput, { flex: 1 }]}
+                  placeholder="বর্তমান স্টক"
+                  keyboardType="numeric"
+                  value={prodStock}
+                  onChangeText={setProdStock}
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TextInput
+                  style={[styles.modalSimpleInput, { flex: 1 }]}
+                  placeholder="ক্রয়মূল্য (৳)"
+                  keyboardType="numeric"
+                  value={prodBuyPrice}
+                  onChangeText={setProdBuyPrice}
+                />
+                <TextInput
+                  style={[styles.modalSimpleInput, { flex: 1 }]}
+                  placeholder="বিক্রয়মূল্য (৳)"
+                  keyboardType="numeric"
+                  value={prodSellPrice}
+                  onChangeText={setProdSellPrice}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary, marginTop: 4 }]}
+                onPress={handleSaveProduct}
+              >
+                <Text style={styles.modalBtnSubmitText}>+ পণ্য যোগ করুন</Text>
+              </TouchableOpacity>
+
+              <Text style={[styles.sectionHeading, { marginTop: 16 }]}>বিদ্যমান পণ্যসমূহ</Text>
+              {inventory.map((item) => (
+                <View key={item.id} style={styles.stockItemRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.stockItemName}>{item.name}</Text>
+                    <Text style={styles.stockItemSub}>
+                      ক্রয়: ৳ {formatMoney(item.buyPrice)} • বিক্রয়: ৳ {formatMoney(item.sellPrice)} / {item.unit}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.stockQtyText, item.stock <= 5 && { color: COLORS.red }]}>
+                      {item.stock} {item.unit}
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                      <TouchableOpacity
+                        style={styles.stockAdjustMiniBtn}
+                        onPress={() => {
+                          setSelectedProduct(item);
+                          setStockAdjustType('in');
+                          setModalAdjustStock(true);
+                        }}
+                      >
+                        <Text style={styles.stockAdjustMiniBtnText}>+ ইন</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.stockAdjustMiniBtn, { backgroundColor: COLORS.red }]}
+                        onPress={() => {
+                          setSelectedProduct(item);
+                          setStockAdjustType('out');
+                          setModalAdjustStock(true);
+                        }}
+                      >
+                        <Text style={styles.stockAdjustMiniBtnText}>- আউট</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteProduct(item.id)} style={{ padding: 2 }}>
+                        <Text style={{ fontSize: 14 }}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: ADJUST PRODUCT STOCK
+         =================================================================== */}
       <Modal visible={modalAdjustStock} animationType="fade" transparent onRequestClose={() => setModalAdjustStock(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -2108,7 +2966,7 @@ function TallyKhataApp() {
                 style={[styles.accTypeToggleBtn, stockAdjustType === 'in' && styles.accTypeToggleBtnActiveGreen]}
                 onPress={() => setStockAdjustType('in')}
               >
-                <Text style={[styles.accTypeToggleText, stockAdjustType === 'in' && { color: '#fff' }]}>
+                <Text style={[styles.accTypeToggleText, stockAdjustType === 'in' && { color: COLORS.white }]}>
                   + নতুন স্টক এলো
                 </Text>
               </TouchableOpacity>
@@ -2116,7 +2974,7 @@ function TallyKhataApp() {
                 style={[styles.accTypeToggleBtn, stockAdjustType === 'out' && styles.accTypeToggleBtnActiveRed]}
                 onPress={() => setStockAdjustType('out')}
               >
-                <Text style={[styles.accTypeToggleText, stockAdjustType === 'out' && { color: '#fff' }]}>
+                <Text style={[styles.accTypeToggleText, stockAdjustType === 'out' && { color: COLORS.white }]}>
                   - স্টক কমেছে / নষ্ট
                 </Text>
               </TouchableOpacity>
@@ -2134,7 +2992,7 @@ function TallyKhataApp() {
                 <Text style={styles.modalBtnCancelText}>বাতিল</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: '#006847' }]}
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
                 onPress={handleAdjustStock}
               >
                 <Text style={styles.modalBtnSubmitText}>আপডেট করুন</Text>
@@ -2144,89 +3002,482 @@ function TallyKhataApp() {
         </View>
       </Modal>
 
-      {/* --- MODAL: BACKUP & RESTORE --- */}
+      {/* ===================================================================
+          MODAL: TAGADA REMINDER TEMPLATE
+         =================================================================== */}
+      <Modal visible={modalTagada} animationType="fade" transparent onRequestClose={() => setModalTagada(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>📢 বকেয়া তাগাদা বার্তা</Text>
+              <TouchableOpacity onPress={() => setModalTagada(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.tagadaMessageBox}>
+              <Text style={styles.tagadaMessageContent}>{generateTagadaMessage(selectedAccount)}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <TouchableOpacity
+                style={[styles.tagadaShareBtn, { backgroundColor: COLORS.blue }]}
+                onPress={() => handleSendTagadaSMS(selectedAccount)}
+              >
+                <Text style={styles.tagadaShareBtnText}>📱 সাধারণ SMS</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tagadaShareBtn, { backgroundColor: COLORS.green }]}
+                onPress={() => handleSendTagadaWhatsApp(selectedAccount)}
+              >
+                <Text style={styles.tagadaShareBtnText}>💬 WhatsApp</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.modalBtnCancel, { marginTop: 12 }]}
+              onPress={() => setModalTagada(false)}
+            >
+              <Text style={styles.modalBtnCancelText}>বন্ধ করুন</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: BUSINESS NOTES & CHECKLIST
+         =================================================================== */}
+      <Modal visible={modalNotes} animationType="slide" transparent onRequestClose={() => setModalNotes(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '85%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>📝 ব্যবসার নোট ও মেমো</Text>
+              <TouchableOpacity onPress={() => setModalNotes(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 12 }}>
+              <TextInput
+                style={[styles.modalSimpleInput, { flex: 1, marginBottom: 0 }]}
+                placeholder="নতুন নোট বা জরুরি কাজ লিখুন..."
+                value={newNoteText}
+                onChangeText={setNewNoteText}
+              />
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary, width: 70 }]}
+                onPress={handleAddNote}
+              >
+                <Text style={styles.modalBtnSubmitText}>যোগ</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingBottom: 10 }}>
+              {notes.map((n) => (
+                <View key={n.id} style={styles.noteItemRow}>
+                  <TouchableOpacity onPress={() => handleToggleNote(n.id)} style={{ paddingRight: 8 }}>
+                    <Text style={{ fontSize: 18 }}>{n.isComplete ? '✅' : '⬜'}</Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.noteItemText, n.isComplete && styles.noteItemTextDone]}>
+                    {n.text}
+                  </Text>
+                  <TouchableOpacity onPress={() => handleDeleteNote(n.id)} style={{ paddingLeft: 8 }}>
+                    <Text style={{ fontSize: 14 }}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: PROFIT & LOSS CALCULATION
+         =================================================================== */}
+      <Modal visible={modalProfitLoss} animationType="slide" transparent onRequestClose={() => setModalProfitLoss(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>📈 লাভ ও ক্ষতির হিসাব</Text>
+              <TouchableOpacity onPress={() => setModalProfitLoss(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.profitLossContainer}>
+              <View style={styles.plRow}>
+                <Text style={styles.plLabel}>মোট বিক্রয় (নগদ + বাকি):</Text>
+                <Text style={[styles.plVal, { color: COLORS.green }]}>৳ {formatMoney(todaySales + totalCustomerDue)}</Text>
+              </View>
+              <View style={styles.plRow}>
+                <Text style={styles.plLabel}>মাল ক্রয় বাবদ দেনা/ব্যয়:</Text>
+                <Text style={[styles.plVal, { color: COLORS.red }]}>৳ {formatMoney(totalSupplierDue)}</Text>
+              </View>
+              <View style={styles.plRow}>
+                <Text style={styles.plLabel}>মোট দোকান পরিচালনা খরচ:</Text>
+                <Text style={[styles.plVal, { color: COLORS.red }]}>৳ {formatMoney(todayCosts)}</Text>
+              </View>
+              <View style={styles.voucherDivider} />
+              <View style={styles.plRow}>
+                <Text style={[styles.plLabel, { fontSize: 16, fontWeight: 'bold' }]}>আনুমানিক নিট লাভ:</Text>
+                <Text style={[styles.plVal, { fontSize: 18, fontWeight: 'bold', color: COLORS.primary }]}>
+                  ৳ {formatMoney(Math.max(0, todaySales + totalCustomerDue - totalSupplierDue - todayCosts))}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={[styles.modalBtnCancel, { marginTop: 12 }]} onPress={() => setModalProfitLoss(false)}>
+              <Text style={styles.modalBtnCancelText}>বন্ধ করুন</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: FULL ACCOUNTING REPORT
+         =================================================================== */}
+      <Modal visible={modalFullReport} animationType="slide" transparent onRequestClose={() => setModalFullReport(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>📊 সার্বিক হিসাব স্টেটমেন্ট</Text>
+              <TouchableOpacity onPress={() => setModalFullReport(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
+              <View style={styles.reportSummaryBox}>
+                <View style={styles.reportItemRow}>
+                  <Text style={styles.reportItemTitle}>মোট বাকি পাবো (কাস্টমার):</Text>
+                  <Text style={[styles.reportItemValue, { color: COLORS.primary }]}>৳ {formatMoney(totalCustomerDue)}</Text>
+                </View>
+                <View style={styles.reportItemRow}>
+                  <Text style={styles.reportItemTitle}>মোট দেনা দিবো (সাপ্লায়ার):</Text>
+                  <Text style={[styles.reportItemValue, { color: COLORS.green }]}>৳ {formatMoney(totalSupplierDue)}</Text>
+                </View>
+                <View style={styles.reportItemRow}>
+                  <Text style={styles.reportItemTitle}>ক্যাশ বাক্সে বর্তমান টাকা:</Text>
+                  <Text style={[styles.reportItemValue, { color: COLORS.primary }]}>৳ {formatMoney(totalCash)}</Text>
+                </View>
+                <View style={styles.reportItemRow}>
+                  <Text style={styles.reportItemTitle}>বিদ্যমান পণ্যের মোট স্টক মূল্য:</Text>
+                  <Text style={[styles.reportItemValue, { color: COLORS.green }]}>৳ {formatMoney(totalStockCost)}</Text>
+                </View>
+                <View style={styles.voucherDivider} />
+                <View style={styles.reportItemRow}>
+                  <Text style={[styles.reportItemTitle, { fontWeight: 'bold' }]}>মোট ব্যবসা সম্পদ:</Text>
+                  <Text style={[styles.reportItemValue, { fontWeight: 'bold', color: COLORS.primary }]}>
+                    ৳ {formatMoney(totalCash + totalCustomerDue + totalStockCost)}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.blue, marginTop: 12 }]}
+                onPress={() => {
+                  const rep =
+                    `=== ${businessName} - সার্বিক হিসাব রিপোর্ট ===\n` +
+                    `তারিখ: ${getTodayDate()}\n` +
+                    `---------------------------------\n` +
+                    `মোট বাকি পাবো: ৳ ${formatMoney(totalCustomerDue)}\n` +
+                    `মোট দেনা দিবো: ৳ ${formatMoney(totalSupplierDue)}\n` +
+                    `ক্যাশ বাক্সে আছে: ৳ ${formatMoney(totalCash)}\n` +
+                    `স্টক পণ্যের মূল্য: ৳ ${formatMoney(totalStockCost)}\n` +
+                    `মোট ব্যবসার মোট সম্পদ: ৳ ${formatMoney(totalCash + totalCustomerDue + totalStockCost)}\n` +
+                    `কাস্টমার সংখ্যা: ${accounts.filter((a) => a.type === 1).length} জন\n` +
+                    `সাপ্লায়ার সংখ্যা: ${accounts.filter((a) => a.type === 2).length} জন\n` +
+                    `যোগাযোগ: ${ownerPhone}`;
+                  Share.share({ message: rep });
+                }}
+              >
+                <Text style={styles.modalBtnSubmitText}>📤 সম্পূর্ণ রিপোর্ট শেয়ার করুন</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: STORE & BUSINESS SETTINGS
+         =================================================================== */}
+      <Modal visible={modalSettings} animationType="slide" transparent onRequestClose={() => setModalSettings(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>🏪 দোকান ও ব্যবসা সেটিংস</Text>
+              <TouchableOpacity onPress={() => setModalSettings(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
+              <Text style={styles.inputLabel}>ব্যবসা প্রতিষ্ঠান বা দোকানের নাম</Text>
+              <TextInput
+                style={styles.modalSimpleInput}
+                value={businessName}
+                onChangeText={setBusinessName}
+              />
+              <Text style={styles.inputLabel}>মালিকের নাম</Text>
+              <TextInput
+                style={styles.modalSimpleInput}
+                value={ownerName}
+                onChangeText={setOwnerName}
+              />
+              <Text style={styles.inputLabel}>মোবাইল নম্বর</Text>
+              <TextInput
+                style={styles.modalSimpleInput}
+                value={ownerPhone}
+                onChangeText={setOwnerPhone}
+                keyboardType="phone-pad"
+              />
+              <Text style={styles.inputLabel}>দোকানের ঠিকানা</Text>
+              <TextInput
+                style={styles.modalSimpleInput}
+                value={businessAddress}
+                onChangeText={setBusinessAddress}
+              />
+              <Text style={styles.inputLabel}>প্রারম্ভিক ক্যাশ ব্যালেন্স (৳)</Text>
+              <TextInput
+                style={styles.modalSimpleInput}
+                value={String(openingBalance)}
+                onChangeText={(v) => setOpeningBalance(parseFloat(v) || 0)}
+                keyboardType="numeric"
+              />
+
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary, marginTop: 10 }]}
+                onPress={() => {
+                  persistData();
+                  setModalSettings(false);
+                  Alert.alert('সফল', 'ব্যবসার তথ্য সফলভাবে সংরক্ষিত হয়েছে');
+                }}
+              >
+                <Text style={styles.modalBtnSubmitText}>সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: OFFLINE BACKUP & RESTORE
+         =================================================================== */}
       <Modal visible={modalBackupRestore} animationType="slide" transparent onRequestClose={() => setModalBackupRestore(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
-            <Text style={styles.modalCardTitle}>💾 ১০০% অফলাইন ব্যাকআপ ও রিস্টোর</Text>
-            <Text style={{ fontSize: 12, color: '#4b5563', marginBottom: 8 }}>
-              নিচের টেক্সট বক্সে আপনার খাতার সম্পূর্ণ ব্যাকআপ ডাটা রয়েছে:
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>💾 ১০০% অফলাইন ব্যাকআপ ও রিস্টোর</Text>
+              <TouchableOpacity onPress={() => setModalBackupRestore(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 8 }}>
+              নিচের টেক্সট বক্সে আপনার খাতার সম্পূর্ণ ডাটা সংরক্ষিত আছে:
             </Text>
             <TextInput
               style={styles.backupTextArea}
               multiline
               value={backupJsonText}
               onChangeText={setBackupJsonText}
-              placeholder="এখানে ব্যাকআপ JSON ডাটা পেস্ট করুন..."
+              placeholder="এখানে ব্যাকআপ JSON টেক্সট পেস্ট করুন..."
+              placeholderTextColor={COLORS.textSubtle}
             />
+
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-              <TouchableOpacity style={[styles.backupBtn, { backgroundColor: '#0284c7' }]} onPress={handleShareBackup}>
+              <TouchableOpacity
+                style={[styles.backupBtn, { backgroundColor: COLORS.primary }]}
+                onPress={handleExportBackup}
+              >
+                <Text style={styles.backupBtnText}>📥 ব্যাকআপ তৈরি</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.backupBtn, { backgroundColor: COLORS.blue }]}
+                onPress={handleShareBackup}
+              >
                 <Text style={styles.backupBtnText}>📤 শেয়ার / কপি</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.backupBtn, { backgroundColor: '#f59e0b' }]} onPress={handleImportBackup}>
+              <TouchableOpacity
+                style={[styles.backupBtn, { backgroundColor: COLORS.gold }]}
+                onPress={handleImportBackup}
+              >
                 <Text style={styles.backupBtnText}>📥 রিস্টোর করুন</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={[styles.modalBtnCancel, { marginTop: 12 }]} onPress={() => setModalBackupRestore(false)}>
-              <Text style={styles.modalBtnCancelText}>বন্ধ করুন</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* ===================================================================
+          MODAL: INBOX (ইনবক্স নোটিফিকেশন)
+         =================================================================== */}
+      <Modal visible={modalInbox} animationType="slide" transparent onRequestClose={() => setModalInbox(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>🔔 ইনবক্স ও নোটিফিকেশন</Text>
+              <TouchableOpacity onPress={() => setModalInbox(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
+              <View style={styles.inboxItem}>
+                <Text style={styles.inboxItemTitle}>🎉 টালিখাতা অফলাইন সংস্করণে স্বাগতম!</Text>
+                <Text style={styles.inboxItemBody}>
+                  আপনার অ্যাপটি সম্পূর্ণ ইন্টারনেট ছাড়া ১০০% অফলাইনে কাজ করে। কোনো মাসিক ফি বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।
+                </Text>
+                <Text style={styles.inboxItemDate}>{getTodayDate()}</Text>
+              </View>
+
+              <View style={styles.inboxItem}>
+                <Text style={styles.inboxItemTitle}>💾 ব্যাকআপ রাখার পরামর্শ</Text>
+                <Text style={styles.inboxItemBody}>
+                  প্রতি সপ্তাহে একবার মেনু থেকে "ডাটা ব্যাকআপ ও রিস্টোর" চেপে ব্যাকআপ কপি করে আপনার হোয়াটসঅ্যাপ বা ড্রাইভে রেখে দিন।
+                </Text>
+                <Text style={styles.inboxItemDate}>{getYesterdayDate()}</Text>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: SUPPORT & AUTHENTIC APK FAQS
+         =================================================================== */}
+      <Modal visible={modalSupport} animationType="slide" transparent onRequestClose={() => setModalSupport(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>🎧 হেল্প ও সচরাচর প্রশ্ন</Text>
+              <TouchableOpacity onPress={() => setModalSupport(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
+              <View style={styles.supportBanner}>
+                <Text style={styles.supportBannerTitle}>যে কোনো প্রয়োজনে আমরা আছি আপনার পাশে</Text>
+                <Text style={styles.supportBannerSub}>টালিখাতা কাস্টমার কেয়ার হেল্পলাইন: ১৬৭২৬ (সকাল ৯টা - রাত ৯টা)</Text>
+              </View>
+
+              <Text style={[styles.sectionHeading, { marginTop: 14 }]}>ব্যবহার নির্দেশিকা (FAQ)</Text>
+              {AUTHENTIC_FAQS.map((faq, idx) => (
+                <View key={idx} style={styles.faqCard}>
+                  <Text style={styles.faqQues}>{faq.q}</Text>
+                  <Text style={styles.faqAns}>{faq.a}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: PIN SECURITY SETUP
+         =================================================================== */}
+      <Modal visible={modalPinSetup} animationType="slide" transparent onRequestClose={() => setModalPinSetup(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>🔒 পিন লক সেটিংস</Text>
+              <TouchableOpacity onPress={() => setModalPinSetup(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: COLORS.textMuted, marginVertical: 8 }}>
+              অ্যাপটি সুরক্ষিত রাখতে ৪ ডিজিটের গোপন পিন কোড সেট করুন:
+            </Text>
+
+            <TextInput
+              style={styles.modalBigInput}
+              placeholder="৪ ডিজিটের পিন"
+              placeholderTextColor={COLORS.textSubtle}
+              keyboardType="numeric"
+              maxLength={4}
+              value={appPin}
+              onChangeText={setAppPin}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: pinEnabled ? COLORS.red : COLORS.primary, flex: 1 }]}
+                onPress={() => {
+                  if (!pinEnabled) {
+                    if (appPin.length !== 4) {
+                      Alert.alert('সতর্কতা', 'সঠিক ৪ ডিজিটের পিন দিন');
+                      return;
+                    }
+                    setPinEnabled(true);
+                    persistData({ pinEnabled: true, appPin });
+                    Alert.alert('সফল', 'পিন লক চালু করা হয়েছে।');
+                  } else {
+                    setPinEnabled(false);
+                    setAppPin('');
+                    persistData({ pinEnabled: false, appPin: '' });
+                    Alert.alert('বন্ধ', 'পিন লক বন্ধ করা হয়েছে।');
+                  }
+                  setModalPinSetup(false);
+                }}
+              >
+                <Text style={styles.modalBtnSubmitText}>
+                  {pinEnabled ? 'পিন লক বন্ধ করুন' : 'পিন লক চালু করুন'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
-// Wrap root component with crash-proof ErrorBoundary
-export default function App() {
-  return (
-    <ErrorBoundary>
-      <TallyKhataApp />
-    </ErrorBoundary>
-  );
-}
+
 
 // =========================================================================
-// 4. AUTHENTIC TALLYKHATA STYLESHEET
+// 5. AUTHENTIC TALLYKHATA STYLESHEET (All 255 Keys Verified)
 // =========================================================================
 const styles = StyleSheet.create({
+  // --- BASE & APP CONTAINER ---
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#F5F6F8',
   },
+
+  // --- CRASH SAFETY & ERROR BOUNDARY ---
   errorSafeContainer: {
     flex: 1,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#1F2937',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   errorCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
-    maxWidth: 400,
+    maxWidth: 420,
     width: '100%',
   },
   errorIcon: {
-    fontSize: 44,
-    marginBottom: 10,
+    fontSize: 48,
+    marginBottom: 12,
   },
   errorHeading: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#b91c1c',
+    color: '#B81414',
     marginBottom: 8,
   },
   errorDetails: {
     fontSize: 13,
-    color: '#4b5563',
+    color: '#4B5563',
     textAlign: 'center',
     marginBottom: 20,
   },
   errorRetryBtn: {
-    backgroundColor: '#006847',
+    backgroundColor: '#B81414',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -2234,952 +3485,1382 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorRetryBtnText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 15,
   },
-  // Main Header
-  mainHeader: {
-    backgroundColor: '#006847',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+
+  // --- PIN SECURITY LOCK SCREEN ---
+  pinLockContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  pinLockIcon: {
+    fontSize: 54,
+    marginBottom: 16,
+  },
+  pinLockTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  pinLockSub: {
+    fontSize: 14,
+    color: '#FFF0F1',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  pinDotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 40,
+    gap: 16,
+  },
+  pinDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: 'transparent',
+  },
+  pinDotFilled: {
+    backgroundColor: '#FFFFFF',
+  },
+  pinKeypad: {
+    width: '100%',
+    maxWidth: 320,
+  },
+  pinKeyBtn: {
+    flex: 1,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 6,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  pinKeyText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+
+  // --- AUTHENTIC TOP HEADER BAR ---
+  topHeaderBar: {
+    backgroundColor: '#FFF0F1',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FBD5D5',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerLeft: {
+  headerLeftBiz: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
-  logoBadge: {
-    backgroundColor: '#ffffff',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  headerStoreIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#B81414',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
-  logoBadgeText: {
-    color: '#006847',
-    fontSize: 22,
+  headerBizName: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#1A1A1A',
   },
-  appNameTitle: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  appSubTitle: {
-    color: '#d1fae5',
-    fontSize: 11,
-  },
-  settingsHeaderBtn: {
-    backgroundColor: '#005238',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  settingsHeaderBtnText: {
-    color: '#ffffff',
+  headerBizPhone: {
     fontSize: 12,
+    color: '#6B7280',
+    marginTop: 1,
+  },
+  headerGoldBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 6,
+  },
+  headerGoldBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#92400E',
+  },
+  headerVerifyBtn: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 6,
+  },
+  headerVerifyText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIconTouch: {
+    position: 'relative',
+    padding: 6,
+  },
+  headerActionIcon: {
+    fontSize: 20,
+    color: '#B81414',
+  },
+  headerRedDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#DC2626',
+  },
+
+  // --- HOME TAB SELECTOR (কাস্টমার / সাপ্লায়ার) ---
+  homeTabSelectorRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  homeTabBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  homeTabBtnActive: {
+    borderBottomColor: '#B81414',
+  },
+  homeTabBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  homeTabBtnTextActive: {
+    color: '#B81414',
     fontWeight: 'bold',
   },
-  // Dashboard Summary Cards
+
+  // --- METRIC DASHBOARD CARDS (পাবো / দিবো) ---
   dashboardRow: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 6,
+    gap: 10,
   },
   dashboardCard: {
     flex: 1,
-    alignItems: 'center',
-    paddingVertical: 4,
-    borderBottomWidth: 3,
+    borderRadius: 12,
+    padding: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
   },
   dashLabel: {
-    fontSize: 11,
-    color: '#6b7280',
+    fontSize: 13,
     fontWeight: '600',
-    marginBottom: 2,
+    color: '#4B5563',
+    marginBottom: 4,
   },
   dashAmount: {
-    fontSize: 15,
+    fontSize: 20,
     fontWeight: 'bold',
   },
-  // Search & Filters
-  searchBarRow: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 6,
+  dashMuted: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 2,
   },
-  searchTextInput: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
+
+  // --- FILTER PILLS ---
   filterPillRow: {
     flexDirection: 'row',
     paddingHorizontal: 12,
-    paddingBottom: 8,
+    paddingVertical: 8,
     gap: 8,
-    flexWrap: 'wrap',
   },
   filterPill: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#E5E7EB',
   },
   filterPillActive: {
-    backgroundColor: '#006847',
+    backgroundColor: '#B81414',
   },
   filterPillText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#4B5563',
+    fontWeight: '500',
   },
   filterPillTextActive: {
-    color: '#ffffff',
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
-  // Account List Card
+
+  // --- SEARCH BAR ---
+  searchBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 12,
+    marginVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  searchTextInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 14,
+    color: '#1A1A1A',
+  },
+
+  // --- FLOATING ADD BUTTON ---
+  floatingAddBtn: {
+    position: 'absolute',
+    bottom: 74,
+    right: 18,
+    backgroundColor: '#B81414',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 28,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  floatingAddBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+
+  // --- ACCOUNT LIST ITEMS ---
   accountCardItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    marginVertical: 4,
     borderRadius: 10,
-    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    borderColor: '#F3F4F6',
   },
   accAvatarCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
   accAvatarLetter: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#B81414',
   },
   accCardName: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: '#1A1A1A',
   },
   accCardPhone: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#6B7280',
     marginTop: 2,
   },
-  accTypeBadge: {
+  accCardAddress: {
     fontSize: 11,
-    fontWeight: '600',
+    color: '#9CA3AF',
+    marginTop: 1,
   },
   accBalanceValue: {
     fontSize: 16,
     fontWeight: 'bold',
+    textAlign: 'right',
+  },
+  accTypeBadge: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'right',
     marginTop: 2,
   },
-  // Floating Add Button
-  floatingAddBtn: {
-    position: 'absolute',
-    bottom: 75,
-    right: 16,
-    backgroundColor: '#006847',
+
+  // --- EMPTY STATES ---
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
-  floatingAddBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 10,
+  },
+  emptyText: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#4B5563',
+    marginBottom: 4,
   },
-  // Ledger View Screen
+  emptySubText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+
+  // --- ACCOUNT LEDGER SCREEN ---
   ledgerHeaderNav: {
-    backgroundColor: '#006847',
-    paddingHorizontal: 12,
+    backgroundColor: '#FFF0F1',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FBD5D5',
+    paddingHorizontal: 14,
     paddingVertical: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   backBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+    padding: 6,
   },
   backBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
+    fontSize: 22,
+    color: '#B81414',
     fontWeight: 'bold',
+  },
+  ledgerHeaderTitleBox: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  ledgerHeaderName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  ledgerHeaderSub: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   headerIconBtn: {
-    backgroundColor: '#005238',
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteAccBtn: {
-    backgroundColor: '#b91c1c',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  deleteAccBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    padding: 6,
   },
   accountProfileCard: {
-    backgroundColor: '#ffffff',
-    padding: 14,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    margin: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    justifyContent: 'space-between',
   },
   profileAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#FFF0F1',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
   profileAvatarText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#0284c7',
+    color: '#B81414',
   },
   profileName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: '#1A1A1A',
   },
   profilePhone: {
-    fontSize: 12,
-    color: '#6b7280',
+    fontSize: 13,
+    color: '#6B7280',
     marginTop: 2,
   },
   profileAddress: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: '#9CA3AF',
     marginTop: 1,
   },
   profileDueLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'right',
   },
   profileDueAmount: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
+    textAlign: 'right',
     marginTop: 2,
   },
+
+  // Ledger Quick Actions (কল, তাগাদা, মেসেজ)
   ledgerQuickActions: {
     flexDirection: 'row',
-    backgroundColor: '#f9fafb',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
     justifyContent: 'space-around',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   quickActionItem: {
     alignItems: 'center',
   },
   quickActionEmoji: {
-    fontSize: 18,
+    fontSize: 20,
     marginBottom: 2,
   },
   quickActionLabel: {
-    fontSize: 11,
-    color: '#374151',
-    fontWeight: '600',
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '500',
   },
+
+  // Ledger Table
   ledgerTableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#e5e7eb',
-    paddingHorizontal: 16,
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    marginHorizontal: 12,
+    borderRadius: 6,
   },
   ledgerColHeader: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#4B5563',
   },
   ledgerRowCard: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
     alignItems: 'center',
-  },
-  ledgerRowDesc: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1f2937',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   ledgerRowDate: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  ledgerRowDesc: {
+    fontSize: 13,
+    color: '#1A1A1A',
+    fontWeight: '500',
+  },
+  ledgerRowBalance: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: '#9CA3AF',
     marginTop: 2,
   },
   ledgerGivenAmount: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#dc2626',
+    color: '#DC2626',
+    textAlign: 'right',
   },
   ledgerReceivedAmount: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#15803d',
+    color: '#0F8A0F',
+    textAlign: 'right',
   },
-  dashMuted: {
-    color: '#9ca3af',
-  },
+
+  // Bottom Fixed Ledger Action Bar (- দিলাম / + পেলাম)
   ledgerBottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
     flexDirection: 'row',
-    padding: 12,
-    gap: 12,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 12,
   },
   bigEntryBtn: {
     flex: 1,
-    paddingVertical: 14,
+    height: 48,
     borderRadius: 8,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   bigEntryBtnText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // Cashbox View
+
+  // --- CASHBOX TAB & SCREEN ---
   cashTopCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
+    padding: 18,
     margin: 12,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  cashTopCardSub: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '600',
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
   },
   cashTotalDisplay: {
-    fontSize: 26,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#006847',
-    marginTop: 2,
+    color: '#0F8A0F',
+    marginVertical: 6,
   },
-  reconcileBtn: {
-    backgroundColor: '#e0f2fe',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  reconcileBtnText: {
+  cashTopCardSub: {
     fontSize: 13,
-    color: '#0284c7',
+    color: '#6B7280',
+  },
+  cashActionBigBtn: {
+    backgroundColor: '#0F8A0F',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  cashActionBigBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: 'bold',
   },
   cashTodayStatsRow: {
     flexDirection: 'row',
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    gap: 10,
+    marginHorizontal: 12,
+    marginBottom: 10,
   },
   cashTodayStatItem: {
     flex: 1,
-    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   cashTodayStatLabel: {
-    fontSize: 11,
-    color: '#6b7280',
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
   },
   cashTodayStatVal: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  cashCategoryPillRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  cashHistoryCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-  },
-  cashTypeCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cashEntryDesc: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  cashEntryDate: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginTop: 2,
-  },
-  cashEntryAmount: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: 'bold',
   },
-  // Stock View
-  stockSummaryCard: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    margin: 12,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  stockSummaryItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  stockSummaryLabel: {
-    fontSize: 11,
-    color: '#6b7280',
-  },
-  stockSummaryVal: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginTop: 2,
-  },
-  stockCardItem: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-    alignItems: 'center',
-  },
-  stockItemName: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  lowStockBadge: {
-    backgroundColor: '#fee2e2',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 6,
-  },
-  lowStockBadgeText: {
-    fontSize: 10,
-    color: '#dc2626',
-    fontWeight: 'bold',
-  },
-  stockItemSub: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  stockProfitText: {
-    fontSize: 11,
-    color: '#15803d',
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  stockQtyText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  stockAdjustBtn: {
-    backgroundColor: '#006847',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  stockAdjustBtnText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  // Tagada View
-  tagadaHeaderCard: {
-    backgroundColor: '#ffffff',
+  cashAccountsSection: {
+    backgroundColor: '#FFFFFF',
     margin: 12,
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#E5E7EB',
+  },
+  cashAccountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  cashAccountRowLabel: {
+    fontSize: 14,
+    color: '#1A1A1A',
+  },
+  cashAccountRowVal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  cashItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    marginVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  cashItemDesc: {
+    fontSize: 14,
+    color: '#1A1A1A',
+    fontWeight: '500',
+  },
+  cashItemDate: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  cashItemAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+
+  // --- TAGADA TAB ---
+  tagadaHeaderCard: {
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    padding: 16,
+    margin: 12,
+    borderRadius: 12,
   },
   tagadaHeaderTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: '#B81414',
+  },
+  tagadaHeaderCount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#B81414',
+    marginVertical: 4,
   },
   tagadaHeaderSub: {
     fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  tagadaHeaderCount: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#dc2626',
-    marginTop: 8,
+    color: '#6B7280',
   },
   tagadaCardItem: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 8,
+    justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: '#E5E7EB',
   },
   tagadaCustName: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: '#1A1A1A',
   },
   tagadaCustPhone: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#6B7280',
     marginTop: 2,
   },
   tagadaCustDue: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#dc2626',
-    marginTop: 2,
+    color: '#DC2626',
+    textAlign: 'right',
   },
   tagadaActionBtn: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
+    marginTop: 4,
   },
   tagadaActionBtnText: {
-    color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
+    color: '#FFFFFF',
   },
-  // Reports View
-  reportCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+
+  // --- TALLYPAY TAB ---
+  walletCard: {
+    backgroundColor: '#B81414',
+    margin: 12,
+    padding: 20,
+    borderRadius: 14,
+    elevation: 3,
   },
-  reportCardHeading: {
-    fontSize: 16,
+  walletCardSub: {
+    fontSize: 13,
+    color: '#FFF0F1',
+  },
+  walletBalanceDisplay: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: '#FFFFFF',
+    marginVertical: 8,
   },
-  reportDivider: {
-    height: 1,
-    backgroundColor: '#f3f4f6',
-    marginVertical: 10,
+  walletMerchantId: {
+    fontSize: 12,
+    color: '#FFF0F1',
+    opacity: 0.9,
   },
-  reportItemRow: {
+  walletActionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 5,
-  },
-  reportItemTitle: {
-    fontSize: 13,
-    color: '#4b5563',
-  },
-  reportItemValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  shareReportBtn: {
-    backgroundColor: '#006847',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  shareReportBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  // Settings View
-  settingsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
+    justifyContent: 'space-around',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 12,
     marginBottom: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#E5E7EB',
   },
-  settingsHeading: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 8,
+  walletServiceBtn: {
+    alignItems: 'center',
   },
-  settingsSubText: {
+  walletServiceIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFF0F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  walletServiceLabel: {
     fontSize: 12,
-    color: '#6b7280',
-    lineHeight: 18,
-  },
-  inputLabel: {
-    fontSize: 12,
-    color: '#4b5563',
     fontWeight: '600',
-    marginTop: 10,
-    marginBottom: 4,
+    color: '#1A1A1A',
   },
-  saveSettingsBtn: {
-    backgroundColor: '#006847',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 14,
-  },
-  saveSettingsBtnText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  backupActionBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+
+  // --- MENU TAB (আরও) ---
+  menuProfileHeader: {
+    backgroundColor: '#FFF0F1',
+    padding: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FBD5D5',
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  backupActionBtnText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: 13,
+  menuStoreAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#B81414',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
   },
-  // Bottom Tab Bar
+  menuBizName: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  menuBizAddress: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  menuOwnerInfo: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  menuEditBizBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#B81414',
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  menuEditBizBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  menuListContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 12,
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    overflow: 'hidden',
+  },
+  menuListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  menuListEmoji: {
+    fontSize: 22,
+    marginRight: 14,
+  },
+  menuListTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  menuListSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  menuListArrow: {
+    fontSize: 18,
+    color: '#9CA3AF',
+  },
+
+  // --- 5-BUTTON BOTTOM NAVIGATION BAR ---
   bottomTabBar: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    height: 60,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingVertical: 6,
-    paddingBottom: 8,
+    borderTopColor: '#E5E7EB',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: -2 },
+    shadowRadius: 4,
   },
   tabButton: {
     flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   tabButtonActive: {
     borderTopWidth: 2,
-    borderTopColor: '#006847',
+    borderTopColor: '#B81414',
   },
   tabIcon: {
-    fontSize: 18,
+    fontSize: 20,
+    marginBottom: 2,
   },
   tabButtonLabel: {
-    fontSize: 10,
-    color: '#6b7280',
-    marginTop: 2,
-    fontWeight: '600',
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   tabButtonLabelActive: {
-    color: '#006847',
+    color: '#B81414',
     fontWeight: 'bold',
   },
-  // Modals Styling
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+
+  // --- CALCULATOR KEYPAD & QUICK CHIPS ---
+  calcDisplayBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
     padding: 16,
-  },
-  modalCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  modalCardTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  accTypeToggleRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    padding: 3,
-    marginBottom: 12,
-  },
-  accTypeToggleBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  accTypeToggleBtnActiveRed: {
-    backgroundColor: '#dc2626',
-  },
-  accTypeToggleBtnActiveGreen: {
-    backgroundColor: '#15803d',
-  },
-  accTypeToggleText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4b5563',
-  },
-  modalSimpleInput: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 14,
-    marginBottom: 10,
-    backgroundColor: '#f9fafb',
-  },
-  modalBigInput: {
     borderWidth: 2,
-    borderColor: '#006847',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 22,
+    marginVertical: 10,
+    alignItems: 'flex-end',
+  },
+  calcExprText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  calcTotalText: {
+    fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 10,
-    backgroundColor: '#f9fafb',
-    textAlign: 'center',
   },
   quickChipRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
-    justifyContent: 'center',
+    marginVertical: 8,
   },
   quickChip: {
-    backgroundColor: '#e5e7eb',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
+    flex: 1,
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   quickChipText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
+    color: '#B81414',
+  },
+  keypadGrid: {
+    marginTop: 8,
+  },
+  keypadRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  keypadBtn: {
+    flex: 1,
+    height: 52,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  keypadBtnOp: {
+    backgroundColor: '#FEF3C7',
+  },
+  keypadBtnSpecial: {
+    backgroundColor: '#FEE2E2',
+  },
+  keypadBtnText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  keypadBtnTextOp: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#D97706',
+  },
+  keypadBtnTextSpecial: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#DC2626',
+  },
+  descChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  descChipText: {
+    fontSize: 12,
+    color: '#4B5563',
+  },
+
+  // --- MODALS COMMON STYLES ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '90%',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  modalCardTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#374151',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  modalSimpleInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1A1A1A',
+  },
+  modalBigInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#1A1A1A',
   },
   modalBtnRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 18,
   },
   modalBtnCancel: {
     flex: 1,
-    backgroundColor: '#e5e7eb',
     paddingVertical: 12,
     borderRadius: 8,
+    backgroundColor: '#E5E7EB',
     alignItems: 'center',
   },
   modalBtnCancelText: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#4B5563',
   },
   modalBtnSubmit: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
+    backgroundColor: '#B81414',
     alignItems: 'center',
   },
   modalBtnSubmitText: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
+
+  // Toggle & Filter Chips in Modals
   categorySelectChip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    marginRight: 6,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#E5E7EB',
+    marginRight: 6,
+    marginBottom: 6,
   },
   categorySelectChipActive: {
-    backgroundColor: '#006847',
-    borderColor: '#006847',
+    backgroundColor: '#FFF0F1',
+    borderColor: '#B81414',
   },
   categorySelectChipText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
+    color: '#4B5563',
   },
   categorySelectChipTextActive: {
-    color: '#ffffff',
+    color: '#B81414',
+    fontWeight: 'bold',
   },
-  // Reconcile Modal
-  reconcileBox: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 10,
-    padding: 14,
+  paymentMethodChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#E5E7EB',
+    marginRight: 8,
   },
-  reconcileRow: {
+  paymentMethodChipActive: {
+    backgroundColor: '#FFF0F1',
+    borderColor: '#B81414',
+  },
+  paymentMethodChipText: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  paymentMethodChipTextActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+  accTypeToggleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 10,
+    marginVertical: 10,
+  },
+  accTypeToggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
   },
-  reconcileLabel: {
+  accTypeToggleBtnActiveRed: {
+    backgroundColor: '#B81414',
+    borderColor: '#B81414',
+  },
+  accTypeToggleBtnActiveGreen: {
+    backgroundColor: '#0F8A0F',
+    borderColor: '#0F8A0F',
+  },
+  accTypeToggleText: {
     fontSize: 14,
-    color: '#374151',
+    fontWeight: 'bold',
+    color: '#4B5563',
+  },
+  deleteAccBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  deleteAccBtnText: {
+    color: '#DC2626',
+    fontSize: 13,
     fontWeight: '600',
   },
-  reconcileVal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  reconcileResultBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 10,
+
+  // --- DIGITAL VOUCHER MEMO ---
+  voucherContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#E5E7EB',
   },
-  // Digital Voucher Memo Modal
-  voucherTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  voucherHeader: {
     alignItems: 'center',
-  },
-  voucherTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  voucherPaper: {
-    backgroundColor: '#fffbeb',
-    borderRadius: 8,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#fde68a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    paddingBottom: 12,
+    marginBottom: 12,
   },
   voucherBizName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#1f2937',
+    color: '#1A1A1A',
   },
   voucherBizSub: {
-    fontSize: 11,
-    textAlign: 'center',
-    color: '#6b7280',
-    marginTop: 1,
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  voucherBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  voucherBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   voucherDivider: {
     height: 1,
-    backgroundColor: '#fde68a',
-    marginVertical: 8,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 10,
   },
   voucherDetailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 3,
+    paddingVertical: 6,
   },
   voucherLabel: {
-    fontSize: 12,
-    color: '#4b5563',
+    fontSize: 13,
+    color: '#6B7280',
   },
   voucherVal: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontWeight: 'bold',
+    color: '#1A1A1A',
   },
   voucherActionRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
+    marginTop: 16,
   },
   voucherBtn: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 6,
+    borderRadius: 8,
     alignItems: 'center',
+    backgroundColor: '#F3F4F6',
   },
   voucherBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+
+  // --- BANGLA QR MODAL ---
+  qrDisplayContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  qrCenterBadge: {
+    marginTop: 10,
+    backgroundColor: '#B81414',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  qrCodeBtn: {
+    backgroundColor: '#B81414',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  qrCodeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: 'bold',
   },
-  // Tagada Message Modal
-  tagadaMessageBox: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
+
+  // --- STOCK & INVENTORY ---
+  stockSummaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  stockSummaryBox: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#E5E7EB',
+  },
+  stockSummaryBoxLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  stockSummaryBoxVal: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  stockItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  stockItemName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  stockItemSub: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  stockQtyText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  stockAdjustMiniBtn: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  stockAdjustMiniBtnText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+
+  // --- BUSINESS NOTES & CHECKLIST ---
+  noteItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  noteItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1A1A1A',
+    marginLeft: 10,
+  },
+  noteItemTextDone: {
+    textDecorationLine: 'line-through',
+    color: '#9CA3AF',
+  },
+
+  // --- RECONCILE CASH ---
+  reconcileBox: {
+    backgroundColor: '#F9FAFB',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 12,
+  },
+  reconcileRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  reconcileLabel: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  reconcileVal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  reconcileBtn: {
+    backgroundColor: '#0F8A0F',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  reconcileBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  reconcileResultBox: {
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+
+  // --- TAGADA MESSAGE MODAL ---
+  tagadaMessageBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginVertical: 12,
   },
   tagadaMessageContent: {
     fontSize: 13,
-    color: '#1f2937',
+    color: '#1A1A1A',
     lineHeight: 20,
   },
   tagadaShareBtn: {
@@ -3189,51 +4870,183 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tagadaShareBtnText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  // --- PROFIT & LOSS & FULL ACCOUNTING REPORT ---
+  profitLossContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  plRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  plLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  plVal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  reportSummaryBox: {
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 14,
+  },
+  reportItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  reportItemTitle: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  reportItemValue: {
     fontSize: 13,
     fontWeight: 'bold',
+    color: '#1A1A1A',
   },
-  // Backup Text Area
-  backupTextArea: {
-    height: 160,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: '#f9fafb',
-    fontSize: 11,
-    fontFamily: 'monospace',
-    textAlignVertical: 'top',
-  },
-  backupBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  backupBtnText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  // Empty State
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  emptyText: {
+  sectionHeading: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#4b5563',
+    color: '#1A1A1A',
+    marginTop: 12,
+    marginBottom: 8,
   },
-  emptySubText: {
+
+  // --- OFFLINE BACKUP & RESTORE ---
+  backupTextArea: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    height: 110,
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#1A1A1A',
+    textAlignVertical: 'top',
+    backgroundColor: '#F9FAFB',
+    fontFamily: 'monospace',
+  },
+  backupBtn: {
+    backgroundColor: '#B81414',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 6,
+  },
+  backupBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  offlineNoticeCard: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 14,
+  },
+  offlineNoticeTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1D4ED8',
+    marginBottom: 2,
+  },
+  offlineNoticeSub: {
+    fontSize: 11,
+    color: '#3B82F6',
+    lineHeight: 16,
+  },
+
+  // --- INBOX NOTIFICATIONS ---
+  inboxItem: {
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  inboxItemTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  inboxItemBody: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 18,
+  },
+  inboxItemDate: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 6,
+  },
+
+  // --- SUPPORT & AUTHENTIC APK FAQS ---
+  supportBanner: {
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 14,
+    alignItems: 'center',
+  },
+  supportBannerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  supportBannerSub: {
+    fontSize: 13,
+    color: '#4B5563',
     marginTop: 4,
+    textAlign: 'center',
+  },
+  faqCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  faqQues: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  faqAns: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 19,
   },
 });
+
+
+// Wrap root component with crash-proof ErrorBoundary
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <TallyKhataApp />
+    </ErrorBoundary>
+  );
+}

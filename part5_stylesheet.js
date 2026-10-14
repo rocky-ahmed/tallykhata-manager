@@ -1,0 +1,1606 @@
+// =========================================================================
+// 5. AUTHENTIC TALLYKHATA STYLESHEET (All 255 Keys Verified)
+// =========================================================================
+const styles = StyleSheet.create({
+  // --- BASE & APP CONTAINER ---
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F6F8',
+  },
+
+  // --- CRASH SAFETY & ERROR BOUNDARY ---
+  errorSafeContainer: {
+    flex: 1,
+    backgroundColor: '#1F2937',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    maxWidth: 420,
+    width: '100%',
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  errorHeading: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#B81414',
+    marginBottom: 8,
+  },
+  errorDetails: {
+    fontSize: 13,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  errorRetryBtn: {
+    backgroundColor: '#B81414',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  errorRetryBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+
+  // --- PIN SECURITY LOCK SCREEN ---
+  pinLockContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  pinLockIcon: {
+    fontSize: 54,
+    marginBottom: 16,
+  },
+  pinLockTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  pinLockSub: {
+    fontSize: 14,
+    color: '#FFF0F1',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  pinDotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 40,
+    gap: 16,
+  },
+  pinDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: 'transparent',
+  },
+  pinDotFilled: {
+    backgroundColor: '#FFFFFF',
+  },
+  pinKeypad: {
+    width: '100%',
+    maxWidth: 320,
+  },
+  pinKeyBtn: {
+    flex: 1,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 6,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  pinKeyText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+
+  // --- AUTHENTIC TOP HEADER BAR ---
+  topHeaderBar: {
+    backgroundColor: '#FFF0F1',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FBD5D5',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerLeftBiz: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerStoreIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#B81414',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  headerBizName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  headerBizPhone: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 1,
+  },
+  headerGoldBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 6,
+  },
+  headerGoldBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#92400E',
+  },
+  headerVerifyBtn: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 6,
+  },
+  headerVerifyText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIconTouch: {
+    position: 'relative',
+    padding: 6,
+  },
+  headerActionIcon: {
+    fontSize: 20,
+    color: '#B81414',
+  },
+  headerRedDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#DC2626',
+  },
+
+  // --- HOME TAB SELECTOR (কাস্টমার / সাপ্লায়ার) ---
+  homeTabSelectorRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  homeTabBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  homeTabBtnActive: {
+    borderBottomColor: '#B81414',
+  },
+  homeTabBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  homeTabBtnTextActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+
+  // --- METRIC DASHBOARD CARDS (পাবো / দিবো) ---
+  dashboardRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 6,
+    gap: 10,
+  },
+  dashboardCard: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+  },
+  dashLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+    marginBottom: 4,
+  },
+  dashAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  dashMuted: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+
+  // --- FILTER PILLS ---
+  filterPillRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#E5E7EB',
+  },
+  filterPillActive: {
+    backgroundColor: '#B81414',
+  },
+  filterPillText: {
+    fontSize: 13,
+    color: '#4B5563',
+    fontWeight: '500',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+
+  // --- SEARCH BAR ---
+  searchBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 12,
+    marginVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  searchTextInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 14,
+    color: '#1A1A1A',
+  },
+
+  // --- FLOATING ADD BUTTON ---
+  floatingAddBtn: {
+    position: 'absolute',
+    bottom: 74,
+    right: 18,
+    backgroundColor: '#B81414',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 28,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  floatingAddBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+
+  // --- ACCOUNT LIST ITEMS ---
+  accountCardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  accAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  accAvatarLetter: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  accCardName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  accCardPhone: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  accCardAddress: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  accBalanceValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'right',
+  },
+  accTypeBadge: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+
+  // --- EMPTY STATES ---
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 10,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4B5563',
+    marginBottom: 4,
+  },
+  emptySubText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+
+  // --- ACCOUNT LEDGER SCREEN ---
+  ledgerHeaderNav: {
+    backgroundColor: '#FFF0F1',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FBD5D5',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  backBtn: {
+    padding: 6,
+  },
+  backBtnText: {
+    fontSize: 22,
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+  ledgerHeaderTitleBox: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  ledgerHeaderName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  ledgerHeaderSub: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  headerIconBtn: {
+    padding: 6,
+  },
+  accountProfileCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    margin: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  profileAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFF0F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  profileAvatarText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  profileName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  profilePhone: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  profileAddress: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  profileDueLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'right',
+  },
+  profileDueAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+
+  // Ledger Quick Actions (কল, তাগাদা, মেসেজ)
+  ledgerQuickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  quickActionItem: {
+    alignItems: 'center',
+  },
+  quickActionEmoji: {
+    fontSize: 20,
+    marginBottom: 2,
+  },
+  quickActionLabel: {
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '500',
+  },
+
+  // Ledger Table
+  ledgerTableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginHorizontal: 12,
+    borderRadius: 6,
+  },
+  ledgerColHeader: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#4B5563',
+  },
+  ledgerRowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  ledgerRowDate: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  ledgerRowDesc: {
+    fontSize: 13,
+    color: '#1A1A1A',
+    fontWeight: '500',
+  },
+  ledgerRowBalance: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  ledgerGivenAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#DC2626',
+    textAlign: 'right',
+  },
+  ledgerReceivedAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#0F8A0F',
+    textAlign: 'right',
+  },
+
+  // Bottom Fixed Ledger Action Bar (- দিলাম / + পেলাম)
+  ledgerBottomBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  bigEntryBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bigEntryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
+  // --- CASHBOX TAB & SCREEN ---
+  cashTopCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    margin: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  cashTotalDisplay: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#0F8A0F',
+    marginVertical: 6,
+  },
+  cashTopCardSub: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  cashActionBigBtn: {
+    backgroundColor: '#0F8A0F',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  cashActionBigBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  cashTodayStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginHorizontal: 12,
+    marginBottom: 10,
+  },
+  cashTodayStatItem: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  cashTodayStatLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  cashTodayStatVal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  cashAccountsSection: {
+    backgroundColor: '#FFFFFF',
+    margin: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  cashAccountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  cashAccountRowLabel: {
+    fontSize: 14,
+    color: '#1A1A1A',
+  },
+  cashAccountRowVal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  cashItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    marginVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  cashItemDesc: {
+    fontSize: 14,
+    color: '#1A1A1A',
+    fontWeight: '500',
+  },
+  cashItemDate: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  cashItemAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+
+  // --- TAGADA TAB ---
+  tagadaHeaderCard: {
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    padding: 16,
+    margin: 12,
+    borderRadius: 12,
+  },
+  tagadaHeaderTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  tagadaHeaderCount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#B81414',
+    marginVertical: 4,
+  },
+  tagadaHeaderSub: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  tagadaCardItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  tagadaCustName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  tagadaCustPhone: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  tagadaCustDue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#DC2626',
+    textAlign: 'right',
+  },
+  tagadaActionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  tagadaActionBtnText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+
+  // --- TALLYPAY TAB ---
+  walletCard: {
+    backgroundColor: '#B81414',
+    margin: 12,
+    padding: 20,
+    borderRadius: 14,
+    elevation: 3,
+  },
+  walletCardSub: {
+    fontSize: 13,
+    color: '#FFF0F1',
+  },
+  walletBalanceDisplay: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginVertical: 8,
+  },
+  walletMerchantId: {
+    fontSize: 12,
+    color: '#FFF0F1',
+    opacity: 0.9,
+  },
+  walletActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 12,
+    marginBottom: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  walletServiceBtn: {
+    alignItems: 'center',
+  },
+  walletServiceIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFF0F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  walletServiceLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+
+  // --- MENU TAB (আরও) ---
+  menuProfileHeader: {
+    backgroundColor: '#FFF0F1',
+    padding: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FBD5D5',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuStoreAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#B81414',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  menuBizName: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  menuBizAddress: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  menuOwnerInfo: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  menuEditBizBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#B81414',
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  menuEditBizBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  menuListContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 12,
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    overflow: 'hidden',
+  },
+  menuListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  menuListEmoji: {
+    fontSize: 22,
+    marginRight: 14,
+  },
+  menuListTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  menuListSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  menuListArrow: {
+    fontSize: 18,
+    color: '#9CA3AF',
+  },
+
+  // --- 5-BUTTON BOTTOM NAVIGATION BAR ---
+  bottomTabBar: {
+    flexDirection: 'row',
+    height: 60,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: -2 },
+    shadowRadius: 4,
+  },
+  tabButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  tabButtonActive: {
+    borderTopWidth: 2,
+    borderTopColor: '#B81414',
+  },
+  tabIcon: {
+    fontSize: 20,
+    marginBottom: 2,
+  },
+  tabButtonLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  tabButtonLabelActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+
+  // --- CALCULATOR KEYPAD & QUICK CHIPS ---
+  calcDisplayBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    marginVertical: 10,
+    alignItems: 'flex-end',
+  },
+  calcExprText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  calcTotalText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  quickChipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginVertical: 8,
+  },
+  quickChip: {
+    flex: 1,
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  quickChipText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  keypadGrid: {
+    marginTop: 8,
+  },
+  keypadRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  keypadBtn: {
+    flex: 1,
+    height: 52,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  keypadBtnOp: {
+    backgroundColor: '#FEF3C7',
+  },
+  keypadBtnSpecial: {
+    backgroundColor: '#FEE2E2',
+  },
+  keypadBtnText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  keypadBtnTextOp: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#D97706',
+  },
+  keypadBtnTextSpecial: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#DC2626',
+  },
+  descChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  descChipText: {
+    fontSize: 12,
+    color: '#4B5563',
+  },
+
+  // --- MODALS COMMON STYLES ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '90%',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  modalCardTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  modalSimpleInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1A1A1A',
+  },
+  modalBigInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#1A1A1A',
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  modalBtnCancelText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4B5563',
+  },
+  modalBtnSubmit: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#B81414',
+    alignItems: 'center',
+  },
+  modalBtnSubmitText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+
+  // Toggle & Filter Chips in Modals
+  categorySelectChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  categorySelectChipActive: {
+    backgroundColor: '#FFF0F1',
+    borderColor: '#B81414',
+  },
+  categorySelectChipText: {
+    fontSize: 12,
+    color: '#4B5563',
+  },
+  categorySelectChipTextActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+  paymentMethodChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginRight: 8,
+  },
+  paymentMethodChipActive: {
+    backgroundColor: '#FFF0F1',
+    borderColor: '#B81414',
+  },
+  paymentMethodChipText: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  paymentMethodChipTextActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+  accTypeToggleRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginVertical: 10,
+  },
+  accTypeToggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+  },
+  accTypeToggleBtnActiveRed: {
+    backgroundColor: '#B81414',
+    borderColor: '#B81414',
+  },
+  accTypeToggleBtnActiveGreen: {
+    backgroundColor: '#0F8A0F',
+    borderColor: '#0F8A0F',
+  },
+  accTypeToggleText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4B5563',
+  },
+  deleteAccBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  deleteAccBtnText: {
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // --- DIGITAL VOUCHER MEMO ---
+  voucherContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  voucherHeader: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    paddingBottom: 12,
+    marginBottom: 12,
+  },
+  voucherBizName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  voucherBizSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  voucherBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  voucherBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  voucherDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 10,
+  },
+  voucherDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  voucherLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  voucherVal: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  voucherActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  voucherBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  voucherBtnText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+
+  // --- BANGLA QR MODAL ---
+  qrDisplayContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  qrCenterBadge: {
+    marginTop: 10,
+    backgroundColor: '#B81414',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  qrCodeBtn: {
+    backgroundColor: '#B81414',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  qrCodeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  // --- STOCK & INVENTORY ---
+  stockSummaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  stockSummaryBox: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  stockSummaryBoxLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  stockSummaryBoxVal: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  stockItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  stockItemName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  stockItemSub: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  stockQtyText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  stockAdjustMiniBtn: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  stockAdjustMiniBtnText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+
+  // --- BUSINESS NOTES & CHECKLIST ---
+  noteItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  noteItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1A1A1A',
+    marginLeft: 10,
+  },
+  noteItemTextDone: {
+    textDecorationLine: 'line-through',
+    color: '#9CA3AF',
+  },
+
+  // --- RECONCILE CASH ---
+  reconcileBox: {
+    backgroundColor: '#F9FAFB',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 12,
+  },
+  reconcileRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  reconcileLabel: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  reconcileVal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  reconcileBtn: {
+    backgroundColor: '#0F8A0F',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  reconcileBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  reconcileResultBox: {
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+
+  // --- TAGADA MESSAGE MODAL ---
+  tagadaMessageBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  tagadaMessageContent: {
+    fontSize: 13,
+    color: '#1A1A1A',
+    lineHeight: 20,
+  },
+  tagadaShareBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  tagadaShareBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  // --- PROFIT & LOSS & FULL ACCOUNTING REPORT ---
+  profitLossContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  plRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  plLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  plVal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  reportSummaryBox: {
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 14,
+  },
+  reportItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  reportItemTitle: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  reportItemValue: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  sectionHeading: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+
+  // --- OFFLINE BACKUP & RESTORE ---
+  backupTextArea: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    height: 110,
+    fontSize: 12,
+    color: '#1A1A1A',
+    textAlignVertical: 'top',
+    backgroundColor: '#F9FAFB',
+    fontFamily: 'monospace',
+  },
+  backupBtn: {
+    backgroundColor: '#B81414',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 6,
+  },
+  backupBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  offlineNoticeCard: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 14,
+  },
+  offlineNoticeTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1D4ED8',
+    marginBottom: 2,
+  },
+  offlineNoticeSub: {
+    fontSize: 11,
+    color: '#3B82F6',
+    lineHeight: 16,
+  },
+
+  // --- INBOX NOTIFICATIONS ---
+  inboxItem: {
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  inboxItemTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  inboxItemBody: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 18,
+  },
+  inboxItemDate: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 6,
+  },
+
+  // --- SUPPORT & AUTHENTIC APK FAQS ---
+  supportBanner: {
+    backgroundColor: '#FFF0F1',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 14,
+    alignItems: 'center',
+  },
+  supportBannerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  supportBannerSub: {
+    fontSize: 13,
+    color: '#4B5563',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  faqCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  faqQues: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  faqAns: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 19,
+  },
+});

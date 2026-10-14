@@ -12,3 +12,6 @@ npm-debug.*
 .DS_Store
 *.log
 
+
+__pycache__/
+*.pyc
