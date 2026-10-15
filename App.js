@@ -2192,7 +2192,7 @@ function TallyKhataApp() {
                 }}
               >
                 <Image
-                  source={require('./assets/icons/ic_check.png')}
+                  source={require('./assets/icons/ic_cash_milai.png')}
                   style={{ width: 18, height: 18, marginRight: 6, tintColor: '#B81414' }}
                   resizeMode="contain"
                 />
@@ -2259,8 +2259,8 @@ function TallyKhataApp() {
               {[
                 { cat: 'sale', label: 'ক্যাশ বেচা', icon: require('./assets/icons/ic_cash_sale.png'), isIn: true, color: '#0F8A0F' },
                 { cat: 'buy', label: 'ক্যাশ কেনা', icon: require('./assets/icons/ic_cash_buy.png'), isIn: false, color: '#B81414' },
-                { cat: 'cost', label: 'খরচ', icon: require('./assets/icons/ic_cash_cost.png'), isIn: false, color: '#B81414' },
-                { cat: 'malik_in', label: 'মালিক দিল', icon: require('./assets/icons/ic_malik_in.png'), isIn: true, color: '#0F8A0F' },
+                { cat: 'cost', label: 'খরচ', icon: require('./assets/icons/ic_menu_cost.png'), isIn: false, color: '#B81414' },
+                { cat: 'malik_in', label: 'মালিক দিল', icon: require('./assets/icons/ic_menu_malik_report.png'), isIn: true, color: '#0F8A0F' },
                 { cat: 'malik_out', label: 'মালিক নিল', icon: require('./assets/icons/ic_malik_out.png'), isIn: false, color: '#B81414' },
               ].map((item) => {
                 const catEntries = (cashEntries || []).filter((c) => c.category === item.cat);
@@ -2630,7 +2630,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalAddMoney(true)}
               >
-                <Image source={require('./assets/nav/nav_tallypay.png')} style={{ width: 22, height: 22, tintColor: COLORS.blue }} resizeMode="contain" />
+                <Image source={require('./assets/icons/ic_menu_accounts.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>একাউন্ট সমূহ</Text>
                   <Text style={styles.menuListSub}>ব্যালেন্স ৳ {formatMoney(walletBalance)} • সংযুক্ত ব্যাংক ও MFS</Text>
@@ -2642,7 +2642,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setActiveTab('tallypay')}
               >
-                <Image source={require('./assets/icons/ic_cash_sale.png')} style={{ width: 22, height: 22, tintColor: COLORS.green }} resizeMode="contain" />
+                <Image source={require('./assets/icons/ic_menu_payment_messaging.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>লেনদেন বিবরণী</Text>
                   <Text style={styles.menuListSub}>মোট {walletTxns.length} টি ওয়ালেট লেনদেন</Text>
@@ -2654,7 +2654,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => Alert.alert('লেনদেনের লিমিট', 'দৈনিক ক্যাশ-ইন লিমিট: ৳ ৫০,০০০ | দৈনিক ক্যাশ-আউট: ৳ ২৫,০০০ | মাসিক লিমিট: ৳ ৫,০০,০০০')}
               >
-                <Image source={require('./assets/icons/ic_lock.png')} style={{ width: 22, height: 22, tintColor: '#F59E0B' }} resizeMode="contain" />
+                <Image source={require('./assets/icons/ic_menu_lock.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>লেনদেনের লিমিট ও চার্জ</Text>
                   <Text style={styles.menuListSub}>১০০% ফ্রি লেনদেন • কোনো চার্জ নেই</Text>
@@ -2684,7 +2684,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalExpenseReport(true)}
               >
-                <Image source={require('./assets/icons/ic_cash_cost.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <Image source={require('./assets/icons/ic_menu_cost.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>খরচ রিপোর্ট</Text>
                   <Text style={styles.menuListSub}>দোকানের সকল যাবতীয় খরচের তালিকা</Text>
@@ -2720,7 +2720,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalMalikReport(true)}
               >
-                <Image source={require('./assets/icons/ic_malik_in.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <Image source={require('./assets/icons/ic_menu_malik_report.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>মালিকের হিসাব</Text>
                   <Text style={styles.menuListSub}>মালিকের বিনিয়োগ ও ব্যক্তিগত উত্তোলন স্টেটমেন্ট</Text>

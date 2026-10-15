@@ -23,3 +23,7 @@ android/local.properties
 
 /android/
 
+
+# Debug screenshots
+/*.png
+!assets/**/*.png
