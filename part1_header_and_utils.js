@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // =========================================================================
 // 1. AUTHENTIC TALLYKHATA BRAND IDENTITY & CONSTANTS
 // =========================================================================
-const STORAGE_KEY = 'tallykhata_offline_store_v5';
+const STORAGE_KEY = 'tallykhata_offline_store_v6';
 
 const COLORS = {
   primary: '#B81414',        // Authentic TallyKhata Crimson Red

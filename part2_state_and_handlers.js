@@ -112,7 +112,7 @@ function TallyKhataApp() {
 
   // Business Picker State (BusinessPickerBottomSheet)
   const [businesses, setBusinesses] = useState([
-    { id: '1', name: 'আমার ব্যবসা প্রতিষ্ঠান', owner: 'স্বত্বাধিকারী', phone: '01700000000', address: 'বাজার রোড, ঢাকা', isSelected: true },
+    { id: '1', name: 'Mobile Xpress', owner: 'স্বত্বাধিকারী', phone: '01700000000', address: 'বাজার রোড, ঢাকা', isSelected: true },
     { id: '2', name: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ', owner: 'হাজী মো: করিম', phone: '01811223344', address: 'পাইকারি আড়ৎ, ঢাকা', isSelected: false },
     { id: '3', name: 'সোনালী ফ্যাশন ও বস্ত্রালয়', owner: 'আহমেদ উল্লাহ', phone: '01911334455', address: 'নিউ মার্কেট, ঢাকা', isSelected: false },
   ]);
@@ -173,7 +173,7 @@ function TallyKhataApp() {
         if (Array.isArray(d.notes)) setNotes(d.notes);
         if (Array.isArray(d.walletTxns)) setWalletTxns(d.walletTxns);
         if (d.walletBalance !== undefined) setWalletBalance(Number(d.walletBalance));
-        if (d.businessName) setBusinessName(d.businessName);
+        if (d.businessName) { setBusinessName(d.businessName === 'আমার ব্যবসা প্রতিষ্ঠান' ? 'Mobile Xpress' : d.businessName); }
         if (d.ownerName) setOwnerName(d.ownerName);
         if (d.ownerPhone) setOwnerPhone(d.ownerPhone);
         if (d.businessAddress) setBusinessAddress(d.businessAddress);

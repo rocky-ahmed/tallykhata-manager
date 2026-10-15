@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // =========================================================================
 // 1. AUTHENTIC TALLYKHATA BRAND IDENTITY & CONSTANTS
 // =========================================================================
-const STORAGE_KEY = 'tallykhata_offline_store_v5';
+const STORAGE_KEY = 'tallykhata_offline_store_v6';
 
 const COLORS = {
   primary: '#B81414',        // Authentic TallyKhata Crimson Red
@@ -435,7 +435,7 @@ function TallyKhataApp() {
 
   // Business Picker State (BusinessPickerBottomSheet)
   const [businesses, setBusinesses] = useState([
-    { id: '1', name: 'আমার ব্যবসা প্রতিষ্ঠান', owner: 'স্বত্বাধিকারী', phone: '01700000000', address: 'বাজার রোড, ঢাকা', isSelected: true },
+    { id: '1', name: 'Mobile Xpress', owner: 'স্বত্বাধিকারী', phone: '01700000000', address: 'বাজার রোড, ঢাকা', isSelected: true },
     { id: '2', name: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ', owner: 'হাজী মো: করিম', phone: '01811223344', address: 'পাইকারি আড়ৎ, ঢাকা', isSelected: false },
     { id: '3', name: 'সোনালী ফ্যাশন ও বস্ত্রালয়', owner: 'আহমেদ উল্লাহ', phone: '01911334455', address: 'নিউ মার্কেট, ঢাকা', isSelected: false },
   ]);
@@ -496,7 +496,7 @@ function TallyKhataApp() {
         if (Array.isArray(d.notes)) setNotes(d.notes);
         if (Array.isArray(d.walletTxns)) setWalletTxns(d.walletTxns);
         if (d.walletBalance !== undefined) setWalletBalance(Number(d.walletBalance));
-        if (d.businessName) setBusinessName(d.businessName);
+        if (d.businessName) { setBusinessName(d.businessName === 'আমার ব্যবসা প্রতিষ্ঠান' ? 'Mobile Xpress' : d.businessName); }
         if (d.ownerName) setOwnerName(d.ownerName);
         if (d.ownerPhone) setOwnerPhone(d.ownerPhone);
         if (d.businessAddress) setBusinessAddress(d.businessAddress);
@@ -1978,7 +1978,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>ক্যাশবক্স</Text>
+                        <Text style={styles.quickGridLabel}>ক্যাশবাক্স</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -2479,36 +2479,7 @@ function TallyKhataApp() {
 
               <TouchableOpacity
                 style={styles.walletServiceBtn}
-                onPress={() => {
-                  Alert.alert(
-                    'মানি আউট',
-                    `আপনার টালিপে ওয়ালেটের ৳ ${formatMoney(walletBalance)} টাকা ব্যাংক বা পার্সোনাল বিকাশ/নগদে স্থানান্তর করতে চান?`,
-                    [
-                      { text: 'বাতিল', style: 'cancel' },
-                      {
-                        text: 'উত্তোলন করুন',
-                        onPress: () => {
-                          if (walletBalance <= 0) {
-                            Alert.alert('ব্যর্থ', 'উত্তোলন করার মতো ব্যালেন্স নেই।');
-                            return;
-                          }
-                          const newTxn = {
-                            id: 'w_' + Date.now(),
-                            title: 'মানি আউট (ব্যাংক একাউন্ট)',
-                            amount: walletBalance,
-                            type: 'out',
-                            date: getTodayDate(),
-                            time: getTimeString(),
-                          };
-                          setWalletBalance(0);
-                          setWalletTxns([newTxn, ...walletTxns]);
-                          persistData({ walletBalance: 0, walletTxns: [newTxn, ...walletTxns] });
-                          Alert.alert('সফল', 'মানি আউট সফল হয়েছে।');
-                        },
-                      },
-                    ]
-                  );
-                }}
+                onPress={() => setModalMoneyOut(true)}
               >
                 <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.greenLight }]}>
                   <Image source={require("./assets/icons/ic_cash_sale.png")} style={{ width: 24, height: 24, tintColor: COLORS.green }} resizeMode="contain" />
@@ -2870,13 +2841,23 @@ function TallyKhataApp() {
           onPress={() => setActiveTab('cashbox')}
           activeOpacity={0.8}
         >
-          <Image
-            source={activeTab === 'cashbox' ? require('./assets/nav/nav_cashbox_active.png') : require('./assets/nav/nav_cashbox.png')}
-            style={styles.tabIconImg}
-            resizeMode="contain"
-          />
+          {activeTab === 'cashbox' ? (
+            <View style={styles.tabActivePill}>
+              <Image
+                source={require('./assets/nav/nav_cashbox_active.png')}
+                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <Image
+              source={require('./assets/nav/nav_cashbox.png')}
+              style={styles.tabIconImg}
+              resizeMode="contain"
+            />
+          )}
           <Text style={[styles.tabButtonLabel, activeTab === 'cashbox' && styles.tabButtonLabelActive]}>
-            ক্যাশবক্স
+            ক্যাশবাক্স
           </Text>
         </TouchableOpacity>
 
@@ -2885,13 +2866,23 @@ function TallyKhataApp() {
           onPress={() => setActiveTab('tallypay')}
           activeOpacity={0.8}
         >
-          <Image
-            source={activeTab === 'tallypay' ? require('./assets/nav/nav_tallypay_active.png') : require('./assets/nav/nav_tallypay.png')}
-            style={styles.tabIconImg}
-            resizeMode="contain"
-          />
+          {activeTab === 'tallypay' ? (
+            <View style={styles.tabActivePill}>
+              <Image
+                source={require('./assets/nav/nav_tallypay_active.png')}
+                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <Image
+              source={require('./assets/nav/nav_tallypay.png')}
+              style={styles.tabIconImg}
+              resizeMode="contain"
+            />
+          )}
           <Text style={[styles.tabButtonLabel, activeTab === 'tallypay' && styles.tabButtonLabelActive]}>
-            টালিপে
+            টালি পে
           </Text>
         </TouchableOpacity>
 
@@ -2900,13 +2891,23 @@ function TallyKhataApp() {
           onPress={() => setActiveTab('menu')}
           activeOpacity={0.8}
         >
-          <Image
-            source={activeTab === 'menu' ? require('./assets/nav/nav_menu_active.png') : require('./assets/nav/nav_menu.png')}
-            style={styles.tabIconImg}
-            resizeMode="contain"
-          />
+          {activeTab === 'menu' ? (
+            <View style={styles.tabActivePill}>
+              <Image
+                source={require('./assets/nav/nav_menu_active.png')}
+                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <Image
+              source={require('./assets/nav/nav_menu.png')}
+              style={styles.tabIconImg}
+              resizeMode="contain"
+            />
+          )}
           <Text style={[styles.tabButtonLabel, activeTab === 'menu' && styles.tabButtonLabelActive]}>
-            মেনু
+            মেন্যু
           </Text>
         </TouchableOpacity>
       </View>

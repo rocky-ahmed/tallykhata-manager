@@ -484,7 +484,7 @@
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>ক্যাশবক্স</Text>
+                        <Text style={styles.quickGridLabel}>ক্যাশবাক্স</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -985,36 +985,7 @@
 
               <TouchableOpacity
                 style={styles.walletServiceBtn}
-                onPress={() => {
-                  Alert.alert(
-                    'মানি আউট',
-                    `আপনার টালিপে ওয়ালেটের ৳ ${formatMoney(walletBalance)} টাকা ব্যাংক বা পার্সোনাল বিকাশ/নগদে স্থানান্তর করতে চান?`,
-                    [
-                      { text: 'বাতিল', style: 'cancel' },
-                      {
-                        text: 'উত্তোলন করুন',
-                        onPress: () => {
-                          if (walletBalance <= 0) {
-                            Alert.alert('ব্যর্থ', 'উত্তোলন করার মতো ব্যালেন্স নেই।');
-                            return;
-                          }
-                          const newTxn = {
-                            id: 'w_' + Date.now(),
-                            title: 'মানি আউট (ব্যাংক একাউন্ট)',
-                            amount: walletBalance,
-                            type: 'out',
-                            date: getTodayDate(),
-                            time: getTimeString(),
-                          };
-                          setWalletBalance(0);
-                          setWalletTxns([newTxn, ...walletTxns]);
-                          persistData({ walletBalance: 0, walletTxns: [newTxn, ...walletTxns] });
-                          Alert.alert('সফল', 'মানি আউট সফল হয়েছে।');
-                        },
-                      },
-                    ]
-                  );
-                }}
+                onPress={() => setModalMoneyOut(true)}
               >
                 <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.greenLight }]}>
                   <Image source={require("./assets/icons/ic_cash_sale.png")} style={{ width: 24, height: 24, tintColor: COLORS.green }} resizeMode="contain" />
@@ -1376,13 +1347,23 @@
           onPress={() => setActiveTab('cashbox')}
           activeOpacity={0.8}
         >
-          <Image
-            source={activeTab === 'cashbox' ? require('./assets/nav/nav_cashbox_active.png') : require('./assets/nav/nav_cashbox.png')}
-            style={styles.tabIconImg}
-            resizeMode="contain"
-          />
+          {activeTab === 'cashbox' ? (
+            <View style={styles.tabActivePill}>
+              <Image
+                source={require('./assets/nav/nav_cashbox_active.png')}
+                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <Image
+              source={require('./assets/nav/nav_cashbox.png')}
+              style={styles.tabIconImg}
+              resizeMode="contain"
+            />
+          )}
           <Text style={[styles.tabButtonLabel, activeTab === 'cashbox' && styles.tabButtonLabelActive]}>
-            ক্যাশবক্স
+            ক্যাশবাক্স
           </Text>
         </TouchableOpacity>
 
@@ -1391,13 +1372,23 @@
           onPress={() => setActiveTab('tallypay')}
           activeOpacity={0.8}
         >
-          <Image
-            source={activeTab === 'tallypay' ? require('./assets/nav/nav_tallypay_active.png') : require('./assets/nav/nav_tallypay.png')}
-            style={styles.tabIconImg}
-            resizeMode="contain"
-          />
+          {activeTab === 'tallypay' ? (
+            <View style={styles.tabActivePill}>
+              <Image
+                source={require('./assets/nav/nav_tallypay_active.png')}
+                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <Image
+              source={require('./assets/nav/nav_tallypay.png')}
+              style={styles.tabIconImg}
+              resizeMode="contain"
+            />
+          )}
           <Text style={[styles.tabButtonLabel, activeTab === 'tallypay' && styles.tabButtonLabelActive]}>
-            টালিপে
+            টালি পে
           </Text>
         </TouchableOpacity>
 
@@ -1406,13 +1397,23 @@
           onPress={() => setActiveTab('menu')}
           activeOpacity={0.8}
         >
-          <Image
-            source={activeTab === 'menu' ? require('./assets/nav/nav_menu_active.png') : require('./assets/nav/nav_menu.png')}
-            style={styles.tabIconImg}
-            resizeMode="contain"
-          />
+          {activeTab === 'menu' ? (
+            <View style={styles.tabActivePill}>
+              <Image
+                source={require('./assets/nav/nav_menu_active.png')}
+                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <Image
+              source={require('./assets/nav/nav_menu.png')}
+              style={styles.tabIconImg}
+              resizeMode="contain"
+            />
+          )}
           <Text style={[styles.tabButtonLabel, activeTab === 'menu' && styles.tabButtonLabelActive]}>
-            মেনু
+            মেন্যু
           </Text>
         </TouchableOpacity>
       </View>
