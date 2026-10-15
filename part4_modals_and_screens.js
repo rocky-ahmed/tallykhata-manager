@@ -886,35 +886,81 @@
          =================================================================== */}
       <Modal visible={modalTagada} animationType="fade" transparent onRequestClose={() => setModalTagada(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { padding: 18 }]}>
+            {/* Toolbar (activity_tagada_v2.xml) */}
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>বকেয়া তাগাদা বার্তা</Text>
+              <Text style={styles.modalCardTitle}>তাগাদা মেসেজ</Text>
               <TouchableOpacity onPress={() => setModalTagada(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.tagadaMessageBox}>
-              <Text style={styles.tagadaMessageContent}>{generateTagadaMessage(selectedAccount)}</Text>
+
+            {/* Receiver User Info Card (layout_tagada_receiver_user_info.xml) */}
+            {selectedAccount ? (
+              <View style={styles.tagadaReceiverCard}>
+                <View style={styles.tagadaReceiverAvatar}>
+                  <Text style={styles.tagadaReceiverAvatarText}>
+                    {(selectedAccount.name || 'খ')[0]}
+                  </Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.tagadaReceiverName}>{selectedAccount.name}</Text>
+                  <Text style={styles.tagadaReceiverPhone}>{selectedAccount.phone || 'মোবাইল নম্বর নেই'}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.tagadaReceiverDueLabel}>বকেয়া</Text>
+                  <Text style={styles.tagadaReceiverDueAmount}>৳ {formatMoney(selectedAccount.balance)}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {/* Dotted SMS Container (bg_rect_dotted.xml) */}
+            <View style={styles.tagadaDottedBox}>
+              <Text style={styles.tagadaMessageContent}>
+                {generateTagadaMessage(selectedAccount)}
+              </Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+
+            {/* Instructions */}
+            <Text style={styles.tagadaActionPrompt}>তাগাদা পাঠাতে ট্যাপ করুন।</Text>
+
+            {/* Authentic Dual Action Buttons (lay_buttons) */}
+            <View style={styles.tagadaDualBtnRow}>
               <TouchableOpacity
-                style={[styles.tagadaShareBtn, { backgroundColor: COLORS.blue }]}
+                style={styles.tagadaTallyMsgBtn}
                 onPress={() => handleSendTagadaSMS(selectedAccount)}
+                activeOpacity={0.85}
               >
-                <Text style={styles.tagadaShareBtnText}>সাধারণ SMS</Text>
+                <Image
+                  source={require('./assets/icons/ic_sms.png')}
+                  style={{ width: 22, height: 22, marginRight: 8, tintColor: '#FFFFFF' }}
+                  resizeMode="contain"
+                />
+                <View>
+                  <Text style={styles.tagadaTallyMsgText}>টালি-মেসেজ পাঠাই</Text>
+                  <Text style={styles.tagadaTallyMsgSub}>অবশিষ্ট: ০৫</Text>
+                </View>
               </TouchableOpacity>
+
               <TouchableOpacity
-                style={[styles.tagadaShareBtn, { backgroundColor: COLORS.green }]}
+                style={styles.tagadaShareAppBtn}
                 onPress={() => handleSendTagadaWhatsApp(selectedAccount)}
+                activeOpacity={0.85}
               >
-                <Text style={styles.tagadaShareBtnText}>WhatsApp</Text>
+                <Image
+                  source={require('./assets/icons/ic_share.png')}
+                  style={{ width: 20, height: 20, marginRight: 6, tintColor: '#1A1A1A' }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.tagadaShareAppText}>শেয়ার করি</Text>
               </TouchableOpacity>
             </View>
+
             <TouchableOpacity
-              style={[styles.modalBtnCancel, { marginTop: 12 }]}
+              style={[styles.modalBtnCancel, { marginTop: 14 }]}
               onPress={() => setModalTagada(false)}
             >
-              <Text style={styles.modalBtnCancelText}>বন্ধ করুন</Text>
+              <Text style={styles.modalBtnCancelText}>বাতিল</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -59,20 +59,34 @@
   }
 
   // =========================================================================
-  // VIEW A: CUSTOMER / SUPPLIER ACCOUNT LEDGER SCREEN
+  // VIEW A: CUSTOMER / SUPPLIER ACCOUNT LEDGER SCREEN (activity_customer_report_v2.xml)
   // =========================================================================
   if (currentScreen === 'account_ledger' && selectedAccount) {
     const isCustomer = selectedAccount.type === 1;
     const accountJournals = (journals || []).filter((j) => j.accountId === selectedAccount.id);
+    const totalGiven = accountJournals
+      .filter((j) => j.type === 'given')
+      .reduce((sum, j) => sum + Number(j.amount || 0), 0);
+    const totalReceived = accountJournals
+      .filter((j) => j.type === 'received')
+      .reduce((sum, j) => sum + Number(j.amount || 0), 0);
 
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-        {/* Ledger Top Header */}
+        {/* Ledger Top Header (matching authentic activity_customer_report_v2.xml toolbar) */}
         <View style={styles.ledgerHeaderNav}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentScreen('home')}>
-            <Text style={styles.backBtnText}>← খাতা</Text>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => setCurrentScreen('home')}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={require("./assets/icons/arrow_left.png")}
+              style={{ width: 22, height: 22, tintColor: '#1A1A1A' }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
           <View style={styles.ledgerHeaderTitleBox}>
             <Text style={styles.ledgerHeaderName} numberOfLines={1}>{selectedAccount.name}</Text>
@@ -80,33 +94,34 @@
               {isCustomer ? 'কাস্টমার হিসাব' : 'সাপ্লায়ার হিসাব'}
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             {selectedAccount.phone ? (
               <TouchableOpacity
                 style={styles.headerIconBtn}
                 onPress={() => handleMakeCall(selectedAccount.phone)}
+                activeOpacity={0.7}
               >
-                <Image source={require("./assets/icons/ic_call.png")} style={{ width: 18, height: 18 }} resizeMode="contain" />
+                <Image source={require("./assets/icons/ic_call.png")} style={{ width: 20, height: 20, tintColor: '#0F8A0F' }} resizeMode="contain" />
               </TouchableOpacity>
             ) : null}
-            {isCustomer ? (
-              <TouchableOpacity
-                style={styles.headerIconBtn}
-                onPress={() => setModalTagada(true)}
-              >
-                <Image source={require("./assets/icons/ic_share.png")} style={{ width: 18, height: 18 }} resizeMode="contain" />
-              </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity style={styles.headerIconBtn} onPress={handleOpenEditAccount}>
-              <Image source={require("./assets/icons/ic_edit.png")} style={{ width: 18, height: 18 }} resizeMode="contain" />
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={handleOpenEditAccount}
+              activeOpacity={0.7}
+            >
+              <Image source={require("./assets/icons/ic_edit.png")} style={{ width: 20, height: 20, tintColor: '#4D4D4D' }} resizeMode="contain" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.deleteAccBtn} onPress={handleDeleteAccount}>
-              <Text style={styles.deleteAccBtnText}>মুছুন</Text>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={handleDeleteAccount}
+              activeOpacity={0.7}
+            >
+              <Image source={require("./assets/icons/ic_delete.png")} style={{ width: 20, height: 20, tintColor: '#B81414' }} resizeMode="contain" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Account Profile Card */}
+        {/* Account Profile Card (layout_customer_info_holder.xml) */}
         <View style={styles.accountProfileCard}>
           <View style={[styles.profileAvatar, { backgroundColor: isCustomer ? COLORS.redLight : COLORS.greenLight }]}>
             <Text style={[styles.profileAvatarText, { color: isCustomer ? COLORS.primary : COLORS.green }]}>
@@ -119,7 +134,7 @@
               {selectedAccount.phone || 'মোবাইল নম্বর নেই'}
             </Text>
             {selectedAccount.address ? (
-              <Text style={styles.profileAddress}>{selectedAccount.address}</Text>
+              <Text style={styles.profileAddress} numberOfLines={1}>{selectedAccount.address}</Text>
             ) : null}
           </View>
           <View style={{ alignItems: 'flex-end' }}>
@@ -132,14 +147,15 @@
           </View>
         </View>
 
-        {/* Quick Action Chips */}
+        {/* Quick Action Chips: তাগাদা পাঠান, কল করুন, স্টেটমেন্ট শেয়ার */}
         <View style={styles.ledgerQuickActions}>
           {isCustomer ? (
             <TouchableOpacity
               style={styles.quickActionItem}
               onPress={() => setModalTagada(true)}
+              activeOpacity={0.7}
             >
-              <Image source={require('./assets/icons/ic_share.png')} style={{ width: 20, height: 20, marginBottom: 4 }} resizeMode="contain" />
+              <Image source={require('./assets/icons/ic_sms.png')} style={{ width: 20, height: 20, marginBottom: 4 }} resizeMode="contain" />
               <Text style={styles.quickActionLabel}>তাগাদা পাঠান</Text>
             </TouchableOpacity>
           ) : null}
@@ -147,8 +163,9 @@
             <TouchableOpacity
               style={styles.quickActionItem}
               onPress={() => handleMakeCall(selectedAccount.phone)}
+              activeOpacity={0.7}
             >
-              <Image source={require('./assets/icons/ic_call.png')} style={{ width: 20, height: 20, marginBottom: 4 }} resizeMode="contain" />
+              <Image source={require('./assets/icons/ic_call.png')} style={{ width: 20, height: 20, marginBottom: 4, tintColor: '#0F8A0F' }} resizeMode="contain" />
               <Text style={styles.quickActionLabel}>কল করুন</Text>
             </TouchableOpacity>
           ) : null}
@@ -161,30 +178,30 @@
                 `মোবাইল: ${selectedAccount.phone || 'দেওয়া নেই'}\n` +
                 `বর্তমান বকেয়া: ৳ ${formatMoney(selectedAccount.balance)}\n` +
                 `মোট লেনদেন: ${accountJournals.length} টি\n` +
+                `দিলাম মোট: ৳ ${formatMoney(totalGiven)}\n` +
+                `পেলাম মোট: ৳ ${formatMoney(totalReceived)}\n` +
                 `যোগাযোগ: ${ownerPhone}`;
               Share.share({ message: fullStatement });
             }}
+            activeOpacity={0.7}
           >
             <Image source={require('./assets/icons/ic_pdf.png')} style={{ width: 20, height: 20, marginBottom: 4 }} resizeMode="contain" />
             <Text style={styles.quickActionLabel}>স্টেটমেন্ট শেয়ার</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Ledger Table Column Headers */}
+        {/* Ledger Table Column Headers (layout_credit_details_table_head: লেনদেনের বিবরণ, দিলাম, পেলাম) */}
         <View style={styles.ledgerTableHeader}>
-          <Text style={[styles.ledgerColHeader, { flex: 1.4 }]}>তারিখ ও বিবরণ</Text>
+          <Text style={[styles.ledgerColHeader, { flex: 1.6 }]}>লেনদেনের বিবরণ</Text>
           <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: COLORS.red }]}>
-            দিলাম (-)
+            দিলাম
           </Text>
           <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: COLORS.green }]}>
-            পেলাম (+)
-          </Text>
-          <Text style={[styles.ledgerColHeader, { flex: 1.1, textAlign: 'right', color: COLORS.textMuted }]}>
-            ব্যালেন্স
+            পেলাম
           </Text>
         </View>
 
-        {/* Ledger Transactions List */}
+        {/* Ledger Transactions List (rvCustomerCreditDetails) */}
         <FlatList
           data={accountJournals}
           keyExtractor={(item) => item.id}
@@ -198,31 +215,27 @@
                   setSelectedVoucherTxn(item);
                   setModalVoucher(true);
                 }}
+                activeOpacity={0.7}
               >
-                <View style={{ flex: 1.4 }}>
+                <View style={{ flex: 1.6 }}>
                   <Text style={styles.ledgerRowDesc}>{item.desc || 'সাধারণ লেনদেন'}</Text>
                   <Text style={styles.ledgerRowDate}>
                     {formatDisplayDate(item.date)} {item.time ? '• ' + item.time : ''}
                   </Text>
                 </View>
-                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
                   {isGiven ? (
                     <Text style={styles.ledgerGivenAmount}>৳ {formatMoney(item.amount)}</Text>
                   ) : (
                     <Text style={styles.dashMuted}>-</Text>
                   )}
                 </View>
-                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
                   {!isGiven ? (
                     <Text style={styles.ledgerReceivedAmount}>৳ {formatMoney(item.amount)}</Text>
                   ) : (
                     <Text style={styles.dashMuted}>-</Text>
                   )}
-                </View>
-                <View style={{ flex: 1.1, alignItems: 'flex-end' }}>
-                  <Text style={styles.ledgerRowBalance}>
-                    ৳ {formatMoney(item.runningBalance !== undefined ? item.runningBalance : selectedAccount.balance)}
-                  </Text>
                 </View>
               </TouchableOpacity>
             );
@@ -236,17 +249,30 @@
           }
         />
 
+        {/* Bottom Summary Totals Strip (bottomLinearLayout from activity_customer_report_v2.xml) */}
+        <View style={styles.ledgerBottomTotalsStrip}>
+          <Text style={styles.ledgerBottomTotalLabel}>মোট</Text>
+          <View style={styles.ledgerBottomTotalCreditBox}>
+            <Text style={styles.ledgerBottomTotalCreditVal}>৳ {formatMoney(totalGiven)}</Text>
+          </View>
+          <View style={styles.ledgerBottomTotalReceivedBox}>
+            <Text style={styles.ledgerBottomTotalReceivedVal}>৳ {formatMoney(totalReceived)}</Text>
+          </View>
+        </View>
+
         {/* Bottom Dual Entry Bar (দিলাম / পেলাম) */}
         <View style={styles.ledgerBottomBar}>
           <TouchableOpacity
             style={[styles.bigEntryBtn, { backgroundColor: COLORS.primary }]}
             onPress={() => handleOpenAddTxn('given')}
+            activeOpacity={0.85}
           >
             <Text style={styles.bigEntryBtnText}>- দিলাম (বাকি)</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.bigEntryBtn, { backgroundColor: COLORS.green }]}
             onPress={() => handleOpenAddTxn('received')}
+            activeOpacity={0.85}
           >
             <Text style={styles.bigEntryBtnText}>+ পেলাম (জমা)</Text>
           </TouchableOpacity>
@@ -964,6 +990,45 @@
                   <Image source={require("./assets/ic_bangla_qr.png")} style={{ width: 24, height: 24 }} resizeMode="contain" />
                 </View>
                 <Text style={styles.walletServiceLabel}>কিউআর পেমেন্ট</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Authentic SQR Promo Banner (layoutSqrPromo from fragment_tp_wallet_main.xml) */}
+            <View style={styles.walletPromoCard}>
+              <Image
+                source={require('./assets/ic_qr_support_all_apps.png')}
+                style={{ width: '100%', height: 75, marginBottom: 12 }}
+                resizeMode="contain"
+              />
+              <Text style={styles.walletPromoTitle}>
+                টালিপে QR — ব্যবসায়ীদের জন্য সেরা বাংলা QR
+              </Text>
+              <View style={styles.walletPromoBenefitRow}>
+                <Image
+                  source={require('./assets/icons/ic_check.png')}
+                  style={{ width: 16, height: 16, tintColor: '#0F8A0F', marginRight: 8, marginTop: 2 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.walletPromoBenefitText}>
+                  টালিপে QR-এ পেমেন্ট নিন নগদ, বিকাশ, রকেট সহ সকল ব্যাংক অ্যাপ থেকে।
+                </Text>
+              </View>
+              <View style={styles.walletPromoBenefitRow}>
+                <Image
+                  source={require('./assets/icons/ic_check.png')}
+                  style={{ width: 16, height: 16, tintColor: '#0F8A0F', marginRight: 8, marginTop: 2 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.walletPromoBenefitText}>
+                  ইনস্ট্যান্ট পেমেন্ট বা টাকা ট্রান্সফার করুন ব্যাংক বা MFS একাউন্টে।
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.walletPromoCtaBtn}
+                onPress={() => setModalBanglaQR(true)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.walletPromoCtaText}>টালিপে QR নিন</Text>
               </TouchableOpacity>
             </View>
 
