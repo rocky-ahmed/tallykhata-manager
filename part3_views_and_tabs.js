@@ -292,7 +292,7 @@
       <View style={styles.topHeaderBar}>
         <TouchableOpacity
           style={styles.headerLeftBiz}
-          onPress={() => setModalSettings(true)}
+          onPress={() => setModalBusinessPicker(true)}
           activeOpacity={0.8}
         >
           <View style={styles.headerStoreIcon}>
@@ -398,13 +398,10 @@
       {/* --- DASHBOARD SUMMARY CARDS (layout_sale_cash_total.xml) --- */}
       <View style={styles.dashboardContainer}>
         <View style={styles.dashboardRow}>
-          {/* Left Card: মোট পাবো */}
+          {/* Left Card: মোট পাবো (opens Baki Report) */}
           <TouchableOpacity
             style={styles.dashboardCard}
-            onPress={() => {
-              setAccountTab('customer');
-              setActiveTab('home');
-            }}
+            onPress={() => setModalBakiReport(true)}
             activeOpacity={0.8}
           >
             <Text style={[styles.dashAmount, { color: '#B81414' }]}>
@@ -673,7 +670,7 @@
             <View style={styles.cashActionBarRow}>
               <TouchableOpacity
                 style={styles.cashActionBarBtn}
-                onPress={() => setModalFullReport(true)}
+                onPress={() => setModalCashReport(true)}
               >
                 <Image
                   source={require('./assets/icons/ic_menu_report.png')}
@@ -769,7 +766,10 @@
                     key={item.cat}
                     style={styles.cashAccountRow}
                     onPress={() => {
-                      setCashFilter(item.cat);
+                      if (item.cat === 'sale' || item.cat === 'buy') setModalBechaKena(true);
+                      else if (item.cat === 'cost') setModalExpenseReport(true);
+                      else if (item.cat === 'malik_in' || item.cat === 'malik_out') setModalMalikReport(true);
+                      else setCashFilter(item.cat);
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -837,37 +837,77 @@
         )}
 
         {/* ===================================================================
-            TAB 3: TAGADA (তাগাদা বার্তা কালেকশন)
+            TAB 3: TAGADA (তাগাদা বার্তা কালেকশন - activity_tagada.xml)
            =================================================================== */}
         {activeTab === 'tagada' && (
           <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
+            {/* Tagada Header Card with SMS Quota Badge */}
             <View style={styles.tagadaHeaderCard}>
-              <Text style={styles.tagadaHeaderTitle}>বকেয়া তাগাদা কালেকশন</Text>
-              <Text style={styles.tagadaHeaderSub}>
-                যেসব কাস্টমারের কাছে বাকি রয়েছে তাদের সরাসরি SMS বা WhatsApp-এ স্বয়ংক্রিয় তাগাদা পাঠান।
-              </Text>
-              <Text style={styles.tagadaHeaderCount}>
-                বকেয়া কাস্টমার: {dueCustomers.length} জন (মোট বাকি ৳ {formatMoney(totalCustomerDue)})
-              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tagadaHeaderTitle}>বকেয়া তাগাদা কালেকশন</Text>
+                  <Text style={styles.tagadaHeaderSub}>
+                    বকেয়া কাস্টমারদের সরাসরি টালি-মেসেজ ও WhatsApp তাগাদা পাঠান।
+                  </Text>
+                </View>
+                <View style={styles.tagadaQuotaBadge}>
+                  <Text style={styles.tagadaQuotaText}>ফ্রি এসএমএস</Text>
+                  <Text style={styles.tagadaQuotaCount}>অবশিষ্ট: {remainingSmsCount < 10 ? '০' + remainingSmsCount : remainingSmsCount} টি</Text>
+                </View>
+              </View>
+
+              <View style={styles.tagadaSummaryStrip}>
+                <Text style={styles.tagadaSummaryText}>
+                  বকেয়া কাস্টমার: <Text style={{ fontWeight: 'bold' }}>{dueCustomers.length} জন</Text>
+                </Text>
+                <Text style={styles.tagadaSummaryText}>
+                  মোট বাকি: <Text style={{ fontWeight: 'bold', color: '#B81414' }}>৳ {formatMoney(totalCustomerDue)}</Text>
+                </Text>
+              </View>
             </View>
 
+            {/* Bulk Tagada Action Banner (গ্রুপ তাগাদা) */}
+            <TouchableOpacity
+              style={styles.bulkTagadaBanner}
+              onPress={handleSendBulkTagada}
+              activeOpacity={0.85}
+            >
+              <Image source={require('./assets/icons/ic_sms.png')} style={{ width: 22, height: 22, tintColor: '#FFFFFF', marginRight: 10 }} resizeMode="contain" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bulkTagadaTitle}>গ্রুপ তাগাদা পাঠান</Text>
+                <Text style={styles.bulkTagadaSub}>একসাথে সব {dueCustomers.length} জন বাকি কাস্টমারকে এসএমএস পাঠান</Text>
+              </View>
+              <Text style={styles.bulkTagadaArrow}>›</Text>
+            </TouchableOpacity>
+
+            {/* Due Customers List */}
             <View style={{ paddingHorizontal: 12, marginTop: 12 }}>
+              <Text style={styles.sectionHeading}>বাকি কাস্টমারের তালিকা ({dueCustomers.length})</Text>
+
               {dueCustomers.map((item) => (
                 <View key={item.id} style={styles.tagadaCardItem}>
-                  <View style={{ flex: 1 }}>
+                  <View style={[styles.profileAvatar, { backgroundColor: '#FEE2E2', width: 44, height: 44, borderRadius: 22 }]}>
+                    <Text style={[styles.profileAvatarText, { color: '#B81414', fontSize: 18 }]}>
+                      {(item.name || 'ক')[0]}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.tagadaCustName}>{item.name}</Text>
-                    <Text style={styles.tagadaCustPhone}>{item.phone || 'মোবাইল নেই'}</Text>
-                    <Text style={styles.tagadaCustDue}>বকেয়া: ৳ {formatMoney(item.balance)}</Text>
+                    <Text style={styles.tagadaCustPhone}>{item.phone || 'মোবাইল নম্বর নেই'}</Text>
+                    <Text style={styles.tagadaCustDue}>বকেয়া বাকি: ৳ {formatMoney(item.balance)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                     <TouchableOpacity
-                      style={[styles.tagadaActionBtn, { backgroundColor: COLORS.blue }]}
-                      onPress={() => handleSendTagadaSMS(item)}
+                      style={[styles.tagadaActionBtn, { backgroundColor: '#B81414' }]}
+                      onPress={() => {
+                        setTagadaCustomer(item);
+                        setModalTagada(true);
+                      }}
                     >
-                      <Text style={styles.tagadaActionBtnText}>SMS</Text>
+                      <Text style={styles.tagadaActionBtnText}>টালি-মেসেজ</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.tagadaActionBtn, { backgroundColor: COLORS.green }]}
+                      style={[styles.tagadaActionBtn, { backgroundColor: '#25D366' }]}
                       onPress={() => handleSendTagadaWhatsApp(item)}
                     >
                       <Text style={styles.tagadaActionBtnText}>WhatsApp</Text>
@@ -1126,7 +1166,7 @@
             <View style={styles.menuListContainer}>
               <TouchableOpacity
                 style={styles.menuListItem}
-                onPress={() => setModalProfitLoss(true)}
+                onPress={() => setModalBechaKena(true)}
               >
                 <Image source={require('./assets/icons/ic_menu_profit.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>
@@ -1138,10 +1178,7 @@
 
               <TouchableOpacity
                 style={styles.menuListItem}
-                onPress={() => {
-                  setCashFilter('cost');
-                  setActiveTab('cashbox');
-                }}
+                onPress={() => setModalExpenseReport(true)}
               >
                 <Image source={require('./assets/icons/ic_cash_cost.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>
@@ -1153,10 +1190,7 @@
 
               <TouchableOpacity
                 style={styles.menuListItem}
-                onPress={() => {
-                  setAccountTab('customer');
-                  setActiveTab('home');
-                }}
+                onPress={() => setModalBakiReport(true)}
               >
                 <Image source={require('./assets/icons/ic_share.png')} style={{ width: 22, height: 22, tintColor: '#B81414' }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>
@@ -1174,6 +1208,18 @@
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>সার্বিক হিসাব রিপোর্ট</Text>
                   <Text style={styles.menuListSub}>দৈনিক, মাসিক ও বার্ষিক স্টেটমেন্ট তৈরি ও শেয়ার</Text>
+                </View>
+                <Text style={styles.menuListArrow}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalMalikReport(true)}
+              >
+                <Image source={require('./assets/icons/ic_malik_in.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>মালিকের হিসাব</Text>
+                  <Text style={styles.menuListSub}>মালিকের বিনিয়োগ ও ব্যক্তিগত উত্তোলন স্টেটমেন্ট</Text>
                 </View>
                 <Text style={styles.menuListArrow}>›</Text>
               </TouchableOpacity>

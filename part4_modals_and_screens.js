@@ -473,69 +473,122 @@
       {/* ===================================================================
           MODAL: RECONCILE CASH (ক্যাশবক্স মিলানো)
          =================================================================== */}
-      <Modal visible={modalReconcileCash} animationType="slide" transparent onRequestClose={() => setModalReconcileCash(false)}>
+      <Modal
+        visible={modalReconcileCash}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalReconcileCash(false)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { maxHeight: '90%', padding: 16 }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>দিনশেষে ক্যাশবক্স মিলানো</Text>
+              <View>
+                <Text style={styles.modalCardTitle}>ক্যাশবক্স মিলানো (নোট গণনা)</Text>
+                <Text style={{ fontSize: 11, color: COLORS.textMuted }}>খাতার ক্যাশ: ৳ {formatMoney(totalCash)}</Text>
+              </View>
               <TouchableOpacity onPress={() => setModalReconcileCash(false)} style={{ padding: 4 }}>
                 <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.reconcileBox}>
-              <View style={styles.reconcileRow}>
-                <Text style={styles.reconcileLabel}>খাতার হিসাব অনুযায়ী ক্যাশ:</Text>
-                <Text style={[styles.reconcileVal, { color: COLORS.primary }]}>৳ {formatMoney(totalCash)}</Text>
+            <ScrollView style={{ marginVertical: 8 }}>
+              <View style={styles.denomContainer}>
+                <View style={styles.denomHeaderRow}>
+                  <Text style={styles.denomHeaderCol}>নোটের মান</Text>
+                  <Text style={styles.denomHeaderCol}>সংখ্যা (টি)</Text>
+                  <Text style={styles.denomHeaderCol}>মোট টাকা</Text>
+                </View>
+
+                {[
+                  { label: '৳ ১০০০', value: 1000, state: notes1000, setter: setNotes1000 },
+                  { label: '৳ ৫০০', value: 500, state: notes500, setter: setNotes500 },
+                  { label: '৳ ২০০', value: 200, state: notes200, setter: setNotes200 },
+                  { label: '৳ ১০০', value: 100, state: notes100, setter: setNotes100 },
+                  { label: '৳ ৫০', value: 50, state: notes50, setter: setNotes50 },
+                  { label: '৳ ২০', value: 20, state: notes20, setter: setNotes20 },
+                  { label: '৳ ১০', value: 10, state: notes10, setter: setNotes10 },
+                  { label: '৳ ৫', value: 5, state: notes5, setter: setNotes5 },
+                  { label: '৳ ২', value: 2, state: notes2, setter: setNotes2 },
+                  { label: '৳ ১', value: 1, state: notes1, setter: setNotes1 },
+                ].map((row) => {
+                  const qty = Number(row.state) || 0;
+                  const subtotal = qty * row.value;
+                  return (
+                    <View key={row.label} style={styles.denomItemRow}>
+                      <Text style={styles.denomNoteTag}>{row.label}</Text>
+                      <Text style={styles.denomX}>×</Text>
+                      <TextInput
+                        style={styles.denomQtyInput}
+                        placeholder="০"
+                        placeholderTextColor={COLORS.textSubtle}
+                        keyboardType="numeric"
+                        value={row.state}
+                        onChangeText={row.setter}
+                      />
+                      <Text style={styles.denomEq}>=</Text>
+                      <Text style={styles.denomSubtotal}>৳ {formatMoney(subtotal)}</Text>
+                    </View>
+                  );
+                })}
               </View>
-              <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4 }}>
-                আপনার ড্রয়ারে গুনে পাওয়া আসল ক্যাশ টাকার পরিমাণ নিচে লিখুন:
-              </Text>
-              <TextInput
-                style={[styles.modalBigInput, { marginTop: 10 }]}
-                placeholder="ড্রয়ারের আসল ক্যাশ টাকা"
-                placeholderTextColor={COLORS.textSubtle}
-                keyboardType="numeric"
-                autoFocus
-                value={countedCash}
-                onChangeText={setCountedCash}
-              />
-              {countedCash ? (
-                <View style={styles.reconcileResultBox}>
+
+              <View style={styles.denomSummaryBox}>
+                <View style={styles.denomSummaryRow}>
+                  <Text style={styles.denomSummaryLabel}>মোট গুনে পাওয়া ক্যাশ:</Text>
+                  <Text style={[styles.denomSummaryVal, { color: COLORS.green }]}>
+                    ৳ {formatMoney(countedFromNotes)}
+                  </Text>
+                </View>
+                <View style={styles.denomSummaryRow}>
+                  <Text style={styles.denomSummaryLabel}>খাতায় বর্তমান ক্যাশ:</Text>
+                  <Text style={styles.denomSummaryVal}>
+                    ৳ {formatMoney(totalCash)}
+                  </Text>
+                </View>
+                <View style={[styles.denomSummaryRow, { borderTopWidth: 1, borderColor: '#E5E7EB', paddingTop: 6, marginTop: 4 }]}>
                   {(() => {
-                    const counted = parseFloat(countedCash) || 0;
-                    const diff = counted - totalCash;
+                    const diff = countedFromNotes - totalCash;
+                    if (countedFromNotes === 0) {
+                      return (
+                        <Text style={{ fontSize: 12, color: COLORS.textMuted }}>
+                          নোটের সংখ্যা লিখে ড্রয়ারের সঠিক ক্যাশ মিলান।
+                        </Text>
+                      );
+                    }
                     if (diff === 0) {
                       return (
-                        <Text style={{ color: COLORS.green, fontWeight: 'bold' }}>
-                          কোনো গরমিল নেই! খাতার হিসাব এবং ড্রয়ারের টাকা পুরোপুরি মিলে গেছে।
+                        <Text style={{ fontSize: 13, color: COLORS.green, fontWeight: 'bold' }}>
+                          ✓ ক্যাশ পুরোপুরি মিলে গেছে! কোনো গরমিল নেই।
                         </Text>
                       );
                     } else if (diff > 0) {
                       return (
-                        <Text style={{ color: COLORS.blue, fontWeight: 'bold' }}>
-                          ℹ️ ড্রয়ারে ৳ {formatMoney(diff)} টাকা বেশি রয়েছে।
+                        <Text style={{ fontSize: 13, color: COLORS.blue, fontWeight: 'bold' }}>
+                          ℹ️ ড্রয়ারে ৳ {formatMoney(diff)} অতিরিক্ত ক্যাশ রয়েছে।
                         </Text>
                       );
                     } else {
                       return (
-                        <Text style={{ color: COLORS.red, fontWeight: 'bold' }}>
-                          ড্রয়ারে ৳ {formatMoney(Math.abs(diff))} টাকা ঘাটতি রয়েছে!
+                        <Text style={{ fontSize: 13, color: COLORS.red, fontWeight: 'bold' }}>
+                          ⚠️ ড্রয়ারে ৳ {formatMoney(Math.abs(diff))} ক্যাশ ঘাটতি রয়েছে!
                         </Text>
                       );
                     }
                   })()}
                 </View>
-              ) : null}
-            </View>
+              </View>
+            </ScrollView>
 
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalReconcileCash(false)}>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setModalReconcileCash(false)}
+              >
                 <Text style={styles.modalBtnCancelText}>বাতিল</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
-                onPress={handleSaveReconciliation}
+                onPress={handleSaveDenominations}
               >
                 <Text style={styles.modalBtnSubmitText}>সমন্বয় সংরক্ষণ</Text>
               </TouchableOpacity>
@@ -887,7 +940,6 @@
       <Modal visible={modalTagada} animationType="fade" transparent onRequestClose={() => setModalTagada(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { padding: 18 }]}>
-            {/* Toolbar (activity_tagada_v2.xml) */}
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>তাগাদা মেসেজ</Text>
               <TouchableOpacity onPress={() => setModalTagada(false)} style={{ padding: 4 }}>
@@ -895,7 +947,6 @@
               </TouchableOpacity>
             </View>
 
-            {/* Receiver User Info Card (layout_tagada_receiver_user_info.xml) */}
             {selectedAccount ? (
               <View style={styles.tagadaReceiverCard}>
                 <View style={styles.tagadaReceiverAvatar}>
@@ -914,21 +965,18 @@
               </View>
             ) : null}
 
-            {/* Dotted SMS Container (bg_rect_dotted.xml) */}
             <View style={styles.tagadaDottedBox}>
               <Text style={styles.tagadaMessageContent}>
                 {generateTagadaMessage(selectedAccount)}
               </Text>
             </View>
 
-            {/* Instructions */}
             <Text style={styles.tagadaActionPrompt}>তাগাদা পাঠাতে ট্যাপ করুন।</Text>
 
-            {/* Authentic Dual Action Buttons (lay_buttons) */}
             <View style={styles.tagadaDualBtnRow}>
               <TouchableOpacity
                 style={styles.tagadaTallyMsgBtn}
-                onPress={() => handleSendTagadaSMS(selectedAccount)}
+                onPress={() => handleSendSingleTagada(selectedAccount)}
                 activeOpacity={0.85}
               >
                 <Image
@@ -938,7 +986,9 @@
                 />
                 <View>
                   <Text style={styles.tagadaTallyMsgText}>টালি-মেসেজ পাঠাই</Text>
-                  <Text style={styles.tagadaTallyMsgSub}>অবশিষ্ট: ০৫</Text>
+                  <Text style={styles.tagadaTallyMsgSub}>
+                    অবশিষ্ট: {remainingSmsCount < 10 ? '০' + remainingSmsCount : remainingSmsCount}
+                  </Text>
                 </View>
               </TouchableOpacity>
 
@@ -952,7 +1002,7 @@
                   style={{ width: 20, height: 20, marginRight: 6, tintColor: '#1A1A1A' }}
                   resizeMode="contain"
                 />
-                <Text style={styles.tagadaShareAppText}>শেয়ার করি</Text>
+                <Text style={styles.tagadaShareAppText}>WhatsApp শেয়ার</Text>
               </TouchableOpacity>
             </View>
 
@@ -1366,6 +1416,770 @@
           </View>
         </View>
       </Modal>
+
+      {/* 1. BUSINESS PICKER */}
+      <Modal
+        visible={modalBusinessPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalBusinessPicker(false)}
+      >
+        <View style={styles.bottomSheetOverlay}>
+          <View style={styles.bottomSheetCard}>
+            <View style={styles.bottomSheetHandle} />
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>ব্যবসা প্রতিষ্ঠান পরিবর্তন</Text>
+              <TouchableOpacity onPress={() => setModalBusinessPicker(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 340, marginVertical: 8 }}>
+              {(businesses || []).map((biz) => {
+                const isSelected = biz.isSelected || biz.name === businessName;
+                return (
+                  <TouchableOpacity
+                    key={biz.id}
+                    style={[styles.bizPickerItem, isSelected && styles.bizPickerItemActive]}
+                    onPress={() => {
+                      handleSelectBusiness(biz);
+                      setModalBusinessPicker(false);
+                    }}
+                  >
+                    <View style={styles.bizPickerAvatar}>
+                      <Image
+                        source={require('./assets/ic_tally_khata_logo_reg.png')}
+                        style={{ width: 28, height: 28 }}
+                        resizeMode="contain"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.bizPickerName}>{biz.name}</Text>
+                      <Text style={styles.bizPickerSub}>{biz.owner || 'স্বত্বাধিকারী'} • {biz.phone || '01700000000'}</Text>
+                      {biz.address ? <Text style={[styles.bizPickerSub, { fontSize: 11 }]}>{biz.address}</Text> : null}
+                    </View>
+                    <View style={[styles.bizPickerRadio, isSelected && styles.bizPickerRadioActive]}>
+                      {isSelected ? <View style={styles.bizPickerRadioInner} /> : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.bizAddBtn}
+              onPress={() => {
+                setModalBusinessPicker(false);
+                setModalAddBusiness(true);
+              }}
+            >
+              <Text style={{ fontSize: 18, color: '#FFFFFF' }}>➕</Text>
+              <Text style={styles.bizAddBtnText}>নতুন ব্যবসা প্রতিষ্ঠান যোগ করুন</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 2. ADD BUSINESS */}
+      <Modal
+        visible={modalAddBusiness}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalAddBusiness(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { padding: 18 }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>নতুন ব্যবসা প্রতিষ্ঠান</Text>
+              <TouchableOpacity onPress={() => setModalAddBusiness(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>ব্যবসার নাম *</Text>
+            <TextInput
+              style={styles.modalSimpleInput}
+              placeholder="যেমন: মেসার্স ভাই ভাই ট্রেডার্স"
+              placeholderTextColor={COLORS.textSubtle}
+              value={newBizName}
+              onChangeText={setNewBizName}
+            />
+
+            <Text style={styles.inputLabel}>স্বত্বাধিকারীর নাম</Text>
+            <TextInput
+              style={styles.modalSimpleInput}
+              placeholder="স্বত্বাধিকারীর নাম"
+              placeholderTextColor={COLORS.textSubtle}
+              value={newBizOwner}
+              onChangeText={setNewBizOwner}
+            />
+
+            <Text style={styles.inputLabel}>মোবাইল নম্বর</Text>
+            <TextInput
+              style={styles.modalSimpleInput}
+              placeholder="০১৭১১..."
+              placeholderTextColor={COLORS.textSubtle}
+              keyboardType="phone-pad"
+              value={newBizPhone}
+              onChangeText={setNewBizPhone}
+            />
+
+            <Text style={styles.inputLabel}>ব্যবসার ঠিকানা</Text>
+            <TextInput
+              style={styles.modalSimpleInput}
+              placeholder="দোকান/বাজারের ঠিকানা"
+              placeholderTextColor={COLORS.textSubtle}
+              value={newBizAddress}
+              onChangeText={setNewBizAddress}
+            />
+
+            <View style={[styles.modalBtnRow, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setModalAddBusiness(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
+                onPress={handleCreateBusiness}
+              >
+                <Text style={styles.modalBtnSubmitText}>সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+
+      {/* 3. BECHA KENA REPORT */}
+      <Modal
+        visible={modalBechaKena}
+        animationType="slide"
+        onRequestClose={() => setModalBechaKena(false)}
+      >
+        <SafeAreaView style={styles.reportContainer}>
+          <View style={styles.reportHeader}>
+            <TouchableOpacity onPress={() => setModalBechaKena(false)} style={styles.reportHeaderBack}>
+              <Text style={styles.reportHeaderBackText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.reportHeaderTitle}>বেচাকেনা রিপোর্ট</Text>
+            <TouchableOpacity
+              style={styles.reportHeaderAction}
+              onPress={() => {
+                Share.share({
+                  message: `${businessName} - বেচাকেনা রিপোর্ট`,
+                });
+              }}
+            >
+              <Text style={styles.reportHeaderActionText}>শেয়ার</Text>
+            </TouchableOpacity>
+          </View>
+
+          {(() => {
+            const cashBecha = (cashEntries || [])
+              .filter((e) => e.category === 'sale')
+              .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+            const cashKena = (cashEntries || [])
+              .filter((e) => e.category === 'buy')
+              .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+            const bakiBecha = (journals || [])
+              .filter((j) => j.type === 'give')
+              .reduce((sum, j) => sum + (Number(j.amount) || 0), 0);
+            const bakiKena = (journals || [])
+              .filter((j) => j.type === 'got')
+              .reduce((sum, j) => sum + (Number(j.amount) || 0), 0);
+            const totalBecha = cashBecha + bakiBecha;
+            const totalKena = cashKena + bakiKena;
+
+            const salesList = (cashEntries || [])
+              .filter((e) => e.category === 'sale' || e.category === 'buy')
+              .map((e) => ({
+                id: e.id,
+                title: e.desc || (e.category === 'sale' ? 'ক্যাশ বেচা' : 'ক্যাশ কেনা'),
+                amount: e.amount,
+                date: e.date,
+                time: e.time,
+                isSale: e.category === 'sale',
+                tag: 'ক্যাশ',
+              }));
+
+            return (
+              <ScrollView style={{ flex: 1 }}>
+                <View style={styles.reportKpiRow}>
+                  <View style={styles.reportKpiCard}>
+                    <Text style={styles.reportKpiLabel}>মোট বেচা (ক্যাশ+বাকি)</Text>
+                    <Text style={[styles.reportKpiValue, { color: COLORS.green }]}>
+                      ৳ {formatMoney(totalBecha)}
+                    </Text>
+                  </View>
+                  <View style={styles.reportKpiCard}>
+                    <Text style={styles.reportKpiLabel}>মোট কেনা (ক্যাশ+বাকি)</Text>
+                    <Text style={[styles.reportKpiValue, { color: COLORS.red }]}>
+                      ৳ {formatMoney(totalKena)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.reportSubKpiRow}>
+                  <View style={styles.reportSubKpiCard}>
+                    <Text style={styles.reportSubKpiLabel}>ক্যাশ বেচা</Text>
+                    <Text style={styles.reportSubKpiValue}>৳ {formatMoney(cashBecha)}</Text>
+                  </View>
+                  <View style={styles.reportSubKpiCard}>
+                    <Text style={styles.reportSubKpiLabel}>বাকি বেচা</Text>
+                    <Text style={styles.reportSubKpiValue}>৳ {formatMoney(bakiBecha)}</Text>
+                  </View>
+                  <View style={styles.reportSubKpiCard}>
+                    <Text style={styles.reportSubKpiLabel}>নীট লাভ</Text>
+                    <Text style={[styles.reportSubKpiValue, { color: totalBecha >= totalKena ? COLORS.green : COLORS.red }]}>
+                      ৳ {formatMoney(totalBecha - totalKena)}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.reportSectionTitle}>লেনদেন তালিকা</Text>
+                {salesList.length === 0 ? (
+                  <View style={{ alignItems: 'center', padding: 30 }}>
+                    <Text style={{ color: COLORS.textMuted }}>কোনো লেনদেন রেকর্ড নেই</Text>
+                  </View>
+                ) : (
+                  salesList.map((item, idx) => (
+                    <View key={item.id || idx} style={styles.reportRowCard}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.reportRowName}>{item.title}</Text>
+                        <Text style={styles.reportRowSub}>{item.date} • {item.time || ''} • {item.tag}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.reportRowAmt, { color: item.isSale ? COLORS.green : COLORS.red }]}>
+                          {item.isSale ? '+' : '-'} ৳ {formatMoney(item.amount)}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.reportRowBadge,
+                            {
+                              backgroundColor: item.isSale ? '#DCFCE7' : '#FEE2E2',
+                              color: item.isSale ? COLORS.green : COLORS.red,
+                            },
+                          ]}
+                        >
+                          {item.isSale ? 'বেচা' : 'কেনা'}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            );
+          })()}
+        </SafeAreaView>
+      </Modal>
+
+      {/* 4. BAKI REPORT */}
+      <Modal
+        visible={modalBakiReport}
+        animationType="slide"
+        onRequestClose={() => setModalBakiReport(false)}
+      >
+        <SafeAreaView style={styles.reportContainer}>
+          <View style={styles.reportHeader}>
+            <TouchableOpacity onPress={() => setModalBakiReport(false)} style={styles.reportHeaderBack}>
+              <Text style={styles.reportHeaderBackText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.reportHeaderTitle}>বাকি রিপোর্ট (পাওনা ও দেনা)</Text>
+            <TouchableOpacity
+              style={styles.reportHeaderAction}
+              onPress={() => {
+                Share.share({
+                  message: `${businessName} - বাকি রিপোর্ট\nমোট পাওনা: ৳ ${formatMoney(totalCustomerDue)}\nমোট দেনা: ৳ ${formatMoney(totalSupplierDue)}`,
+                });
+              }}
+            >
+              <Text style={styles.reportHeaderActionText}>শেয়ার</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.reportKpiRow}>
+            <View style={styles.reportKpiCard}>
+              <Text style={styles.reportKpiLabel}>মোট পাবো (কাস্টমার বাকি)</Text>
+              <Text style={[styles.reportKpiValue, { color: COLORS.primary }]}>
+                ৳ {formatMoney(totalCustomerDue)}
+              </Text>
+            </View>
+            <View style={styles.reportKpiCard}>
+              <Text style={styles.reportKpiLabel}>মোট দেবো (সাপ্লায়ার বাকি)</Text>
+              <Text style={[styles.reportKpiValue, { color: COLORS.green }]}>
+                ৳ {formatMoney(totalSupplierDue)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.reportSubKpiRow, { paddingBottom: 6 }]}>
+            <View style={styles.reportSubKpiCard}>
+              <Text style={styles.reportSubKpiLabel}>বাকি কাস্টমার</Text>
+              <Text style={styles.reportSubKpiValue}>
+                {(accounts || []).filter((a) => a.type === 1 && a.balance > 0).length} জন
+              </Text>
+            </View>
+            <View style={styles.reportSubKpiCard}>
+              <Text style={styles.reportSubKpiLabel}>বকেয়া সাপ্লায়ার</Text>
+              <Text style={styles.reportSubKpiValue}>
+                {(accounts || []).filter((a) => a.type === 2 && a.balance > 0).length} জন
+              </Text>
+            </View>
+            <View style={styles.reportSubKpiCard}>
+              <Text style={styles.reportSubKpiLabel}>নীট পাওনা</Text>
+              <Text style={[styles.reportSubKpiValue, { color: totalCustomerDue >= totalSupplierDue ? COLORS.primary : COLORS.green }]}>
+                ৳ {formatMoney(totalCustomerDue - totalSupplierDue)}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView style={{ flex: 1 }}>
+            <Text style={styles.reportSectionTitle}>কাস্টমারদের বকেয়া তালিকা</Text>
+            {(accounts || []).filter((a) => a.type === 1 && a.balance > 0).length === 0 ? (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: COLORS.textMuted }}>কোনো কাস্টমারের বাকি নেই</Text>
+              </View>
+            ) : (
+              (accounts || [])
+                .filter((a) => a.type === 1 && a.balance > 0)
+                .map((a) => (
+                  <View key={a.id} style={styles.reportRowCard}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.reportRowName}>{a.name}</Text>
+                      <Text style={styles.reportRowSub}>{a.phone || 'ফোন নম্বর নেই'} • {a.address || 'ঠিকানা নেই'}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[styles.reportRowAmt, { color: COLORS.primary }]}>
+                        ৳ {formatMoney(a.balance)}
+                      </Text>
+                      <TouchableOpacity
+                        style={{ marginTop: 4, backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}
+                        onPress={() => {
+                          setSelectedAccount(a);
+                          setModalBakiReport(false);
+                          setModalTagada(true);
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: 'bold' }}>তাগাদা পাঠান</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+            )}
+
+            <Text style={[styles.reportSectionTitle, { marginTop: 10 }]}>সাপ্লায়ারদের বকেয়া তালিকা</Text>
+            {(accounts || []).filter((a) => a.type === 2 && a.balance > 0).length === 0 ? (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: COLORS.textMuted }}>কোনো সাপ্লায়ারের বকেয়া নেই</Text>
+              </View>
+            ) : (
+              (accounts || [])
+                .filter((a) => a.type === 2 && a.balance > 0)
+                .map((a) => (
+                  <View key={a.id} style={styles.reportRowCard}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.reportRowName}>{a.name}</Text>
+                      <Text style={styles.reportRowSub}>{a.phone || 'ফোন নম্বর নেই'} • {a.address || 'ঠিকানা নেই'}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[styles.reportRowAmt, { color: COLORS.green }]}>
+                        ৳ {formatMoney(a.balance)}
+                      </Text>
+                      <Text style={[styles.reportRowBadge, { backgroundColor: '#DCFCE7', color: COLORS.green }]}>দেবো</Text>
+                    </View>
+                  </View>
+                ))
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+
+      {/* 5. CASH REPORT */}
+      <Modal
+        visible={modalCashReport}
+        animationType="slide"
+        onRequestClose={() => setModalCashReport(false)}
+      >
+        <SafeAreaView style={styles.reportContainer}>
+          <View style={styles.reportHeader}>
+            <TouchableOpacity onPress={() => setModalCashReport(false)} style={styles.reportHeaderBack}>
+              <Text style={styles.reportHeaderBackText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.reportHeaderTitle}>ক্যাশ রিপোর্ট (ক্যাশবক্স হিসাব)</Text>
+            <TouchableOpacity
+              style={styles.reportHeaderAction}
+              onPress={() => {
+                Share.share({
+                  message: `${businessName} - ক্যাশ রিপোর্ট\nবর্তমান ক্যাশ ব্যালেন্স: ৳ ${formatMoney(totalCash)}`,
+                });
+              }}
+            >
+              <Text style={styles.reportHeaderActionText}>শেয়ার</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ flex: 1 }}>
+            <View style={styles.reportKpiRow}>
+              <View style={[styles.reportKpiCard, { backgroundColor: '#1E293B' }]}>
+                <Text style={[styles.reportKpiLabel, { color: '#94A3B8' }]}>বর্তমান ক্যাশবক্স ব্যালেন্স</Text>
+                <Text style={[styles.reportKpiValue, { color: '#FFFFFF', fontSize: 22 }]}>
+                  ৳ {formatMoney(totalCash)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.reportKpiRow}>
+              <View style={styles.reportKpiCard}>
+                <Text style={styles.reportKpiLabel}>আজকের ক্যাশ ইন (+)</Text>
+                <Text style={[styles.reportKpiValue, { color: COLORS.green }]}>
+                  ৳ {formatMoney(todayCashIn)}
+                </Text>
+              </View>
+              <View style={styles.reportKpiCard}>
+                <Text style={styles.reportKpiLabel}>আজকের ক্যাশ আউট (-)</Text>
+                <Text style={[styles.reportKpiValue, { color: COLORS.red }]}>
+                  ৳ {formatMoney(todayCashOut)}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.reportSectionTitle}>ক্যাশবক্স খাত অনুযায়ী হিসাব</Text>
+            <View style={{ paddingHorizontal: 14 }}>
+              {[
+                { name: 'ক্যাশ বেচা', type: 'in', cat: 'sale', color: COLORS.green },
+                { name: 'ক্যাশ কেনা', type: 'out', cat: 'buy', color: COLORS.red },
+                { name: 'দোকান খরচ', type: 'out', cat: 'cost', color: COLORS.red },
+                { name: 'মালিক দিল (মূলধন)', type: 'in', cat: 'malik_in', color: COLORS.blue },
+                { name: 'মালিক নিল (উত্তোলন)', type: 'out', cat: 'malik_out', color: '#D97706' },
+              ].map((acc) => {
+                const totalAcc = (cashEntries || [])
+                  .filter((e) => e.category === acc.cat)
+                  .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                return (
+                  <View key={acc.name} style={[styles.reportRowCard, { borderRadius: 8, marginVertical: 4 }]}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#1A1A1A' }}>{acc.name}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: acc.color }}>
+                      {acc.type === 'in' ? '+' : '-'} ৳ {formatMoney(totalAcc)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            <Text style={[styles.reportSectionTitle, { marginTop: 12 }]}>সর্বশেষ ক্যাশ লেনদেন</Text>
+            {(cashEntries || []).length === 0 ? (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: COLORS.textMuted }}>কোনো ক্যাশ এন্ট্রি নেই</Text>
+              </View>
+            ) : (
+              (cashEntries || []).slice(0, 30).map((entry, index) => (
+                <View key={entry.id || index} style={styles.reportRowCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.reportRowName}>{entry.desc || entry.category || 'ক্যাশ লেনদেন'}</Text>
+                    <Text style={styles.reportRowSub}>{entry.date} • {entry.time || ''}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.reportRowAmt, { color: entry.type === 'in' ? COLORS.green : COLORS.red }]}>
+                      {entry.type === 'in' ? '+' : '-'} ৳ {formatMoney(entry.amount)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.reportRowBadge,
+                        {
+                          backgroundColor: entry.type === 'in' ? '#DCFCE7' : '#FEE2E2',
+                          color: entry.type === 'in' ? COLORS.green : COLORS.red,
+                        },
+                      ]}
+                    >
+                      {entry.type === 'in' ? 'ক্যাশ ইন' : 'ক্যাশ আউট'}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 6. EXPENSE REPORT */}
+      <Modal
+        visible={modalExpenseReport}
+        animationType="slide"
+        onRequestClose={() => setModalExpenseReport(false)}
+      >
+        <SafeAreaView style={styles.reportContainer}>
+          <View style={styles.reportHeader}>
+            <TouchableOpacity onPress={() => setModalExpenseReport(false)} style={styles.reportHeaderBack}>
+              <Text style={styles.reportHeaderBackText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.reportHeaderTitle}>দোকান খরচ রিপোর্ট</Text>
+            <TouchableOpacity
+              style={styles.reportHeaderAction}
+              onPress={() => {
+                setCashCategory('cost');
+                setCashType('out');
+                setModalExpenseReport(false);
+                setModalAddCash(true);
+              }}
+            >
+              <Text style={styles.reportHeaderActionText}>+ খরচ লিখুন</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.reportKpiRow}>
+            <View style={[styles.reportKpiCard, { backgroundColor: '#DC2626' }]}>
+              <Text style={[styles.reportKpiLabel, { color: '#FEE2E2' }]}>মোট দোকান খরচ</Text>
+              <Text style={[styles.reportKpiValue, { color: '#FFFFFF', fontSize: 24 }]}>
+                ৳ {formatMoney(
+                  (cashEntries || [])
+                    .filter((e) => e.category === 'cost')
+                    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+                )}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView style={{ flex: 1 }}>
+            <Text style={styles.reportSectionTitle}>খরচের তালিকা</Text>
+            {(cashEntries || []).filter((e) => e.category === 'cost').length === 0 ? (
+              <View style={{ padding: 30, alignItems: 'center' }}>
+                <Text style={{ color: COLORS.textMuted }}>কোনো খরচের হিসাব নেই</Text>
+              </View>
+            ) : (
+              (cashEntries || [])
+                .filter((e) => e.category === 'cost')
+                .map((costItem, idx) => (
+                  <View key={costItem.id || idx} style={styles.reportRowCard}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.reportRowName}>{costItem.desc || 'দোকান খরচ'}</Text>
+                      <Text style={styles.reportRowSub}>{costItem.date} • {costItem.time || ''}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[styles.reportRowAmt, { color: COLORS.red }]}>
+                        - ৳ {formatMoney(costItem.amount)}
+                      </Text>
+                      <Text style={[styles.reportRowBadge, { backgroundColor: '#FEE2E2', color: COLORS.red }]}>
+                        খরচ
+                      </Text>
+                    </View>
+                  </View>
+                ))
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+
+      {/* 7. MALIK REPORT */}
+      <Modal
+        visible={modalMalikReport}
+        animationType="slide"
+        onRequestClose={() => setModalMalikReport(false)}
+      >
+        <SafeAreaView style={styles.reportContainer}>
+          <View style={styles.reportHeader}>
+            <TouchableOpacity onPress={() => setModalMalikReport(false)} style={styles.reportHeaderBack}>
+              <Text style={styles.reportHeaderBackText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.reportHeaderTitle}>মালিকের হিসাব (মূলধন ও ব্যক্তিগত)</Text>
+            <TouchableOpacity
+              style={styles.reportHeaderAction}
+              onPress={() => {
+                Share.share({
+                  message: `${businessName} - মালিকের হিসাব`,
+                });
+              }}
+            >
+              <Text style={styles.reportHeaderActionText}>শেয়ার</Text>
+            </TouchableOpacity>
+          </View>
+
+          {(() => {
+            const malikIn = (cashEntries || [])
+              .filter((e) => e.category === 'malik_in')
+              .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+            const malikOut = (cashEntries || [])
+              .filter((e) => e.category === 'malik_out')
+              .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+            const malikNet = malikIn - malikOut;
+            return (
+              <ScrollView style={{ flex: 1 }}>
+                <View style={styles.reportKpiRow}>
+                  <View style={styles.reportKpiCard}>
+                    <Text style={styles.reportKpiLabel}>মালিক দিল (মূলধন যোগ)</Text>
+                    <Text style={[styles.reportKpiValue, { color: COLORS.blue }]}>
+                      ৳ {formatMoney(malikIn)}
+                    </Text>
+                  </View>
+                  <View style={styles.reportKpiCard}>
+                    <Text style={styles.reportKpiLabel}>মালিক নিল (উত্তোলন)</Text>
+                    <Text style={[styles.reportKpiValue, { color: '#D97706' }]}>
+                      ৳ {formatMoney(malikOut)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[styles.reportSubKpiRow, { paddingBottom: 6 }]}>
+                  <View style={[styles.reportSubKpiCard, { flex: 1 }]}>
+                    <Text style={styles.reportSubKpiLabel}>মালিকের নীট ব্যালেন্স</Text>
+                    <Text style={[styles.reportSubKpiValue, { fontSize: 16, color: malikNet >= 0 ? COLORS.blue : '#D97706' }]}>
+                      ৳ {formatMoney(malikNet)} {malikNet >= 0 ? '(ব্যবসায় বিনিয়োগ)' : '(উত্তোলন)'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 14, marginVertical: 8 }}>
+                  <TouchableOpacity
+                    style={[styles.modalBtnSubmit, { flex: 1, backgroundColor: COLORS.blue }]}
+                    onPress={() => {
+                      setCashCategory('malik_in');
+                      setCashType('in');
+                      setModalMalikReport(false);
+                      setModalAddCash(true);
+                    }}
+                  >
+                    <Text style={styles.modalBtnSubmitText}>+ মালিক দিল (মূলধন)</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtnSubmit, { flex: 1, backgroundColor: '#D97706' }]}
+                    onPress={() => {
+                      setCashCategory('malik_out');
+                      setCashType('out');
+                      setModalMalikReport(false);
+                      setModalAddCash(true);
+                    }}
+                  >
+                    <Text style={styles.modalBtnSubmitText}>- মালিক নিল (উত্তোলন)</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.reportSectionTitle}>মালিকের লেনদেন ইতিহাস</Text>
+                {(cashEntries || []).filter((e) => e.category === 'malik_in' || e.category === 'malik_out').length === 0 ? (
+                  <View style={{ padding: 30, alignItems: 'center' }}>
+                    <Text style={{ color: COLORS.textMuted }}>কোনো লেনদেন রেকর্ড নেই</Text>
+                  </View>
+                ) : (
+                  (cashEntries || [])
+                    .filter((e) => e.category === 'malik_in' || e.category === 'malik_out')
+                    .map((mItem, idx) => (
+                      <View key={mItem.id || idx} style={styles.reportRowCard}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.reportRowName}>
+                            {mItem.category === 'malik_in' ? 'মালিক দিল (মূলধন)' : 'মালিক নিল (উত্তোলন)'}
+                          </Text>
+                          <Text style={styles.reportRowSub}>{mItem.date} • {mItem.time || ''} {mItem.desc ? `• ${mItem.desc}` : ''}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={[styles.reportRowAmt, { color: mItem.category === 'malik_in' ? COLORS.blue : '#D97706' }]}>
+                            {mItem.category === 'malik_in' ? '+' : '-'} ৳ {formatMoney(mItem.amount)}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.reportRowBadge,
+                              {
+                                backgroundColor: mItem.category === 'malik_in' ? '#DBEAFE' : '#FEF3C7',
+                                color: mItem.category === 'malik_in' ? COLORS.blue : '#D97706',
+                              },
+                            ]}
+                          >
+                            {mItem.category === 'malik_in' ? 'মূলধন' : 'উত্তোলন'}
+                          </Text>
+                        </View>
+                      </View>
+                    ))
+                )}
+              </ScrollView>
+            );
+          })()}
+        </SafeAreaView>
+      </Modal>
+
+      {/* 8. MONEY OUT */}
+      <Modal
+        visible={modalMoneyOut}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalMoneyOut(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { padding: 18 }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalCardTitle}>টাকা উত্তোলন / ট্রান্সফার</Text>
+              <TouchableOpacity onPress={() => setModalMoneyOut(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.moneyOutBalCard}>
+              <Text style={styles.moneyOutBalLabel}>বর্তমান টালিপে ব্যালেন্স</Text>
+              <Text style={styles.moneyOutBalValue}>৳ {formatMoney(walletBalance)}</Text>
+            </View>
+
+            <Text style={styles.inputLabel}>ট্রান্সফার মেথড নির্বাচন করুন</Text>
+            <View style={styles.moneyOutMethodGrid}>
+              {[
+                { id: 'bank', name: 'ব্যাংক একাউন্ট', icon: '🏦' },
+                { id: 'bkash', name: 'বিকাশ', icon: '📱' },
+                { id: 'nagad', name: 'নগদ', icon: '💸' },
+              ].map((m) => (
+                <TouchableOpacity
+                  key={m.id}
+                  style={[styles.moneyOutMethodCard, moneyOutMethod === m.id && styles.moneyOutMethodCardActive]}
+                  onPress={() => setMoneyOutMethod(m.id)}
+                >
+                  <Text style={{ fontSize: 22 }}>{m.icon}</Text>
+                  <Text style={[styles.moneyOutMethodText, moneyOutMethod === m.id && styles.moneyOutMethodTextActive]}>
+                    {m.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>
+              {moneyOutMethod === 'bank' ? 'ব্যাংক একাউন্ট নম্বর' : 'মোবাইল একাউন্ট নম্বর'}
+            </Text>
+            <TextInput
+              style={styles.modalSimpleInput}
+              placeholder={moneyOutMethod === 'bank' ? 'যেমন: ২০৫.১২০.XXXX' : 'যেমন: ০১৭XXXXXXXX'}
+              placeholderTextColor={COLORS.textSubtle}
+              keyboardType="numeric"
+              value={moneyOutAccNumber}
+              onChangeText={setMoneyOutAccNumber}
+            />
+
+            <Text style={styles.inputLabel}>উত্তোলনের পরিমাণ (টাকা) *</Text>
+            <TextInput
+              style={styles.modalBigInput}
+              placeholder="৳ ০"
+              placeholderTextColor={COLORS.textSubtle}
+              keyboardType="numeric"
+              value={moneyOutAmount}
+              onChangeText={setMoneyOutAmount}
+            />
+
+            <View style={[styles.modalBtnRow, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setModalMoneyOut(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
+                onPress={handleMoneyOut}
+              >
+                <Text style={styles.modalBtnSubmitText}>ট্রান্সফার নিশ্চিত করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+
+
 
     </SafeAreaView>
   );

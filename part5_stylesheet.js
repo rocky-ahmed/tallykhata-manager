@@ -2054,4 +2054,392 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+
+  // --- BOTTOM SHEET & BUSINESS PICKER (BusinessPickerBottomSheet) ---
+  bottomSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheetCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 30,
+    maxHeight: '80%',
+  },
+  bottomSheetHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#D1D5DB',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  bizPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    marginBottom: 10,
+  },
+  bizPickerItemActive: {
+    borderColor: '#D32F2F',
+    backgroundColor: '#FFF5F5',
+  },
+  bizPickerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  bizPickerName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  bizPickerSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  bizPickerRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#9CA3AF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bizPickerRadioActive: {
+    borderColor: '#D32F2F',
+  },
+  bizPickerRadioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#D32F2F',
+  },
+  bizAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#D32F2F',
+    marginTop: 10,
+  },
+  bizAddBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+
+  // --- AUTHENTIC FULLSCREEN REPORT SCREENS ---
+  reportContainer: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D32F2F',
+    paddingTop: 12,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+    elevation: 3,
+  },
+  reportHeaderBack: {
+    padding: 6,
+    marginRight: 12,
+  },
+  reportHeaderBackText: {
+    fontSize: 22,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  reportHeaderTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  reportHeaderAction: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 6,
+  },
+  reportHeaderActionText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+
+  // Date Filter Segment
+  reportDateBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  reportDateTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  reportDateTabActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  reportDateTabText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  reportDateTabTextActive: {
+    color: '#D32F2F',
+    fontWeight: 'bold',
+  },
+
+  // Authentic Report KPI Cards
+  reportKpiRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+  reportKpiCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  reportKpiLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  reportKpiValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  reportSubKpiRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 10,
+  },
+  reportSubKpiCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  reportSubKpiLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+  },
+  reportSubKpiValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginTop: 2,
+  },
+
+  // Authentic Report Ledger List
+  reportSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#374151',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  reportRowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  reportRowName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  reportRowSub: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  reportRowAmt: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  reportRowBadge: {
+    fontSize: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 3,
+    alignSelf: 'flex-end',
+  },
+
+  // --- DENOMINATIONS (activity_cash_adjustment.xml) ---
+  denomContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 10,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  denomHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 6,
+  },
+  denomHeaderCol: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#6B7280',
+  },
+  denomItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderColor: '#F9FAFB',
+  },
+  denomNoteTag: {
+    width: 65,
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  denomX: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginRight: 8,
+  },
+  denomQtyInput: {
+    width: 65,
+    height: 34,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 6,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    backgroundColor: '#F9FAFB',
+    padding: 0,
+  },
+  denomEq: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginHorizontal: 8,
+  },
+  denomSubtotal: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#374151',
+    textAlign: 'right',
+  },
+  denomSummaryBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  denomSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 3,
+  },
+  denomSummaryLabel: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  denomSummaryVal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  // --- MONEY OUT / WALLET TRANSFER (TpTransferActivity) ---
+  moneyOutBalCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  moneyOutBalLabel: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  moneyOutBalValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginTop: 4,
+  },
+  moneyOutMethodGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  moneyOutMethodCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  moneyOutMethodCardActive: {
+    borderColor: '#D32F2F',
+    backgroundColor: '#FFF5F5',
+  },
+  moneyOutMethodText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+    marginTop: 6,
+  },
+  moneyOutMethodTextActive: {
+    color: '#D32F2F',
+    fontWeight: 'bold',
+  },
+
 });

@@ -108,6 +108,52 @@ function TallyKhataApp() {
   const [modalPinSetup, setModalPinSetup] = useState(false);
   const [backupJsonText, setBackupJsonText] = useState('');
 
+  // Business Picker State (BusinessPickerBottomSheet)
+  const [businesses, setBusinesses] = useState([
+    { id: '1', name: 'আমার ব্যবসা প্রতিষ্ঠান', owner: 'স্বত্বাধিকারী', phone: '01700000000', address: 'বাজার রোড, ঢাকা', isSelected: true },
+    { id: '2', name: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ', owner: 'হাজী মো: করিম', phone: '01811223344', address: 'পাইকারি আড়ৎ, ঢাকা', isSelected: false },
+    { id: '3', name: 'সোনালী ফ্যাশন ও বস্ত্রালয়', owner: 'আহমেদ উল্লাহ', phone: '01911334455', address: 'নিউ মার্কেট, ঢাকা', isSelected: false },
+  ]);
+  const [modalBusinessPicker, setModalBusinessPicker] = useState(false);
+  const [modalAddBusiness, setModalAddBusiness] = useState(false);
+  const [newBizName, setNewBizName] = useState('');
+  const [newBizOwner, setNewBizOwner] = useState('');
+  const [newBizPhone, setNewBizPhone] = useState('');
+  const [newBizAddress, setNewBizAddress] = useState('');
+
+  // Authentic Report Modals
+  const [modalBechaKena, setModalBechaKena] = useState(false);
+  const [modalBakiReport, setModalBakiReport] = useState(false);
+  const [modalCashReport, setModalCashReport] = useState(false);
+  const [modalExpenseReport, setModalExpenseReport] = useState(false);
+  const [modalMalikReport, setModalMalikReport] = useState(false);
+  const [modalMoneyOut, setModalMoneyOut] = useState(false);
+  const [reportDateTab, setReportDateTab] = useState('daily'); // 'daily' | 'monthly'
+  const [selectedReportDate, setSelectedReportDate] = useState(getTodayDate());
+  const [reportSummaryOnly, setReportSummaryOnly] = useState(false);
+
+  // Cash Reconcile Denominations (activity_cash_adjustment.xml)
+  const [notes1000, setNotes1000] = useState('');
+  const [notes500, setNotes500] = useState('');
+  const [notes200, setNotes200] = useState('');
+  const [notes100, setNotes100] = useState('');
+  const [notes50, setNotes50] = useState('');
+  const [notes20, setNotes20] = useState('');
+  const [notes10, setNotes10] = useState('');
+  const [notes5, setNotes5] = useState('');
+  const [notes2, setNotes2] = useState('');
+  const [notes1, setNotes1] = useState('');
+
+  // Tagada State
+  const [remainingSmsCount, setRemainingSmsCount] = useState(5);
+  const [tagadaCustomer, setTagadaCustomer] = useState(null);
+  const [tagadaCustomMsg, setTagadaCustomMsg] = useState('');
+
+  // Money Out State
+  const [moneyOutAmount, setMoneyOutAmount] = useState('');
+  const [moneyOutMethod, setMoneyOutMethod] = useState('bank'); // 'bank' | 'bkash' | 'nagad'
+  const [moneyOutAccNumber, setMoneyOutAccNumber] = useState('');
+
   // --- PERSISTENCE: LOAD & SAVE ---
   useEffect(() => {
     loadSavedData();
@@ -129,6 +175,8 @@ function TallyKhataApp() {
         if (d.ownerName) setOwnerName(d.ownerName);
         if (d.ownerPhone) setOwnerPhone(d.ownerPhone);
         if (d.businessAddress) setBusinessAddress(d.businessAddress);
+        if (Array.isArray(d.businesses)) setBusinesses(d.businesses);
+        if (d.remainingSmsCount !== undefined) setRemainingSmsCount(Number(d.remainingSmsCount));
         if (d.openingBalance !== undefined) setOpeningBalance(Number(d.openingBalance));
         if (d.pinEnabled && d.appPin) {
           setPinEnabled(true);
@@ -154,6 +202,8 @@ function TallyKhataApp() {
       ownerName: overrides.ownerName !== undefined ? overrides.ownerName : ownerName,
       ownerPhone: overrides.ownerPhone !== undefined ? overrides.ownerPhone : ownerPhone,
       businessAddress: overrides.businessAddress !== undefined ? overrides.businessAddress : businessAddress,
+      businesses: overrides.businesses !== undefined ? overrides.businesses : businesses,
+      remainingSmsCount: overrides.remainingSmsCount !== undefined ? overrides.remainingSmsCount : remainingSmsCount,
       openingBalance: overrides.openingBalance !== undefined ? overrides.openingBalance : openingBalance,
       pinEnabled: overrides.pinEnabled !== undefined ? overrides.pinEnabled : pinEnabled,
       appPin: overrides.appPin !== undefined ? overrides.appPin : appPin,
@@ -207,6 +257,18 @@ function TallyKhataApp() {
       if (c.category === 'supplier_pay') todaySupplierPay += amt;
     }
   });
+
+  const countedFromNotes =
+    (Number(notes1000) || 0) * 1000 +
+    (Number(notes500) || 0) * 500 +
+    (Number(notes200) || 0) * 200 +
+    (Number(notes100) || 0) * 100 +
+    (Number(notes50) || 0) * 50 +
+    (Number(notes20) || 0) * 20 +
+    (Number(notes10) || 0) * 10 +
+    (Number(notes5) || 0) * 5 +
+    (Number(notes2) || 0) * 2 +
+    (Number(notes1) || 0) * 1;
 
   let totalStockCost = 0;
   let totalStockSaleValue = 0;
@@ -897,6 +959,176 @@ function TallyKhataApp() {
       `=================================\n` +
       `১০০% সঠিক ও ডিজিটাল টালিখাতা হিসাব।\nধন্যবাদ, আবার আসবেন।`
     );
+  };
+
+  // --- BUSINESS PICKER & CREATION HANDLERS ---
+  const handleSelectBusiness = (biz) => {
+    setBusinessName(biz.name);
+    if (biz.owner) setOwnerName(biz.owner);
+    if (biz.phone) setOwnerPhone(biz.phone);
+    if (biz.address) setBusinessAddress(biz.address);
+    const updated = businesses.map((b) => ({ ...b, isSelected: b.id === biz.id }));
+    setBusinesses(updated);
+    persistData({
+      businessName: biz.name,
+      ownerName: biz.owner || ownerName,
+      ownerPhone: biz.phone || ownerPhone,
+      businessAddress: biz.address || businessAddress,
+      businesses: updated,
+    });
+    setModalBusinessPicker(false);
+    Alert.alert('ব্যবসা পরিবর্তন', `বর্তমানে সক্রিয়: ${biz.name}`);
+  };
+
+  const handleCreateBusiness = () => {
+    if (!newBizName.trim()) {
+      Alert.alert('সতর্কতা', 'ব্যবসার নাম লিখুন');
+      return;
+    }
+    const newBiz = {
+      id: Date.now().toString(),
+      name: newBizName.trim(),
+      owner: newBizOwner.trim() || ownerName,
+      phone: newBizPhone.trim() || ownerPhone,
+      address: newBizAddress.trim() || 'ঢাকা, বাংলাদেশ',
+      isSelected: true,
+    };
+    const updated = [...businesses.map((b) => ({ ...b, isSelected: false })), newBiz];
+    setBusinesses(updated);
+    setBusinessName(newBiz.name);
+    if (newBiz.owner) setOwnerName(newBiz.owner);
+    if (newBiz.phone) setOwnerPhone(newBiz.phone);
+    if (newBiz.address) setBusinessAddress(newBiz.address);
+    persistData({
+      businessName: newBiz.name,
+      ownerName: newBiz.owner,
+      ownerPhone: newBiz.phone,
+      businessAddress: newBiz.address,
+      businesses: updated,
+    });
+    setNewBizName('');
+    setNewBizOwner('');
+    setNewBizPhone('');
+    setNewBizAddress('');
+    setModalAddBusiness(false);
+    setModalBusinessPicker(false);
+    Alert.alert('সফল', `নতুন ব্যবসা "${newBiz.name}" তৈরি ও সক্রিয় করা হয়েছে।`);
+  };
+
+  // --- CASH RECONCILIATION WITH DENOMINATIONS HANDLER ---
+  const handleSaveDenominations = () => {
+    const totalCounted = countedFromNotes > 0 ? countedFromNotes : (Number(countedCash) || 0);
+    const diff = totalCounted - totalCash;
+    const adjEntry = {
+      id: 'adj_' + Date.now(),
+      category: diff >= 0 ? 'malik_in' : 'cost',
+      type: diff >= 0 ? 'in' : 'out',
+      amount: Math.abs(diff),
+      desc:
+        diff === 0
+          ? 'ক্যাশবক্স মিলানো (কোনো গরমিল নেই)'
+          : diff > 0
+          ? `ক্যাশবক্স সমন্বয় (অতিরিক্ত ক্যাশ ৳ ${formatMoney(diff)})`
+          : `ক্যাশবক্স সমন্বয় (ক্যাশ ঘাটতি ৳ ${formatMoney(Math.abs(diff))})`,
+      date: getTodayDate(),
+      time: getTimeString(),
+    };
+    const updatedCash = [adjEntry, ...cashEntries];
+    setCashEntries(updatedCash);
+    persistData({ cashEntries: updatedCash });
+    setModalReconcileCash(false);
+    Alert.alert(
+      'ক্যাশবক্স মিলানো সম্পন্ন',
+      diff === 0
+        ? 'ক্যাশ ১০০% মিলেছে।'
+        : `ক্যাশ সমন্বয় রেকর্ড সেভ হয়েছে। পার্থক্য: ৳ ${formatMoney(Math.abs(diff))}`
+    );
+  };
+
+  // --- TAGADA HANDLERS (SMS & BULK TAGADA) ---
+  const handleSendSingleTagada = (account) => {
+    if (remainingSmsCount <= 0) {
+      Alert.alert('ফ্রি এসএমএস সমাপ্ত', 'আপনার ফ্রি টালি-মেসেজ শেষ হয়ে গেছে। ফোনের স্বাভাবিক এসএমএস বা WhatsApp ব্যবহার করুন।');
+      return;
+    }
+    const newCount = remainingSmsCount - 1;
+    setRemainingSmsCount(newCount);
+    const log = {
+      id: 'tag_' + Date.now(),
+      customerName: account.name,
+      phone: account.phone,
+      amount: account.balance,
+      date: getTodayDate(),
+      time: getTimeString(),
+    };
+    const updatedLogs = [log, ...tagadaLogs];
+    setTagadaLogs(updatedLogs);
+    persistData({ remainingSmsCount: newCount, tagadaLogs: updatedLogs });
+    setModalTagada(false);
+    Alert.alert(
+      'মেসেজ পাঠানো হয়েছে',
+      `${account.name} (বকেয়া ৳ ${formatMoney(account.balance)})-কে সফলভাবে টালি-মেসেজ পাঠানো হয়েছে।\nঅবশিষ্ট ফ্রি এসএমএস: ${newCount} টি`
+    );
+  };
+
+  const handleSendBulkTagada = () => {
+    if (dueCustomers.length === 0) {
+      Alert.alert('তথ্য', 'কোনো কাস্টমারের কাছে বকেয়া বাকি নেই।');
+      return;
+    }
+    Alert.alert(
+      'গ্রুপ তাগাদা পাঠান',
+      `মোট ${dueCustomers.length} জন বাকি কাস্টমারকে একসাথে টালি-মেসেজ পাঠাতে চান? মোট বকেয়া ৳ ${formatMoney(totalCustomerDue)}।`,
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'পাঠান',
+          onPress: () => {
+            setRemainingSmsCount(Math.max(0, remainingSmsCount - 1));
+            Alert.alert(
+              'সফল',
+              `সকল ${dueCustomers.length} জন বকেয়া কাস্টমারকে গ্রুপ তাগাদা মেসেজ সফলভাবে পাঠানো হয়েছে!`
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  // --- MONEY OUT HANDLER ---
+  const handleMoneyOut = () => {
+    const amt = parseFloat(moneyOutAmount) || 0;
+    if (!amt || amt <= 0) {
+      Alert.alert('সতর্কতা', 'সঠিক টাকার পরিমাণ দিন');
+      return;
+    }
+    if (amt > walletBalance) {
+      Alert.alert('ব্যর্থ', 'পর্যাপ্ত ওয়ালেট ব্যালেন্স নেই');
+      return;
+    }
+    const newBal = walletBalance - amt;
+    const methodLabel =
+      moneyOutMethod === 'bank'
+        ? 'ব্যাংক একাউন্ট'
+        : moneyOutMethod === 'bkash'
+        ? 'বিকাশ'
+        : 'নগদ';
+    const newTxn = {
+      id: 'w_' + Date.now(),
+      title: `মানি আউট (${methodLabel})`,
+      amount: amt,
+      type: 'out',
+      date: getTodayDate(),
+      time: getTimeString(),
+    };
+    const updatedTxns = [newTxn, ...walletTxns];
+    setWalletBalance(newBal);
+    setWalletTxns(updatedTxns);
+    persistData({ walletBalance: newBal, walletTxns: updatedTxns });
+    setMoneyOutAmount('');
+    setMoneyOutAccNumber('');
+    setModalMoneyOut(false);
+    Alert.alert('সফল', `৳ ${formatMoney(amt)} টাকা সফলভাবে ${methodLabel}-এ স্থানান্তর করা হয়েছে।`);
   };
 
   // --- FILTERED ACCOUNTS FOR TAB 1 ---
