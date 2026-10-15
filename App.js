@@ -3994,7 +3994,7 @@ const styles = StyleSheet.create({
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   headerIconTouch: {
     position: 'relative',
@@ -5439,7 +5439,7 @@ const styles = StyleSheet.create({
   headerToolbarActionBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 42,
+    minWidth: 38,
   },
   headerToolbarActionLabel: {
     fontSize: 10,
