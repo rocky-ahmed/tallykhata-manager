@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // =========================================================================
 // 1. AUTHENTIC TALLYKHATA BRAND IDENTITY & CONSTANTS
 // =========================================================================
-const STORAGE_KEY = 'tallykhata_offline_store_v4';
+const STORAGE_KEY = 'tallykhata_offline_store_v5';
 
 const COLORS = {
   primary: '#B81414',        // Authentic TallyKhata Crimson Red
@@ -56,6 +56,72 @@ const formatMoney = (amount) => {
   const isNeg = num < 0;
   const absStr = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return isNeg ? '-' + absStr : absStr;
+};
+
+
+const toBengaliNumber = (amount) => {
+  if (amount === undefined || amount === null || isNaN(amount)) return '০';
+  const num = Math.round(Number(amount));
+  const isNeg = num < 0;
+  const absStr = Math.abs(num).toString();
+  let formatted = '';
+  if (absStr.length > 3) {
+    const last3 = absStr.substring(absStr.length - 3);
+    const rest = absStr.substring(0, absStr.length - 3);
+    const withCommas = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+    formatted = withCommas + ',' + last3;
+  } else {
+    formatted = absStr;
+  }
+  const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  const bnStr = formatted.split('').map(c => (c >= '0' && c <= '9') ? bnDigits[parseInt(c, 10)] : c).join('');
+  return isNeg ? '-' + bnStr : bnStr;
+};
+
+const toBengaliDecimal = (amount) => {
+  if (amount === undefined || amount === null || isNaN(amount)) return '০.০০';
+  const num = Number(amount);
+  const isNeg = num < 0;
+  const absNum = Math.abs(num);
+  const intPart = Math.floor(absNum);
+  const decPart = Math.round((absNum - intPart) * 100).toString().padStart(2, '0');
+  
+  const absStr = intPart.toString();
+  let formatted = '';
+  if (absStr.length > 3) {
+    const last3 = absStr.substring(absStr.length - 3);
+    const rest = absStr.substring(0, absStr.length - 3);
+    const withCommas = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+    formatted = withCommas + ',' + last3;
+  } else {
+    formatted = absStr;
+  }
+  const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  const bnInt = formatted.split('').map(c => (c >= '0' && c <= '9') ? bnDigits[parseInt(c, 10)] : c).join('');
+  const bnDec = decPart.split('').map(c => (c >= '0' && c <= '9') ? bnDigits[parseInt(c, 10)] : c).join('');
+  const res = bnInt + '.' + bnDec;
+  return isNeg ? '-' + res : res;
+};
+
+const getAvatarInfo = (name, index) => {
+  const colors = ['#DCFCE7', '#FEF08A', '#DBEAFE', '#FFE4E6', '#DCFCE7', '#FEF08A', '#DBEAFE', '#FFE4E6'];
+  const bg = colors[index % colors.length];
+  let text = 'ক';
+  if (name) {
+    const trimmed = name.trim();
+    if (trimmed.includes('★')) {
+      const firstWord = trimmed.split(/\s+/)[0];
+      text = (firstWord[0] || 'C').toUpperCase() + '★';
+    } else {
+      const words = trimmed.split(/\s+/);
+      if (words.length >= 2 && words[0][0] && words[1][0] && /[A-Za-z]/.test(words[0][0])) {
+        text = (words[0][0] + words[1][0]).toUpperCase();
+      } else if (words[0]) {
+        text = words[0].slice(0, 2);
+      }
+    }
+  }
+  return { bg, text };
 };
 
 const getTodayDate = () => {
@@ -176,10 +242,18 @@ class ErrorBoundary extends Component {
 // 4. SEED DATA & AUTHENTIC TALLYKHATA FAQS
 // =========================================================================
 const INITIAL_ACCOUNTS = [
-  { id: '1', name: 'মো: রফিকুল ইসলাম', phone: '01711223344', type: 1, balance: 3200, address: 'বাজার মোড়', createDate: getTodayDate() },
-  { id: '2', name: 'আলমগীর স্টোর', phone: '01812345678', type: 1, balance: 1450, address: 'পশ্চিম পাড়া', createDate: getTodayDate() },
-  { id: '3', name: 'মেসার্স ভাই ভাই ট্রেডার্স', phone: '01911998877', type: 2, balance: 5000, address: 'পাইকারি আড়ৎ', createDate: getTodayDate() },
-  { id: '4', name: 'হাজী জেনারেল স্টোর', phone: '01622334455', type: 1, balance: 0, address: 'দক্ষিণ বাজার', createDate: getTodayDate() },
+  { id: '1', name: 'Raihan ★ khoksha', phone: '01711223344', type: 1, balance: 7000, address: 'খোকসা বাজার', createDate: getTodayDate(), timeAgo: '৩ মাস' },
+  { id: '2', name: 'Faysal ★★', phone: '01812345678', type: 1, balance: 10000, address: 'পশ্চিম পাড়া', createDate: getTodayDate(), timeAgo: '৩ মাস' },
+  { id: '3', name: 'Abd. Samad ★ Jv', phone: '01911998877', type: 1, balance: 8000, address: 'জেভি মোড়', createDate: getTodayDate(), timeAgo: '৩ মাস' },
+  { id: '4', name: 'Tanvir ★ Al Baraka', phone: '01622334455', type: 1, balance: 0, address: 'আল বারাকা মার্কেট', createDate: getTodayDate(), timeAgo: '৪ মাস' },
+  { id: '5', name: 'Jwel Vai Gk', phone: '01733445566', type: 1, balance: 500, address: 'জিকে কলোনি', createDate: getTodayDate(), timeAgo: '৫ মাস' },
+  { id: '6', name: 'Shamim Telecom', phone: '01744556677', type: 1, balance: 12000, address: 'স্টেশন রোড', createDate: getTodayDate(), timeAgo: '৬ মাস' },
+  { id: '7', name: 'Kabir Hardware', phone: '01755667788', type: 1, balance: 15000, address: 'মেইন রোড', createDate: getTodayDate(), timeAgo: '২ মাস' },
+  { id: '8', name: 'Babul Enterprise', phone: '01766778899', type: 1, balance: 18000, address: 'চকবাজার', createDate: getTodayDate(), timeAgo: '১ মাস' },
+  { id: '9', name: 'Rubel Electronics', phone: '01777889900', type: 1, balance: 14000, address: 'নিউ মার্কেট', createDate: getTodayDate(), timeAgo: '৩ মাস' },
+  { id: '10', name: 'Shuvo Mobile Store', phone: '01788990011', type: 1, balance: 9000, address: 'কলেজ গেট', createDate: getTodayDate(), timeAgo: '৪ মাস' },
+  { id: '11', name: 'Ripon Telecom', phone: '01799001122', type: 1, balance: 7000, address: 'থানা মোড়', createDate: getTodayDate(), timeAgo: '৫ মাস' },
+  { id: '12', name: 'Monir Store', phone: '01712341234', type: 1, balance: 8000, address: 'হাসপাতাল রোড', createDate: getTodayDate(), timeAgo: '২ মাস' },
 ];
 
 const INITIAL_JOURNALS = [
@@ -253,7 +327,7 @@ function TallyKhataApp() {
   const [activeTab, setActiveTab] = useState('home');         // 'home' | 'cashbox' | 'tagada' | 'tallypay' | 'menu'
 
   // Business Profile
-  const [businessName, setBusinessName] = useState('আমার ব্যবসা প্রতিষ্ঠান');
+  const [businessName, setBusinessName] = useState('Mobile Xpress');
   const [ownerName, setOwnerName] = useState('স্বত্বাধিকারী');
   const [ownerPhone, setOwnerPhone] = useState('01700000000');
   const [businessAddress, setBusinessAddress] = useState('বাজার রোড, ঢাকা');
@@ -344,6 +418,8 @@ function TallyKhataApp() {
   const [modalAddStock, setModalAddStock] = useState(false);
   const [modalAdjustStock, setModalAdjustStock] = useState(false);
   const [modalTagada, setModalTagada] = useState(false);
+  const [modalTallyMessage, setModalTallyMessage] = useState(false);
+  const [tallyMessageBalance, setTallyMessageBalance] = useState(50);
   const [modalBanglaQR, setModalBanglaQR] = useState(false);
   const [modalAddMoney, setModalAddMoney] = useState(false);
   const [modalMobileRecharge, setModalMobileRecharge] = useState(false);
@@ -1700,307 +1776,320 @@ function TallyKhataApp() {
   }
 
   // =========================================================================
-  // VIEW B: MAIN HOME VIEW (WITH 5 AUTHENTIC TABS)
+  // =========================================================================
+  // VIEW B: MAIN HOME VIEW (WITH AUTHENTIC 1:1 VISUAL PARITY)
   // =========================================================================
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
+      <StatusBar barStyle="light-content" backgroundColor="#991111" />
 
-      {/* --- AUTHENTIC TALLYKHATA TOP HEADER BAR (layout_content_main.xml) --- */}
-      <View style={styles.topHeaderBar}>
-        <TouchableOpacity
-          style={styles.headerLeftBiz}
-          onPress={() => setModalBusinessPicker(true)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.headerStoreIcon}>
+      {/* --- AUTHENTIC 1:1 TALLYKHATA TOP HEADER BAR (photo_2026-10-15_18-13-34.jpg) --- */}
+      <View style={styles.topHeaderBarRed}>
+        <View style={styles.headerLeftPillContainer}>
+          <TouchableOpacity
+            style={styles.headerBizPill}
+            onPress={() => setModalBusinessPicker(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.headerBizPillText}>{businessName || 'Mobile Xpress'}</Text>
             <Image
-              source={require('./assets/ic_tally_khata_logo_reg.png')}
-              style={{ width: 24, height: 24 }}
+              source={require('./assets/icons/ic_arrow_down.png')}
+              style={styles.headerBizPillArrow}
               resizeMode="contain"
             />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Image
-                source={require('./assets/icons/ic_crown.png')}
-                style={{ width: 14, height: 14, marginRight: 4 }}
-                resizeMode="contain"
-              />
-              <Text style={styles.headerBizName} numberOfLines={1}>{businessName}</Text>
-              <Image
-                source={require('./assets/icons/ic_arrow_down.png')}
-                style={{ width: 10, height: 10, marginLeft: 4, tintColor: '#1A1A1A' }}
-                resizeMode="contain"
-              />
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 1 }}>
-              <Text style={styles.headerBizPhone}>গোল্ড (অবশিষ্টঃ ৭ দিন)</Text>
-              <View style={styles.headerDotSep} />
-              <TouchableOpacity
-                onPress={() => Alert.alert('ভেরিফাইড মার্চেন্ট', 'আপনার টালিখাতা অ্যাকাউন্ট ১০০% ভেরিফাইড ও সুরক্ষিত।')}
-              >
-                <Text style={styles.headerVerifyTag}>ভেরিফাইড</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.headerRightActions}>
-          {/* Cloud Sync Status */}
-          <TouchableOpacity
-            style={styles.headerToolbarActionBtn}
-            onPress={() => {
-              setBackupJsonText('');
-              setModalBackupRestore(true);
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cloudIconWrapper}>
-              <Image
-                source={require('./assets/icons/ic_cloud.png')}
-                style={{ width: 22, height: 22 }}
-                resizeMode="contain"
-              />
-              <View style={styles.cloudTickDot}>
-                <Image
-                  source={require('./assets/icons/ic_check.png')}
-                  style={{ width: 7, height: 7 }}
-                  resizeMode="contain"
-                />
-              </View>
-            </View>
-            <Text style={styles.headerToolbarActionLabel}>ব্যাকআপ</Text>
           </TouchableOpacity>
+          <Text style={styles.headerSubtitleWhite}>স্ট্যান্ডার্ড</Text>
+        </View>
 
+        <View style={styles.headerRightActionsRed}>
           {/* Inbox with 99+ Badge and Bangla text */}
           <TouchableOpacity
-            style={styles.headerToolbarActionBtn}
+            style={styles.headerWhiteActionBtn}
             onPress={() => setModalInbox(true)}
             activeOpacity={0.7}
           >
-            <View style={styles.headerIconWithBadge}>
+            <View style={{ position: 'relative' }}>
               <Image
-                source={require('./assets/icons/ic_inbox.png')}
-                style={{ width: 22, height: 22 }}
+                source={require('./assets/icons/tb_inbox_white.png')}
+                style={styles.headerWhiteActionIcon}
                 resizeMode="contain"
               />
-              <View style={styles.headerCounterBadge}>
-                <Text style={styles.headerCounterText}>99+</Text>
+              <View style={styles.headerBadgeWhite}>
+                <Text style={styles.headerBadgeWhiteText}>99+</Text>
               </View>
             </View>
-            <Text style={styles.headerToolbarActionLabel}>ইনবক্স</Text>
+            <Text style={styles.headerActionLabelWhite}>ইনবক্স</Text>
           </TouchableOpacity>
 
-          {/* Support with 9+ Badge and Bangla text */}
+          {/* Support with Bangla text */}
           <TouchableOpacity
-            style={styles.headerToolbarActionBtn}
+            style={styles.headerWhiteActionBtn}
             onPress={() => setModalSupport(true)}
             activeOpacity={0.7}
           >
-            <View style={styles.headerIconWithBadge}>
-              <Image
-                source={require('./assets/icons/ic_support.png')}
-                style={{ width: 22, height: 22 }}
-                resizeMode="contain"
-              />
-              <View style={styles.headerCounterBadge}>
-                <Text style={styles.headerCounterText}>9+</Text>
-              </View>
-            </View>
-            <Text style={styles.headerToolbarActionLabel}>সাপোর্ট</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* --- DASHBOARD SUMMARY CARDS (layout_sale_cash_total.xml) --- */}
-      <View style={styles.dashboardContainer}>
-        <View style={styles.dashboardRow}>
-          {/* Left Card: মোট পাবো (opens Baki Report) */}
-          <TouchableOpacity
-            style={styles.dashboardCard}
-            onPress={() => setModalBakiReport(true)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.dashAmount, { color: '#B81414' }]}>
-              ৳ {formatMoney(totalCustomerDue)}
-            </Text>
-            <Text style={styles.dashLabel}>মোট পাবো</Text>
-          </TouchableOpacity>
-
-          {/* Authentic Vertical Divider */}
-          <View style={styles.dashboardVerticalDivider} />
-
-          {/* Right Card: মোট দেবো */}
-          <TouchableOpacity
-            style={styles.dashboardCard}
-            onPress={() => {
-              setAccountTab('supplier');
-              setActiveTab('home');
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.dashAmount, { color: '#1C7D50' }]}>
-              ৳ {formatMoney(totalSupplierDue)}
-            </Text>
-            <Text style={styles.dashLabel}>মোট দেবো</Text>
+            <Image
+              source={require('./assets/icons/tb_support_white.png')}
+              style={styles.headerWhiteActionIcon}
+              resizeMode="contain"
+            />
+            <Text style={styles.headerActionLabelWhite}>সাপোর্ট</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* --- TAB CONTENT CONTAINER --- */}
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
 
         {/* ===================================================================
-            TAB 1: HOME / KHATA (কাস্টমার ও সাপ্লায়ার তালিকা)
+            TAB 1: HOME / TALLY (টালি - 1:1 Authentic from photo_2026-10-15_18-13-34.jpg)
            =================================================================== */}
         {activeTab === 'home' && (
-          <View style={{ flex: 1 }}>
-            {/* Customer vs Supplier Tabs */}
-            <View style={styles.homeTabSelectorRow}>
-              <TouchableOpacity
-                style={[styles.homeTabBtn, accountTab === 'customer' && styles.homeTabBtnActive]}
-                onPress={() => setAccountTab('customer')}
-              >
-                <Text style={[styles.homeTabBtnText, accountTab === 'customer' && styles.homeTabBtnTextActive]}>
-                  কাস্টমার ({accounts.filter((a) => a.type === 1).length})
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.homeTabBtn, accountTab === 'supplier' && styles.homeTabBtnActive]}
-                onPress={() => setAccountTab('supplier')}
-              >
-                <Text style={[styles.homeTabBtnText, accountTab === 'supplier' && styles.homeTabBtnTextActive]}>
-                  সাপ্লায়ার ({accounts.filter((a) => a.type === 2).length})
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.homeTabBtn, accountTab === 'all' && styles.homeTabBtnActive]}
-                onPress={() => setAccountTab('all')}
-              >
-                <Text style={[styles.homeTabBtnText, accountTab === 'all' && styles.homeTabBtnTextActive]}>
-                  সকল ({accounts.length})
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Search & Filter Bar (fragment_home.xml layoutSearch) */}
-            <View style={styles.searchBarRow}>
-              <Image
-                source={require('./assets/icons/ic_search.png')}
-                style={{ width: 18, height: 18, marginRight: 8 }}
-                resizeMode="contain"
-              />
-              <TextInput
-                style={styles.searchTextInput}
-                placeholder="নাম বা মোবাইল নম্বর দিয়ে খুঁজুন..."
-                placeholderTextColor={COLORS.textSubtle}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              {searchQuery ? (
-                <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 6 }}>
-                  <Image
-                    source={require('./assets/icons/ic_close.png')}
-                    style={{ width: 14, height: 14, tintColor: COLORS.textMuted }}
-                    resizeMode="contain"
-                  />
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity
-                style={styles.searchFilterBtn}
-                onPress={() => {
-                  const nextF = accountFilter === 'all' ? 'due' : accountFilter === 'due' ? 'highest' : 'all';
-                  setAccountFilter(nextF);
-                }}
-              >
-                <Image
-                  source={require('./assets/icons/ic_filter.png')}
-                  style={{ width: 20, height: 20, tintColor: accountFilter !== 'all' ? COLORS.primary : '#4D4D4D' }}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.searchDownloadBtn}
-                onPress={() => setModalFullReport(true)}
-              >
-                <Image
-                  source={require('./assets/icons/ic_download.png')}
-                  style={{ width: 20, height: 20, tintColor: '#4D4D4D' }}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Filter Pills */}
-            <View style={styles.filterPillRow}>
-              {[
-                { id: 'all', label: 'সব' },
-                { id: 'due', label: 'বাকি আছে' },
-                { id: 'highest', label: 'সর্বোচ্চ বাকি' },
-              ].map((f) => (
-                <TouchableOpacity
-                  key={f.id}
-                  style={[styles.filterPill, accountFilter === f.id && styles.filterPillActive]}
-                  onPress={() => setAccountFilter(f.id)}
-                >
-                  <Text style={[styles.filterPillText, accountFilter === f.id && styles.filterPillTextActive]}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* List Helper Header (fragment_home.xml lay_list_helper) */}
-            <View style={styles.listHelperHeader}>
-              <Text style={styles.listHelperTitle}>
-                {accountTab === 'supplier' ? 'সাপ্লায়ারের তালিকা' : accountTab === 'all' ? 'সকল খাতার তালিকা' : 'কাস্টমার/সাপ্লায়ারের তালিকা'}
-              </Text>
-              <Text style={[styles.listHelperType, { color: accountTab === 'supplier' ? '#1C7D50' : '#B81414' }]}>
-                {accountTab === 'supplier' ? 'দেবো' : 'পাবো'}
-              </Text>
-            </View>
-
-            {/* Accounts FlatList */}
+          <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
             <FlatList
               data={filteredAccounts}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: 95, paddingHorizontal: 12 }}
-              renderItem={({ item }) => {
-                const isCust = item.type === 1;
-                const hasDue = Number(item.balance) > 0;
+              contentContainerStyle={{ paddingBottom: 95 }}
+              showsVerticalScrollIndicator={false}
+              ListHeaderComponent={
+                <View style={{ backgroundColor: '#F8F9FA' }}>
+                  {/* --- 1. PROMO BANNER (মানি ট্রান্সফার চার্জ ফ্রি!*) --- */}
+                  <TouchableOpacity
+                    style={styles.promoBannerCard}
+                    onPress={() => setActiveTab('tallypay')}
+                    activeOpacity={0.85}
+                  >
+                    <Image
+                      source={require('./assets/icons/ic_sqr_value_banner.png')}
+                      style={styles.promoBannerImg}
+                      resizeMode="contain"
+                    />
+                    <View style={styles.promoBannerTextCol}>
+                      <Text style={styles.promoBannerBold}>মানি ট্রান্সফার</Text>
+                      <Text style={styles.promoBannerBold}>চার্জ ফ্রি!*</Text>
+                      <Text style={styles.promoBannerSub}>*শর্ত প্রযোজ্য</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* --- 2. 8-ITEM AUTHENTIC QUICK ACTIONS GRID --- */}
+                  <View style={styles.quickGridContainer}>
+                    {/* Row 1 */}
+                    <View style={styles.quickGridRow}>
+                      <TouchableOpacity
+                        style={styles.quickGridItem}
+                        onPress={() => setModalBusinessPicker(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('./assets/icons/grid_multi_biz.png')}
+                          style={styles.quickGridIcon}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.quickGridLabel}>মাল্টি ব্যবসা</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.quickGridItem}
+                        onPress={() => setModalAddStock(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('./assets/icons/grid_stock.png')}
+                          style={styles.quickGridIcon}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.quickGridLabel}>স্টক হিসাব</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.quickGridItem}
+                        onPress={() => setModalNotes(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('./assets/icons/grid_note.png')}
+                          style={styles.quickGridIcon}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.quickGridLabel}>ব্যবসার নোট</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.quickGridItem}
+                        onPress={() => setModalTagada(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('./assets/icons/grid_bulk_tagada.png')}
+                          style={styles.quickGridIcon}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.quickGridLabel}>গ্রুপ তাগাদা</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Row 2 */}
+                    <View style={styles.quickGridRow}>
+                      <TouchableOpacity
+                        style={styles.quickGridItem}
+                        onPress={() => setModalBanglaQR(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('./assets/icons/grid_qr.png')}
+                          style={styles.quickGridIcon}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.quickGridLabel}>QR কোড</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.quickGridItem}
+                        onPress={() => setModalBackupRestore(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('./assets/icons/grid_backup.png')}
+                          style={styles.quickGridIcon}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.quickGridLabel}>ডাটা ব্যাকআপ</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.quickGridItem}
+                        onPress={() => setModalTallyMessage(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('./assets/icons/grid_tally_msg.png')}
+                          style={styles.quickGridIcon}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.quickGridLabel}>টালি-মেসেজ</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.quickGridItem}
+                        onPress={() => setActiveTab('cashbox')}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('./assets/icons/grid_cashbox.png')}
+                          style={styles.quickGridIcon}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.quickGridLabel}>ক্যাশবক্স</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* --- 3. SUMMARY CARD (১,০৮,৫০০ মোট পাবো | ০ মোট দেবো) --- */}
+                  <View style={styles.summaryCardContainer}>
+                    <TouchableOpacity
+                      style={styles.summaryCardCol}
+                      onPress={() => setModalBakiReport(true)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.summaryCardAmountRed}>
+                        {toBengaliNumber(totalCustomerDue)}
+                      </Text>
+                      <Text style={styles.summaryCardLabel}>মোট পাবো</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.summaryCardDivider} />
+
+                    <TouchableOpacity
+                      style={styles.summaryCardCol}
+                      onPress={() => {
+                        setAccountTab('supplier');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.summaryCardAmountGreen}>
+                        {toBengaliNumber(totalSupplierDue)}
+                      </Text>
+                      <Text style={styles.summaryCardLabel}>মোট দেবো</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* --- 4. SEARCH & ACTION BAR --- */}
+                  <View style={styles.searchPillBar}>
+                    <Image
+                      source={require('./assets/icons/ic_search.png')}
+                      style={{ width: 18, height: 18, tintColor: '#6B7280', marginRight: 10 }}
+                      resizeMode="contain"
+                    />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 15, color: '#111827', paddingVertical: 0 }}
+                      placeholder="খোঁজ"
+                      placeholderTextColor="#6B7280"
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                    />
+                    {searchQuery ? (
+                      <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+                        <Image
+                          source={require('./assets/icons/ic_close.png')}
+                          style={{ width: 14, height: 14, tintColor: '#6B7280' }}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity
+                      style={{ padding: 6, marginLeft: 4 }}
+                      onPress={() => {
+                        const nextF = accountFilter === 'all' ? 'due' : accountFilter === 'due' ? 'highest' : 'all';
+                        setAccountFilter(nextF);
+                      }}
+                    >
+                      <Image
+                        source={require('./assets/icons/ic_filter.png')}
+                        style={{ width: 22, height: 22, tintColor: accountFilter !== 'all' ? '#B81414' : '#374151' }}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ padding: 6, marginLeft: 4 }}
+                      onPress={() => setModalFullReport(true)}
+                    >
+                      <Image
+                        source={require('./assets/icons/ic_download.png')}
+                        style={{ width: 22, height: 22, tintColor: '#374151' }}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* --- 5. COUNTER STRIP (কাস্টমার ১২ / সাপ্লায়ার ০) --- */}
+                  <View style={styles.counterStripRow}>
+                    <Text style={styles.counterStripText}>
+                      কাস্টমার {toBengaliNumber(accounts.filter((a) => a.type === 1).length)} / সাপ্লায়ার {toBengaliNumber(accounts.filter((a) => a.type === 2).length)}
+                    </Text>
+                  </View>
+                </View>
+              }
+              renderItem={({ item, index }) => {
+                const avatar = getAvatarInfo(item.name, index);
                 return (
                   <TouchableOpacity
-                    style={styles.accountCardItem}
+                    style={styles.customerListCard}
                     onPress={() => {
                       setSelectedAccount(item);
                       setCurrentScreen('account_ledger');
                     }}
+                    activeOpacity={0.7}
                   >
-                    <View style={[styles.accAvatarCircle, { backgroundColor: isCust ? COLORS.redLight : COLORS.greenLight }]}>
-                      <Text style={[styles.accAvatarLetter, { color: isCust ? COLORS.primary : COLORS.green }]}>
-                        {(item.name || 'খ')[0]}
-                      </Text>
+                    <View style={[styles.customerAvatarCircle, { backgroundColor: avatar.bg }]}>
+                      <Text style={styles.customerAvatarText}>{avatar.text}</Text>
                     </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.accCardName}>{item.name}</Text>
-                      <Text style={styles.accCardPhone}>
-                        {item.phone || 'মোবাইল নেই'}
-                      </Text>
-                      {item.address ? (
-                        <Text style={styles.accCardAddress} numberOfLines={1}>{item.address}</Text>
-                      ) : null}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.customerCardName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={styles.customerCardTime}>{item.timeAgo || '৩ মাস'}</Text>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.accTypeBadge, { color: isCust ? COLORS.primary : COLORS.green }]}>
-                        {isCust ? (hasDue ? 'পাবো (বাকি)' : 'হিসাব সমান') : (hasDue ? 'দেবো (পাওনা)' : 'হিসাব সমান')}
-                      </Text>
-                      <Text style={[styles.accBalanceValue, { color: isCust ? COLORS.primary : COLORS.green }]}>
-                        ৳ {formatMoney(item.balance)}
-                      </Text>
-                    </View>
+                    <Text style={[styles.customerCardAmount, { color: item.balance > 0 ? '#B81414' : item.balance < 0 ? '#1C7D50' : '#4B5563' }]}>
+                      {toBengaliDecimal(item.balance)}
+                    </Text>
+                    <Text style={styles.customerChevron}>›</Text>
                   </TouchableOpacity>
                 );
               }}
@@ -2017,23 +2106,20 @@ function TallyKhataApp() {
               }
             />
 
-            {/* Floating Action Button: New Account (ll_add_customer) */}
+            {/* --- 6. CIRCULAR FLOATING ACTION BUTTON (👤+) --- */}
             <TouchableOpacity
-              style={styles.floatingAddBtn}
+              style={styles.floatingRoundFab}
               onPress={() => {
-                setAccType(accountTab === 'supplier' ? 2 : 1);
+                setAccType(1);
                 setModalAddAccount(true);
               }}
               activeOpacity={0.85}
             >
               <Image
                 source={require('./assets/icons/ic_add_user.png')}
-                style={{ width: 18, height: 18, marginRight: 8, tintColor: '#FFFFFF' }}
+                style={{ width: 26, height: 26, tintColor: '#FFFFFF' }}
                 resizeMode="contain"
               />
-              <Text style={styles.floatingAddBtnText}>
-                নতুন কাস্টমার/সাপ্লায়ার
-              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -2752,25 +2838,37 @@ function TallyKhataApp() {
 
       </View>
 
-      {/* --- AUTHENTIC 5-TAB BOTTOM NAVIGATION BAR --- */}
+      {/* --- AUTHENTIC 4-TAB BOTTOM NAVIGATION BAR (photo_2026-10-15_18-13-34.jpg) --- */}
       <View style={styles.bottomTabBar}>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'home' && styles.tabButtonActive]}
+          style={styles.tabButton}
           onPress={() => setActiveTab('home')}
+          activeOpacity={0.8}
         >
-          <Image
-            source={activeTab === 'home' ? require('./assets/nav/nav_home_active.png') : require('./assets/nav/nav_home.png')}
-            style={styles.tabIconImg}
-            resizeMode="contain"
-          />
+          {activeTab === 'home' ? (
+            <View style={styles.tabActivePill}>
+              <Image
+                source={require('./assets/nav/nav_home_active.png')}
+                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <Image
+              source={require('./assets/nav/nav_home.png')}
+              style={styles.tabIconImg}
+              resizeMode="contain"
+            />
+          )}
           <Text style={[styles.tabButtonLabel, activeTab === 'home' && styles.tabButtonLabelActive]}>
-            খাতা
+            টালি
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'cashbox' && styles.tabButtonActive]}
+          style={styles.tabButton}
           onPress={() => setActiveTab('cashbox')}
+          activeOpacity={0.8}
         >
           <Image
             source={activeTab === 'cashbox' ? require('./assets/nav/nav_cashbox_active.png') : require('./assets/nav/nav_cashbox.png')}
@@ -2783,22 +2881,9 @@ function TallyKhataApp() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'tagada' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('tagada')}
-        >
-          <Image
-            source={activeTab === 'tagada' ? require('./assets/nav/nav_tagada_active.png') : require('./assets/nav/nav_tagada.png')}
-            style={styles.tabIconImg}
-            resizeMode="contain"
-          />
-          <Text style={[styles.tabButtonLabel, activeTab === 'tagada' && styles.tabButtonLabelActive]}>
-            তাগাদা
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'tallypay' && styles.tabButtonActive]}
+          style={styles.tabButton}
           onPress={() => setActiveTab('tallypay')}
+          activeOpacity={0.8}
         >
           <Image
             source={activeTab === 'tallypay' ? require('./assets/nav/nav_tallypay_active.png') : require('./assets/nav/nav_tallypay.png')}
@@ -2811,8 +2896,9 @@ function TallyKhataApp() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'menu' && styles.tabButtonActive]}
+          style={styles.tabButton}
           onPress={() => setActiveTab('menu')}
+          activeOpacity={0.8}
         >
           <Image
             source={activeTab === 'menu' ? require('./assets/nav/nav_menu_active.png') : require('./assets/nav/nav_menu.png')}
@@ -5007,6 +5093,86 @@ function TallyKhataApp() {
       </Modal>
 
 
+      {/* ===================================================================
+          AUTHENTIC MODAL: TALLY MESSAGE (টালি-মেসেজ)
+         =================================================================== */}
+      <Modal
+        visible={modalTallyMessage}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalTallyMessage(false)}
+      >
+        <SafeAreaView style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Image
+                  source={require('./assets/icons/grid_tally_msg.png')}
+                  style={{ width: 28, height: 28, marginRight: 8 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.modalCardTitle}>টালি-মেসেজ সার্ভিস</Text>
+              </View>
+              <TouchableOpacity onPress={() => setModalTallyMessage(false)}>
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={{ width: 20, height: 20, tintColor: '#6B7280' }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 12 }}>
+              {/* Quota Card */}
+              <View style={{ backgroundColor: '#FEF2F2', borderRadius: 12, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#FCA5A5' }}>
+                <Text style={{ fontSize: 13, color: '#991B1B', fontWeight: '600' }}>আপনার ফ্রি এসএমএস ব্যালেন্স</Text>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#B81414', marginVertical: 4 }}>
+                  {toBengaliNumber(tallyMessageBalance)} টি অবশিষ্ট
+                </Text>
+                <Text style={{ fontSize: 12, color: '#6B7280' }}>
+                  প্রতিটি লেনদেন ও তাগাদার সাথে স্বয়ংক্রিয়ভাবে কাস্টমারকে ফ্রি মেসেজ পাঠানো হয়।
+                </Text>
+              </View>
+
+              {/* Message Bundles */}
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#111827', marginBottom: 10 }}>এসএমএস প্যাকেজ</Text>
+              {[
+                { count: 100, price: 50, tag: 'জনপ্রিয়' },
+                { count: 250, price: 120, tag: 'বেস্ট ভ্যালু' },
+                { count: 500, price: 220, tag: 'সুপার সেভার' },
+                { count: 1000, price: 400, tag: 'বিগ সেভিং' },
+              ].map((pkg, idx) => (
+                <View
+                  key={idx}
+                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 8 }}
+                >
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#111827' }}>{toBengaliNumber(pkg.count)} এসএমএস</Text>
+                      <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#B45309' }}>{pkg.tag}</Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>মেয়াদ আজীবন • কোনো মেয়াদ নেই</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#B81414', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
+                    onPress={() => {
+                      setTallyMessageBalance(prev => prev + pkg.count);
+                      Alert.alert('অভিনন্দন!', `${toBengaliNumber(pkg.count)} টি এসএমএস সফলভাবে আপনার অ্যাকাউন্টে যোগ হয়েছে।`);
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>৳ {toBengaliNumber(pkg.price)}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+
+
 
 
     </SafeAreaView>
@@ -5019,6 +5185,283 @@ function TallyKhataApp() {
 // 5. AUTHENTIC TALLYKHATA STYLESHEET (All 255 Keys Verified)
 // =========================================================================
 const styles = StyleSheet.create({
+  // --- AUTHENTIC 1:1 VISUAL PARITY STYLES (photo_2026-10-15_18-13-34.jpg) ---
+  topHeaderBarRed: {
+    backgroundColor: '#B81414',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerLeftPillContainer: {
+    alignItems: 'flex-start',
+  },
+  headerBizPill: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerBizPillText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginRight: 6,
+  },
+  headerBizPillArrow: {
+    width: 10,
+    height: 10,
+    tintColor: '#000000',
+  },
+  headerSubtitleWhite: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    marginTop: 4,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  headerRightActionsRed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  headerWhiteActionBtn: {
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  headerWhiteActionIcon: {
+    width: 24,
+    height: 24,
+  },
+  headerActionLabelWhite: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    marginTop: 3,
+    fontWeight: '500',
+  },
+  headerBadgeWhite: {
+    position: 'absolute',
+    top: -5,
+    right: -8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: '#B81414',
+  },
+  headerBadgeWhiteText: {
+    color: '#B81414',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+
+  // Yellow Promo Banner
+  promoBannerCard: {
+    backgroundColor: '#FFFED402',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FEF08A',
+  },
+  promoBannerImg: {
+    width: 66,
+    height: 76,
+  },
+  promoBannerTextCol: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  promoBannerBold: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#000000',
+    lineHeight: 28,
+  },
+  promoBannerSub: {
+    fontSize: 10,
+    color: '#374151',
+    alignSelf: 'flex-end',
+    marginTop: 2,
+  },
+
+  // 8-Item Quick Grid
+  quickGridContainer: {
+    marginHorizontal: 8,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  quickGridRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+  },
+  quickGridItem: {
+    width: '24%',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  quickGridIcon: {
+    width: 44,
+    height: 44,
+  },
+  quickGridLabel: {
+    fontSize: 12,
+    color: '#1F2937',
+    marginTop: 6,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+
+  // Summary Card
+  summaryCardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+  },
+  summaryCardCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryCardAmountRed: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  summaryCardAmountGreen: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1C7D50',
+  },
+  summaryCardLabel: {
+    fontSize: 13,
+    color: '#111827',
+    marginTop: 4,
+  },
+  summaryCardDivider: {
+    width: 1,
+    height: 38,
+    backgroundColor: '#E5E7EB',
+  },
+
+  // Search Pill & Counter Strip
+  searchPillBar: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginTop: 6,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+  counterStripRow: {
+    paddingHorizontal: 20,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  counterStripText: {
+    color: '#4B5563',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Customer List Rows
+  customerListCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  customerAvatarCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  customerAvatarText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  customerCardName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  customerCardTime: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 3,
+  },
+  customerCardAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#B81414',
+    marginRight: 8,
+  },
+  customerChevron: {
+    fontSize: 18,
+    color: '#9CA3AF',
+    fontWeight: 'bold',
+  },
+
+  // Floating Round FAB
+  floatingRoundFab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 18,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#B81414',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    zIndex: 10,
+  },
+
+  // Active Pill on Bottom Nav
+  tabActivePill: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+
   // --- BASE & APP CONTAINER ---
   container: {
     flex: 1,

@@ -3,167 +3,94 @@ import sys
 sys.stdout.reconfigure(encoding='utf-8')
 
 with open('part4_modals_and_screens.js', 'r', encoding='utf-8') as f:
-    p4 = f.read()
+    content = f.read()
 
-# 1. Voucher Header
-old_vhdr = """                <View style={styles.voucherHeader}>
-                  <Text style={styles.voucherBizName}>{businessName}</Text>"""
-new_vhdr = """                <View style={styles.voucherHeader}>
-                  <Image
-                    source={require('./assets/ic_tally_khata_logo_reg.png')}
-                    style={{ width: 44, height: 44, marginBottom: 6 }}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.voucherBizName}>{businessName}</Text>"""
-p4 = p4.replace(old_vhdr, new_vhdr)
-
-# 2. QR Display
-old_qr = """            {/* QR Visual Card */}
-            <View style={styles.qrDisplayContainer}>
-              <Text style={{ fontSize: 90 }}>📱</Text>
-              <Text style={styles.qrCenterBadge}>বাংলা QR</Text>
-            </View>"""
-new_qr = """            {/* QR Visual Card */}
-            <View style={styles.qrDisplayContainer}>
-              <Image
-                source={require('./assets/ic_bangla_qr.png')}
-                style={{ width: 170, height: 170 }}
-                resizeMode="contain"
-              />
-              <Text style={styles.qrCenterBadge}>বাংলা QR • {businessName}</Text>
-            </View>"""
-p4 = p4.replace(old_qr, new_qr)
-
-# 3. Add Money Methods
-old_add = """            <Text style={styles.inputLabel}>পেমেন্ট মেথড নির্বাচন করুন</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>
-              {['bKash', 'Nagad', 'Rocket', 'Bank Card'].map((m) => (
-                <TouchableOpacity
-                  key={m}
-                  style={[styles.paymentMethodChip, addMoneyMethod === m && styles.paymentMethodChipActive]}
-                  onPress={() => setAddMoneyMethod(m)}
-                >
-                  <Text style={[styles.paymentMethodChipText, addMoneyMethod === m && styles.paymentMethodChipTextActive]}>
-                    {m}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>"""
-new_add = """            <Text style={styles.inputLabel}>পেমেন্ট মেথড নির্বাচন করুন</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                {[
-                  { id: 'bKash', name: 'বিকাশ', img: require('./assets/banks/bkash90px.png') },
-                  { id: 'Rocket', name: 'রকেট', img: require('./assets/banks/ic_rocket_rounded.png') },
-                  { id: 'SureCash', name: 'শিওরক্যাশ', img: require('./assets/banks/ic_sure_cash.png') },
-                  { id: 'NexusPay', name: 'নেক্সাস পে', img: require('./assets/banks/ic_dbbl_nexuspay.png') },
-                ].map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.paymentMethodChip,
-                      addMoneyMethod === item.id && styles.paymentMethodChipActive,
-                      { alignItems: 'center', paddingVertical: 10, minWidth: 90 },
-                    ]}
-                    onPress={() => setAddMoneyMethod(item.id)}
-                  >
-                    <Image
-                      source={item.img}
-                      style={{ width: 34, height: 34, marginBottom: 4 }}
-                      resizeMode="contain"
-                    />
-                    <Text
-                      style={[
-                        styles.paymentMethodChipText,
-                        addMoneyMethod === item.id && styles.paymentMethodChipTextActive,
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>"""
-p4 = p4.replace(old_add, new_add)
-
-# 4. Mobile Recharge Operators
-old_rec = """            <Text style={styles.inputLabel}>মোবাইল অপারেটর</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 8 }}>
-              {['Grameenphone', 'Banglalink', 'Robi', 'Airtel', 'Teletalk'].map((op) => (
-                <TouchableOpacity
-                  key={op}
-                  style={[styles.paymentMethodChip, rechargeOperator === op && styles.paymentMethodChipActive]}
-                  onPress={() => setRechargeOperator(op)}
-                >
-                  <Text style={[styles.paymentMethodChipText, rechargeOperator === op && styles.paymentMethodChipTextActive]}>
-                    {op}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>"""
-new_rec = """            <Text style={styles.inputLabel}>মোবাইল অপারেটর নির্বাচন করুন</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                {[
-                  { id: 'Grameenphone', name: 'গ্রামীনফোন', img: require('./assets/operators/mobile_operator_grameenphone.webp') },
-                  { id: 'Banglalink', name: 'বাংলালিংক', img: require('./assets/operators/mobile_operator_banglalink.png') },
-                  { id: 'Robi', name: 'রবি', img: require('./assets/operators/mobile_operator_robi.webp') },
-                  { id: 'Airtel', name: 'এয়ারটেল', img: require('./assets/operators/mobile_operator_airtel.png') },
-                  { id: 'Teletalk', name: 'টেলিটক', img: require('./assets/operators/mobile_operator_teletalk.webp') },
-                ].map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.paymentMethodChip,
-                      rechargeOperator === item.id && styles.paymentMethodChipActive,
-                      { alignItems: 'center', paddingVertical: 10, minWidth: 80 },
-                    ]}
-                    onPress={() => setRechargeOperator(item.id)}
-                  >
-                    <Image
-                      source={item.img}
-                      style={{ width: 36, height: 36, marginBottom: 4 }}
-                      resizeMode="contain"
-                    />
-                    <Text
-                      style={[
-                        styles.paymentMethodChipText,
-                        rechargeOperator === item.id && styles.paymentMethodChipTextActive,
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>"""
-p4 = p4.replace(old_rec, new_rec)
-
-# 5. Support Banner
-old_sup = """              <View style={styles.supportBanner}>
-                <Text style={styles.supportBannerTitle}>যে কোনো প্রয়োজনে আমরা আছি আপনার পাশে</Text>
-                <Text style={styles.supportBannerSub}>টালিখাতা কাস্টমার কেয়ার হেল্পলাইন: ১৬৭২৬ (সকাল ৯টা - রাত ৯টা)</Text>
-              </View>"""
-new_sup = """              <View style={[styles.supportBanner, { flexDirection: 'row', alignItems: 'center', padding: 14 }]}>
+modal_tally_msg_code = '''
+      {/* ===================================================================
+          AUTHENTIC MODAL: TALLY MESSAGE (টালি-মেসেজ)
+         =================================================================== */}
+      <Modal
+        visible={modalTallyMessage}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalTallyMessage(false)}
+      >
+        <SafeAreaView style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Image
-                  source={require('./assets/customer_care_lady.png')}
-                  style={{ width: 56, height: 56, borderRadius: 28, marginRight: 14 }}
+                  source={require('./assets/icons/grid_tally_msg.png')}
+                  style={{ width: 28, height: 28, marginRight: 8 }}
                   resizeMode="contain"
                 />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.supportBannerTitle}>টালিখাতা কাস্টমার সাপোর্ট</Text>
-                  <TouchableOpacity onPress={() => Linking.openURL('tel:09612446677')}>
-                    <Text style={{ fontSize: 15, color: COLORS.primary, fontWeight: 'bold', marginTop: 3 }}>
-                      📞 হটলাইন: ০৯৬১২-৪৪৬৬৭৭
-                    </Text>
+                <Text style={styles.modalCardTitle}>টালি-মেসেজ সার্ভিস</Text>
+              </View>
+              <TouchableOpacity onPress={() => setModalTallyMessage(false)}>
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={{ width: 20, height: 20, tintColor: '#6B7280' }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 12 }}>
+              {/* Quota Card */}
+              <View style={{ backgroundColor: '#FEF2F2', borderRadius: 12, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#FCA5A5' }}>
+                <Text style={{ fontSize: 13, color: '#991B1B', fontWeight: '600' }}>আপনার ফ্রি এসএমএস ব্যালেন্স</Text>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#B81414', marginVertical: 4 }}>
+                  {toBengaliNumber(tallyMessageBalance)} টি অবশিষ্ট
+                </Text>
+                <Text style={{ fontSize: 12, color: '#6B7280' }}>
+                  প্রতিটি লেনদেন ও তাগাদার সাথে স্বয়ংক্রিয়ভাবে কাস্টমারকে ফ্রি মেসেজ পাঠানো হয়।
+                </Text>
+              </View>
+
+              {/* Message Bundles */}
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#111827', marginBottom: 10 }}>এসএমএস প্যাকেজ</Text>
+              {[
+                { count: 100, price: 50, tag: 'জনপ্রিয়' },
+                { count: 250, price: 120, tag: 'বেস্ট ভ্যালু' },
+                { count: 500, price: 220, tag: 'সুপার সেভার' },
+                { count: 1000, price: 400, tag: 'বিগ সেভিং' },
+              ].map((pkg, idx) => (
+                <View
+                  key={idx}
+                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 8 }}
+                >
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#111827' }}>{toBengaliNumber(pkg.count)} এসএমএস</Text>
+                      <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#B45309' }}>{pkg.tag}</Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>মেয়াদ আজীবন • কোনো মেয়াদ নেই</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#B81414', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
+                    onPress={() => {
+                      setTallyMessageBalance(prev => prev + pkg.count);
+                      Alert.alert('অভিনন্দন!', `${toBengaliNumber(pkg.count)} টি এসএমএস সফলভাবে আপনার অ্যাকাউন্টে যোগ হয়েছে।`);
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>৳ {toBengaliNumber(pkg.price)}</Text>
                   </TouchableOpacity>
-                  <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
-                    সকাল ৯টা - রাত ৯টা (ছুটির দিনসহ)
-                  </Text>
                 </View>
-              </View>"""
-p4 = p4.replace(old_sup, new_sup)
+              ))}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </Modal>
+'''
+
+if 'modalTallyMessage' not in content:
+    idx = content.rfind('modalMoneyOut')
+    end_modal = content.find('</Modal>', idx) + len('</Modal>')
+    content = content[:end_modal] + '\n\n' + modal_tally_msg_code + content[end_modal:]
 
 with open('part4_modals_and_screens.js', 'w', encoding='utf-8') as f:
-    f.write(p4)
-print('part4_modals_and_screens.js updated with authentic assets successfully!')
+    f.write(content)
+
+print('part4_modals_and_screens.js updated successfully!')

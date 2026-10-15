@@ -4,7 +4,7 @@ function TallyKhataApp() {
   const [activeTab, setActiveTab] = useState('home');         // 'home' | 'cashbox' | 'tagada' | 'tallypay' | 'menu'
 
   // Business Profile
-  const [businessName, setBusinessName] = useState('আমার ব্যবসা প্রতিষ্ঠান');
+  const [businessName, setBusinessName] = useState('Mobile Xpress');
   const [ownerName, setOwnerName] = useState('স্বত্বাধিকারী');
   const [ownerPhone, setOwnerPhone] = useState('01700000000');
   const [businessAddress, setBusinessAddress] = useState('বাজার রোড, ঢাকা');
@@ -95,6 +95,8 @@ function TallyKhataApp() {
   const [modalAddStock, setModalAddStock] = useState(false);
   const [modalAdjustStock, setModalAdjustStock] = useState(false);
   const [modalTagada, setModalTagada] = useState(false);
+  const [modalTallyMessage, setModalTallyMessage] = useState(false);
+  const [tallyMessageBalance, setTallyMessageBalance] = useState(50);
   const [modalBanglaQR, setModalBanglaQR] = useState(false);
   const [modalAddMoney, setModalAddMoney] = useState(false);
   const [modalMobileRecharge, setModalMobileRecharge] = useState(false);
