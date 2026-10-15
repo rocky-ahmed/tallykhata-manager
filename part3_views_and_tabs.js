@@ -484,7 +484,7 @@
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>ক্যাশবাক্স</Text>
+                        <Text style={styles.quickGridLabel}>ক্যাশবক্স</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1363,7 +1363,7 @@
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'cashbox' && styles.tabButtonLabelActive]}>
-            ক্যাশবাক্স
+            ক্যাশবক্স
           </Text>
         </TouchableOpacity>
 
@@ -1388,7 +1388,7 @@
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'tallypay' && styles.tabButtonLabelActive]}>
-            টালি পে
+            টালিপে
           </Text>
         </TouchableOpacity>
 
