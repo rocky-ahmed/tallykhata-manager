@@ -47,7 +47,12 @@ function validateStockAdjustment(currentStock, adjustQty, adjustType) {
     return { valid: false, error: 'সঠিক স্টক সমন্বয় পরিমাণ দিন।' };
   }
   const current = Number(currentStock) || 0;
-  if (adjustType === 'out' && qty > current) {
+  const isOut = adjustType === 'out' || adjustType === 'reduce' || adjustType === 'decrease';
+  const isIn = adjustType === 'in' || adjustType === 'add' || adjustType === 'increase';
+  if (!isIn && !isOut) {
+    return { valid: false, error: 'অবৈধ স্টক সমন্বয় ধরন।' };
+  }
+  if (isOut && qty > current) {
     return {
       valid: false,
       error: `বর্তমান স্টক (${current}) থেকে বেশি (${qty}) বাদ দেওয়া সম্ভব নয়।`,
@@ -55,7 +60,7 @@ function validateStockAdjustment(currentStock, adjustQty, adjustType) {
   }
   return {
     valid: true,
-    newStock: adjustType === 'in' ? current + qty : current - qty,
+    newStock: isIn ? current + qty : current - qty,
   };
 }
 
@@ -238,6 +243,7 @@ function migrateV5toV6(rawV5Data) {
       pinEnabled: Boolean(v5.pinEnabled),
       appPin: v5.appPin || '',
       tagadaLogs: Array.isArray(v5.tagadaLogs) ? v5.tagadaLogs : [],
+      version: 6,
       migrationVersion: 6,
       migratedAt: new Date().toISOString(),
     };

@@ -42,3 +42,20 @@ This document records all detected bugs, UI mismatches, state synchronization de
 | DATA-3 | Storage Key Migration | Old local storage key cached stale placeholder profile | Hardcoded to `tallykhata_offline_store_v5` | Implemented safe one-time migration (`migrateV5toV6`) with `tallykhata_offline_store_v5_backup` retention | RESOLVED |
 | DATA-4 | Persistence Mutex | Concurrent rapid writes caused state loss | `persistData` had no serialization queue | Implemented Promise chain mutex queue guaranteeing sequential atomic writes | RESOLVED |
 | DATA-5 | Awaitable Write Handlers | Handlers cleared form inputs and closed modals before confirming storage write | Fire-and-forget `persistData` calls | Made all handlers `await persistData()`, keeping inputs intact on write failure | RESOLVED |
+
+---
+
+## 4. Phase 3.2 Deep Production Audit & Remediation Log
+
+| ID | Domain / Component | Observed Defect | Root Cause | Remediation & Fix | Status |
+|---|---|---|---|---|---|
+| LOGIC-7 | Test Runner Harness | `runTest` in `test_phase3_1.js` did not `await` async callbacks, causing unhandled rejections to pass silently | `runTest` was declared as a synchronous function without awaiting promise return values | Refactored `runTest` in `test_phase3_2.js` into an `async` function with strict `await`, rejection tracking, and exit code `1` on failure | RESOLVED |
+| DATA-2 | Concurrency & Re-render Mutex | `persistenceQueue` in `part2_state_and_handlers.js` was re-instantiated on every React component re-render | Declared with `let persistenceQueue = Promise.resolve();` inside the component body | Created `src/storageRepository.js` with module-scoped `writeQueue` mutex surviving re-renders | RESOLVED |
+| DATA-3 | Stale Snapshot Overwrites | Partial updates using outdated React state could overwrite newer updates to other keys | `persistData` constructed payload from component closure variables | Implemented authoritative `currentStore` cache in `StorageRepository` that merges partial updates onto the latest committed state | RESOLVED |
+| DATA-4 | Unawaited Cash Entry Handlers | `handleDeleteCashEntry`, `handleSaveReconciliation`, and `handleSaveDenominations` called `persistData` without `await` | Callers fired and forgot without verifying storage success before dismissing UI | Made all cash handlers `async`, awaited `persistData`, and checked `saveRes.success` before updating state and closing modals | RESOLVED |
+| DATA-5 | Unawaited Stock Handlers | `handleDeleteProduct` was unawaited | `persistData` was invoked without `await` in `onPress` callback | Made `onPress` callback `async`, awaited `persistData`, and checked `saveRes.success` | RESOLVED |
+| DATA-6 | Unawaited Note Handlers | `handleAddNote`, `handleToggleNote`, and `handleDeleteNote` were unawaited | Handlers ran synchronously without checking storage write result | Converted note handlers to `async`, awaited `persistData`, and checked `saveRes.success` | RESOLVED |
+| DATA-7 | Unawaited Business & Tagada | `handleSelectBusiness`, `handleCreateBusiness`, `handleSendSingleTagada`, `handleSendBulkTagada` unawaited | Operations dismissed modals before checking write results | Converted to `async`, awaited `persistData`, and checked `saveRes.success` | RESOLVED |
+| DATA-8 | Unawaited Backup & Security | `handleImportBackup`, PIN setup modal in `part4` were unawaited | Handlers closed modals and set state before storage write was confirmed | Added `await persistData`, checked `saveRes.success` before updating state or dismissing modals | RESOLVED |
+| LOGIC-8 | Supplier Initial Balance Sign | New supplier accounts with initial balance created initial journal with `type: 'given'`, inverting balance on recalculation | Hardcoded `type: 'given'` in initial journal generation | Updated initial journal generation to `type: accType === 1 ? 'given' : 'received'`, correctly increasing supplier debt | RESOLVED |
+| DATA-9 | Missing Version in Migration | `migrateV5toV6` omitted explicit `version: 6` field in returned payload | Property was named `migrationVersion: 6` without `version: 6` | Added `version: 6` to migrated payload in `src/ledgerEngine.js` | RESOLVED |

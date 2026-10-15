@@ -28,3 +28,25 @@
    - Connected Xiaomi Redmi Note 9 over USB with `adb reverse tcp:8081 tcp:8081`.
    - Reloaded Expo Go on device (`exp://127.0.0.1:8081`).
    - Captured and visually verified `live_device_screen.png`.
+
+---
+
+## 2026-10-16: Phase 3.2 Production-Path Testing & Complete Functional Repair
+- **Created Production Storage Repository**:
+  - Implemented `src/storageRepository.js` exporting `StorageRepository`, singleton `storageRepository`, and `createDefaultState`.
+  - Added module-scoped `writeQueue` mutex to guarantee serialization across all React component re-render lifecycles.
+  - Implemented authoritative in-memory caching and field merging to eliminate stale React snapshot overwrites.
+  - Implemented failure-safe queue chaining that prevents deadlock when I/O or storage errors occur.
+  - Built safe migration integration with `tallykhata_offline_store_v5_backup` preservation.
+- **Audited and Fixed All 27 Persistence Sites**:
+  - Refactored `part2_state_and_handlers.js` and `part4_modals_and_screens.js` to strictly `await persistData(...)` and verify `saveRes.success` before updating component state or dismissing modals.
+  - Corrected cash entries, stock inventory, notes, business multi-profile switcher, Tagada SMS logs, backup restoration, and PIN security lock setup.
+  - Fixed initial supplier balance journal type convention from hardcoded `'given'` to `accType === 1 ? 'given' : 'received'`.
+- **Created and Verified Phase 3.2 Async Test Suite**:
+  - Implemented `test_phase3_2.js` using async/await test harness with non-zero exit codes on failure.
+  - Verified 12/12 production-path tests spanning customer and supplier ledger recalculations, race-condition prevention, error recovery, cascade deletion, double-entry cashbox synchronization, and end-to-end workflows.
+- **Built and Verified Full Application**:
+  - Rebuilt `App.js` (8,070 lines, 290,191 characters) via `build_full_app.py`.
+  - Verified zero syntax errors with `node -c App.js`.
+  - Verified clean bundle serving on Metro (4.50 MB, 0 errors).
+  - Verified live device screen on Xiaomi Redmi Note 9 (`737ee4410405`).

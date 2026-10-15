@@ -18,6 +18,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ledgerEngine from './src/ledgerEngine';
+import { storageRepository, StorageRepository, createDefaultState } from './src/storageRepository';
+
+// Initialize production storage repository adapter with AsyncStorage
+storageRepository.setStorageAdapter(AsyncStorage);
 
 const {
   validateTransaction,

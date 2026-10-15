@@ -1219,8 +1219,18 @@
 
               <TouchableOpacity
                 style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary, marginTop: 10 }]}
-                onPress={() => {
-                  persistData();
+                onPress={async () => {
+                  const saveRes = await persistData({
+                    businessName,
+                    ownerName,
+                    ownerPhone,
+                    businessAddress,
+                    openingBalance,
+                  });
+                  if (!saveRes.success) {
+                    Alert.alert('ত্রুটি', 'ব্যবসার তথ্য সংরক্ষণ করা যায়নি।');
+                    return;
+                  }
                   setModalSettings(false);
                   Alert.alert('সফল', 'ব্যবসার তথ্য সফলভাবে সংরক্ষিত হয়েছে');
                 }}
@@ -1390,19 +1400,27 @@
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
               <TouchableOpacity
                 style={[styles.modalBtnSubmit, { backgroundColor: pinEnabled ? COLORS.red : COLORS.primary, flex: 1 }]}
-                onPress={() => {
+                onPress={async () => {
                   if (!pinEnabled) {
                     if (appPin.length !== 4) {
                       Alert.alert('সতর্কতা', 'সঠিক ৪ ডিজিটের পিন দিন');
                       return;
                     }
+                    const saveRes = await persistData({ pinEnabled: true, appPin });
+                    if (!saveRes.success) {
+                      Alert.alert('ত্রুটি', 'পিন লক চালু করা যায়নি।');
+                      return;
+                    }
                     setPinEnabled(true);
-                    persistData({ pinEnabled: true, appPin });
                     Alert.alert('সফল', 'পিন লক চালু করা হয়েছে।');
                   } else {
+                    const saveRes = await persistData({ pinEnabled: false, appPin: '' });
+                    if (!saveRes.success) {
+                      Alert.alert('ত্রুটি', 'পিন লক বন্ধ করা যায়নি।');
+                      return;
+                    }
                     setPinEnabled(false);
                     setAppPin('');
-                    persistData({ pinEnabled: false, appPin: '' });
                     Alert.alert('বন্ধ', 'পিন লক বন্ধ করা হয়েছে।');
                   }
                   setModalPinSetup(false);

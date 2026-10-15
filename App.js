@@ -18,6 +18,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ledgerEngine from './src/ledgerEngine';
+import { storageRepository, StorageRepository, createDefaultState } from './src/storageRepository';
+
+// Initialize production storage repository adapter with AsyncStorage
+storageRepository.setStorageAdapter(AsyncStorage);
 
 const {
   validateTransaction,
@@ -501,9 +505,9 @@ function TallyKhataApp() {
 
   const loadSavedData = async () => {
     try {
-      const v6DataStr = await AsyncStorage.getItem(STORAGE_KEY);
-      if (v6DataStr) {
-        const d = JSON.parse(v6DataStr);
+      const res = await storageRepository.loadInitialData();
+      if (res.success && res.data) {
+        const d = res.data;
         if (Array.isArray(d.accounts)) setAccounts(d.accounts);
         if (Array.isArray(d.journals)) setJournals(d.journals);
         if (Array.isArray(d.cashEntries)) setCashEntries(d.cashEntries);
@@ -511,7 +515,9 @@ function TallyKhataApp() {
         if (Array.isArray(d.notes)) setNotes(d.notes);
         if (Array.isArray(d.walletTxns)) setWalletTxns(d.walletTxns);
         if (d.walletBalance !== undefined) setWalletBalance(Number(d.walletBalance));
-        if (d.businessName) { setBusinessName(d.businessName === 'আমার ব্যবসা প্রতিষ্ঠান' ? 'Mobile Xpress' : d.businessName); }
+        if (d.businessName) {
+          setBusinessName(d.businessName === 'আমার ব্যবসা প্রতিষ্ঠান' ? 'Mobile Xpress' : d.businessName);
+        }
         if (d.ownerName) setOwnerName(d.ownerName);
         if (d.ownerPhone) setOwnerPhone(d.ownerPhone);
         if (d.businessAddress) setBusinessAddress(d.businessAddress);
@@ -524,81 +530,43 @@ function TallyKhataApp() {
           setAppPin(d.appPin);
           setIsLocked(true);
         }
-        return;
+      } else {
+        console.warn('Failed to load initial data from storageRepository:', res.error);
       }
-
-      // Safe Data Migration from V5 if V6 not found
-      const v5DataStr = await AsyncStorage.getItem(V5_KEY);
-      if (v5DataStr) {
-        console.log('Detected v5 store. Migrating safely to v6...');
-        const mig = migrateV5toV6(v5DataStr);
-        if (mig.success && mig.data) {
-          const d = mig.data;
-          await AsyncStorage.setItem(V5_BACKUP_KEY, v5DataStr);
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(d));
-          setAccounts(d.accounts);
-          setJournals(d.journals);
-          setCashEntries(d.cashEntries);
-          setInventory(d.inventory);
-          setNotes(d.notes);
-          setWalletTxns(d.walletTxns);
-          setWalletBalance(d.walletBalance);
-          setBusinessName(d.businessName);
-          setOwnerName(d.ownerName);
-          setOwnerPhone(d.ownerPhone);
-          setBusinessAddress(d.businessAddress);
-          setBusinesses(d.businesses);
-          setRemainingSmsCount(d.remainingSmsCount);
-          setOpeningBalance(d.openingBalance);
-          setTagadaLogs(d.tagadaLogs);
-          if (d.pinEnabled && d.appPin) {
-            setPinEnabled(true);
-            setAppPin(d.appPin);
-            setIsLocked(true);
-          }
-          return;
-        }
-      }
-
-      // First time initialization
-      await persistData();
     } catch (e) {
       console.log('Error loading saved data:', e);
     }
   };
 
-  let persistenceQueue = Promise.resolve();
-  const persistData = (overrides = {}) => {
-    return new Promise((resolve) => {
-      persistenceQueue = persistenceQueue.then(async () => {
-        try {
-          const payload = {
-            accounts: overrides.accounts !== undefined ? overrides.accounts : accounts,
-            journals: overrides.journals !== undefined ? overrides.journals : journals,
-            cashEntries: overrides.cashEntries !== undefined ? overrides.cashEntries : cashEntries,
-            inventory: overrides.inventory !== undefined ? overrides.inventory : inventory,
-            notes: overrides.notes !== undefined ? overrides.notes : notes,
-            walletBalance: overrides.walletBalance !== undefined ? overrides.walletBalance : walletBalance,
-            walletTxns: overrides.walletTxns !== undefined ? overrides.walletTxns : walletTxns,
-            businessName: overrides.businessName !== undefined ? overrides.businessName : businessName,
-            ownerName: overrides.ownerName !== undefined ? overrides.ownerName : ownerName,
-            ownerPhone: overrides.ownerPhone !== undefined ? overrides.ownerPhone : ownerPhone,
-            businessAddress: overrides.businessAddress !== undefined ? overrides.businessAddress : businessAddress,
-            businesses: overrides.businesses !== undefined ? overrides.businesses : businesses,
-            remainingSmsCount: overrides.remainingSmsCount !== undefined ? overrides.remainingSmsCount : remainingSmsCount,
-            openingBalance: overrides.openingBalance !== undefined ? overrides.openingBalance : openingBalance,
-            pinEnabled: overrides.pinEnabled !== undefined ? overrides.pinEnabled : pinEnabled,
-            appPin: overrides.appPin !== undefined ? overrides.appPin : appPin,
-            tagadaLogs: overrides.tagadaLogs !== undefined ? overrides.tagadaLogs : tagadaLogs,
-          };
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-          resolve({ success: true, payload });
-        } catch (err) {
-          console.error('persistData write error:', err);
-          resolve({ success: false, error: err });
-        }
+  const persistData = async (overrides = {}) => {
+    try {
+      const saveRes = await storageRepository.persistData((prevStore) => {
+        return {
+          ...prevStore,
+          accounts: overrides.accounts !== undefined ? overrides.accounts : (prevStore.accounts || accounts),
+          journals: overrides.journals !== undefined ? overrides.journals : (prevStore.journals || journals),
+          cashEntries: overrides.cashEntries !== undefined ? overrides.cashEntries : (prevStore.cashEntries || cashEntries),
+          inventory: overrides.inventory !== undefined ? overrides.inventory : (prevStore.inventory || inventory),
+          notes: overrides.notes !== undefined ? overrides.notes : (prevStore.notes || notes),
+          walletBalance: overrides.walletBalance !== undefined ? overrides.walletBalance : (prevStore.walletBalance ?? walletBalance),
+          walletTxns: overrides.walletTxns !== undefined ? overrides.walletTxns : (prevStore.walletTxns || walletTxns),
+          businessName: overrides.businessName !== undefined ? overrides.businessName : (prevStore.businessName || businessName),
+          ownerName: overrides.ownerName !== undefined ? overrides.ownerName : (prevStore.ownerName || ownerName),
+          ownerPhone: overrides.ownerPhone !== undefined ? overrides.ownerPhone : (prevStore.ownerPhone || ownerPhone),
+          businessAddress: overrides.businessAddress !== undefined ? overrides.businessAddress : (prevStore.businessAddress || businessAddress),
+          businesses: overrides.businesses !== undefined ? overrides.businesses : (prevStore.businesses || businesses),
+          remainingSmsCount: overrides.remainingSmsCount !== undefined ? overrides.remainingSmsCount : (prevStore.remainingSmsCount ?? remainingSmsCount),
+          openingBalance: overrides.openingBalance !== undefined ? overrides.openingBalance : (prevStore.openingBalance ?? openingBalance),
+          pinEnabled: overrides.pinEnabled !== undefined ? overrides.pinEnabled : (prevStore.pinEnabled ?? pinEnabled),
+          appPin: overrides.appPin !== undefined ? overrides.appPin : (prevStore.appPin || appPin),
+          tagadaLogs: overrides.tagadaLogs !== undefined ? overrides.tagadaLogs : (prevStore.tagadaLogs || tagadaLogs),
+        };
       });
-    });
+      return saveRes;
+    } catch (err) {
+      console.error('persistData write error:', err);
+      return { success: false, error: err };
+    }
   };
 
   // --- FINANCIAL CALCULATIONS & DOUBLE-ENTRY SYNC ---
@@ -907,7 +875,7 @@ function TallyKhataApp() {
       const initJ = {
         id: (Date.now() + 1).toString(),
         accountId: newId,
-        type: 'given',
+        type: accType === 1 ? 'given' : 'received',
         amount: valRes.initialBalance,
         desc: 'পূর্বের বাকি (জের)',
         date: getTodayDate(),
@@ -1053,16 +1021,20 @@ function TallyKhataApp() {
       {
         text: 'মুছুন',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           const updated = cashEntries.filter((c) => c.id !== id);
+          const saveRes = await persistData({ cashEntries: updated });
+          if (!saveRes.success) {
+            Alert.alert('ত্রুটি', 'ক্যাশ এন্ট্রি মুছতে সমস্যা হয়েছে।');
+            return;
+          }
           setCashEntries(updated);
-          persistData({ cashEntries: updated });
         },
       },
     ]);
   };
 
-  const handleSaveReconciliation = () => {
+  const handleSaveReconciliation = async () => {
     const counted = parseFloat(countedCash);
     if (isNaN(counted)) {
       Alert.alert('সতর্কতা', 'ড্রয়ারের আসল ক্যাশ টাকার পরিমাণ লিখুন');
@@ -1085,8 +1057,12 @@ function TallyKhataApp() {
       time: getTimeString(),
     };
     const updated = [adjEntry, ...cashEntries];
+    const saveRes = await persistData({ cashEntries: updated });
+    if (!saveRes.success) {
+      Alert.alert('ত্রুটি', 'ক্যাশবক্স সমন্বয় সংরক্ষণ করা যায়নি।');
+      return;
+    }
     setCashEntries(updated);
-    persistData({ cashEntries: updated });
     setModalReconcileCash(false);
     Alert.alert('সফল', 'ক্যাশবক্স সমন্বয় রেকর্ড সম্পন্ন হয়েছে।');
   };
@@ -1146,17 +1122,21 @@ function TallyKhataApp() {
       {
         text: 'মুছুন',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           const updated = inventory.filter((p) => p.id !== id);
+          const saveRes = await persistData({ inventory: updated });
+          if (!saveRes.success) {
+            Alert.alert('ত্রুটি', 'পণ্য মুছে ফেলা সম্ভব হয়নি।');
+            return;
+          }
           setInventory(updated);
-          persistData({ inventory: updated });
         },
       },
     ]);
   };
 
   // --- HANDLER: BUSINESS NOTES ---
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (!newNoteText.trim()) return;
     const newN = {
       id: Date.now().toString(),
@@ -1165,21 +1145,33 @@ function TallyKhataApp() {
       date: getTodayDate(),
     };
     const updated = [newN, ...notes];
+    const saveRes = await persistData({ notes: updated });
+    if (!saveRes.success) {
+      Alert.alert('ত্রুটি', 'নোট সংরক্ষণ করা যায়নি।');
+      return;
+    }
     setNotes(updated);
-    persistData({ notes: updated });
     setNewNoteText('');
   };
 
-  const handleToggleNote = (id) => {
+  const handleToggleNote = async (id) => {
     const updated = notes.map((n) => (n.id === id ? { ...n, isComplete: !n.isComplete } : n));
+    const saveRes = await persistData({ notes: updated });
+    if (!saveRes.success) {
+      Alert.alert('ত্রুটি', 'নোট আপডেট করা যায়নি।');
+      return;
+    }
     setNotes(updated);
-    persistData({ notes: updated });
   };
 
-  const handleDeleteNote = (id) => {
+  const handleDeleteNote = async (id) => {
     const updated = notes.filter((n) => n.id !== id);
+    const saveRes = await persistData({ notes: updated });
+    if (!saveRes.success) {
+      Alert.alert('ত্রুটি', 'নোট মুছে ফেলা সম্ভব হয়নি।');
+      return;
+    }
     setNotes(updated);
-    persistData({ notes: updated });
   };
 
   // --- HANDLER: TALLYPAY WALLET ---
@@ -1328,7 +1320,7 @@ function TallyKhataApp() {
     });
   };
 
-  const handleImportBackup = () => {
+  const handleImportBackup = async () => {
     try {
       if (!backupJsonText.trim()) {
         Alert.alert('সতর্কতা', 'দয়া করে ব্যাকআপ JSON ডাটা পেস্ট করুন');
@@ -1339,6 +1331,26 @@ function TallyKhataApp() {
         Alert.alert('ত্রুটি', 'অকার্যকর ব্যাকআপ ফরম্যাট');
         return;
       }
+
+      const saveRes = await persistData({
+        accounts: data.accounts,
+        journals: data.journals || [],
+        cashEntries: data.cashEntries || [],
+        inventory: data.inventory || [],
+        notes: data.notes || [],
+        businessName: data.businessName,
+        ownerName: data.ownerName,
+        ownerPhone: data.ownerPhone,
+        businessAddress: data.businessAddress,
+        openingBalance: data.openingBalance,
+        walletBalance: data.walletBalance,
+      });
+
+      if (!saveRes.success) {
+        Alert.alert('ত্রুটি', 'ব্যাকআপ ডাটা সংরক্ষণ ব্যর্থ হয়েছে।');
+        return;
+      }
+
       setAccounts(data.accounts || []);
       setJournals(data.journals || []);
       setCashEntries(data.cashEntries || []);
@@ -1350,20 +1362,6 @@ function TallyKhataApp() {
       if (data.businessAddress) setBusinessAddress(data.businessAddress);
       if (data.openingBalance !== undefined) setOpeningBalance(data.openingBalance);
       if (data.walletBalance !== undefined) setWalletBalance(data.walletBalance);
-
-      persistData({
-        accounts: data.accounts,
-        journals: data.journals,
-        cashEntries: data.cashEntries,
-        inventory: data.inventory,
-        notes: data.notes,
-        businessName: data.businessName,
-        ownerName: data.ownerName,
-        ownerPhone: data.ownerPhone,
-        businessAddress: data.businessAddress,
-        openingBalance: data.openingBalance,
-        walletBalance: data.walletBalance,
-      });
 
       setModalBackupRestore(false);
       Alert.alert('সফল', 'ডাটা সফলভাবে ব্যাকআপ থেকে পুনরুদ্ধার করা হয়েছে!');
@@ -1400,25 +1398,29 @@ function TallyKhataApp() {
   };
 
   // --- BUSINESS PICKER & CREATION HANDLERS ---
-  const handleSelectBusiness = (biz) => {
-    setBusinessName(biz.name);
-    if (biz.owner) setOwnerName(biz.owner);
-    if (biz.phone) setOwnerPhone(biz.phone);
-    if (biz.address) setBusinessAddress(biz.address);
+  const handleSelectBusiness = async (biz) => {
     const updated = businesses.map((b) => ({ ...b, isSelected: b.id === biz.id }));
-    setBusinesses(updated);
-    persistData({
+    const saveRes = await persistData({
       businessName: biz.name,
       ownerName: biz.owner || ownerName,
       ownerPhone: biz.phone || ownerPhone,
       businessAddress: biz.address || businessAddress,
       businesses: updated,
     });
+    if (!saveRes.success) {
+      Alert.alert('ত্রুটি', 'ব্যবসা পরিবর্তন সংরক্ষণ ব্যর্থ হয়েছে।');
+      return;
+    }
+    setBusinessName(biz.name);
+    if (biz.owner) setOwnerName(biz.owner);
+    if (biz.phone) setOwnerPhone(biz.phone);
+    if (biz.address) setBusinessAddress(biz.address);
+    setBusinesses(updated);
     setModalBusinessPicker(false);
     Alert.alert('ব্যবসা পরিবর্তন', `বর্তমানে সক্রিয়: ${biz.name}`);
   };
 
-  const handleCreateBusiness = () => {
+  const handleCreateBusiness = async () => {
     if (!newBizName.trim()) {
       Alert.alert('সতর্কতা', 'ব্যবসার নাম লিখুন');
       return;
@@ -1432,29 +1434,33 @@ function TallyKhataApp() {
       isSelected: true,
     };
     const updated = [...businesses.map((b) => ({ ...b, isSelected: false })), newBiz];
-    setBusinesses(updated);
-    setBusinessName(newBiz.name);
-    if (newBiz.owner) setOwnerName(newBiz.owner);
-    if (newBiz.phone) setOwnerPhone(newBiz.phone);
-    if (newBiz.address) setBusinessAddress(newBiz.address);
-    persistData({
+    const saveRes = await persistData({
       businessName: newBiz.name,
       ownerName: newBiz.owner,
       ownerPhone: newBiz.phone,
       businessAddress: newBiz.address,
       businesses: updated,
     });
+    if (!saveRes.success) {
+      Alert.alert('ত্রুটি', 'নতুন ব্যবসা তৈরি ও সংরক্ষণ ব্যর্থ হয়েছে।');
+      return;
+    }
+    setBusinesses(updated);
+    setBusinessName(newBiz.name);
+    if (newBiz.owner) setOwnerName(newBiz.owner);
+    if (newBiz.phone) setOwnerPhone(newBiz.phone);
+    if (newBiz.address) setBusinessAddress(newBiz.address);
     setNewBizName('');
     setNewBizOwner('');
     setNewBizPhone('');
     setNewBizAddress('');
     setModalAddBusiness(false);
     setModalBusinessPicker(false);
-    Alert.alert('সফল', `নতুন ব্যবসা "${newBiz.name}" তৈরি ও সক্রিয় করা হয়েছে।`);
+    Alert.alert('সফল', `নতুন ব্যবসা "${newBiz.name}" তৈরি ও সক্রিয় করা হয়েছে।`);
   };
 
   // --- CASH RECONCILIATION WITH DENOMINATIONS HANDLER ---
-  const handleSaveDenominations = () => {
+  const handleSaveDenominations = async () => {
     const totalCounted = countedFromNotes > 0 ? countedFromNotes : (Number(countedCash) || 0);
     const diff = totalCounted - totalCash;
     const adjEntry = {
@@ -1472,8 +1478,12 @@ function TallyKhataApp() {
       time: getTimeString(),
     };
     const updatedCash = [adjEntry, ...cashEntries];
+    const saveRes = await persistData({ cashEntries: updatedCash });
+    if (!saveRes.success) {
+      Alert.alert('ত্রুটি', 'ক্যাশবক্স মিলানো তথ্য সংরক্ষণ করা যায়নি।');
+      return;
+    }
     setCashEntries(updatedCash);
-    persistData({ cashEntries: updatedCash });
     setModalReconcileCash(false);
     Alert.alert(
       'ক্যাশবক্স মিলানো সম্পন্ন',
@@ -1484,13 +1494,12 @@ function TallyKhataApp() {
   };
 
   // --- TAGADA HANDLERS (SMS & BULK TAGADA) ---
-  const handleSendSingleTagada = (account) => {
+  const handleSendSingleTagada = async (account) => {
     if (remainingSmsCount <= 0) {
       Alert.alert('ফ্রি এসএমএস সমাপ্ত', 'আপনার ফ্রি টালি-মেসেজ শেষ হয়ে গেছে। ফোনের স্বাভাবিক এসএমএস বা WhatsApp ব্যবহার করুন।');
       return;
     }
     const newCount = remainingSmsCount - 1;
-    setRemainingSmsCount(newCount);
     const log = {
       id: 'tag_' + Date.now(),
       customerName: account.name,
@@ -1500,8 +1509,13 @@ function TallyKhataApp() {
       time: getTimeString(),
     };
     const updatedLogs = [log, ...tagadaLogs];
+    const saveRes = await persistData({ remainingSmsCount: newCount, tagadaLogs: updatedLogs });
+    if (!saveRes.success) {
+      Alert.alert('ত্রুটি', 'তাগাদা মেসেজ রেকর্ড সংরক্ষণ করা যায়নি।');
+      return;
+    }
+    setRemainingSmsCount(newCount);
     setTagadaLogs(updatedLogs);
-    persistData({ remainingSmsCount: newCount, tagadaLogs: updatedLogs });
     setModalTagada(false);
     Alert.alert(
       'মেসেজ পাঠানো হয়েছে',
@@ -1521,8 +1535,14 @@ function TallyKhataApp() {
         { text: 'বাতিল', style: 'cancel' },
         {
           text: 'পাঠান',
-          onPress: () => {
-            setRemainingSmsCount(Math.max(0, remainingSmsCount - 1));
+          onPress: async () => {
+            const newCount = Math.max(0, remainingSmsCount - 1);
+            const saveRes = await persistData({ remainingSmsCount: newCount });
+            if (!saveRes.success) {
+              Alert.alert('ত্রুটি', 'গ্রুপ তাগাদা সংরক্ষণ ব্যর্থ হয়েছে।');
+              return;
+            }
+            setRemainingSmsCount(newCount);
             Alert.alert(
               'সফল',
               `সকল ${dueCustomers.length} জন বকেয়া কাস্টমারকে গ্রুপ তাগাদা মেসেজ সফলভাবে পাঠানো হয়েছে!`
@@ -4251,8 +4271,18 @@ function TallyKhataApp() {
 
               <TouchableOpacity
                 style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary, marginTop: 10 }]}
-                onPress={() => {
-                  persistData();
+                onPress={async () => {
+                  const saveRes = await persistData({
+                    businessName,
+                    ownerName,
+                    ownerPhone,
+                    businessAddress,
+                    openingBalance,
+                  });
+                  if (!saveRes.success) {
+                    Alert.alert('ত্রুটি', 'ব্যবসার তথ্য সংরক্ষণ করা যায়নি।');
+                    return;
+                  }
                   setModalSettings(false);
                   Alert.alert('সফল', 'ব্যবসার তথ্য সফলভাবে সংরক্ষিত হয়েছে');
                 }}
@@ -4422,19 +4452,27 @@ function TallyKhataApp() {
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
               <TouchableOpacity
                 style={[styles.modalBtnSubmit, { backgroundColor: pinEnabled ? COLORS.red : COLORS.primary, flex: 1 }]}
-                onPress={() => {
+                onPress={async () => {
                   if (!pinEnabled) {
                     if (appPin.length !== 4) {
                       Alert.alert('সতর্কতা', 'সঠিক ৪ ডিজিটের পিন দিন');
                       return;
                     }
+                    const saveRes = await persistData({ pinEnabled: true, appPin });
+                    if (!saveRes.success) {
+                      Alert.alert('ত্রুটি', 'পিন লক চালু করা যায়নি।');
+                      return;
+                    }
                     setPinEnabled(true);
-                    persistData({ pinEnabled: true, appPin });
                     Alert.alert('সফল', 'পিন লক চালু করা হয়েছে।');
                   } else {
+                    const saveRes = await persistData({ pinEnabled: false, appPin: '' });
+                    if (!saveRes.success) {
+                      Alert.alert('ত্রুটি', 'পিন লক বন্ধ করা যায়নি।');
+                      return;
+                    }
                     setPinEnabled(false);
                     setAppPin('');
-                    persistData({ pinEnabled: false, appPin: '' });
                     Alert.alert('বন্ধ', 'পিন লক বন্ধ করা হয়েছে।');
                   }
                   setModalPinSetup(false);
