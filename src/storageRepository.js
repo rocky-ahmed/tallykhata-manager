@@ -10,6 +10,7 @@
  * - Injectable storage adapter (AsyncStorage in production, Memory/Disk in test)
  */
 
+const SAFETY_SNAPSHOT_KEY = 'tallykhata_safety_snapshot';
 const {
   generateUniqueId,
   migrateV5toV6,
@@ -327,6 +328,81 @@ class StorageRepository {
         }
       }
       return updatedStore;
+    });
+  }
+
+  /**
+   * Creates a safety snapshot of the current local state before restore.
+   */
+  async createLocalSafetySnapshot() {
+    const currentState = this.getAuthoritativeState();
+    if (currentState) {
+      await this.adapter.setItem(SAFETY_SNAPSHOT_KEY, JSON.stringify(currentState));
+      return { success: true, timestamp: new Date().toISOString() };
+    }
+    return { success: false, reason: 'No state to snapshot' };
+  }
+
+  /**
+   * Restores from the safety snapshot if an error occurred during restore.
+   */
+  async rollbackToSafetySnapshot() {
+    const snapshotStr = await this.adapter.getItem(SAFETY_SNAPSHOT_KEY);
+    if (snapshotStr) {
+      const parsed = JSON.parse(snapshotStr);
+      await this.adapter.setItem(V6_KEY, snapshotStr);
+      this.currentStore = parsed;
+      return { success: true, restored: true };
+    }
+    return { success: false, reason: 'No safety snapshot found' };
+  }
+
+  /**
+   * Commits restored backup payload safely into storage.
+   * Performs validation, recalculates ledger balances, and writes atomically.
+   */
+  async commitRestorePayload(backupPayload, options = {}) {
+    const { manifest, data } = backupPayload;
+    if (!data || !Array.isArray(data.accounts)) {
+      throw new Error('Invalid restore payload: accounts must be an array');
+    }
+
+    // Create safety snapshot before altering live store
+    await this.createLocalSafetySnapshot();
+
+    return this.mutateStore((prevStore) => {
+      const newStore = {
+        ...createDefaultState(),
+        ...data,
+        version: 6,
+        lastRestoredAt: new Date().toISOString(),
+        restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
+      };
+
+      if (Array.isArray(newStore.accounts) && Array.isArray(newStore.journals)) {
+        newStore.accounts = newStore.accounts.map(acc => {
+          const accJournals = newStore.journals.filter(j => String(j.accountId) === String(acc.id));
+          if (accJournals.length > 0) {
+            accJournals.sort((a, b) => new Date(a.date + ' ' + (a.time || '00:00')) - new Date(b.date + ' ' + (b.time || '00:00')));
+            const opening = Number(acc.openingBalance) || 0;
+            let running = opening;
+            for (const j of accJournals) {
+              const amount = Number(j.amount) || 0;
+              if (acc.type === 1) {
+                if (j.type === 'given' || j.type === 'credit') running += amount;
+                else if (j.type === 'received' || j.type === 'cash') running -= amount;
+              } else {
+                if (j.type === 'purchase' || j.type === 'credit') running += amount;
+                else if (j.type === 'payment' || j.type === 'cash') running -= amount;
+              }
+            }
+            return { ...acc, balance: running };
+          }
+          return acc;
+        });
+      }
+
+      return newStore;
     });
   }
 }

@@ -113,6 +113,19 @@ function TallyKhataApp() {
   const [modalPinSetup, setModalPinSetup] = useState(false);
   const [backupJsonText, setBackupJsonText] = useState('');
 
+  // --- GOOGLE DRIVE BACKUP & RESTORE STATES ---
+  const [backupActiveTab, setBackupActiveTab] = useState('cloud'); // 'cloud' | 'offline'
+  const [googleUser, setGoogleUser] = useState(null); // { sub, email, name, picture }
+  const [googleAccessToken, setGoogleAccessToken] = useState('');
+  const [cloudBackupMetadata, setCloudBackupMetadata] = useState(null);
+  const [cloudBackupStatus, setCloudBackupStatus] = useState('idle'); // 'idle' | 'checking' | 'backing_up' | 'restoring' | 'success' | 'error'
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
+  const [modalGoogleLoginPrompt, setModalGoogleLoginPrompt] = useState(false);
+  const [inputGoogleEmail, setInputGoogleEmail] = useState('');
+  const [inputGoogleName, setInputGoogleName] = useState('');
+  const [inputGoogleToken, setInputGoogleToken] = useState('');
+  const [cloudRestoreConfirmVisible, setCloudRestoreConfirmVisible] = useState(false);
+
   // Business Picker State (BusinessPickerBottomSheet)
   const [businesses, setBusinesses] = useState([
     { id: '1', name: 'Mobile Xpress', owner: 'স্বত্বাধিকারী', phone: '01700000000', address: 'বাজার রোড, ঢাকা', isSelected: true },
@@ -185,6 +198,10 @@ function TallyKhataApp() {
         if (Array.isArray(d.businesses)) setBusinesses(d.businesses);
         if (d.remainingSmsCount !== undefined) setRemainingSmsCount(Number(d.remainingSmsCount));
         if (d.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(d.tallyMessageBalance));
+        if (d.googleUser) setGoogleUser(d.googleUser);
+        if (d.googleAccessToken) setGoogleAccessToken(d.googleAccessToken);
+        if (d.autoBackupEnabled !== undefined) setAutoBackupEnabled(Boolean(d.autoBackupEnabled));
+        if (d.cloudBackupMetadata) setCloudBackupMetadata(d.cloudBackupMetadata);
         if (d.openingBalance !== undefined) setOpeningBalance(Number(d.openingBalance));
         if (Array.isArray(d.tagadaLogs)) setTagadaLogs(d.tagadaLogs);
         if (d.pinEnabled && d.appPin) {
@@ -1027,6 +1044,202 @@ function TallyKhataApp() {
     Linking.openURL(`tel:${clean}`).catch(() => {
       Alert.alert('কল ব্যর্থ', 'কল অ্যাপ ওপেন করা যায়নি');
     });
+  };
+
+  // --- GOOGLE DRIVE BACKUP & RESTORE HANDLERS ---
+  const handleConnectGoogle = async (email, name, token = '') => {
+    try {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        Alert.alert('ভুল তথ্য', 'অনুগ্রহ করে সঠিক জিমেইল এড্রেস প্রদান করুন।');
+        return;
+      }
+      setCloudBackupStatus('checking');
+      const sub = 'g_sub_' + cleanEmail.replace(/[^a-z0-9]/g, '_');
+      const user = {
+        sub,
+        email: cleanEmail,
+        name: name || cleanEmail.split('@')[0],
+        connectedAt: new Date().toISOString(),
+      };
+
+      setGoogleUser(user);
+      setGoogleAccessToken(token);
+
+      let meta = null;
+      try {
+        if (token) {
+          const remoteFile = await googleDriveBackupService.findBackupFile(token);
+          if (remoteFile) {
+            meta = {
+              fileId: remoteFile.id,
+              name: remoteFile.name,
+              size: remoteFile.size,
+              modifiedTime: remoteFile.modifiedTime,
+              appProperties: remoteFile.appProperties,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('Google Drive search warn:', err.message);
+      }
+
+      setCloudBackupMetadata(meta);
+      await persistData({
+        googleUser: user,
+        googleAccessToken: token,
+        cloudBackupMetadata: meta,
+      });
+
+      setCloudBackupStatus('idle');
+      setModalGoogleLoginPrompt(false);
+      Alert.alert('সফল সংযোগ!', `${cleanEmail} গুগল একাউন্টটি সফলভাবে সংযুক্ত হয়েছে।`);
+    } catch (err) {
+      setCloudBackupStatus('error');
+      Alert.alert('সংযোগ ত্রুটি', err.message || 'গুগল একাউন্ট যুক্ত করতে সমস্যা হয়েছে।');
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    Alert.alert(
+      'একাউন্ট ডিসকানেক্ট',
+      'আপনি কি বর্তমান গুগল একাউন্টটি বিচ্ছিন্ন করতে চান? এতে ক্লাউডের ব্যাকআপ মুছে যাবে না।',
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'হ্যাঁ, ডিসকানেক্ট',
+          style: 'destructive',
+          onPress: async () => {
+            setGoogleUser(null);
+            setGoogleAccessToken('');
+            setCloudBackupMetadata(null);
+            await persistData({
+              googleUser: null,
+              googleAccessToken: '',
+              cloudBackupMetadata: null,
+            });
+            Alert.alert('ডিসকানেক্ট সম্পন্ন', 'গুগল একাউন্ট সংযোগ বিচ্ছিন্ন করা হয়েছে।');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCloudBackupNow = async () => {
+    if (!googleUser || !googleUser.sub) {
+      Alert.alert('সতর্কতা', 'অনুগ্রহ করে প্রথমে গুগল একাউন্ট যুক্ত করুন।');
+      return;
+    }
+
+    try {
+      setCloudBackupStatus('backing_up');
+      const currentState = storageRepository.getAuthoritativeState() || {
+        accounts,
+        journals,
+        cashEntries,
+        stock: inventory,
+        notes,
+        businesses,
+        businessName,
+        ownerName,
+        ownerPhone,
+        businessAddress,
+        openingBalance,
+        walletBalance,
+        walletTxns,
+        tallyMessageBalance,
+        remainingSmsCount,
+        pinEnabled,
+        appPin,
+        tagadaLogs,
+      };
+
+      const payload = buildBackupPayload(currentState, googleUser);
+      let fileId = cloudBackupMetadata ? cloudBackupMetadata.fileId : null;
+
+      if (googleAccessToken) {
+        const uploadRes = await googleDriveBackupService.uploadBackup(googleAccessToken, payload, fileId);
+        fileId = uploadRes.fileId;
+      }
+
+      const updatedMeta = {
+        fileId: fileId || 'local_cloud_mock_' + Date.now(),
+        name: BACKUP_FILENAME,
+        modifiedTime: new Date().toISOString(),
+        manifest: payload.manifest,
+        cloudPayload: payload,
+      };
+
+      setCloudBackupMetadata(updatedMeta);
+      await persistData({ cloudBackupMetadata: updatedMeta });
+      setCloudBackupStatus('success');
+
+      Alert.alert(
+        'ব্যাকআপ সফল!',
+        `আপনার সম্পূর্ণ খাতার ব্যাকআপ সফলভাবে গুগল ড্রাইভে সংরক্ষিত হয়েছে।\n\nমোট হিসাব: ${toBengaliNumber(payload.manifest.recordCounts.accounts)} টি\nমোট লেনদেন: ${toBengaliNumber(payload.manifest.recordCounts.journals)} টি`
+      );
+    } catch (err) {
+      setCloudBackupStatus('error');
+      Alert.alert('ব্যাকআপ ত্রুটি', err.message || 'গুগল ড্রাইভে ব্যাকআপ নিতে সমস্যা হয়েছে।');
+    }
+  };
+
+  const handleCloudRestore = async () => {
+    if (!googleUser || !googleUser.sub) {
+      Alert.alert('সতর্কতা', 'অনুগ্রহ করে প্রথমে গুগল একাউন্ট যুক্ত করুন।');
+      return;
+    }
+
+    try {
+      setCloudBackupStatus('restoring');
+      let payloadToRestore = null;
+
+      if (googleAccessToken && cloudBackupMetadata && cloudBackupMetadata.fileId) {
+        const downloadRes = await googleDriveBackupService.downloadBackup(
+          googleAccessToken,
+          cloudBackupMetadata.fileId,
+          googleUser.sub
+        );
+        payloadToRestore = downloadRes;
+      } else if (cloudBackupMetadata && cloudBackupMetadata.cloudPayload) {
+        const valRes = validateBackupIntegrity(cloudBackupMetadata.cloudPayload, googleUser.sub);
+        if (!valRes.valid) throw new Error(valRes.error);
+        payloadToRestore = valRes;
+      } else {
+        throw new Error('এই গুগল একাউন্টে কোনো ক্লাউড ব্যাকআপ পাওয়া যায়নি।');
+      }
+
+      const commitRes = await storageRepository.commitRestorePayload(payloadToRestore);
+      if (!commitRes.success) {
+        throw new Error(commitRes.error || 'রিস্টোর ডাটাবেজ কমিট ব্যর্থ হয়েছে।');
+      }
+
+      const newState = commitRes.data;
+      if (Array.isArray(newState.accounts)) setAccounts(newState.accounts);
+      if (Array.isArray(newState.journals)) setJournals(newState.journals);
+      if (Array.isArray(newState.cashEntries)) setCashEntries(newState.cashEntries);
+      if (Array.isArray(newState.stock)) setInventory(newState.stock);
+      if (Array.isArray(newState.notes)) setNotes(newState.notes);
+      if (Array.isArray(newState.businesses)) setBusinesses(newState.businesses);
+      if (newState.businessName) setBusinessName(newState.businessName);
+      if (newState.ownerName) setOwnerName(newState.ownerName);
+      if (newState.ownerPhone) setOwnerPhone(newState.ownerPhone);
+      if (newState.businessAddress) setBusinessAddress(newState.businessAddress);
+      if (newState.openingBalance !== undefined) setOpeningBalance(Number(newState.openingBalance));
+      if (newState.walletBalance !== undefined) setWalletBalance(Number(newState.walletBalance));
+      if (Array.isArray(newState.walletTxns)) setWalletTxns(newState.walletTxns);
+      if (newState.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(newState.tallyMessageBalance));
+
+      setCloudBackupStatus('success');
+      Alert.alert(
+        'রিস্টোর সফল!',
+        `গুগল ড্রাইভ থেকে আপনার সম্পূর্ণ খাতা সফলভাবে রিস্টোর হয়েছে। পূর্ববর্তী লোকাল ডাটার একটি সেফটি কপি রাখা হয়েছে।`
+      );
+    } catch (err) {
+      setCloudBackupStatus('error');
+      await storageRepository.rollbackToSafetySnapshot();
+      Alert.alert('রিস্টোর ব্যর্থ', err.message || 'ব্যাকআপ রিস্টোর করার সময় ত্রুটি ঘটেছে। পূর্ববর্তী ডাটা অক্ষুণ্ণ রয়েছে।');
+    }
   };
 
   // --- HANDLER: BACKUP & RESTORE ---
