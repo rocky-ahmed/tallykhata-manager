@@ -14,6 +14,9 @@
         "backgroundColor": "#B81414"
       },
       "package": "com.progoti.tallykhata.offline"
-    }
+    },
+    "plugins": [
+      "@react-native-google-signin/google-signin"
+    ]
   }
 }

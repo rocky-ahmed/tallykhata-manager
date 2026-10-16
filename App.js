@@ -1402,6 +1402,40 @@ function TallyKhataApp() {
   };
 
   // --- GOOGLE DRIVE BACKUP & RESTORE HANDLERS ---
+  const handleNativeGoogleSignIn = async () => {
+    try {
+      let GoogleSignin = null;
+      try {
+        const mod = require('@react-native-google-signin/google-signin');
+        GoogleSignin = mod.GoogleSignin;
+      } catch (e) {}
+
+      if (GoogleSignin && typeof GoogleSignin.signIn === 'function') {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        GoogleSignin.configure({
+          scopes: [
+            'https://www.googleapis.com/auth/drive.appdata',
+            'https://www.googleapis.com/auth/userinfo.profile',
+            'https://www.googleapis.com/auth/userinfo.email',
+          ],
+        });
+        const res = await GoogleSignin.signIn();
+        const userObj = res.data ? res.data.user : (res.user || res);
+        const tokens = await GoogleSignin.getTokens();
+        if (userObj && tokens && tokens.accessToken) {
+          await handleConnectGoogle(userObj.email, userObj.name, tokens.accessToken);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Native Google Sign-In prompt/fallback:', err && err.message ? err.message : err);
+    }
+    setInputGoogleEmail('');
+    setInputGoogleName('');
+    setInputGoogleToken('');
+    setModalGoogleLoginPrompt(true);
+  };
+
   const handleConnectGoogle = async (email, name, token = '') => {
     try {
       const cleanEmail = (email || '').trim().toLowerCase();
@@ -4715,12 +4749,7 @@ function TallyKhataApp() {
 
                       <TouchableOpacity
                         style={styles.cloudConnectBtn}
-                        onPress={() => {
-                          setInputGoogleEmail('');
-                          setInputGoogleName('');
-                          setInputGoogleToken('');
-                          setModalGoogleLoginPrompt(true);
-                        }}
+                        onPress={handleNativeGoogleSignIn}
                         activeOpacity={0.85}
                       >
                         <Image
