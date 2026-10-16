@@ -2278,7 +2278,7 @@ function TallyKhataApp() {
   // =========================================================================
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#991111" />
+      <StatusBar barStyle="light-content" backgroundColor="#B81414" />
 
       {/* --- AUTHENTIC 1:1 TALLYKHATA TOP HEADER BAR (photo_2026-10-15_18-13-34.jpg) --- */}
       <View style={styles.topHeaderBarRed}>
@@ -4936,59 +4936,7 @@ function TallyKhataApp() {
         </View>
       </Modal>
 
-      {/* ===================================================================
-          MODAL: GOOGLE ACCOUNT CONNECT PROMPT
-         =================================================================== */}
-      <Modal
-        visible={modalGoogleLoginPrompt}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setModalGoogleLoginPrompt(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxWidth: 360 }]}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>গুগল একাউন্ট যুক্ত করুন</Text>
-              <TouchableOpacity onPress={() => setModalGoogleLoginPrompt(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: '#6B7280' }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 12 }}>
-              আপনার যে জিমেইল একাউন্টে ব্যাকআপ সংরক্ষণ করতে চান তা লিখুন:
-            </Text>
-
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 4 }}>জিমেইল এড্রেস *</Text>
-            <TextInput
-              style={styles.dialogInput}
-              value={inputGoogleEmail}
-              onChangeText={setInputGoogleEmail}
-              placeholder="example@gmail.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholderTextColor="#9CA3AF"
-            />
-
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', marginTop: 10, marginBottom: 4 }}>আপনার নাম (ঐচ্ছিক)</Text>
-            <TextInput
-              style={styles.dialogInput}
-              value={inputGoogleName}
-              onChangeText={setInputGoogleName}
-              placeholder="দোকানদারের নাম"
-              placeholderTextColor="#9CA3AF"
-            />
-
-            <TouchableOpacity
-              style={[styles.cloudConnectBtn, { marginTop: 16 }]}
-              onPress={() => handleConnectGoogle(inputGoogleEmail, inputGoogleName, inputGoogleToken)}
-            >
-              <Text style={styles.cloudConnectBtnText}>সংযোগ নিশ্চিত করুন</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ===================================================================
+      {/* Native Google Account Sign-In handled by GoogleSignin SDK */}
           MODAL: INBOX (ইনবক্স নোটিফিকেশন)
          =================================================================== */}
       <Modal visible={modalInbox} animationType="slide" transparent onRequestClose={() => setModalInbox(false)}>
@@ -6203,7 +6151,7 @@ const styles = StyleSheet.create({
   topHeaderBarRed: {
     backgroundColor: '#B81414',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 16 : 12,
+    paddingTop: Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 36) + 12 : 12,
     paddingBottom: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -6276,17 +6224,21 @@ const styles = StyleSheet.create({
 
   // Yellow Promo Banner
   promoBannerCard: {
-    backgroundColor: '#FFFED402',
-    borderRadius: 12,
+    backgroundColor: '#FFDE00',
+    borderRadius: 14,
     marginHorizontal: 16,
     marginTop: 10,
     marginBottom: 6,
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FEF08A',
+    borderWidth: 0,
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
   promoBannerImg: {
     width: 66,
