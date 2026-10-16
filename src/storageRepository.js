@@ -84,6 +84,7 @@ function createDefaultState() {
     businessAddress: 'বাজার রোড, ঢাকা',
     businesses: DEFAULT_BUSINESSES,
     remainingSmsCount: 5,
+    tallyMessageBalance: 50,
     openingBalance: 3000,
     pinEnabled: false,
     appPin: '',

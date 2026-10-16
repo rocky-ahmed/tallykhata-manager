@@ -194,14 +194,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   counterStripRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     marginTop: 14,
     marginBottom: 8,
   },
-  counterStripText: {
+  counterTabPill: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    borderRadius: 6,
+  },
+  counterTabPillActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  counterTabText: {
     color: '#4B5563',
     fontSize: 14,
     fontWeight: '500',
+  },
+  counterTabTextActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+  counterStripDivider: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    marginHorizontal: 4,
   },
 
   // Customer List Rows
@@ -2719,4 +2738,121 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  // Transaction Limit Modal Styles (activity_transaction_limit.xml)
+  txnLimitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#B81414',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  txnLimitBackBtn: {
+    padding: 4,
+  },
+  txnLimitHeaderTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  txnLimitTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  txnLimitTabBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  txnLimitTabBtnActive: {
+    borderBottomColor: '#B81414',
+  },
+  txnLimitTabLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  txnLimitTabLabelActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+  txnLimitStatusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 16,
+  },
+  txnLimitVerifiedBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  txnLimitVerifiedText: {
+    color: '#15803D',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  txnLimitDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 12,
+  },
+  txnLimitSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  txnLimitCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  txnLimitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+  },
+  txnLimitRowDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  txnLimitRowTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  txnLimitRowSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  txnLimitRowAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  txnChargeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+    marginBottom: 16,
+  },
 });

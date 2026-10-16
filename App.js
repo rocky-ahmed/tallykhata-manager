@@ -441,6 +441,8 @@ function TallyKhataApp() {
   const [modalTagada, setModalTagada] = useState(false);
   const [modalTallyMessage, setModalTallyMessage] = useState(false);
   const [tallyMessageBalance, setTallyMessageBalance] = useState(50);
+  const [modalTxnLimit, setModalTxnLimit] = useState(false);
+  const [txnLimitTab, setTxnLimitTab] = useState('limits'); // 'limits' | 'charges'
   const [modalBanglaQR, setModalBanglaQR] = useState(false);
   const [modalAddMoney, setModalAddMoney] = useState(false);
   const [modalMobileRecharge, setModalMobileRecharge] = useState(false);
@@ -525,6 +527,7 @@ function TallyKhataApp() {
         if (d.businessAddress) setBusinessAddress(d.businessAddress);
         if (Array.isArray(d.businesses)) setBusinesses(d.businesses);
         if (d.remainingSmsCount !== undefined) setRemainingSmsCount(Number(d.remainingSmsCount));
+        if (d.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(d.tallyMessageBalance));
         if (d.openingBalance !== undefined) setOpeningBalance(Number(d.openingBalance));
         if (Array.isArray(d.tagadaLogs)) setTagadaLogs(d.tagadaLogs);
         if (d.pinEnabled && d.appPin) {
@@ -2297,9 +2300,31 @@ function TallyKhataApp() {
 
                   {/* --- 5. COUNTER STRIP (কাস্টমার ১২ / সাপ্লায়ার ০) --- */}
                   <View style={styles.counterStripRow}>
-                    <Text style={styles.counterStripText}>
-                      কাস্টমার {toBengaliNumber(accounts.filter((a) => a.type === 1).length)} / সাপ্লায়ার {toBengaliNumber(accounts.filter((a) => a.type === 2).length)}
-                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setAccountTab('customer');
+                        setAccType(1);
+                      }}
+                      activeOpacity={0.7}
+                      style={[styles.counterTabPill, accountTab === 'customer' && styles.counterTabPillActive]}
+                    >
+                      <Text style={[styles.counterTabText, accountTab === 'customer' && styles.counterTabTextActive]}>
+                        কাস্টমার {toBengaliNumber(accounts.filter((a) => a.type === 1).length)}
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={styles.counterStripDivider}>/</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setAccountTab('supplier');
+                        setAccType(2);
+                      }}
+                      activeOpacity={0.7}
+                      style={[styles.counterTabPill, accountTab === 'supplier' && styles.counterTabPillActive]}
+                    >
+                      <Text style={[styles.counterTabText, accountTab === 'supplier' && styles.counterTabTextActive]}>
+                        সাপ্লায়ার {toBengaliNumber(accounts.filter((a) => a.type === 2).length)}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               }
@@ -2345,7 +2370,7 @@ function TallyKhataApp() {
             <TouchableOpacity
               style={styles.floatingRoundFab}
               onPress={() => {
-                setAccType(1);
+                setAccType(accountTab === 'supplier' ? 2 : 1);
                 setModalAddAccount(true);
               }}
               activeOpacity={0.85}
@@ -2858,7 +2883,7 @@ function TallyKhataApp() {
 
               <TouchableOpacity
                 style={styles.menuListItem}
-                onPress={() => Alert.alert('লেনদেনের লিমিট', 'দৈনিক ক্যাশ-ইন লিমিট: ৳ ৫০,০০০ | দৈনিক ক্যাশ-আউট: ৳ ২৫,০০০ | মাসিক লিমিট: ৳ ৫,০০,০০০')}
+                onPress={() => setModalTxnLimit(true)}
               >
                 <Image source={require('./assets/icons/ic_menu_lock.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>
@@ -5411,8 +5436,10 @@ function TallyKhataApp() {
                   </View>
                   <TouchableOpacity
                     style={{ backgroundColor: '#B81414', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
-                    onPress={() => {
-                      setTallyMessageBalance(prev => prev + pkg.count);
+                    onPress={async () => {
+                      const newBal = tallyMessageBalance + pkg.count;
+                      setTallyMessageBalance(newBal);
+                      await persistData({ tallyMessageBalance: newBal });
                       Alert.alert('অভিনন্দন!', `${toBengaliNumber(pkg.count)} টি এসএমএস সফলভাবে আপনার অ্যাকাউন্টে যোগ হয়েছে।`);
                     }}
                   >
@@ -5424,6 +5451,217 @@ function TallyKhataApp() {
           </View>
         </SafeAreaView>
       </Modal>
+      {/* ===================================================================
+          AUTHENTIC MODAL: TRANSACTION LIMIT (লেনদেনের লিমিট ও চার্জ)
+          Layout: res/layout/activity_transaction_limit.xml
+         =================================================================== */}
+      <Modal
+        visible={modalTxnLimit}
+        animationType="slide"
+        onRequestClose={() => setModalTxnLimit(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
+          {/* Toolbar matching activity_transaction_limit.xml */}
+          <View style={styles.txnLimitHeader}>
+            <TouchableOpacity
+              onPress={() => setModalTxnLimit(false)}
+              style={styles.txnLimitBackBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Image
+                source={require('./assets/icons/arrow_left.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <Text style={styles.txnLimitHeaderTitle}>লেনদেনের লিমিট ও চার্জ</Text>
+            <View style={{ width: 22 }} />
+          </View>
+
+          {/* Tab Bar matching TabLayout id=2131364239 */}
+          <View style={styles.txnLimitTabBar}>
+            <TouchableOpacity
+              style={[styles.txnLimitTabBtn, txnLimitTab === 'limits' && styles.txnLimitTabBtnActive]}
+              onPress={() => setTxnLimitTab('limits')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.txnLimitTabLabel, txnLimitTab === 'limits' && styles.txnLimitTabLabelActive]}>
+                লিমিট
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.txnLimitTabBtn, txnLimitTab === 'charges' && styles.txnLimitTabBtnActive]}
+              onPress={() => setTxnLimitTab('charges')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.txnLimitTabLabel, txnLimitTab === 'charges' && styles.txnLimitTabLabelActive]}>
+                চার্জ
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            {txnLimitTab === 'limits' ? (
+              <View>
+                {/* Account Status Card */}
+                <View style={styles.txnLimitStatusCard}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Image
+                      source={require('./assets/icons/ic_check.png')}
+                      style={{ width: 22, height: 22, tintColor: '#0F8A0F', marginRight: 10 }}
+                      resizeMode="contain"
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#111827' }}>
+                        স্ট্যান্ডার্ড একাউন্ট
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#4B5563', marginTop: 2 }}>
+                        জাতীয় পরিচয়পত্র ও ফেস ভেরিফিকেশন সম্পন্ন
+                      </Text>
+                    </View>
+                    <View style={styles.txnLimitVerifiedBadge}>
+                      <Text style={styles.txnLimitVerifiedText}>ভেরিফাইড</Text>
+                    </View>
+                  </View>
+                  <View style={styles.txnLimitDivider} />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: '#4B5563' }}>সর্বোচ্চ ওয়ালেট ব্যালেন্স</Text>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#0F8A0F' }}>৳ ৩,০০,০০০</Text>
+                  </View>
+                </View>
+
+                {/* Daily Limits Card */}
+                <Text style={styles.txnLimitSectionTitle}>দৈনিক লিমিট</Text>
+                <View style={styles.txnLimitCard}>
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>ক্যাশ-ইন (টাকা লোড)</Text>
+                      <Text style={styles.txnLimitRowSub}>সর্বোচ্চ ৫ বার</Text>
+                    </View>
+                    <Text style={styles.txnLimitRowAmount}>৳ ৫০,০০০</Text>
+                  </View>
+                  <View style={styles.txnLimitRowDivider} />
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>ক্যাশ-আউট (টাকা উত্তোলন)</Text>
+                      <Text style={styles.txnLimitRowSub}>সর্বোচ্চ ৩ বার</Text>
+                    </View>
+                    <Text style={styles.txnLimitRowAmount}>৳ ২৫,০০০</Text>
+                  </View>
+                  <View style={styles.txnLimitRowDivider} />
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>সেন্ড মানি (কাস্টমার/সাপ্লায়ার)</Text>
+                      <Text style={styles.txnLimitRowSub}>সর্বোচ্চ ১০ বার</Text>
+                    </View>
+                    <Text style={styles.txnLimitRowAmount}>৳ ৫০,০০০</Text>
+                  </View>
+                  <View style={styles.txnLimitRowDivider} />
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>মোবাইল রিচার্জ</Text>
+                      <Text style={styles.txnLimitRowSub}>সর্বোচ্চ ৫০ বার</Text>
+                    </View>
+                    <Text style={styles.txnLimitRowAmount}>৳ ১০,০০০</Text>
+                  </View>
+                </View>
+
+                {/* Monthly Limits Card */}
+                <Text style={styles.txnLimitSectionTitle}>মাসিক লিমিট</Text>
+                <View style={styles.txnLimitCard}>
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>মাসিক ক্যাশ-ইন</Text>
+                      <Text style={styles.txnLimitRowSub}>সর্বোচ্চ ৫০ বার</Text>
+                    </View>
+                    <Text style={styles.txnLimitRowAmount}>৳ ৫,০০,০০০</Text>
+                  </View>
+                  <View style={styles.txnLimitRowDivider} />
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>মাসিক ক্যাশ-আউট</Text>
+                      <Text style={styles.txnLimitRowSub}>সর্বোচ্চ ৩০ বার</Text>
+                    </View>
+                    <Text style={styles.txnLimitRowAmount}>৳ ২,০০,০০০</Text>
+                  </View>
+                  <View style={styles.txnLimitRowDivider} />
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>মাসিক সর্বমোট লেনদেন</Text>
+                      <Text style={styles.txnLimitRowSub}>সর্বোচ্চ ১০০ বার</Text>
+                    </View>
+                    <Text style={styles.txnLimitRowAmount}>৳ ৫,০০,০০০</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View>
+                {/* Free Transactions Announcement */}
+                <View style={styles.txnChargeBanner}>
+                  <Image
+                    source={require('./assets/ic_bangla_qr.png')}
+                    style={{ width: 36, height: 36, marginRight: 12 }}
+                    resizeMode="contain"
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1B5E20' }}>
+                      ১০০% ফ্রি লেনদেন
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#2E7D32', marginTop: 2 }}>
+                      বাংলা QR এবং টালিখাতা অ্যাপে অধিকাংশ সার্ভিস সম্পূর্ণ ফ্রি!
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Charges List Card */}
+                <Text style={styles.txnLimitSectionTitle}>সার্ভিস চার্জ তালিকা</Text>
+                <View style={styles.txnLimitCard}>
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>ক্যাশ-ইন (ব্যাংক / কার্ড)</Text>
+                      <Text style={styles.txnLimitRowSub}>যেকোনো ভিসা বা মাস্টারকার্ড</Text>
+                    </View>
+                    <Text style={[styles.txnLimitRowAmount, { color: '#0F8A0F' }]}>ফ্রি (০%)</Text>
+                  </View>
+                  <View style={styles.txnLimitRowDivider} />
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>সেন্ড মানি</Text>
+                      <Text style={styles.txnLimitRowSub}>টালিপে থেকে টালিপে একাউন্ট</Text>
+                    </View>
+                    <Text style={[styles.txnLimitRowAmount, { color: '#0F8A0F' }]}>ফ্রি (০%)</Text>
+                  </View>
+                  <View style={styles.txnLimitRowDivider} />
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>মোবাইল রিচার্জ</Text>
+                      <Text style={styles.txnLimitRowSub}>সব মোবাইল অপারেটরে</Text>
+                    </View>
+                    <Text style={[styles.txnLimitRowAmount, { color: '#0F8A0F' }]}>ফ্রি (০%)</Text>
+                  </View>
+                  <View style={styles.txnLimitRowDivider} />
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>বাংলা QR পেমেন্ট রিসিভ</Text>
+                      <Text style={styles.txnLimitRowSub}>যেকোনো ব্যাংক বা MFS অ্যাপ থেকে</Text>
+                    </View>
+                    <Text style={[styles.txnLimitRowAmount, { color: '#0F8A0F' }]}>ফ্রি (০%)</Text>
+                  </View>
+                  <View style={styles.txnLimitRowDivider} />
+                  <View style={styles.txnLimitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txnLimitRowTitle}>ক্যাশ-আউট (ব্যাংক একাউন্ট)</Text>
+                      <Text style={styles.txnLimitRowSub}>সংযুক্ত ব্যাংক একাউন্টে ট্রান্সফার</Text>
+                    </View>
+                    <Text style={styles.txnLimitRowAmount}>১.৫%</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
 
 
 
@@ -5631,14 +5869,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   counterStripRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     marginTop: 14,
     marginBottom: 8,
   },
-  counterStripText: {
+  counterTabPill: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    borderRadius: 6,
+  },
+  counterTabPillActive: {
+    backgroundColor: '#FEE2E2',
+  },
+  counterTabText: {
     color: '#4B5563',
     fontSize: 14,
     fontWeight: '500',
+  },
+  counterTabTextActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+  counterStripDivider: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    marginHorizontal: 4,
   },
 
   // Customer List Rows
@@ -8156,6 +8413,123 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  // Transaction Limit Modal Styles (activity_transaction_limit.xml)
+  txnLimitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#B81414',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  txnLimitBackBtn: {
+    padding: 4,
+  },
+  txnLimitHeaderTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  txnLimitTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  txnLimitTabBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  txnLimitTabBtnActive: {
+    borderBottomColor: '#B81414',
+  },
+  txnLimitTabLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  txnLimitTabLabelActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+  txnLimitStatusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 16,
+  },
+  txnLimitVerifiedBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  txnLimitVerifiedText: {
+    color: '#15803D',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  txnLimitDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 12,
+  },
+  txnLimitSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  txnLimitCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  txnLimitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+  },
+  txnLimitRowDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  txnLimitRowTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  txnLimitRowSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  txnLimitRowAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  txnChargeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+    marginBottom: 16,
+  },
 });
 
 // Wrap root component with crash-proof ErrorBoundary

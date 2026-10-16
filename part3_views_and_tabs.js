@@ -568,9 +568,31 @@
 
                   {/* --- 5. COUNTER STRIP (কাস্টমার ১২ / সাপ্লায়ার ০) --- */}
                   <View style={styles.counterStripRow}>
-                    <Text style={styles.counterStripText}>
-                      কাস্টমার {toBengaliNumber(accounts.filter((a) => a.type === 1).length)} / সাপ্লায়ার {toBengaliNumber(accounts.filter((a) => a.type === 2).length)}
-                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setAccountTab('customer');
+                        setAccType(1);
+                      }}
+                      activeOpacity={0.7}
+                      style={[styles.counterTabPill, accountTab === 'customer' && styles.counterTabPillActive]}
+                    >
+                      <Text style={[styles.counterTabText, accountTab === 'customer' && styles.counterTabTextActive]}>
+                        কাস্টমার {toBengaliNumber(accounts.filter((a) => a.type === 1).length)}
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={styles.counterStripDivider}>/</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setAccountTab('supplier');
+                        setAccType(2);
+                      }}
+                      activeOpacity={0.7}
+                      style={[styles.counterTabPill, accountTab === 'supplier' && styles.counterTabPillActive]}
+                    >
+                      <Text style={[styles.counterTabText, accountTab === 'supplier' && styles.counterTabTextActive]}>
+                        সাপ্লায়ার {toBengaliNumber(accounts.filter((a) => a.type === 2).length)}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               }
@@ -616,7 +638,7 @@
             <TouchableOpacity
               style={styles.floatingRoundFab}
               onPress={() => {
-                setAccType(1);
+                setAccType(accountTab === 'supplier' ? 2 : 1);
                 setModalAddAccount(true);
               }}
               activeOpacity={0.85}
@@ -1129,7 +1151,7 @@
 
               <TouchableOpacity
                 style={styles.menuListItem}
-                onPress={() => Alert.alert('লেনদেনের লিমিট', 'দৈনিক ক্যাশ-ইন লিমিট: ৳ ৫০,০০০ | দৈনিক ক্যাশ-আউট: ৳ ২৫,০০০ | মাসিক লিমিট: ৳ ৫,০০,০০০')}
+                onPress={() => setModalTxnLimit(true)}
               >
                 <Image source={require('./assets/icons/ic_menu_lock.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
                 <View style={{ flex: 1, marginLeft: 14 }}>

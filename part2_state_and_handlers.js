@@ -98,6 +98,8 @@ function TallyKhataApp() {
   const [modalTagada, setModalTagada] = useState(false);
   const [modalTallyMessage, setModalTallyMessage] = useState(false);
   const [tallyMessageBalance, setTallyMessageBalance] = useState(50);
+  const [modalTxnLimit, setModalTxnLimit] = useState(false);
+  const [txnLimitTab, setTxnLimitTab] = useState('limits'); // 'limits' | 'charges'
   const [modalBanglaQR, setModalBanglaQR] = useState(false);
   const [modalAddMoney, setModalAddMoney] = useState(false);
   const [modalMobileRecharge, setModalMobileRecharge] = useState(false);
@@ -182,6 +184,7 @@ function TallyKhataApp() {
         if (d.businessAddress) setBusinessAddress(d.businessAddress);
         if (Array.isArray(d.businesses)) setBusinesses(d.businesses);
         if (d.remainingSmsCount !== undefined) setRemainingSmsCount(Number(d.remainingSmsCount));
+        if (d.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(d.tallyMessageBalance));
         if (d.openingBalance !== undefined) setOpeningBalance(Number(d.openingBalance));
         if (Array.isArray(d.tagadaLogs)) setTagadaLogs(d.tagadaLogs);
         if (d.pinEnabled && d.appPin) {
