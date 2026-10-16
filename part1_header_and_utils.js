@@ -15,7 +15,10 @@ import {
   Share,
   Dimensions,
   Image,
+  LogBox,
 } from 'react-native';
+
+LogBox.ignoreAllLogs(true);
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ledgerEngine from './src/ledgerEngine';
 import { storageRepository, StorageRepository, createDefaultState } from './src/storageRepository';

@@ -12,6 +12,6 @@ const server = net.createServer((socket) => {
   });
 });
 
-server.listen(8081, '127.0.0.1', () => {
-  console.log('Bridge active: 127.0.0.1:8081 -> [::1]:8081');
+server.listen(8081, '0.0.0.0', () => {
+  console.log('Bridge active: 0.0.0.0:8081 -> [::1]:8081');
 });

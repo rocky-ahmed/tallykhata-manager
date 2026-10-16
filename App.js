@@ -15,7 +15,10 @@ import {
   Share,
   Dimensions,
   Image,
+  LogBox,
 } from 'react-native';
+
+LogBox.ignoreAllLogs(true);
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ledgerEngine from './src/ledgerEngine';
 import { storageRepository, StorageRepository, createDefaultState } from './src/storageRepository';
@@ -2422,7 +2425,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>টালি-মেসেজ</Text>
+                        <Text style={styles.quickGridLabel}>ট্যালি-মেসেজ</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -3311,7 +3314,7 @@ function TallyKhataApp() {
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'home' && styles.tabButtonLabelActive]}>
-            টালি
+            ট্যালি
           </Text>
         </TouchableOpacity>
 

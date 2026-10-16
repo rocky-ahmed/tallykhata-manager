@@ -471,7 +471,7 @@
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>টালি-মেসেজ</Text>
+                        <Text style={styles.quickGridLabel}>ট্যালি-মেসেজ</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -1360,7 +1360,7 @@
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'home' && styles.tabButtonLabelActive]}>
-            টালি
+            ট্যালি
           </Text>
         </TouchableOpacity>
 
