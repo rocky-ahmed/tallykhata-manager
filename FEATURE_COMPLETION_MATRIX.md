@@ -14,3 +14,19 @@
 | Data Backup & Restore | JSON export, share via WhatsApp/Drive, JSON import | Complete | Yes (`handleExportBackup`, `handleImportBackup`) | 100% |
 | Security (PIN Lock) | 4-digit security PIN lock screen on launch | Complete | Yes (`isLocked`, `handleVerifyPin`) | 100% |
 | Tagada Reminders | Single customer Bangla SMS/WhatsApp & bulk tagada | Complete | Yes (`handleSendSingleTagada`, `handleSendBulkTagada`) | 100% |
+
+---
+
+## Phase 3.3 Core Accounting & Concurrency Matrix
+
+| Feature / Capability | Requirements | Implementation | Test Verification | Status |
+|---|---|---|---|---|
+| Explicit Opening Balances | Accounts store explicit openingBalance (default 0) | src/ledgerEngine.js | Test A, B, C | VERIFIED |
+| Chronological Running Balances | Journals running totals include opening balance baseline | src/ledgerEngine.js | Test A, B, C, D | VERIFIED |
+| Supplier Conventions | Credit buy (+), cash payment (-) | src/ledgerEngine.js | Test B, Test 18 | VERIFIED |
+| Unresolvable Discrepancies | Flag and preserve raw balance without fake history | src/ledgerEngine.js | Test D | VERIFIED |
+| Safe Migration | Preserve V5 backup, handle malformed fields, idempotency | src/storageRepository.js | Tests 5, 6, 7, 8, 9, 10 | VERIFIED |
+| Atomic Collection Mutations | mutateCollection on latest committed store | src/storageRepository.js | Concurrency Tests A, B, C, D | VERIFIED |
+| Multi-Collection Mutations | mutateStore for atomic cascade updates | src/storageRepository.js | Concurrency Test E, F | VERIFIED |
+| Collision-Free IDs | Monotonic sequence + random entropy | src/ledgerEngine.js | Concurrency Tests A-F | VERIFIED |
+| End-to-End Persistence | Restart preserves full customer and supplier lifecycles | src/storageRepository.js | E2E Tests 17, 18 | VERIFIED |

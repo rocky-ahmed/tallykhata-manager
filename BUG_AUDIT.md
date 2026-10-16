@@ -59,3 +59,15 @@ This document records all detected bugs, UI mismatches, state synchronization de
 | DATA-8 | Unawaited Backup & Security | `handleImportBackup`, PIN setup modal in `part4` were unawaited | Handlers closed modals and set state before storage write was confirmed | Added `await persistData`, checked `saveRes.success` before updating state or dismissing modals | RESOLVED |
 | LOGIC-8 | Supplier Initial Balance Sign | New supplier accounts with initial balance created initial journal with `type: 'given'`, inverting balance on recalculation | Hardcoded `type: 'given'` in initial journal generation | Updated initial journal generation to `type: accType === 1 ? 'given' : 'received'`, correctly increasing supplier debt | RESOLVED |
 | DATA-9 | Missing Version in Migration | `migrateV5toV6` omitted explicit `version: 6` field in returned payload | Property was named `migrationVersion: 6` without `version: 6` | Added `version: 6` to migrated payload in `src/ledgerEngine.js` | RESOLVED |
+---
+
+## Phase 3.3 Accounting Model & Data Integrity Defects
+
+| ID | Component / Area | Observed Defect | Root Cause | Remediation & Fix | Status |
+|---|---|---|---|---|---|
+| ACC-1 | src/ledgerEngine.js | Initial balance reset to 0 in recalculation; stored account balance overwritten by journal sum only | Lack of explicit openingBalance on account records; running totals started strictly at 0 | Introduced explicit openingBalance baseline; running balance chronologically starts at openingBalance | RESOLVED |
+| ACC-2 | src/ledgerEngine.js | Inconsistent demo dataset (e.g., Raihan stored balance 7000 vs journal 3200) | Missing baseline derivation from legacy balance | Implemented stablishAccountOpeningBalance calculating 7000 - 3200 = 3800 opening balance; updated demo seed | RESOLVED |
+| ACC-3 | src/storageRepository.js | Concurrent mutations of same collection overwrite each other | React handlers submitted stale array snapshots captured at render time | Implemented mutateCollection(collectionName, updater) and mutateStore(updater) acting on latest committed queue state | RESOLVED |
+| ACC-4 | part2_state_and_handlers.js | Rapid simultaneous writes generate colliding item IDs | Used Date.now().toString() which produces identical IDs in same millisecond | Implemented collision-free generateUniqueId(prefix) with monotonic sequence counter and random entropy | RESOLVED |
+| ACC-5 | src/ledgerEngine.js | Risk of doubling opening balance on repeated migration or app restart | Opening balance calculation recalculated on each run | Made migration strictly idempotent: checks for existing openingBalance before deriving | RESOLVED |
+| ACC-6 | part2_state_and_handlers.js | Creating account with initial balance created artificial journal entry | Duplicate representation of opening balance | Explicitly store openingBalance and alance directly on account record without inventing artificial transactions | RESOLVED |

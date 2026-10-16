@@ -1,8 +1,15 @@
-/**
+﻿/**
  * src/ledgerEngine.js
  * Authoritative Accounting, Ledger & Persistence Logic for TallyKhata
  * 100% Offline Double-Entry & Referential Integrity Engine
  */
+
+// --- 0. UNIQUE ID GENERATION (COLLISION-FREE) ---
+let _idSequence = 0;
+function generateUniqueId(prefix = '') {
+  _idSequence = (_idSequence + 1) % 1000000;
+  return `${prefix}${Date.now()}_${_idSequence}_${Math.random().toString(36).substring(2, 7)}`;
+}
 
 // --- 1. VALIDATION HELPERS ---
 function validateTransaction(amount, type, desc = '') {
@@ -64,7 +71,69 @@ function validateStockAdjustment(currentStock, adjustQty, adjustType) {
   };
 }
 
-// --- 2. CHRONOLOGICAL RUNNING BALANCES RECALCULATION ---
+// --- 2. OPENING BALANCE BASELINE ESTABLISHMENT ---
+/**
+ * Safely derives or retrieves the authoritative opening balance baseline for an account.
+ * If openingBalance is explicitly defined, returns it directly.
+ * If openingBalance is missing but stored balance exists without unresolvable discrepancy,
+ * establishes baseline = stored balance - journal net.
+ */
+function establishAccountOpeningBalance(account, allJournals = []) {
+  if (!account) return 0;
+  if (account.openingBalance !== undefined && account.openingBalance !== null && !isNaN(Number(account.openingBalance))) {
+    return Number(account.openingBalance);
+  }
+  if (account.initialBalance !== undefined && account.initialBalance !== null && !isNaN(Number(account.initialBalance))) {
+    return Number(account.initialBalance);
+  }
+  if (account.hasDiscrepancy || account.unresolvableDiscrepancy) {
+    return 0;
+  }
+
+  const isCust = account.type === 1;
+  const targetAccId = String(account.id);
+  let jNet = 0;
+  let hasInvalid = false;
+
+  for (const j of allJournals) {
+    if (String(j.accountId) === targetAccId) {
+      const amt = Number(j.amount);
+      if (isNaN(amt)) {
+        hasInvalid = true;
+        break;
+      }
+      if (isCust) {
+        if (j.type === 'given') jNet += amt;
+        else if (j.type === 'received') jNet -= amt;
+        else hasInvalid = true;
+      } else {
+        if (j.type === 'received') jNet += amt;
+        else if (j.type === 'given') jNet -= amt;
+        else hasInvalid = true;
+      }
+    }
+  }
+
+  const storedBal = Number(account.balance);
+  if (!isNaN(storedBal) && !hasInvalid) {
+    return Math.round((storedBal - jNet) * 100) / 100;
+  }
+  return 0;
+}
+
+// --- 3. CHRONOLOGICAL RUNNING BALANCES RECALCULATION ---
+/**
+ * Recalculates running balances chronologically incorporating the explicit openingBalance baseline.
+ * Handles customer (type 1) and supplier (type 2) conventions:
+ * - Customer:
+ *     given (+) = credit sale / customer owes more
+ *     received (-) = payment received / customer owes less
+ *     balance = openingBalance + sum(given) - sum(received)
+ * - Supplier:
+ *     received (+) = credit purchase / we owe supplier more
+ *     given (-) = cash paid / we owe supplier less
+ *     balance = openingBalance + sum(received) - sum(given)
+ */
 function recalculateAccountRunningBalances(account, allJournals = []) {
   if (!account || !account.id) {
     return { updatedAccount: account, updatedJournals: allJournals, accountJournals: [] };
@@ -103,22 +172,34 @@ function recalculateAccountRunningBalances(account, allJournals = []) {
     return String(a.id).localeCompare(String(b.id));
   });
 
-  // Calculate sequential running balance
-  let running = 0;
+  // Determine explicit opening balance baseline
+  let openingBal = 0;
+  if (account.openingBalance !== undefined && account.openingBalance !== null) {
+    openingBal = Number(account.openingBalance) || 0;
+  } else if (account.initialBalance !== undefined && account.initialBalance !== null) {
+    openingBal = Number(account.initialBalance) || 0;
+  }
+
+  // Calculate sequential running balance starting from openingBal baseline
+  let running = openingBal;
   for (const j of targetJournals) {
     const amt = Number(j.amount) || 0;
     if (isCustomer) {
       if (j.type === 'given') running += amt;
       else if (j.type === 'received') running -= amt;
     } else {
-      if (j.type === 'given') running -= amt;
-      else if (j.type === 'received') running += amt;
+      if (j.type === 'received') running += amt;
+      else if (j.type === 'given') running -= amt;
     }
     j.runningBalance = Math.round(running * 100) / 100;
   }
 
   const finalBalance = Math.round(running * 100) / 100;
-  const updatedAccount = { ...account, balance: finalBalance };
+  const updatedAccount = {
+    ...account,
+    balance: finalBalance,
+    openingBalance: Math.round(openingBal * 100) / 100,
+  };
 
   // For UI display, account journals are displayed newest first
   const displayAccountJournals = [...targetJournals].reverse();
@@ -145,13 +226,13 @@ function recalculateAccountRunningBalances(account, allJournals = []) {
   };
 }
 
-// --- 3. CASHBOX SYNCHRONIZATION & REFERENTIAL INTEGRITY ---
+// --- 4. CASHBOX SYNCHRONIZATION & REFERENTIAL INTEGRITY ---
 function syncCashboxForTransaction(txn, account, cashEntries = []) {
   if (!txn || !account) return cashEntries;
 
   const isCust = account.type === 1;
-  const requiresCashIn = isCust && txn.type === 'received';
-  const requiresCashOut = !isCust && txn.type === 'given';
+  const requiresCashIn = isCust && txn.type === 'received'; // Customer gave cash to me -> cash in (baki aday)
+  const requiresCashOut = !isCust && txn.type === 'given'; // I gave cash to supplier -> cash out (supplier pay)
   const requiresEntry = requiresCashIn || requiresCashOut;
 
   const strTxnId = String(txn.id);
@@ -194,7 +275,7 @@ function removeCashEntriesForTransactions(txnIds = [], cashEntries = []) {
   return cashEntries.filter((c) => !c.linkedTxnId || !idSet.has(String(c.linkedTxnId)));
 }
 
-// --- 4. DATA MIGRATION: V5 TO V6 ---
+// --- 5. DATA MIGRATION: V5 TO V6 ---
 const V5_KEY = 'tallykhata_offline_store_v5';
 const V6_KEY = 'tallykhata_offline_store_v6';
 const V5_BACKUP_KEY = 'tallykhata_offline_store_v5_backup';
@@ -206,7 +287,7 @@ function migrateV5toV6(rawV5Data) {
       return { success: false, error: 'Invalid v5 data structure: expected object' };
     }
 
-    const accounts = Array.isArray(v5.accounts) ? [...v5.accounts] : [];
+    const rawAccounts = Array.isArray(v5.accounts) ? [...v5.accounts] : [];
     let journals = Array.isArray(v5.journals) ? [...v5.journals] : [];
     let cashEntries = Array.isArray(v5.cashEntries) ? [...v5.cashEntries] : [];
     const inventory = Array.isArray(v5.inventory) ? [...v5.inventory] : [];
@@ -215,7 +296,24 @@ function migrateV5toV6(rawV5Data) {
     const businesses = Array.isArray(v5.businesses) ? [...v5.businesses] : [];
 
     const updatedAccounts = [];
-    for (let acc of accounts) {
+    for (let rawAcc of rawAccounts) {
+      const acc = { ...rawAcc };
+
+      // 1. If openingBalance is already explicitly defined, preserve it
+      if (acc.openingBalance !== undefined && acc.openingBalance !== null && !isNaN(Number(acc.openingBalance))) {
+        acc.openingBalance = Number(acc.openingBalance);
+      } else {
+        // 2. Establish baseline if stored balance is present
+        if (acc.hasDiscrepancy || acc.unresolvableDiscrepancy) {
+          acc.openingBalance = 0;
+          acc.legacyStoredBalance = acc.balance;
+          acc.hasDiscrepancy = true;
+          acc.discrepancyReason = 'Unresolvable difference between stored balance and journal history';
+        } else {
+          acc.openingBalance = establishAccountOpeningBalance(acc, journals);
+        }
+      }
+
       const { updatedAccount, updatedJournals } = recalculateAccountRunningBalances(acc, journals);
       updatedAccounts.push(updatedAccount);
       journals = updatedJournals;
@@ -264,9 +362,11 @@ function migrateV5toV6(rawV5Data) {
 }
 
 const ledgerEngine = {
+  generateUniqueId,
   validateTransaction,
   validateAccount,
   validateStockAdjustment,
+  establishAccountOpeningBalance,
   recalculateAccountRunningBalances,
   syncCashboxForTransaction,
   removeCashEntriesForTransactions,

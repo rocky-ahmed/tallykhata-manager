@@ -199,29 +199,18 @@ function TallyKhataApp() {
 
   const persistData = async (overrides = {}) => {
     try {
-      const saveRes = await storageRepository.persistData((prevStore) => {
-        return {
-          ...prevStore,
-          accounts: overrides.accounts !== undefined ? overrides.accounts : (prevStore.accounts || accounts),
-          journals: overrides.journals !== undefined ? overrides.journals : (prevStore.journals || journals),
-          cashEntries: overrides.cashEntries !== undefined ? overrides.cashEntries : (prevStore.cashEntries || cashEntries),
-          inventory: overrides.inventory !== undefined ? overrides.inventory : (prevStore.inventory || inventory),
-          notes: overrides.notes !== undefined ? overrides.notes : (prevStore.notes || notes),
-          walletBalance: overrides.walletBalance !== undefined ? overrides.walletBalance : (prevStore.walletBalance ?? walletBalance),
-          walletTxns: overrides.walletTxns !== undefined ? overrides.walletTxns : (prevStore.walletTxns || walletTxns),
-          businessName: overrides.businessName !== undefined ? overrides.businessName : (prevStore.businessName || businessName),
-          ownerName: overrides.ownerName !== undefined ? overrides.ownerName : (prevStore.ownerName || ownerName),
-          ownerPhone: overrides.ownerPhone !== undefined ? overrides.ownerPhone : (prevStore.ownerPhone || ownerPhone),
-          businessAddress: overrides.businessAddress !== undefined ? overrides.businessAddress : (prevStore.businessAddress || businessAddress),
-          businesses: overrides.businesses !== undefined ? overrides.businesses : (prevStore.businesses || businesses),
-          remainingSmsCount: overrides.remainingSmsCount !== undefined ? overrides.remainingSmsCount : (prevStore.remainingSmsCount ?? remainingSmsCount),
-          openingBalance: overrides.openingBalance !== undefined ? overrides.openingBalance : (prevStore.openingBalance ?? openingBalance),
-          pinEnabled: overrides.pinEnabled !== undefined ? overrides.pinEnabled : (prevStore.pinEnabled ?? pinEnabled),
-          appPin: overrides.appPin !== undefined ? overrides.appPin : (prevStore.appPin || appPin),
-          tagadaLogs: overrides.tagadaLogs !== undefined ? overrides.tagadaLogs : (prevStore.tagadaLogs || tagadaLogs),
-        };
+      if (typeof overrides === 'function') {
+        return await storageRepository.mutateStore(overrides);
+      }
+      return await storageRepository.mutateStore((prevStore) => {
+        const next = { ...prevStore };
+        for (const k of Object.keys(overrides)) {
+          if (overrides[k] !== undefined) {
+            next[k] = overrides[k];
+          }
+        }
+        return next;
       });
-      return saveRes;
     } catch (err) {
       console.error('persistData write error:', err);
       return { success: false, error: err };
@@ -348,7 +337,7 @@ function TallyKhataApp() {
     }
 
     const isCust = selectedAccount.type === 1;
-    const txnId = Date.now().toString();
+    const txnId = generateUniqueId('txn_');
     const defaultDesc = txnType === 'given'
       ? (isCust ? 'বাকি বিক্রি' : 'মাল ক্রয় বাবদ দেনা')
       : (isCust ? 'বাকি আদায় (জমা)' : 'টাকা পরিশোধ');
@@ -363,22 +352,32 @@ function TallyKhataApp() {
       time: getTimeString(),
     };
 
-    const combinedJournals = [newJournal, ...journals];
-    const { updatedAccount, updatedJournals } = recalculateAccountRunningBalances(
-      selectedAccount,
-      combinedJournals
-    );
-
-    const updatedCash = syncCashboxForTransaction(newJournal, selectedAccount, cashEntries);
-    const updatedAccounts = accounts.map((a) =>
-      a.id === selectedAccount.id ? updatedAccount : a
-    );
-
     setIsSaving(true);
-    const saveRes = await persistData({
-      accounts: updatedAccounts,
-      journals: updatedJournals,
-      cashEntries: updatedCash,
+    let finalAccount = null;
+    const saveRes = await storageRepository.mutateStore((latestStore) => {
+      const curAccounts = latestStore.accounts || [];
+      const curJournals = latestStore.journals || [];
+      const curCash = latestStore.cashEntries || [];
+
+      const accInStore = curAccounts.find((a) => String(a.id) === String(selectedAccount.id)) || selectedAccount;
+      const combinedJournals = [newJournal, ...curJournals];
+      const { updatedAccount, updatedJournals } = recalculateAccountRunningBalances(
+        accInStore,
+        combinedJournals
+      );
+      finalAccount = updatedAccount;
+
+      const updatedCash = syncCashboxForTransaction(newJournal, updatedAccount, curCash);
+      const updatedAccounts = curAccounts.map((a) =>
+        String(a.id) === String(selectedAccount.id) ? updatedAccount : a
+      );
+
+      return {
+        ...latestStore,
+        accounts: updatedAccounts,
+        journals: updatedJournals,
+        cashEntries: updatedCash,
+      };
     });
     setIsSaving(false);
 
@@ -387,10 +386,10 @@ function TallyKhataApp() {
       return;
     }
 
-    setSelectedAccount(updatedAccount);
-    setAccounts(updatedAccounts);
-    setJournals(updatedJournals);
-    setCashEntries(updatedCash);
+    if (finalAccount) setSelectedAccount(finalAccount);
+    setAccounts(saveRes.data.accounts);
+    setJournals(saveRes.data.journals);
+    setCashEntries(saveRes.data.cashEntries);
 
     setCalcExpr('');
     setCalcDisplay('০');
@@ -420,31 +419,44 @@ function TallyKhataApp() {
       return;
     }
 
-    const updatedTxn = {
-      ...targetTxn,
-      amount: valRes.amount,
-      desc: editDesc.trim() || targetTxn.desc,
-    };
-
-    const baseJournals = journals.map((j) =>
-      j.id === editTxnId ? updatedTxn : j
-    );
-
-    const { updatedAccount, updatedJournals } = recalculateAccountRunningBalances(
-      selectedAccount,
-      baseJournals
-    );
-
-    const updatedCash = syncCashboxForTransaction(updatedTxn, selectedAccount, cashEntries);
-    const updatedAccounts = accounts.map((a) =>
-      a.id === selectedAccount.id ? updatedAccount : a
-    );
-
     setIsSaving(true);
-    const saveRes = await persistData({
-      accounts: updatedAccounts,
-      journals: updatedJournals,
-      cashEntries: updatedCash,
+    let finalAccount = null;
+    const saveRes = await storageRepository.mutateStore((latestStore) => {
+      const curAccounts = latestStore.accounts || [];
+      const curJournals = latestStore.journals || [];
+      const curCash = latestStore.cashEntries || [];
+
+      const accInStore = curAccounts.find((a) => String(a.id) === String(selectedAccount.id)) || selectedAccount;
+      const existingTxn = curJournals.find((j) => String(j.id) === String(editTxnId));
+      if (!existingTxn) return latestStore;
+
+      const updatedTxn = {
+        ...existingTxn,
+        amount: valRes.amount,
+        desc: editDesc.trim() || existingTxn.desc,
+      };
+
+      const baseJournals = curJournals.map((j) =>
+        String(j.id) === String(editTxnId) ? updatedTxn : j
+      );
+
+      const { updatedAccount, updatedJournals } = recalculateAccountRunningBalances(
+        accInStore,
+        baseJournals
+      );
+      finalAccount = updatedAccount;
+
+      const updatedCash = syncCashboxForTransaction(updatedTxn, updatedAccount, curCash);
+      const updatedAccounts = curAccounts.map((a) =>
+        String(a.id) === String(selectedAccount.id) ? updatedAccount : a
+      );
+
+      return {
+        ...latestStore,
+        accounts: updatedAccounts,
+        journals: updatedJournals,
+        cashEntries: updatedCash,
+      };
     });
     setIsSaving(false);
 
@@ -453,10 +465,10 @@ function TallyKhataApp() {
       return;
     }
 
-    setSelectedAccount(updatedAccount);
-    setAccounts(updatedAccounts);
-    setJournals(updatedJournals);
-    setCashEntries(updatedCash);
+    if (finalAccount) setSelectedAccount(finalAccount);
+    setAccounts(saveRes.data.accounts);
+    setJournals(saveRes.data.journals);
+    setCashEntries(saveRes.data.cashEntries);
 
     setModalEditTxn(false);
     setEditTxnId(null);
@@ -477,32 +489,45 @@ function TallyKhataApp() {
             const targetJ = journals.find((j) => j.id === txnId);
             if (!targetJ) return;
 
-            const remainingJournals = journals.filter((j) => j.id !== txnId);
-            const { updatedAccount, updatedJournals } = recalculateAccountRunningBalances(
-              selectedAccount,
-              remainingJournals
-            );
+            setIsSaving(true);
+            let finalAccount = null;
+            const saveRes = await storageRepository.mutateStore((latestStore) => {
+              const curAccounts = latestStore.accounts || [];
+              const curJournals = latestStore.journals || [];
+              const curCash = latestStore.cashEntries || [];
 
-            const updatedCash = removeCashEntriesForTransactions([txnId], cashEntries);
-            const updatedAccounts = accounts.map((a) =>
-              a.id === selectedAccount.id ? updatedAccount : a
-            );
+              const accInStore = curAccounts.find((a) => String(a.id) === String(selectedAccount.id)) || selectedAccount;
+              const remainingJournals = curJournals.filter((j) => String(j.id) !== String(txnId));
 
-            const saveRes = await persistData({
-              accounts: updatedAccounts,
-              journals: updatedJournals,
-              cashEntries: updatedCash,
+              const { updatedAccount, updatedJournals } = recalculateAccountRunningBalances(
+                accInStore,
+                remainingJournals
+              );
+              finalAccount = updatedAccount;
+
+              const updatedCash = removeCashEntriesForTransactions([txnId], curCash);
+              const updatedAccounts = curAccounts.map((a) =>
+                String(a.id) === String(selectedAccount.id) ? updatedAccount : a
+              );
+
+              return {
+                ...latestStore,
+                accounts: updatedAccounts,
+                journals: updatedJournals,
+                cashEntries: updatedCash,
+              };
             });
+            setIsSaving(false);
 
             if (!saveRes.success) {
               Alert.alert('ত্রুটি', 'লেনদেন মুছতে সমস্যা হয়েছে।');
               return;
             }
 
-            setSelectedAccount(updatedAccount);
-            setAccounts(updatedAccounts);
-            setJournals(updatedJournals);
-            setCashEntries(updatedCash);
+            if (finalAccount) setSelectedAccount(finalAccount);
+            setAccounts(saveRes.data.accounts);
+            setJournals(saveRes.data.journals);
+            setCashEntries(saveRes.data.cashEntries);
             setModalVoucher(false);
           },
         },
@@ -518,42 +543,30 @@ function TallyKhataApp() {
       return;
     }
 
-    const newId = Date.now().toString();
+    const newId = generateUniqueId('acc_');
     const newAcc = {
       id: newId,
       name: valRes.name,
       phone: valRes.phone,
       address: accAddress.trim(),
       type: accType,
-      balance: valRes.initialBalance,
+      openingBalance: valRes.initialBalance || 0,
+      balance: valRes.initialBalance || 0,
       createDate: getTodayDate(),
     };
 
-    let updatedJournals = journals;
-    if (valRes.initialBalance > 0) {
-      const initJ = {
-        id: (Date.now() + 1).toString(),
-        accountId: newId,
-        type: accType === 1 ? 'given' : 'received',
-        amount: valRes.initialBalance,
-        desc: 'পূর্বের বাকি (জের)',
-        date: getTodayDate(),
-        time: getTimeString(),
-        runningBalance: valRes.initialBalance,
-      };
-      updatedJournals = [initJ, ...journals];
-    }
-
-    const updatedAccounts = [newAcc, ...accounts];
-    const saveRes = await persistData({ accounts: updatedAccounts, journals: updatedJournals });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('accounts', (latestAccounts) => {
+      return [newAcc, ...latestAccounts];
+    });
+    setIsSaving(false);
 
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'নতুন হিসাব সংরক্ষণ ব্যর্থ হয়েছে।');
       return;
     }
 
-    setAccounts(updatedAccounts);
-    setJournals(updatedJournals);
+    setAccounts(saveRes.collection);
     setAccName('');
     setAccPhone('');
     setAccAddress('');
@@ -576,20 +589,31 @@ function TallyKhataApp() {
       Alert.alert('সতর্কতা', valRes.error);
       return;
     }
-    const updated = {
-      ...selectedAccount,
-      name: valRes.name,
-      phone: valRes.phone,
-      address: accAddress.trim(),
-    };
-    const updatedList = accounts.map((a) => (a.id === selectedAccount.id ? updated : a));
-    const saveRes = await persistData({ accounts: updatedList });
+
+    let updatedTarget = null;
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('accounts', (latestAccounts) => {
+      return latestAccounts.map((a) => {
+        if (String(a.id) === String(selectedAccount.id)) {
+          updatedTarget = {
+            ...a,
+            name: valRes.name,
+            phone: valRes.phone,
+            address: accAddress.trim(),
+          };
+          return updatedTarget;
+        }
+        return a;
+      });
+    });
+    setIsSaving(false);
+
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'হিসাবের তথ্য আপডেট করা যায়নি।');
       return;
     }
-    setSelectedAccount(updated);
-    setAccounts(updatedList);
+    if (updatedTarget) setSelectedAccount(updatedTarget);
+    setAccounts(saveRes.collection);
     setModalEditAccount(false);
     Alert.alert('সফল', 'হিসাবের তথ্য সফলভাবে আপডেট হয়েছে।');
   };
@@ -605,28 +629,38 @@ function TallyKhataApp() {
           text: 'মুছে ফেলুন',
           style: 'destructive',
           onPress: async () => {
-            const accTxnIds = journals
-              .filter((j) => String(j.accountId) === String(selectedAccount.id))
-              .map((j) => j.id);
+            const accId = String(selectedAccount.id);
+            setIsSaving(true);
+            const saveRes = await storageRepository.mutateStore((latestStore) => {
+              const curAccounts = latestStore.accounts || [];
+              const curJournals = latestStore.journals || [];
+              const curCash = latestStore.cashEntries || [];
 
-            const updatedAccounts = accounts.filter((a) => a.id !== selectedAccount.id);
-            const updatedJournals = journals.filter((j) => String(j.accountId) !== String(selectedAccount.id));
-            const updatedCash = removeCashEntriesForTransactions(accTxnIds, cashEntries);
+              const accTxnIds = curJournals
+                .filter((j) => String(j.accountId) === accId)
+                .map((j) => String(j.id));
 
-            const saveRes = await persistData({
-              accounts: updatedAccounts,
-              journals: updatedJournals,
-              cashEntries: updatedCash,
+              const updatedAccounts = curAccounts.filter((a) => String(a.id) !== accId);
+              const updatedJournals = curJournals.filter((j) => String(j.accountId) !== accId);
+              const updatedCash = removeCashEntriesForTransactions(accTxnIds, curCash);
+
+              return {
+                ...latestStore,
+                accounts: updatedAccounts,
+                journals: updatedJournals,
+                cashEntries: updatedCash,
+              };
             });
+            setIsSaving(false);
 
             if (!saveRes.success) {
               Alert.alert('ত্রুটি', 'খাতা মুছে ফেলা ব্যর্থ হয়েছে।');
               return;
             }
 
-            setAccounts(updatedAccounts);
-            setJournals(updatedJournals);
-            setCashEntries(updatedCash);
+            setAccounts(saveRes.data.accounts);
+            setJournals(saveRes.data.journals);
+            setCashEntries(saveRes.data.cashEntries);
             setSelectedAccount(null);
             setCurrentScreen('home');
           },
@@ -653,7 +687,7 @@ function TallyKhataApp() {
     else if (cashCategory === 'malik_out') defaultDesc = 'মালিক নিল (ক্যাশ উত্তোলন)';
 
     const newEntry = {
-      id: Date.now().toString(),
+      id: generateUniqueId('cash_'),
       category: cashCategory,
       type: type,
       amount: amt,
@@ -662,13 +696,17 @@ function TallyKhataApp() {
       time: getTimeString(),
     };
 
-    const updated = [newEntry, ...cashEntries];
-    const saveRes = await persistData({ cashEntries: updated });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('cashEntries', (latestCash) => {
+      return [newEntry, ...latestCash];
+    });
+    setIsSaving(false);
+
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'ক্যাশ এন্ট্রি সংরক্ষণ করা যায়নি।');
       return;
     }
-    setCashEntries(updated);
+    setCashEntries(saveRes.collection);
     setCashAmount('');
     setCashDesc('');
     setModalAddCash(false);
@@ -681,13 +719,16 @@ function TallyKhataApp() {
         text: 'মুছুন',
         style: 'destructive',
         onPress: async () => {
-          const updated = cashEntries.filter((c) => c.id !== id);
-          const saveRes = await persistData({ cashEntries: updated });
+          setIsSaving(true);
+          const saveRes = await storageRepository.mutateCollection('cashEntries', (latestCash) => {
+            return latestCash.filter((c) => String(c.id) !== String(id));
+          });
+          setIsSaving(false);
           if (!saveRes.success) {
             Alert.alert('ত্রুটি', 'ক্যাশ এন্ট্রি মুছতে সমস্যা হয়েছে।');
             return;
           }
-          setCashEntries(updated);
+          setCashEntries(saveRes.collection);
         },
       },
     ]);
@@ -707,7 +748,7 @@ function TallyKhataApp() {
     }
     // Record adjustment
     const adjEntry = {
-      id: Date.now().toString(),
+      id: generateUniqueId('adj_'),
       category: diff > 0 ? 'malik_in' : 'cost',
       type: diff > 0 ? 'in' : 'out',
       amount: Math.abs(diff),
@@ -715,13 +756,16 @@ function TallyKhataApp() {
       date: getTodayDate(),
       time: getTimeString(),
     };
-    const updated = [adjEntry, ...cashEntries];
-    const saveRes = await persistData({ cashEntries: updated });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('cashEntries', (latestCash) => {
+      return [adjEntry, ...latestCash];
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'ক্যাশবক্স সমন্বয় সংরক্ষণ করা যায়নি।');
       return;
     }
-    setCashEntries(updated);
+    setCashEntries(saveRes.collection);
     setModalReconcileCash(false);
     Alert.alert('সফল', 'ক্যাশবক্স সমন্বয় রেকর্ড সম্পন্ন হয়েছে।');
   };
@@ -733,20 +777,23 @@ function TallyKhataApp() {
       return;
     }
     const newP = {
-      id: Date.now().toString(),
+      id: generateUniqueId('prod_'),
       name: prodName.trim(),
       unit: prodUnit.trim() || 'পিস',
       buyPrice: parseFloat(prodBuyPrice) || 0,
       sellPrice: parseFloat(prodSellPrice) || 0,
       stock: parseFloat(prodStock) || 0,
     };
-    const updated = [newP, ...inventory];
-    const saveRes = await persistData({ inventory: updated });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('inventory', (latestInv) => {
+      return [newP, ...latestInv];
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'পণ্য সংরক্ষণ করা যায়নি।');
       return;
     }
-    setInventory(updated);
+    setInventory(saveRes.collection);
     setProdName('');
     setProdBuyPrice('');
     setProdSellPrice('');
@@ -761,15 +808,18 @@ function TallyKhataApp() {
       Alert.alert('সতর্কতা', valRes.error);
       return;
     }
-    const updated = inventory.map((p) =>
-      p.id === selectedProduct.id ? { ...p, stock: valRes.newStock } : p
-    );
-    const saveRes = await persistData({ inventory: updated });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('inventory', (latestInv) => {
+      return latestInv.map((p) =>
+        String(p.id) === String(selectedProduct.id) ? { ...p, stock: valRes.newStock } : p
+      );
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'স্টক সংরক্ষণ ব্যর্থ হয়েছে।');
       return;
     }
-    setInventory(updated);
+    setInventory(saveRes.collection);
     setStockAdjustQty('');
     setModalAdjustStock(false);
     setSelectedProduct(null);
@@ -782,13 +832,16 @@ function TallyKhataApp() {
         text: 'মুছুন',
         style: 'destructive',
         onPress: async () => {
-          const updated = inventory.filter((p) => p.id !== id);
-          const saveRes = await persistData({ inventory: updated });
+          setIsSaving(true);
+          const saveRes = await storageRepository.mutateCollection('inventory', (latestInv) => {
+            return latestInv.filter((p) => String(p.id) !== String(id));
+          });
+          setIsSaving(false);
           if (!saveRes.success) {
             Alert.alert('ত্রুটি', 'পণ্য মুছে ফেলা সম্ভব হয়নি।');
             return;
           }
-          setInventory(updated);
+          setInventory(saveRes.collection);
         },
       },
     ]);
@@ -798,39 +851,48 @@ function TallyKhataApp() {
   const handleAddNote = async () => {
     if (!newNoteText.trim()) return;
     const newN = {
-      id: Date.now().toString(),
+      id: generateUniqueId('note_'),
       text: newNoteText.trim(),
       isComplete: false,
       date: getTodayDate(),
     };
-    const updated = [newN, ...notes];
-    const saveRes = await persistData({ notes: updated });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('notes', (latestNotes) => {
+      return [newN, ...latestNotes];
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'নোট সংরক্ষণ করা যায়নি।');
       return;
     }
-    setNotes(updated);
+    setNotes(saveRes.collection);
     setNewNoteText('');
   };
 
   const handleToggleNote = async (id) => {
-    const updated = notes.map((n) => (n.id === id ? { ...n, isComplete: !n.isComplete } : n));
-    const saveRes = await persistData({ notes: updated });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('notes', (latestNotes) => {
+      return latestNotes.map((n) => (String(n.id) === String(id) ? { ...n, isComplete: !n.isComplete } : n));
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'নোট আপডেট করা যায়নি।');
       return;
     }
-    setNotes(updated);
+    setNotes(saveRes.collection);
   };
 
   const handleDeleteNote = async (id) => {
-    const updated = notes.filter((n) => n.id !== id);
-    const saveRes = await persistData({ notes: updated });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('notes', (latestNotes) => {
+      return latestNotes.filter((n) => String(n.id) !== String(id));
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'নোট মুছে ফেলা সম্ভব হয়নি।');
       return;
     }
-    setNotes(updated);
+    setNotes(saveRes.collection);
   };
 
   // --- HANDLER: TALLYPAY WALLET ---
@@ -840,23 +902,31 @@ function TallyKhataApp() {
       Alert.alert('সতর্কতা', 'টাকার পরিমাণ দিন');
       return;
     }
-    const newBal = walletBalance + amt;
     const newTxn = {
-      id: 'w_' + Date.now(),
+      id: generateUniqueId('w_'),
       title: `অ্যাড মানি (${addMoneyMethod})`,
       amount: amt,
       type: 'in',
       date: getTodayDate(),
       time: getTimeString(),
     };
-    const updatedTxns = [newTxn, ...walletTxns];
-    const saveRes = await persistData({ walletBalance: newBal, walletTxns: updatedTxns });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateStore((latestStore) => {
+      const curBal = Number(latestStore.walletBalance) || 0;
+      const curTxns = latestStore.walletTxns || [];
+      return {
+        ...latestStore,
+        walletBalance: curBal + amt,
+        walletTxns: [newTxn, ...curTxns],
+      };
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'ওয়ালেট আপডেট করা যায়নি।');
       return;
     }
-    setWalletBalance(newBal);
-    setWalletTxns(updatedTxns);
+    setWalletBalance(saveRes.data.walletBalance);
+    setWalletTxns(saveRes.data.walletTxns);
     setAddMoneyAmount('');
     setModalAddMoney(false);
     Alert.alert('সফল', `৳ ${formatMoney(amt)} টাকা ওয়ালেটে সফলভাবে যোগ হয়েছে (লোকাল লেজার)।`);
@@ -877,23 +947,31 @@ function TallyKhataApp() {
       Alert.alert('সতর্কতা', 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন');
       return;
     }
-    const newBal = walletBalance - amt;
     const newTxn = {
-      id: 'w_' + Date.now(),
+      id: generateUniqueId('w_'),
       title: `রিচার্জ (${rechargeOperator} - ${cleanPh})`,
       amount: amt,
       type: 'out',
       date: getTodayDate(),
       time: getTimeString(),
     };
-    const updatedTxns = [newTxn, ...walletTxns];
-    const saveRes = await persistData({ walletBalance: newBal, walletTxns: updatedTxns });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateStore((latestStore) => {
+      const curBal = Number(latestStore.walletBalance) || 0;
+      const curTxns = latestStore.walletTxns || [];
+      return {
+        ...latestStore,
+        walletBalance: curBal - amt,
+        walletTxns: [newTxn, ...curTxns],
+      };
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'রিচার্জ সংরক্ষণ করা যায়নি।');
       return;
     }
-    setWalletBalance(newBal);
-    setWalletTxns(updatedTxns);
+    setWalletBalance(saveRes.data.walletBalance);
+    setWalletTxns(saveRes.data.walletTxns);
     setRechargePhone('');
     setRechargeAmount('');
     setModalMobileRecharge(false);
@@ -1085,26 +1163,32 @@ function TallyKhataApp() {
       return;
     }
     const newBiz = {
-      id: Date.now().toString(),
+      id: generateUniqueId('biz_'),
       name: newBizName.trim(),
       owner: newBizOwner.trim() || ownerName,
       phone: newBizPhone.trim() || ownerPhone,
       address: newBizAddress.trim() || 'ঢাকা, বাংলাদেশ',
       isSelected: true,
     };
-    const updated = [...businesses.map((b) => ({ ...b, isSelected: false })), newBiz];
-    const saveRes = await persistData({
-      businessName: newBiz.name,
-      ownerName: newBiz.owner,
-      ownerPhone: newBiz.phone,
-      businessAddress: newBiz.address,
-      businesses: updated,
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateStore((latestStore) => {
+      const curBusinesses = latestStore.businesses || [];
+      const updated = [...curBusinesses.map((b) => ({ ...b, isSelected: false })), newBiz];
+      return {
+        ...latestStore,
+        businessName: newBiz.name,
+        ownerName: newBiz.owner,
+        ownerPhone: newBiz.phone,
+        businessAddress: newBiz.address,
+        businesses: updated,
+      };
     });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'নতুন ব্যবসা তৈরি ও সংরক্ষণ ব্যর্থ হয়েছে।');
       return;
     }
-    setBusinesses(updated);
+    setBusinesses(saveRes.data.businesses);
     setBusinessName(newBiz.name);
     if (newBiz.owner) setOwnerName(newBiz.owner);
     if (newBiz.phone) setOwnerPhone(newBiz.phone);
@@ -1123,7 +1207,7 @@ function TallyKhataApp() {
     const totalCounted = countedFromNotes > 0 ? countedFromNotes : (Number(countedCash) || 0);
     const diff = totalCounted - totalCash;
     const adjEntry = {
-      id: 'adj_' + Date.now(),
+      id: generateUniqueId('adj_'),
       category: diff >= 0 ? 'malik_in' : 'cost',
       type: diff >= 0 ? 'in' : 'out',
       amount: Math.abs(diff),
@@ -1136,13 +1220,16 @@ function TallyKhataApp() {
       date: getTodayDate(),
       time: getTimeString(),
     };
-    const updatedCash = [adjEntry, ...cashEntries];
-    const saveRes = await persistData({ cashEntries: updatedCash });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateCollection('cashEntries', (latestCash) => {
+      return [adjEntry, ...latestCash];
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'ক্যাশবক্স মিলানো তথ্য সংরক্ষণ করা যায়নি।');
       return;
     }
-    setCashEntries(updatedCash);
+    setCashEntries(saveRes.collection);
     setModalReconcileCash(false);
     Alert.alert(
       'ক্যাশবক্স মিলানো সম্পন্ন',
@@ -1160,21 +1247,30 @@ function TallyKhataApp() {
     }
     const newCount = remainingSmsCount - 1;
     const log = {
-      id: 'tag_' + Date.now(),
+      id: generateUniqueId('tag_'),
       customerName: account.name,
       phone: account.phone,
       amount: account.balance,
       date: getTodayDate(),
       time: getTimeString(),
     };
-    const updatedLogs = [log, ...tagadaLogs];
-    const saveRes = await persistData({ remainingSmsCount: newCount, tagadaLogs: updatedLogs });
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateStore((latestStore) => {
+      const curCount = Number(latestStore.remainingSmsCount) || 0;
+      const curLogs = latestStore.tagadaLogs || [];
+      return {
+        ...latestStore,
+        remainingSmsCount: Math.max(0, curCount - 1),
+        tagadaLogs: [log, ...curLogs],
+      };
+    });
+    setIsSaving(false);
     if (!saveRes.success) {
       Alert.alert('ত্রুটি', 'তাগাদা মেসেজ রেকর্ড সংরক্ষণ করা যায়নি।');
       return;
     }
-    setRemainingSmsCount(newCount);
-    setTagadaLogs(updatedLogs);
+    setRemainingSmsCount(saveRes.data.remainingSmsCount);
+    setTagadaLogs(saveRes.data.tagadaLogs);
     setModalTagada(false);
     Alert.alert(
       'মেসেজ পাঠানো হয়েছে',
@@ -1231,7 +1327,7 @@ function TallyKhataApp() {
         ? 'বিকাশ'
         : 'নগদ';
     const newTxn = {
-      id: 'w_' + Date.now(),
+      id: generateUniqueId('w_'),
       title: `মানি আউট (${methodLabel})`,
       amount: amt,
       type: 'out',

@@ -131,3 +131,9 @@ To ensure rock-solid data integrity under concurrent writes and React component 
 5. **Safe V5 Migration with Backup Retention**:
    - `loadInitialData()` automatically detects existing V5 stores, creates an unmutated snapshot in `tallykhata_offline_store_v5_backup`, migrates to V6, and persists the result.
    - Seed data is strictly prohibited from overwriting genuine user records.
+---
+
+## Phase 3.3 Backend Audit: Ledger Integrity & Concurrency Architecture
+- **State Mutex & Transaction Isolation**: The singleton storageRepository executes all operations through 	his.writeQueue. Mutations operate on deep-cloned snapshots of the latest committed state, guaranteeing serializable isolation.
+- **Referential Integrity**: Cascade deletes atomically purge account journals and linked cashbox entries in a single atomic store mutation.
+- **Crash & Disk-Fault Immunity**: If a persistence write fails, the in-memory cache remains strictly uncorrupted, returning { success: false } without deadlocking subsequent writes.

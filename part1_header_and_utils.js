@@ -24,6 +24,8 @@ import { storageRepository, StorageRepository, createDefaultState } from './src/
 storageRepository.setStorageAdapter(AsyncStorage);
 
 const {
+  generateUniqueId,
+  establishAccountOpeningBalance,
   validateTransaction,
   validateAccount,
   validateStockAdjustment,
