@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, Component } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, Component } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,6 +16,7 @@ import {
   Dimensions,
   Image,
   LogBox,
+  Platform,
 } from 'react-native';
 
 LogBox.ignoreAllLogs(true);
@@ -134,23 +135,25 @@ const toBengaliDecimal = (amount) => {
 
 const getAvatarInfo = (name, index) => {
   const colors = ['#DCFCE7', '#FEF08A', '#DBEAFE', '#FFE4E6', '#DCFCE7', '#FEF08A', '#DBEAFE', '#FFE4E6'];
+  const textColors = ['#0F8A0F', '#B8860B', '#1A68D1', '#B81414', '#0F8A0F', '#B8860B', '#1A68D1', '#B81414'];
   const bg = colors[index % colors.length];
+  const color = textColors[index % textColors.length];
   let text = 'ক';
   if (name) {
     const trimmed = name.trim();
-    if (trimmed.includes('★')) {
-      const firstWord = trimmed.split(/\s+/)[0];
+    const words = trimmed.split(/\s+/);
+    if (words.length >= 2 && words[0].includes('.') && /[A-Za-z]/.test(words[0][0]) && /[A-Za-z]/.test(words[1][0])) {
+      text = (words[0][0] + words[1][0]).toUpperCase();
+    } else if (trimmed.includes('★')) {
+      const firstWord = words[0];
       text = (firstWord[0] || 'C').toUpperCase() + '★';
-    } else {
-      const words = trimmed.split(/\s+/);
-      if (words.length >= 2 && words[0][0] && words[1][0] && /[A-Za-z]/.test(words[0][0])) {
-        text = (words[0][0] + words[1][0]).toUpperCase();
-      } else if (words[0]) {
-        text = words[0].slice(0, 2);
-      }
+    } else if (words.length >= 2 && words[0][0] && words[1][0] && /[A-Za-z]/.test(words[0][0])) {
+      text = (words[0][0] + words[1][0]).toUpperCase();
+    } else if (words[0]) {
+      text = words[0].slice(0, 2);
     }
   }
-  return { bg, text };
+  return { bg, color, text };
 };
 
 const getTodayDate = () => {
@@ -2562,7 +2565,7 @@ function TallyKhataApp() {
                     activeOpacity={0.7}
                   >
                     <View style={[styles.customerAvatarCircle, { backgroundColor: avatar.bg }]}>
-                      <Text style={styles.customerAvatarText}>{avatar.text}</Text>
+                      <Text style={[styles.customerAvatarText, { color: avatar.color }]}>{avatar.text}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.customerCardName} numberOfLines={1}>{item.name}</Text>
@@ -7367,7 +7370,8 @@ const styles = StyleSheet.create({
   // --- 5-BUTTON BOTTOM NAVIGATION BAR ---
   bottomTabBar: {
     flexDirection: 'row',
-    height: 60,
+    height: Platform.OS === 'android' ? 102 : 60,
+    paddingBottom: Platform.OS === 'android' ? 44 : 2,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
@@ -7379,9 +7383,9 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingTop: 6,
   },
   tabButtonActive: {
     borderTopWidth: 2,
@@ -9315,3 +9319,8 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+
+
+
+
