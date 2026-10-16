@@ -38,8 +38,14 @@ In **APIs & Services > Library**, search for and enable:
    - Application type: **Android**
    - Package name: `com.progoti.tallykhata.offline` (as configured in `app.json`)
    - SHA-1 certificate fingerprint:
-     - Run: `keytool -keystore ~/.android/debug.keystore -list -v` (password: `android`)
-     - Or extract from your release keystore.
+     ```
+     5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
+     ```
+   - SHA-256 certificate fingerprint:
+     ```
+     FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C
+     ```
+   *(Note: The above are the exact verified fingerprints from the local debug keystore used by the application).*
 3. **For Web / Expo Client**:
    - Application type: **Web application** (used by Expo AuthSession)
    - Authorized redirect URIs:
