@@ -3376,7 +3376,7 @@ function TallyKhataApp() {
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'cashbox' && styles.tabButtonLabelActive]}>
-            ক্যাশবক্স
+            ক্যাশবাক্স
           </Text>
         </TouchableOpacity>
 
@@ -3401,7 +3401,7 @@ function TallyKhataApp() {
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'tallypay' && styles.tabButtonLabelActive]}>
-            টালিপে
+            ট্যালিপে
           </Text>
         </TouchableOpacity>
 
@@ -6203,7 +6203,7 @@ const styles = StyleSheet.create({
   topHeaderBarRed: {
     backgroundColor: '#B81414',
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: Platform.OS === 'android' ? 16 : 12,
     paddingBottom: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -6403,15 +6403,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   counterTabPillActive: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'transparent',
   },
   counterTabText: {
-    color: '#4B5563',
+    color: '#6B7280',
     fontSize: 14,
     fontWeight: '500',
   },
   counterTabTextActive: {
-    color: '#B81414',
+    color: '#111827',
     fontWeight: 'bold',
   },
   counterStripDivider: {
@@ -6468,7 +6468,7 @@ const styles = StyleSheet.create({
   // Floating Round FAB
   floatingRoundFab: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 28,
     right: 18,
     width: 56,
     height: 56,
