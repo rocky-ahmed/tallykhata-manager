@@ -27,3 +27,7 @@ android/local.properties
 # Debug screenshots
 /*.png
 !assets/**/*.png
+\
+build/
+captures/
+cxx/
