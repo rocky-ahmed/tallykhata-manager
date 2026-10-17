@@ -3450,7 +3450,7 @@ function TallyKhataApp() {
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'cashbox' && styles.tabButtonLabelActive]}>
-            ক্যাশবক্স
+            ক্যাশবাক্স
           </Text>
         </TouchableOpacity>
 
@@ -6238,8 +6238,8 @@ const styles = StyleSheet.create({
   topHeaderBarRed: {
     backgroundColor: '#B81414',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 36) + 12 : 12,
-    paddingBottom: 14,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 4 : 10,
+    paddingBottom: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -6312,12 +6312,12 @@ const styles = StyleSheet.create({
   // Yellow Promo Banner
   promoBannerCard: {
     backgroundColor: '#FFDE00',
-    borderRadius: 14,
+    borderRadius: 12,
     marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    marginTop: 6,
+    marginBottom: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 0,
@@ -6328,21 +6328,21 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   promoBannerImg: {
-    width: 66,
-    height: 76,
+    width: 52,
+    height: 60,
   },
   promoBannerTextCol: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: 12,
   },
   promoBannerBold: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#000000',
-    lineHeight: 28,
+    lineHeight: 23,
   },
   promoBannerSub: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#374151',
     alignSelf: 'flex-end',
     marginTop: 2,
@@ -6350,28 +6350,28 @@ const styles = StyleSheet.create({
 
   // 8-Item Quick Grid
   quickGridContainer: {
-    marginHorizontal: 8,
-    marginTop: 8,
-    marginBottom: 6,
+    marginHorizontal: 10,
+    marginTop: 4,
+    marginBottom: 4,
   },
   quickGridRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   quickGridItem: {
     width: '24%',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 3,
   },
   quickGridIcon: {
-    width: 44,
-    height: 44,
+    width: 36,
+    height: 36,
   },
   quickGridLabel: {
-    fontSize: 12,
-    color: '#1F2937',
-    marginTop: 6,
+    fontSize: 11,
+    color: '#212121',
+    marginTop: 3,
     fontWeight: '500',
     textAlign: 'center',
   },
@@ -6381,8 +6381,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     marginHorizontal: 16,
-    marginVertical: 8,
-    paddingVertical: 14,
+    marginVertical: 4,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
@@ -6398,33 +6398,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryCardAmountRed: {
-    fontSize: 24,
+    fontSize: 21,
     fontWeight: 'bold',
     color: '#B81414',
   },
   summaryCardAmountGreen: {
-    fontSize: 24,
+    fontSize: 21,
     fontWeight: 'bold',
     color: '#1C7D50',
   },
   summaryCardLabel: {
-    fontSize: 13,
-    color: '#111827',
-    marginTop: 4,
+    fontSize: 12,
+    color: '#616161',
+    marginTop: 2,
+    fontWeight: '500',
   },
   summaryCardDivider: {
     width: 1,
-    height: 38,
+    height: 34,
     backgroundColor: '#E5E7EB',
   },
 
   // Search Pill & Counter Strip
   searchPillBar: {
     backgroundColor: '#F5F5F5',
-    borderRadius: 24,
+    borderRadius: 22,
     marginHorizontal: 16,
-    marginTop: 6,
-    height: 44,
+    marginTop: 4,
+    marginBottom: 4,
+    height: 40,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
@@ -6432,9 +6434,9 @@ const styles = StyleSheet.create({
   counterStripRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginTop: 14,
-    marginBottom: 8,
+    paddingHorizontal: 18,
+    marginTop: 8,
+    marginBottom: 4,
   },
   counterTabPill: {
     paddingVertical: 2,
@@ -6446,7 +6448,7 @@ const styles = StyleSheet.create({
   },
   counterTabText: {
     color: '#6B7280',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   counterTabTextActive: {
@@ -6455,7 +6457,7 @@ const styles = StyleSheet.create({
   },
   counterStripDivider: {
     color: '#9CA3AF',
-    fontSize: 14,
+    fontSize: 13,
     marginHorizontal: 4,
   },
 
@@ -6463,40 +6465,40 @@ const styles = StyleSheet.create({
   customerListCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   customerAvatarCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+    marginRight: 12,
   },
   customerAvatarText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#111827',
   },
   customerCardName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#111827',
   },
   customerCardTime: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
-    marginTop: 3,
+    marginTop: 2,
   },
   customerCardAmount: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#B81414',
-    marginRight: 8,
+    marginRight: 6,
   },
   customerChevron: {
     fontSize: 18,
@@ -6507,11 +6509,11 @@ const styles = StyleSheet.create({
   // Floating Round FAB
   floatingRoundFab: {
     position: 'absolute',
-    bottom: 28,
-    right: 18,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: 20,
+    right: 16,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: '#B81414',
     justifyContent: 'center',
     alignItems: 'center',
@@ -7438,8 +7440,8 @@ const styles = StyleSheet.create({
   // --- 5-BUTTON BOTTOM NAVIGATION BAR ---
   bottomTabBar: {
     flexDirection: 'row',
-    height: Platform.OS === 'android' ? 102 : 60,
-    paddingBottom: Platform.OS === 'android' ? 44 : 2,
+    height: Platform.OS === 'android' ? 78 : 60,
+    paddingBottom: Platform.OS === 'android' ? 22 : 4,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
