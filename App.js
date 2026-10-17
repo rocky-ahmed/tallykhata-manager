@@ -17,6 +17,7 @@ import {
   Image,
   LogBox,
   Platform,
+  BackHandler,
 } from 'react-native';
 
 LogBox.ignoreAllLogs(true);
@@ -554,6 +555,57 @@ function TallyKhataApp() {
     const sub = Linking.addEventListener('url', (e) => handleUrl(e.url));
     return () => sub && sub.remove && sub.remove();
   }, []);
+
+  // --- HARDWARE BACK HANDLER (Closes modals & navigates back natively) ---
+  useEffect(() => {
+    const onBackPress = () => {
+      if (modalAddTxn) { setModalAddTxn(false); return true; }
+      if (modalEditTxn) { setModalEditTxn(false); return true; }
+      if (modalAddAccount) { setModalAddAccount(false); return true; }
+      if (modalEditAccount) { setModalEditAccount(false); return true; }
+      if (modalAddCash) { setModalAddCash(false); return true; }
+      if (modalReconcileCash) { setModalReconcileCash(false); return true; }
+      if (modalBackupRestore) { setModalBackupRestore(false); return true; }
+      if (modalFullReport) { setModalFullReport(false); return true; }
+      if (modalNotes) { setModalNotes(false); return true; }
+      if (modalAddStock) { setModalAddStock(false); return true; }
+      if (modalAdjustStock) { setModalAdjustStock(false); return true; }
+      if (modalBanglaQR) { setModalBanglaQR(false); return true; }
+      if (modalTallyMessage) { setModalTallyMessage(false); return true; }
+      if (modalSettings) { setModalSettings(false); return true; }
+      if (modalSupport) { setModalSupport(false); return true; }
+      if (modalInbox) { setModalInbox(false); return true; }
+      if (modalBusinessPicker) { setModalBusinessPicker(false); return true; }
+      if (modalAddBusiness) { setModalAddBusiness(false); return true; }
+      if (modalAddMoney) { setModalAddMoney(false); return true; }
+      if (modalMobileRecharge) { setModalMobileRecharge(false); return true; }
+      if (modalTagada) { setModalTagada(false); return true; }
+      if (modalVoucher) { setModalVoucher(false); return true; }
+      if (modalPinSetup) { setModalPinSetup(false); return true; }
+      if (modalProfitLoss) { setModalProfitLoss(false); return true; }
+      if (modalBechaKena) { setModalBechaKena(false); return true; }
+      if (modalBakiReport) { setModalBakiReport(false); return true; }
+      if (modalCashReport) { setModalCashReport(false); return true; }
+      if (modalExpenseReport) { setModalExpenseReport(false); return true; }
+      if (modalMalikReport) { setModalMalikReport(false); return true; }
+      if (modalMoneyOut) { setModalMoneyOut(false); return true; }
+      if (currentScreen !== 'home') {
+        setCurrentScreen('home');
+        return true;
+      }
+      return false;
+    };
+    const backSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backSub && backSub.remove && backSub.remove();
+  }, [
+    modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
+    modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSettings,
+    modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
+    modalMobileRecharge, modalTagada, modalVoucher, modalPinSetup, modalProfitLoss,
+    modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
+    modalMalikReport, modalMoneyOut, currentScreen
+  ]);
 
   const loadSavedData = async () => {
     try {
@@ -2843,6 +2895,7 @@ function TallyKhataApp() {
             {/* --- 6. CIRCULAR FLOATING ACTION BUTTON (👤+) --- */}
             <TouchableOpacity
               style={styles.floatingRoundFab}
+              collapsable={false}
               onPress={() => {
                 setAccType(accountTab === 'supplier' ? 2 : 1);
                 setModalAddAccount(true);
@@ -2862,7 +2915,7 @@ function TallyKhataApp() {
             TAB 2: CASHBOX (ক্যাশবক্স - layout_cashbook_dashboard_total.xml)
            =================================================================== */}
         {activeTab === 'cashbox' && (
-          <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Cash Dashboard Card (layout_cashbook_dashboard_total.xml) */}
             <View style={styles.cashTopCard}>
               {/* Upper Box: আজকের বেচা & বর্তমান ক্যাশ */}
@@ -3078,7 +3131,7 @@ function TallyKhataApp() {
             TAB 3: TAGADA (তাগাদা বার্তা কালেকশন - activity_tagada.xml)
            =================================================================== */}
         {activeTab === 'tagada' && (
-          <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Tagada Top Header Bar with Back navigation */}
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
               <TouchableOpacity
@@ -3184,7 +3237,7 @@ function TallyKhataApp() {
             TAB 4: TALLYPAY (টালিপে ডিজিটাল ওয়ালেট ও বাংলা কিউআর)
            =================================================================== */}
         {activeTab === 'tallypay' && (
-          <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Wallet Balance Card */}
             <View style={styles.walletCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3318,7 +3371,7 @@ function TallyKhataApp() {
             TAB 5: MENU / MORE (মেনু / ড্রয়ার - activity_main_drawer.xml)
            =================================================================== */}
         {activeTab === 'menu' && (
-          <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Merchant Shop Profile Header (nav_header_main.xml) */}
             <View style={styles.menuProfileHeader}>
               <View style={styles.menuStoreAvatar}>
@@ -6714,20 +6767,20 @@ const styles = StyleSheet.create({
   // Floating Round FAB
   floatingRoundFab: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 24,
     right: 16,
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#B81414',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 6,
+    elevation: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    zIndex: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    zIndex: 999,
   },
 
   // Active Pill on Bottom Nav
@@ -7157,7 +7210,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#FBD5D5',
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 6 : 10,
+    paddingBottom: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -7645,8 +7699,8 @@ const styles = StyleSheet.create({
   // --- 5-BUTTON BOTTOM NAVIGATION BAR ---
   bottomTabBar: {
     flexDirection: 'row',
-    height: Platform.OS === 'android' ? 84 : 62,
-    paddingBottom: Platform.OS === 'android' ? 26 : 4,
+    height: Platform.OS === 'android' ? 80 : 62,
+    paddingBottom: Platform.OS === 'android' ? 22 : 4,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
