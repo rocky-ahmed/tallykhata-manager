@@ -30,6 +30,11 @@ import {
   BACKUP_FILENAME,
 } from './src/googleDriveBackupService';
 
+// Google OAuth Configuration
+// Package: com.progoti.tallykhata.offline
+// Local Debug Keystore SHA-1: 5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
+const GOOGLE_WEB_CLIENT_ID = '';
+
 // Initialize production storage repository adapter with AsyncStorage
 storageRepository.setStorageAdapter(AsyncStorage);
 
@@ -526,6 +531,7 @@ function TallyKhataApp() {
   // --- PERSISTENCE: LOAD & SAVE ---
   useEffect(() => {
     loadSavedData();
+    initGoogleSignIn();
   }, []);
 
   const loadSavedData = async () => {
@@ -1396,6 +1402,21 @@ function TallyKhataApp() {
     });
   };
 
+  const initGoogleSignIn = async () => {
+    try {
+      const mod = require('@react-native-google-signin/google-signin');
+      if (mod && mod.GoogleSignin && typeof mod.GoogleSignin.configure === 'function') {
+        const config = {
+          scopes: ['https://www.googleapis.com/auth/drive.appdata'],
+        };
+        if (GOOGLE_WEB_CLIENT_ID) {
+          config.webClientId = GOOGLE_WEB_CLIENT_ID;
+        }
+        mod.GoogleSignin.configure(config);
+      }
+    } catch (e) {}
+  };
+
   // --- GOOGLE DRIVE BACKUP & RESTORE HANDLERS ---
   const handleNativeGoogleSignIn = async () => {
     try {
@@ -1452,10 +1473,22 @@ function TallyKhataApp() {
         return;
       }
       setCloudBackupStatus('error');
-      Alert.alert(
-        'গুগল সাইন-ইন ত্রুটি',
-        (err && err.message) ? err.message : 'গুগল সাইন-ইন সম্পন্ন করা সম্ভব হয়নি।'
-      );
+      const rawMsg = (err && err.message) ? String(err.message) : '';
+      const errCode = (err && err.code) ? String(err.code) : '';
+      if (errCode === '10' || rawMsg.includes('DEVELOPER_ERROR') || rawMsg.includes('statusCode=10')) {
+        Alert.alert(
+          'গুগল ক্লাউড কনফিগারেশন ত্রুটি (DEVELOPER_ERROR)',
+          'গুগল সাইন-ইন সফল করার জন্য Google Cloud Console-এ এই অ্যাপের প্যাকেজ নাম এবং SHA-1 ফিঙ্গারপ্রিন্ট যুক্ত থাকতে হবে।\n\n' +
+          '• প্যাকেজ নাম: com.progoti.tallykhata.offline\n\n' +
+          '• SHA-1 ফিঙ্গারপ্রিন্ট: 5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25\n\n' +
+          'Google Cloud Console > Credentials > Create Credentials > OAuth client ID > Android নির্বাচন করে প্যাকেজ ও SHA-1 বসিয়ে দিন।'
+        );
+      } else {
+        Alert.alert(
+          'গুগল সাইন-ইন ত্রুটি',
+          rawMsg || 'গুগল সাইন-ইন সম্পন্ন করা সম্ভব হয়নি।'
+        );
+      }
     }
   };
 
@@ -4785,6 +4818,18 @@ function TallyKhataApp() {
                         />
                         <Text style={styles.cloudConnectBtnText}>গুগল একাউন্ট যুক্ত করুন</Text>
                       </TouchableOpacity>
+
+                      <View style={{ marginTop: 14, padding: 10, backgroundColor: '#F8FAFC', borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: 'bold', marginBottom: 3 }}>
+                          Android OAuth তথ্যাবলী (Google Cloud Console):
+                        </Text>
+                        <Text style={{ fontSize: 10, color: '#334155', marginBottom: 2 }}>
+                          • প্যাকেজ: com.progoti.tallykhata.offline
+                        </Text>
+                        <Text style={{ fontSize: 10, color: '#334155' }}>
+                          • SHA-1: 5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
+                        </Text>
+                      </View>
                     </View>
                   ) : (
                     <View>
