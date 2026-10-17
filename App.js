@@ -2491,7 +2491,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>ট্যালি-মেসেজ</Text>
+                        <Text style={styles.quickGridLabel}>টালি-মেসেজ</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -3380,7 +3380,7 @@ function TallyKhataApp() {
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'home' && styles.tabButtonLabelActive]}>
-            ট্যালি
+            টালি
           </Text>
         </TouchableOpacity>
 
@@ -3405,7 +3405,7 @@ function TallyKhataApp() {
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'cashbox' && styles.tabButtonLabelActive]}>
-            ক্যাশবাক্স
+            ক্যাশবক্স
           </Text>
         </TouchableOpacity>
 
@@ -3430,7 +3430,7 @@ function TallyKhataApp() {
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'tallypay' && styles.tabButtonLabelActive]}>
-            ট্যালিপে
+            টালিপে
           </Text>
         </TouchableOpacity>
 
