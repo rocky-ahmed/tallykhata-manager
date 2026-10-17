@@ -2471,7 +2471,7 @@ function TallyKhataApp() {
 
                       <TouchableOpacity
                         style={styles.quickGridItem}
-                        onPress={() => setModalTagada(true)}
+                        onPress={() => setActiveTab('tagada')}
                         activeOpacity={0.7}
                       >
                         <Image
@@ -2534,7 +2534,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>ক্যাশবক্স</Text>
+                        <Text style={styles.quickGridLabel}>ক্যাশবাক্স</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -2923,6 +2923,21 @@ function TallyKhataApp() {
            =================================================================== */}
         {activeTab === 'tagada' && (
           <ScrollView contentContainerStyle={{ paddingBottom: 95 }}>
+            {/* Tagada Top Header Bar with Back navigation */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+              <TouchableOpacity
+                onPress={() => setActiveTab('home')}
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={require('./assets/icons/arrow_left.png')}
+                  style={{ width: 20, height: 20, tintColor: '#1F2937', marginRight: 8 }}
+                  resizeMode="contain"
+                />
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1F2937' }}>গ্রুপ তাগাদা</Text>
+              </TouchableOpacity>
+            </View>
             {/* Tagada Header Card with SMS Quota Badge */}
             <View style={styles.tagadaHeaderCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
