@@ -532,6 +532,27 @@ function TallyKhataApp() {
   useEffect(() => {
     loadSavedData();
     initGoogleSignIn();
+
+    const handleUrl = (url) => {
+      if (!url) return;
+      if (url.includes('tab=cashbox')) setActiveTab('cashbox');
+      else if (url.includes('tab=tallypay')) setActiveTab('tallypay');
+      else if (url.includes('tab=menu')) setActiveTab('menu');
+      else if (url.includes('tab=home')) setActiveTab('home');
+
+      if (url.includes('action=backup')) setModalBackupRestore(true);
+      else if (url.includes('action=add_account')) setModalAddAccount(true);
+      else if (url.includes('action=tagada')) setModalTagada(true);
+      else if (url.includes('action=notes')) setModalNotes(true);
+      else if (url.includes('action=stock')) setModalAddStock(true);
+      else if (url.includes('action=inbox')) setModalInbox(true);
+      else if (url.includes('action=support')) setModalSupport(true);
+      else if (url.includes('action=qr')) setModalBanglaQR(true);
+    };
+
+    Linking.getInitialURL().then(handleUrl);
+    const sub = Linking.addEventListener('url', (e) => handleUrl(e.url));
+    return () => sub && sub.remove && sub.remove();
   }, []);
 
   const loadSavedData = async () => {
@@ -1582,7 +1603,14 @@ function TallyKhataApp() {
 
   const handleCloudBackupNow = async () => {
     if (!googleUser || !googleUser.sub) {
-      Alert.alert('সতর্কতা', 'অনুগ্রহ করে প্রথমে গুগল একাউন্ট যুক্ত করুন।');
+      Alert.alert(
+        'গুগল একাউন্ট প্রয়োজন',
+        'ক্লাউড ব্যাকআপ নিতে প্রথমে আপনার গুগল একাউন্ট যুক্ত করতে হবে। আপনি কি এখন একাউন্ট যুক্ত করতে চান?',
+        [
+          { text: 'বাতিল', style: 'cancel' },
+          { text: 'যুক্ত করুন', onPress: handleNativeGoogleSignIn },
+        ]
+      );
       return;
     }
     if (!googleAccessToken) {
@@ -1629,7 +1657,10 @@ function TallyKhataApp() {
 
       Alert.alert(
         'ব্যাকআপ সফল!',
-        "আপনার সম্পূর্ণ খাতার ব্যাকআপ সফলভাবে গুগল ড্রাইভে সংরক্ষিত ও যাচাইকৃত হয়েছে।\n\n" + 'মোট হিসাব: ' + toBengaliNumber(payload.manifest.recordCounts.accounts) + ' টি\n' + 'মোট লেনদেন: ' + toBengaliNumber(payload.manifest.recordCounts.journals) + ' টি'
+        `আপনার সম্পূর্ণ খাতার ব্যাকআপ সফলভাবে গুগল ড্রাইভে সংরক্ষিত ও যাচাইকৃত হয়েছে।\n\n` +
+        `মোট হিসাব: ${toBengaliNumber(payload.manifest.recordCounts.accounts)} টি\n` +
+        `মোট লেনদেন: ${toBengaliNumber(payload.manifest.recordCounts.journals)} টি\n` +
+        `ক্যাশবক্স এন্ট্রি: ${toBengaliNumber(payload.manifest.recordCounts.cashEntries)} টি`
       );
     } catch (err) {
       setCloudBackupStatus('error');
@@ -1637,24 +1668,10 @@ function TallyKhataApp() {
     }
   };
 
-  const handleCloudRestore = async () => {
-    if (!googleUser || !googleUser.sub) {
-      Alert.alert('সতর্কতা', 'অনুগ্রহ করে প্রথমে গুগল একাউন্ট যুক্ত করুন।');
-      return;
-    }
-    if (!googleAccessToken) {
-      Alert.alert('অনুমোদন প্রয়োজন', 'গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় গুগল একাউন্ট সংযোগ করুন।');
-      return;
-    }
-    if (!cloudBackupMetadata || !cloudBackupMetadata.fileId) {
-      Alert.alert('ফাইল পাওয়া যায়নি', 'এই গুগল একাউন্টে কোনো ক্লাউড ব্যাকআপ পাওয়া যায়নি।');
-      return;
-    }
-
+  const executeCloudRestore = async () => {
     try {
       setCloudBackupStatus('restoring');
 
-      // Real download from Google Drive
       const downloadRes = await googleDriveBackupService.downloadBackup(
         googleAccessToken,
         cloudBackupMetadata.fileId,
@@ -1665,7 +1682,6 @@ function TallyKhataApp() {
         throw new Error('গুগল ড্রাইভ থেকে ব্যাকআপ ডাটা ডাউনলোড ব্যর্থ হয়েছে।');
       }
 
-      // Stage and commit payload with safety snapshot rollback protection
       const commitRes = await storageRepository.commitRestorePayload(downloadRes);
       if (!commitRes.success) {
         throw new Error(commitRes.error || 'রিস্টোর ডাটাবেজ কমিট ব্যর্থ হয়েছে।');
@@ -1699,6 +1715,137 @@ function TallyKhataApp() {
     }
   };
 
+  const handleCloudRestore = async () => {
+    if (!googleUser || !googleUser.sub) {
+      Alert.alert(
+        'গুগল একাউন্ট প্রয়োজন',
+        'অনলাইন ব্যাকআপ রিস্টোর করতে প্রথমে আপনার গুগল একাউন্ট যুক্ত করতে হবে। আপনি কি এখন একাউন্ট যুক্ত করতে চান?',
+        [
+          { text: 'বাতিল', style: 'cancel' },
+          { text: 'যুক্ত করুন', onPress: handleNativeGoogleSignIn },
+        ]
+      );
+      return;
+    }
+    if (!googleAccessToken) {
+      Alert.alert('অনুমোদন প্রয়োজন', 'গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় গুগল একাউন্ট সংযোগ করুন।');
+      return;
+    }
+    if (!cloudBackupMetadata || !cloudBackupMetadata.fileId) {
+      Alert.alert('ব্যাকআপ পাওয়া যায়নি', 'আপনার এই গুগল ড্রাইভ একাউন্টে কোনো সংরক্ষিত ব্যাকআপ পাওয়া যায়নি। প্রথমে "এখন ব্যাকআপ নিন" বাটনে চাপ দিয়ে ব্যাকআপ তৈরি করুন।');
+      return;
+    }
+
+    const backupDate = cloudBackupMetadata.modifiedTime
+      ? new Date(cloudBackupMetadata.modifiedTime).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : 'আজ';
+    const accCount = toBengaliNumber(cloudBackupMetadata.manifest?.recordCounts?.accounts || 0);
+    const jrnCount = toBengaliNumber(cloudBackupMetadata.manifest?.recordCounts?.journals || 0);
+
+    Alert.alert(
+      'অনলাইন ব্যাকআপ রিস্টোর',
+      `গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে।
+
+• ব্যাকআপের তারিখ: ${backupDate}
+• মোট হিসাব: ${accCount} টি
+• মোট লেনদেন: ${jrnCount} টি
+
+আপনি কি নিশ্চিত রিস্টোর করতে চান?`,
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        { text: 'হ্যাঁ, রিস্টোর করুন', onPress: executeCloudRestore },
+      ]
+    );
+  };
+
+  const handleExportData = async () => {
+    try {
+      const currentState = storageRepository.getAuthoritativeState();
+      const payload = buildBackupPayload(currentState, googleUser || { sub: 'offline_export', email: '', name: businessName });
+      const jsonStr = JSON.stringify(payload, null, 2);
+      await Share.share({
+        title: `TallyKhata Backup - ${businessName}`,
+        message: jsonStr,
+      });
+    } catch (e) {
+      Alert.alert('ত্রুটি', 'ডাটা এক্সপোর্ট করা সম্ভব হয়নি।');
+    }
+  };
+
+  const handleChangeGoogleAccount = async () => {
+    Alert.alert(
+      'গুগল একাউন্ট পরিবর্তন',
+      'আপনি কি গুগল একাউন্ট পরিবর্তন করতে চান? বর্তমান একাউন্ট সাইন-আউট করে নতুন একাউন্ট সিলেক্ট করা হবে। আপনার লোকাল ডাটা অক্ষুণ্ণ থাকবে।',
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'পরিবর্তন করুন',
+          onPress: async () => {
+            try {
+              let GoogleSignin = null;
+              try {
+                const mod = require('@react-native-google-signin/google-signin');
+                GoogleSignin = mod.GoogleSignin;
+              } catch (e) {}
+              if (GoogleSignin) {
+                await GoogleSignin.signOut().catch(() => {});
+              }
+              setGoogleUser(null);
+              setGoogleAccessToken('');
+              setCloudBackupMetadata(null);
+              await persistData({
+                googleUser: null,
+                googleAccessToken: '',
+                cloudBackupMetadata: null,
+              });
+              handleNativeGoogleSignIn();
+            } catch (err) {
+              console.error('Change account error:', err);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRemoveGoogleAccount = async () => {
+    Alert.alert(
+      'গুগল একাউন্ট সরান',
+      'আপনি কি গুগল একাউন্ট সংযোগ বিচ্ছিন্ন করতে চান? আপনার বর্তমান মোবাইলের সকল খাতার ডাটা নিরাপদ থাকবে এবং গুগল ড্রাইভে থাকা আগের ব্যাকআপও অক্ষুণ্ণ থাকবে।',
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'সরান',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              let GoogleSignin = null;
+              try {
+                const mod = require('@react-native-google-signin/google-signin');
+                GoogleSignin = mod.GoogleSignin;
+              } catch (e) {}
+              if (GoogleSignin) {
+                await GoogleSignin.signOut().catch(() => {});
+              }
+              setGoogleUser(null);
+              setGoogleAccessToken('');
+              setCloudBackupMetadata(null);
+              setAutoBackupEnabled(false);
+              await persistData({
+                googleUser: null,
+                googleAccessToken: '',
+                cloudBackupMetadata: null,
+                autoBackupEnabled: false,
+              });
+              Alert.alert('সফল', 'গুগল একাউন্ট সফলভাবে সংযোগ বিচ্ছিন্ন করা হয়েছে।');
+            } catch (err) {
+              console.error('Remove account error:', err);
+            }
+          },
+        },
+      ]
+    );
+  };
   // --- HANDLER: BACKUP & RESTORE ---
   const handleExportBackup = () => {
     const backupObj = {
@@ -3422,7 +3569,7 @@ function TallyKhataApp() {
             <View style={styles.tabActivePill}>
               <Image
                 source={require('./assets/nav/nav_home_active.png')}
-                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                style={[styles.tabIconImg, { marginBottom: 0 }]}
                 resizeMode="contain"
               />
             </View>
@@ -3447,7 +3594,7 @@ function TallyKhataApp() {
             <View style={styles.tabActivePill}>
               <Image
                 source={require('./assets/nav/nav_cashbox_active.png')}
-                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                style={[styles.tabIconImg, { marginBottom: 0 }]}
                 resizeMode="contain"
               />
             </View>
@@ -3472,7 +3619,7 @@ function TallyKhataApp() {
             <View style={styles.tabActivePill}>
               <Image
                 source={require('./assets/nav/nav_tallypay_active.png')}
-                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                style={[styles.tabIconImg, { marginBottom: 0 }]}
                 resizeMode="contain"
               />
             </View>
@@ -3497,7 +3644,7 @@ function TallyKhataApp() {
             <View style={styles.tabActivePill}>
               <Image
                 source={require('./assets/nav/nav_menu_active.png')}
-                style={[styles.tabIconImg, { tintColor: '#B81414', marginBottom: 0 }]}
+                style={[styles.tabIconImg, { marginBottom: 0 }]}
                 resizeMode="contain"
               />
             </View>
@@ -4809,186 +4956,235 @@ function TallyKhataApp() {
             <ScrollView contentContainerStyle={{ padding: 16 }}>
               {backupActiveTab === 'cloud' ? (
                 <View>
-                  {/* --- STATE A: NOT CONNECTED --- */}
-                  {!googleUser ? (
-                    <View style={styles.cloudNotConnectedCard}>
-                      <View style={styles.cloudGoogleIconCircle}>
-                        <Image
-                          source={require('./assets/icons/ic_cloud.png')}
-                          style={{ width: 36, height: 36, tintColor: '#0F8A0F' }}
-                          resizeMode="contain"
-                        />
+                  {/* Account Connection Status Header */}
+                  {googleUser ? (
+                    <View style={styles.cloudAccountBanner}>
+                      <View style={styles.cloudAvatarCircle}>
+                        <Text style={styles.cloudAvatarText}>
+                          {(googleUser.name || googleUser.email || 'G').charAt(0).toUpperCase()}
+                        </Text>
                       </View>
-                      <Text style={styles.cloudCardTitle}>গুগল ড্রাইভ ক্লাউড ব্যাকআপ</Text>
-                      <Text style={styles.cloudCardSub}>
-                        আপনার জিমেইল একাউন্ট যুক্ত করে সম্পূর্ণ খাতার ডাটা গুগল ড্রাইভে নিরাপদ রাখুন। ফোন নষ্ট হলে বা পরিবর্তন করলেও একই জিমেইল দিয়ে সহজেই সকল ডাটা ফেরত পাবেন।
-                      </Text>
-
-                      <View style={styles.cloudBenefitList}>
-                        <Text style={styles.cloudBenefitItem}>✓ প্রতিটি ইউজারের জন্য ১০০% নিজস্ব সুরক্ষিত ব্যাকআপ</Text>
-                        <Text style={styles.cloudBenefitItem}>✓ নতুন মোবাইলে ১-ক্লিকে রিস্টোর সুবিধা</Text>
-                        <Text style={styles.cloudBenefitItem}>✓ ডাটা হারানোর কোনো ভয় নেই</Text>
-                      </View>
-
-                      <TouchableOpacity
-                        style={styles.cloudConnectBtn}
-                        onPress={handleNativeGoogleSignIn}
-                        activeOpacity={0.85}
-                      >
-                        <Image
-                          source={require('./assets/icons/ic_check.png')}
-                          style={{ width: 18, height: 18, tintColor: '#FFFFFF', marginRight: 8 }}
-                          resizeMode="contain"
-                        />
-                        <Text style={styles.cloudConnectBtnText}>গুগল একাউন্ট যুক্ত করুন</Text>
-                      </TouchableOpacity>
-
-                      <View style={{ marginTop: 14, padding: 10, backgroundColor: '#F8FAFC', borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: 'bold', marginBottom: 3 }}>
-                          Android OAuth তথ্যাবলী (Google Cloud Console):
-                        </Text>
-                        <Text style={{ fontSize: 10, color: '#334155', marginBottom: 2 }}>
-                          • প্যাকেজ: com.progoti.tallykhata.offline
-                        </Text>
-                        <Text style={{ fontSize: 10, color: '#334155' }}>
-                          • SHA-1: 5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
-                        </Text>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={styles.cloudAccountName}>{googleUser.name || 'গুগল ব্যবহারকারী'}</Text>
+                          <View style={styles.cloudVerifiedBadge}>
+                            <Text style={styles.cloudVerifiedBadgeText}>সংযুক্ত</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.cloudAccountEmail}>{googleUser.email}</Text>
                       </View>
                     </View>
                   ) : (
-                    <View>
-                      {/* Connected Account Banner */}
-                      <View style={styles.cloudAccountBanner}>
-                        <View style={styles.cloudAvatarCircle}>
-                          <Text style={styles.cloudAvatarText}>
-                            {(googleUser.name || googleUser.email || 'G').charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.cloudAccountName}>{googleUser.name || 'গুগল ব্যবহারকারী'}</Text>
-                            <View style={styles.cloudVerifiedBadge}>
-                              <Text style={styles.cloudVerifiedBadgeText}>ভেরিফাইড</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.cloudAccountEmail}>{googleUser.email}</Text>
-                        </View>
-                        <TouchableOpacity
-                          onPress={handleDisconnectGoogle}
-                          style={styles.cloudDisconnectBtn}
-                        >
-                          <Text style={styles.cloudDisconnectBtnText}>ডিসকানেক্ট</Text>
-                        </TouchableOpacity>
+                    <View style={styles.cloudNotConnectedMiniBanner}>
+                      <View style={styles.cloudGoogleIconCircleSmall}>
+                        <Image
+                          source={require('./assets/icons/ic_cloud.png')}
+                          style={{ width: 24, height: 24, tintColor: '#0F8A0F' }}
+                          resizeMode="contain"
+                        />
                       </View>
-
-                      {/* --- STATE B: BACKUP EXISTS --- */}
-                      {cloudBackupMetadata ? (
-                        <View style={styles.cloudBackupMetaCard}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                            <View style={[styles.statusDot, { backgroundColor: '#16A34A' }]} />
-                            <Text style={styles.cloudMetaHeaderTitle}>ক্লাউড ব্যাকআপ বিদ্যমান</Text>
-                          </View>
-
-                          <View style={styles.cloudMetaRow}>
-                            <Text style={styles.cloudMetaLabel}>সর্বশেষ ব্যাকআপ:</Text>
-                            <Text style={styles.cloudMetaValue}>
-                              {cloudBackupMetadata.modifiedTime ? new Date(cloudBackupMetadata.modifiedTime).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'আজ'}
-                            </Text>
-                          </View>
-
-                          {cloudBackupMetadata.manifest && cloudBackupMetadata.manifest.recordCounts && (
-                            <View style={styles.cloudStatsGrid}>
-                              <View style={styles.cloudStatBox}>
-                                <Text style={styles.cloudStatNumber}>
-                                  {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.accounts || 0)}
-                                </Text>
-                                <Text style={styles.cloudStatLabel}>মোট হিসাব</Text>
-                              </View>
-                              <View style={styles.cloudStatBox}>
-                                <Text style={styles.cloudStatNumber}>
-                                  {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.journals || 0)}
-                                </Text>
-                                <Text style={styles.cloudStatLabel}>লেনদেন</Text>
-                              </View>
-                              <View style={styles.cloudStatBox}>
-                                <Text style={styles.cloudStatNumber}>
-                                  {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.cashEntries || 0)}
-                                </Text>
-                                <Text style={styles.cloudStatLabel}>ক্যাশবক্স</Text>
-                              </View>
-                            </View>
-                          )}
-
-                          {/* Action Buttons Row */}
-                          <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-                            <TouchableOpacity
-                              style={[styles.cloudActionBtn, { backgroundColor: '#0F8A0F' }]}
-                              onPress={() => {
-                                Alert.alert(
-                                  'ক্লাউড ব্যাকআপ রিস্টোর',
-                                  'আপনার বর্তমান খাতার ডাটার একটি সেফটি কপি নিয়ে গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করা হবে। আপনি কি নিশ্চিত?',
-                                  [
-                                    { text: 'বাতিল', style: 'cancel' },
-                                    { text: 'হ্যাঁ, রিস্টোর করুন', onPress: handleCloudRestore }
-                                  ]
-                                );
-                              }}
-                              disabled={cloudBackupStatus === 'restoring'}
-                            >
-                              <Text style={styles.cloudActionBtnText}>
-                                {cloudBackupStatus === 'restoring' ? 'রিস্টোর হচ্ছে...' : 'রিস্টোর করুন'}
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[styles.cloudActionBtn, { backgroundColor: '#B81414' }]}
-                              onPress={handleCloudBackupNow}
-                              disabled={cloudBackupStatus === 'backing_up'}
-                            >
-                              <Text style={styles.cloudActionBtnText}>
-                                {cloudBackupStatus === 'backing_up' ? 'ব্যাকআপ হচ্ছে...' : 'এখন ব্যাকআপ নিন'}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ) : (
-                        /* --- STATE C: NO BACKUP EXISTS --- */
-                        <View style={styles.cloudNoBackupCard}>
-                          <Text style={styles.cloudNoBackupTitle}>ক্লাউডে কোনো পূর্ববর্তী ব্যাকআপ নেই</Text>
-                          <Text style={styles.cloudNoBackupSub}>
-                            আপনার এই গুগল ড্রাইভে এখনও কোনো ব্যাকআপ সংরক্ষিত নেই। বর্তমান মোবাইলের সকল খাতা ও হিসাব এই একাউন্টে ব্যাকআপ করতে নিচের বাটনে চাপ দিন।
-                          </Text>
-                          <TouchableOpacity
-                            style={[styles.cloudConnectBtn, { marginTop: 12 }]}
-                            onPress={handleCloudBackupNow}
-                            disabled={cloudBackupStatus === 'backing_up'}
-                          >
-                            <Text style={styles.cloudConnectBtnText}>
-                              {cloudBackupStatus === 'backing_up' ? 'ব্যাকআপ তৈরি হচ্ছে...' : 'প্রথম ব্যাকআপ তৈরি করুন'}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-
-                      {/* Auto Backup Toggle */}
-                      <View style={styles.cloudAutoBackupRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.cloudAutoBackupTitle}>অটো-ক্লাউড ব্যাকআপ</Text>
-                          <Text style={styles.cloudAutoBackupSub}>প্রতিটি হিসাব বা লেনদেন এন্ট্রির পর স্বয়ংক্রিয়ভাবে ড্রাইভে সেভ হবে</Text>
-                        </View>
-                        <TouchableOpacity
-                          style={[styles.toggleSwitch, autoBackupEnabled && styles.toggleSwitchActive]}
-                          onPress={async () => {
-                            const next = !autoBackupEnabled;
-                            setAutoBackupEnabled(next);
-                            await persistData({ autoBackupEnabled: next });
-                          }}
-                        >
-                          <View style={[styles.toggleThumb, autoBackupEnabled && styles.toggleThumbActive]} />
-                        </TouchableOpacity>
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#111827' }}>
+                          গুগল ড্রাইভ কানেক্টেড নেই
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
+                          অনলাইন ব্যাকআপ ও রিস্টোরের জন্য জিমেইল একাউন্ট যুক্ত করুন
+                        </Text>
                       </View>
+                      <TouchableOpacity
+                        style={styles.cloudConnectBtnSmall}
+                        onPress={handleNativeGoogleSignIn}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.cloudConnectBtnSmallText}>কানেক্ট</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
+
+                  {/* 5 ALWAYS VISIBLE CORE ACTIONS (PHASE 4 SPECIFICATION) */}
+                  <View style={styles.cloudControlsSection}>
+                    <Text style={styles.cloudControlsSectionTitle}>ক্লাউড ব্যাকআপ ও রিস্টোর অপশন</Text>
+
+                    {/* CONTROL 1: এখন ব্যাকআপ নিন */}
+                    <TouchableOpacity
+                      style={[styles.cloudControlCard, { borderColor: '#FECACA' }]}
+                      onPress={handleCloudBackupNow}
+                      disabled={cloudBackupStatus === 'backing_up'}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#FEE2E2' }]}>
+                        <Image
+                          source={require('./assets/icons/grid_backup.png')}
+                          style={{ width: 22, height: 22, tintColor: '#B81414' }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.cloudControlTitle, { color: '#B81414' }]}>
+                          {cloudBackupStatus === 'backing_up' ? 'গুগল ড্রাইভে ব্যাকআপ হচ্ছে...' : 'এখন ব্যাকআপ নিন'}
+                        </Text>
+                        <Text style={styles.cloudControlSub}>
+                          খাতার সকল তথ্য ও লেনদেন গুগল ড্রাইভে নিরাপদ রাখুন
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 18, color: '#B81414', fontWeight: 'bold' }}>›</Text>
+                    </TouchableOpacity>
+
+                    {/* CONTROL 2: অনলাইন ব্যাকআপ রিস্টোর করুন */}
+                    <TouchableOpacity
+                      style={[styles.cloudControlCard, { borderColor: '#BBF7D0' }]}
+                      onPress={handleCloudRestore}
+                      disabled={cloudBackupStatus === 'restoring'}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#DCFCE7' }]}>
+                        <Image
+                          source={require('./assets/icons/ic_cloud.png')}
+                          style={{ width: 22, height: 22, tintColor: '#0F8A0F' }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.cloudControlTitle, { color: '#0F8A0F' }]}>
+                          {cloudBackupStatus === 'restoring' ? 'ড্রাইভ থেকে রিস্টোর হচ্ছে...' : 'অনলাইন ব্যাকআপ রিস্টোর করুন'}
+                        </Text>
+                        <Text style={styles.cloudControlSub}>
+                          গুগল ড্রাইভ থেকে আগের সংরক্ষিত ডাটা মোবাইলে ফেরত আনুন
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 18, color: '#0F8A0F', fontWeight: 'bold' }}>›</Text>
+                    </TouchableOpacity>
+
+                    {/* CONTROL 3: ডাটা এক্সপোর্ট করুন */}
+                    <TouchableOpacity
+                      style={styles.cloudControlCard}
+                      onPress={handleExportData}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#DBEAFE' }]}>
+                        <Image
+                          source={require('./assets/icons/ic_share.png')}
+                          style={{ width: 20, height: 20, tintColor: '#2563EB' }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.cloudControlTitle, { color: '#1E40AF' }]}>
+                          ডাটা এক্সপোর্ট করুন
+                        </Text>
+                        <Text style={styles.cloudControlSub}>
+                          সম্পূর্ণ খাতার ব্যাকআপ ফাইল (JSON) শেয়ার বা সেভ করুন
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 18, color: '#2563EB', fontWeight: 'bold' }}>›</Text>
+                    </TouchableOpacity>
+
+                    {/* CONTROL 4: Google Drive Account পরিবর্তন করুন */}
+                    <TouchableOpacity
+                      style={styles.cloudControlCard}
+                      onPress={handleChangeGoogleAccount}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#FEF3C7' }]}>
+                        <Image
+                          source={require('./assets/icons/ic_menu_accounts.png')}
+                          style={{ width: 20, height: 20, tintColor: '#D97706' }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.cloudControlTitle, { color: '#B45309' }]}>
+                          Google Drive Account পরিবর্তন করুন
+                        </Text>
+                        <Text style={styles.cloudControlSub}>
+                          অন্য কোনো জিমেইল একাউন্ট নির্বাচন করতে এখানে ট্যাপ করুন
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 18, color: '#D97706', fontWeight: 'bold' }}>›</Text>
+                    </TouchableOpacity>
+
+                    {/* CONTROL 5: Google Account সরান */}
+                    <TouchableOpacity
+                      style={[styles.cloudControlCard, { borderColor: '#FEE2E2', backgroundColor: '#FEF2F2' }]}
+                      onPress={handleRemoveGoogleAccount}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#FEE2E2' }]}>
+                        <Image
+                          source={require('./assets/icons/ic_delete.png')}
+                          style={{ width: 20, height: 20, tintColor: '#DC2626' }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.cloudControlTitle, { color: '#DC2626' }]}>
+                          Google Account সরান
+                        </Text>
+                        <Text style={styles.cloudControlSub}>
+                          গুগল ড্রাইভ সংযোগ বিচ্ছিন্ন করুন (লোকাল ডাটা অপরিবর্তিত থাকবে)
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 18, color: '#DC2626', fontWeight: 'bold' }}>›</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Cloud Backup Metadata Details if exists */}
+                  {cloudBackupMetadata && (
+                    <View style={styles.cloudBackupMetaCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                        <View style={[styles.statusDot, { backgroundColor: '#16A34A' }]} />
+                        <Text style={styles.cloudMetaHeaderTitle}>সংরক্ষিত ক্লাউড ব্যাকআপ বিবরণ</Text>
+                      </View>
+
+                      <View style={styles.cloudMetaRow}>
+                        <Text style={styles.cloudMetaLabel}>সর্বশেষ ব্যাকআপ:</Text>
+                        <Text style={styles.cloudMetaValue}>
+                          {cloudBackupMetadata.modifiedTime ? new Date(cloudBackupMetadata.modifiedTime).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'আজ'}
+                        </Text>
+                      </View>
+
+                      {cloudBackupMetadata.manifest && cloudBackupMetadata.manifest.recordCounts && (
+                        <View style={styles.cloudStatsGrid}>
+                          <View style={styles.cloudStatBox}>
+                            <Text style={styles.cloudStatNumber}>
+                              {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.accounts || 0)}
+                            </Text>
+                            <Text style={styles.cloudStatLabel}>মোট হিসাব</Text>
+                          </View>
+                          <View style={styles.cloudStatBox}>
+                            <Text style={styles.cloudStatNumber}>
+                              {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.journals || 0)}
+                            </Text>
+                            <Text style={styles.cloudStatLabel}>লেনদেন</Text>
+                          </View>
+                          <View style={styles.cloudStatBox}>
+                            <Text style={styles.cloudStatNumber}>
+                              {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.cashEntries || 0)}
+                            </Text>
+                            <Text style={styles.cloudStatLabel}>ক্যাশবক্স</Text>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Auto Backup Toggle */}
+                  <View style={styles.cloudAutoBackupRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cloudAutoBackupTitle}>অটো-ক্লাউড ব্যাকআপ</Text>
+                      <Text style={styles.cloudAutoBackupSub}>প্রতিটি হিসাব বা লেনদেন এন্ট্রির পর স্বয়ংক্রিয়ভাবে ড্রাইভে সেভ হবে</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.toggleSwitch, autoBackupEnabled && styles.toggleSwitchActive]}
+                      onPress={async () => {
+                        const next = !autoBackupEnabled;
+                        setAutoBackupEnabled(next);
+                        await persistData({ autoBackupEnabled: next });
+                      }}
+                    >
+                      <View style={[styles.toggleThumb, autoBackupEnabled && styles.toggleThumbActive]} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ) : (
                 /* --- TAB 2: OFFLINE FILE BACKUP --- */
@@ -7449,8 +7645,8 @@ const styles = StyleSheet.create({
   // --- 5-BUTTON BOTTOM NAVIGATION BAR ---
   bottomTabBar: {
     flexDirection: 'row',
-    height: Platform.OS === 'android' ? 78 : 60,
-    paddingBottom: Platform.OS === 'android' ? 22 : 4,
+    height: Platform.OS === 'android' ? 84 : 62,
+    paddingBottom: Platform.OS === 'android' ? 26 : 4,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
@@ -9142,6 +9338,81 @@ const styles = StyleSheet.create({
     color: '#0F8A0F',
     fontWeight: 'bold',
   },
+
+  cloudNotConnectedMiniBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    marginBottom: 14,
+  },
+  cloudGoogleIconCircleSmall: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cloudConnectBtnSmall: {
+    backgroundColor: '#0F8A0F',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  cloudConnectBtnSmallText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  cloudControlsSection: {
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  cloudControlsSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 10,
+  },
+  cloudControlCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 10,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+  },
+  cloudControlIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  cloudControlTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  cloudControlSub: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+
   cloudNotConnectedCard: {
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
