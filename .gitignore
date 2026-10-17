@@ -31,3 +31,7 @@ android/local.properties
 build/
 captures/
 cxx/
+
+BridgelessReactNativeDevBundle.*
+screen_captures/
+

@@ -1587,10 +1587,7 @@ function TallyKhataApp() {
 
       Alert.alert(
         'ব্যাকআপ সফল!',
-        'আপনার সম্পূর্ণ খাতার ব্যাকআপ সফলভাবে গুগল ড্রাইভে সংরক্ষিত ও যাচাইকৃত হয়েছে।
-
-মোট হিসাব: ' + toBengaliNumber(payload.manifest.recordCounts.accounts) + ' টি
-মোট লেনদেন: ' + toBengaliNumber(payload.manifest.recordCounts.journals) + ' টি'
+        "আপনার সম্পূর্ণ খাতার ব্যাকআপ সফলভাবে গুগল ড্রাইভে সংরক্ষিত ও যাচাইকৃত হয়েছে।\n\n" + 'মোট হিসাব: ' + toBengaliNumber(payload.manifest.recordCounts.accounts) + ' টি\n' + 'মোট লেনদেন: ' + toBengaliNumber(payload.manifest.recordCounts.journals) + ' টি'
       );
     } catch (err) {
       setCloudBackupStatus('error');
@@ -4966,6 +4963,7 @@ function TallyKhataApp() {
       </Modal>
 
       {/* Native Google Account Sign-In handled by GoogleSignin SDK */}
+      {/* ===================================================================
           MODAL: INBOX (ইনবক্স নোটিফিকেশন)
          =================================================================== */}
       <Modal visible={modalInbox} animationType="slide" transparent onRequestClose={() => setModalInbox(false)}>
