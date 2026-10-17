@@ -33,7 +33,7 @@ import {
 // Google OAuth Configuration
 // Package: com.progoti.tallykhata.offline
 // Local Debug Keystore SHA-1: 5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
-const GOOGLE_WEB_CLIENT_ID = '';
+const GOOGLE_WEB_CLIENT_ID = '1009081420727-rbto5d1l56pm7743cuijuaceps4503gk.apps.googleusercontent.com';
 
 // Initialize production storage repository adapter with AsyncStorage
 storageRepository.setStorageAdapter(AsyncStorage);
@@ -1411,6 +1411,7 @@ function TallyKhataApp() {
         };
         if (GOOGLE_WEB_CLIENT_ID) {
           config.webClientId = GOOGLE_WEB_CLIENT_ID;
+          config.offlineAccess = true;
         }
         mod.GoogleSignin.configure(config);
       }
@@ -1429,13 +1430,20 @@ function TallyKhataApp() {
       if (GoogleSignin && typeof GoogleSignin.signIn === 'function') {
         setCloudBackupStatus('checking');
         await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-        GoogleSignin.configure({
+        const config = {
           scopes: [
             'https://www.googleapis.com/auth/drive.appdata',
           ],
-        });
+        };
+        if (GOOGLE_WEB_CLIENT_ID) {
+          config.webClientId = GOOGLE_WEB_CLIENT_ID;
+          config.offlineAccess = true;
+        }
+        GoogleSignin.configure(config);
 
+        console.log('[GoogleSignIn] Calling GoogleSignin.signIn()...');
         const res = await GoogleSignin.signIn();
+        console.log('[GoogleSignIn] signIn returned:', JSON.stringify(res));
         if (res && res.type === 'cancelled') {
           setCloudBackupStatus('idle');
           return;
@@ -1469,6 +1477,7 @@ function TallyKhataApp() {
       }
     } catch (err) {
       setCloudBackupStatus('idle');
+      console.log('[GoogleSignIn] CAUGHT ERROR:', err ? err.code : null, err ? err.message : null);
       if (err.code === 'SIGN_IN_CANCELLED' || (err.message && err.message.toLowerCase().includes('cancel'))) {
         return;
       }
