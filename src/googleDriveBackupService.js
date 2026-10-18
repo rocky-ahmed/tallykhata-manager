@@ -91,14 +91,6 @@ function sha256Hex(asciiStr) {
  */
 function calculateSha256Checksum(dataObj) {
   const str = JSON.stringify(dataObj);
-  try {
-    if (typeof require === "function") {
-      const crypto = require("crypto");
-      if (crypto && typeof crypto.createHash === "function") {
-        return "sha256_" + crypto.createHash("sha256").update(Buffer.from(str, "utf8")).digest("hex");
-      }
-    }
-  } catch (e) {}
   const binaryStr = unescape(encodeURIComponent(str));
   return "sha256_" + sha256Hex(binaryStr);
 }
