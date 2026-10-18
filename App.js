@@ -7649,6 +7649,71 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  tagadaQuotaBadge: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  tagadaQuotaText: {
+    fontSize: 11,
+    color: '#4B5563',
+    fontWeight: '600',
+  },
+  tagadaQuotaCount: {
+    fontSize: 12,
+    color: '#B81414',
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  tagadaSummaryStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#FECACA',
+  },
+  tagadaSummaryText: {
+    fontSize: 13,
+    color: '#374151',
+  },
+  bulkTagadaBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#B81414',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginHorizontal: 12,
+    marginTop: 8,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#B81414',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  bulkTagadaTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  bulkTagadaSub: {
+    fontSize: 12,
+    color: '#FEE2E2',
+    marginTop: 2,
+  },
+  bulkTagadaArrow: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginLeft: 8,
+  },
+
   // --- TAGADA TAB ---
   tagadaHeaderCard: {
     backgroundColor: '#FFF0F1',
@@ -7851,8 +7916,8 @@ const styles = StyleSheet.create({
   // --- 5-BUTTON BOTTOM NAVIGATION BAR ---
   bottomTabBar: {
     flexDirection: 'row',
-    height: Platform.OS === 'android' ? 88 : 64,
-    paddingBottom: Platform.OS === 'android' ? 28 : 6,
+    height: Platform.OS === 'android' ? 104 : 64,
+    paddingBottom: Platform.OS === 'android' ? 44 : 6,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
@@ -7866,7 +7931,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: 8,
+    paddingTop: 6,
   },
   tabButtonActive: {
     borderTopWidth: 2,
@@ -9014,7 +9079,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 30,
+    paddingBottom: Platform.OS === 'android' ? 52 : 30,
     maxHeight: '80%',
   },
   bottomSheetHandle: {
