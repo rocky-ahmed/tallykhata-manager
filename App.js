@@ -2319,19 +2319,23 @@ function TallyKhataApp() {
   // =========================================================================
   // VIEW A: CUSTOMER / SUPPLIER ACCOUNT LEDGER SCREEN (activity_customer_report_v2.xml)
   // =========================================================================
-  if (currentScreen === 'account_ledger' && selectedAccount) {
-    const isCustomer = selectedAccount.type === 1;
-    const accountJournals = (journals || []).filter((j) => j.accountId === selectedAccount.id);
-    const totalGiven = accountJournals
-      .filter((j) => j.type === 'given')
-      .reduce((sum, j) => sum + Number(j.amount || 0), 0);
-    const totalReceived = accountJournals
-      .filter((j) => j.type === 'received')
-      .reduce((sum, j) => sum + Number(j.amount || 0), 0);
+  const isCustomer = selectedAccount ? selectedAccount.type === 1 : true;
+  const accountJournals = selectedAccount ? (journals || []).filter((j) => j.accountId === selectedAccount.id) : [];
+  const totalGiven = accountJournals
+    .filter((j) => j.type === 'given')
+    .reduce((sum, j) => sum + Number(j.amount || 0), 0);
+  const totalReceived = accountJournals
+    .filter((j) => j.type === 'received')
+    .reduce((sum, j) => sum + Number(j.amount || 0), 0);
 
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar
+        barStyle={currentScreen === 'account_ledger' ? 'dark-content' : 'light-content'}
+        backgroundColor={currentScreen === 'account_ledger' ? '#FFFFFF' : '#B81414'}
+      />
+      {currentScreen === 'account_ledger' && selectedAccount ? (
+        <View style={{ flex: 1 }}>
 
         {/* Ledger Top Header (matching authentic activity_customer_report_v2.xml toolbar) */}
         <View style={styles.ledgerHeaderNav}>
@@ -2535,17 +2539,9 @@ function TallyKhataApp() {
             <Text style={styles.bigEntryBtnText}>+ পেলাম (জমা)</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  // =========================================================================
-  // =========================================================================
-  // VIEW B: MAIN HOME VIEW (WITH AUTHENTIC 1:1 VISUAL PARITY)
-  // =========================================================================
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#B81414" />
+        </View>
+      ) : (
+        <View style={{ flex: 1 }}>
 
       {/* --- AUTHENTIC 1:1 TALLYKHATA TOP HEADER BAR (photo_2026-10-15_18-13-34.jpg) --- */}
       <View style={styles.topHeaderBarRed}>
@@ -2875,7 +2871,7 @@ function TallyKhataApp() {
                     <Text style={[styles.customerCardAmount, { color: item.balance > 0 ? '#B81414' : item.balance < 0 ? '#1C7D50' : '#4B5563' }]}>
                       {toBengaliDecimal(item.balance)}
                     </Text>
-                    <Text style={styles.customerChevron}>›</Text>
+                    <Text style={styles.customerChevron}>></Text>
                   </TouchableOpacity>
                 );
               }}
@@ -3715,12 +3711,16 @@ function TallyKhataApp() {
       </View>
 
 
+        </View>
+      )}
+
       {/* ===================================================================
           MODAL: ADD TRANSACTION WITH AUTHENTIC BUILT-IN CALCULATOR KEYPAD
          =================================================================== */}
       <Modal visible={modalAddTxn} animationType="slide" transparent onRequestClose={() => setModalAddTxn(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '95%' }]}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
             <View style={styles.modalHeaderRow}>
               <Text style={[styles.modalCardTitle, { color: txnType === 'given' ? COLORS.primary : COLORS.green }]}>
                 {txnType === 'given' ? '- দিলাম (টাকা বা পণ্য বাকি)' : '+ পেলাম (নগদ বা জমা আদায়)'}
@@ -3832,6 +3832,7 @@ function TallyKhataApp() {
                 <Text style={styles.modalBtnSubmitText}>নিশ্চিত করি</Text>
               </TouchableOpacity>
             </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -7375,7 +7376,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'android' ? 46 : 12,
     gap: 12,
   },
   bigEntryBtn: {
@@ -7699,8 +7701,8 @@ const styles = StyleSheet.create({
   // --- 5-BUTTON BOTTOM NAVIGATION BAR ---
   bottomTabBar: {
     flexDirection: 'row',
-    height: Platform.OS === 'android' ? 80 : 62,
-    paddingBottom: Platform.OS === 'android' ? 22 : 4,
+    height: Platform.OS === 'android' ? 88 : 64,
+    paddingBottom: Platform.OS === 'android' ? 28 : 6,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
@@ -7712,9 +7714,10 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 6,
+    paddingTop: 4,
+    paddingBottom: Platform.OS === 'android' ? 6 : 2,
   },
   tabButtonActive: {
     borderTopWidth: 2,
@@ -7743,9 +7746,9 @@ const styles = StyleSheet.create({
   calcDisplayBox: {
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     borderWidth: 2,
-    marginVertical: 10,
+    marginVertical: 6,
     alignItems: 'flex-end',
   },
   calcExprText: {
@@ -7786,7 +7789,7 @@ const styles = StyleSheet.create({
   },
   keypadBtn: {
     flex: 1,
-    height: 52,
+    height: 44,
     backgroundColor: '#F3F4F6',
     borderRadius: 8,
     justifyContent: 'center',
