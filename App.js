@@ -365,6 +365,11 @@ function TallyKhataApp() {
   const [currentScreen, setCurrentScreen] = useState('home'); // 'home' | 'account_ledger'
   const [activeTab, setActiveTab] = useState('home');         // 'home' | 'cashbox' | 'tagada' | 'tallypay' | 'menu'
 
+  const currentScreenRef = useRef(currentScreen);
+  currentScreenRef.current = currentScreen;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
   // Business Profile
   const [businessName, setBusinessName] = useState('Mobile Xpress');
   const [ownerName, setOwnerName] = useState('স্বত্বাধিকারী');
@@ -589,10 +594,20 @@ function TallyKhataApp() {
       if (modalExpenseReport) { setModalExpenseReport(false); return true; }
       if (modalMalikReport) { setModalMalikReport(false); return true; }
       if (modalMoneyOut) { setModalMoneyOut(false); return true; }
-      if (currentScreen !== 'home') {
+      if (modalTxnLimit) { setModalTxnLimit(false); return true; }
+
+      // Return to home screen from account_ledger
+      if (currentScreenRef.current !== 'home') {
         setCurrentScreen('home');
         return true;
       }
+
+      // Return to home tab from non-home tabs (cashbox, tallypay, menu, tagada)
+      if (activeTabRef.current !== 'home') {
+        setActiveTab('home');
+        return true;
+      }
+
       return false;
     };
     const backSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
@@ -604,7 +619,7 @@ function TallyKhataApp() {
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalTagada, modalVoucher, modalPinSetup, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
-    modalMalikReport, modalMoneyOut, currentScreen
+    modalMalikReport, modalMoneyOut, modalTxnLimit, currentScreen, activeTab
   ]);
 
   const loadSavedData = async () => {
@@ -1653,6 +1668,27 @@ function TallyKhataApp() {
     );
   };
 
+  const getValidGoogleAccessToken = async () => {
+    if (googleAccessToken) return googleAccessToken;
+    try {
+      let GoogleSignin = null;
+      try {
+        const mod = require('@react-native-google-signin/google-signin');
+        GoogleSignin = mod.GoogleSignin;
+      } catch (e) {}
+      if (GoogleSignin && typeof GoogleSignin.getTokens === 'function') {
+        const tokens = await GoogleSignin.getTokens();
+        if (tokens && tokens.accessToken) {
+          setGoogleAccessToken(tokens.accessToken);
+          return tokens.accessToken;
+        }
+      }
+    } catch (err) {
+      console.log('Silent token refresh failed:', err);
+    }
+    return null;
+  };
+
   const handleCloudBackupNow = async () => {
     if (!googleUser || !googleUser.sub) {
       Alert.alert(
@@ -1681,7 +1717,7 @@ function TallyKhataApp() {
       let fileId = cloudBackupMetadata ? cloudBackupMetadata.fileId : null;
 
       // Real upload to Google Drive REST API
-      const uploadRes = await googleDriveBackupService.uploadBackup(googleAccessToken, payload, fileId);
+      const uploadRes = await googleDriveBackupService.uploadBackup(activeToken, payload, fileId);
       if (!uploadRes || !uploadRes.fileId) {
         throw new Error('গুগল ড্রাইভ সার্ভার থেকে ফাইল আইডি পাওয়া যায়নি। আপলোড ব্যর্থ হয়েছে।');
       }
@@ -1945,7 +1981,7 @@ function TallyKhataApp() {
         accounts: data.accounts,
         journals: data.journals || [],
         cashEntries: data.cashEntries || [],
-        inventory: data.inventory || [],
+        inventory: importedStock,
         notes: data.notes || [],
         businessName: data.businessName,
         ownerName: data.ownerName,
@@ -1963,7 +1999,7 @@ function TallyKhataApp() {
       setAccounts(data.accounts || []);
       setJournals(data.journals || []);
       setCashEntries(data.cashEntries || []);
-      setInventory(data.inventory || []);
+      setInventory(importedStock);
       setNotes(data.notes || []);
       if (data.businessName) setBusinessName(data.businessName);
       if (data.ownerName) setOwnerName(data.ownerName);

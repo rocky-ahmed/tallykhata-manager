@@ -34,3 +34,11 @@ cxx/
 BridgelessReactNativeDevBundle.*
 screen_captures/
 
+# Temporary reverse engineering and inspection artifacts
+*.py
+*.ps1
+*.apk
+*.xml
+*.txt
+capture_temp*
+screen_captures_live/
