@@ -6786,7 +6786,7 @@ const styles = StyleSheet.create({
 
   // Active Pill on Bottom Nav
   tabActivePill: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FCE8E8',
     paddingHorizontal: 16,
     paddingVertical: 4,
     borderRadius: 16,
@@ -7714,10 +7714,9 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: 4,
-    paddingBottom: Platform.OS === 'android' ? 6 : 2,
+    paddingTop: 8,
   },
   tabButtonActive: {
     borderTopWidth: 2,
@@ -7733,9 +7732,10 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   tabButtonLabel: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontWeight: '500',
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '600',
+    marginTop: 2,
   },
   tabButtonLabelActive: {
     color: '#B81414',
