@@ -374,6 +374,8 @@ class StorageRepository {
       const newStore = {
         ...createDefaultState(),
         ...data,
+        pinEnabled: false,
+        appPin: '', // Restored backup always resets PIN lock to safe default for security
         version: 6,
         lastRestoredAt: new Date().toISOString(),
         restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,

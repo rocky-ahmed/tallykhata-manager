@@ -1531,13 +1531,14 @@ function TallyKhataApp() {
 
         console.log('[GoogleSignIn] Calling GoogleSignin.signIn()...');
         const res = await GoogleSignin.signIn();
-        console.log('[GoogleSignIn] signIn returned:', JSON.stringify(res));
+        
         if (res && res.type === 'cancelled') {
           setCloudBackupStatus('idle');
           return;
         }
 
         const userRaw = res && res.data ? res.data.user : (res && res.user ? res.user : null);
+        console.log('[GoogleSignIn] signIn completed for account:', userRaw ? userRaw.email : 'unknown');
         if (!userRaw || !userRaw.id || !userRaw.email) {
           throw new Error('গুগল একাউন্ট থেকে ব্যবহারকারীর সঠিক তথ্য পাওয়া যায়নি।');
         }
@@ -1668,25 +1669,51 @@ function TallyKhataApp() {
     );
   };
 
-  const getValidGoogleAccessToken = async () => {
-    if (googleAccessToken) return googleAccessToken;
+  /**
+   * Acquire a verified, non-expired Google OAuth access token from native Google Play Services.
+   * Clears cached token if forceRefresh is true or when reacquisition is required after 401.
+   */
+  const getValidGoogleAccessToken = async (forceRefresh = false) => {
+    if (!googleUser || !googleUser.sub) {
+      return null;
+    }
+
+    let GoogleSignin = null;
     try {
-      let GoogleSignin = null;
-      try {
-        const mod = require('@react-native-google-signin/google-signin');
-        GoogleSignin = mod.GoogleSignin;
-      } catch (e) {}
-      if (GoogleSignin && typeof GoogleSignin.getTokens === 'function') {
+      const mod = require('@react-native-google-signin/google-signin');
+      GoogleSignin = mod.GoogleSignin;
+    } catch (e) {}
+
+    if (!GoogleSignin || typeof GoogleSignin.getTokens !== 'function') {
+      return null;
+    }
+
+    try {
+      let currentToken = googleAccessToken;
+
+      if (forceRefresh && currentToken && typeof GoogleSignin.clearCachedAccessToken === 'function') {
+        try {
+          await GoogleSignin.clearCachedAccessToken(currentToken);
+        } catch (clearErr) {
+          console.log('[GoogleToken] clearCachedAccessToken notice:', clearErr ? clearErr.message : clearErr);
+        }
+        currentToken = '';
+        setGoogleAccessToken('');
+      }
+
+      if (!currentToken || forceRefresh) {
         const tokens = await GoogleSignin.getTokens();
         if (tokens && tokens.accessToken) {
-          setGoogleAccessToken(tokens.accessToken);
-          return tokens.accessToken;
+          currentToken = tokens.accessToken;
+          setGoogleAccessToken(currentToken);
         }
       }
+
+      return currentToken || null;
     } catch (err) {
-      console.log('Silent token refresh failed:', err);
+      console.log('[GoogleToken] Error obtaining Google access token:', err ? err.message : err);
+      return null;
     }
-    return null;
   };
 
   const handleCloudBackupNow = async () => {
@@ -1701,8 +1728,22 @@ function TallyKhataApp() {
       );
       return;
     }
-    if (!googleAccessToken) {
-      Alert.alert('অনুমোদন প্রয়োজন', 'গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় গুগল একাউন্ট সংযোগ করুন।');
+
+    let token = await getValidGoogleAccessToken(false);
+    if (!token) {
+      // Attempt fresh token retrieval from native Play Services
+      token = await getValidGoogleAccessToken(true);
+    }
+
+    if (!token) {
+      Alert.alert(
+        'অনুমোদন প্রয়োজন',
+        'গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় গুগল একাউন্ট সংযোগ করুন।',
+        [
+          { text: 'বাতিল', style: 'cancel' },
+          { text: 'পুনরায় সংযোগ', onPress: handleNativeGoogleSignIn },
+        ]
+      );
       return;
     }
 
@@ -1716,18 +1757,54 @@ function TallyKhataApp() {
       const payload = buildBackupPayload(currentState, googleUser);
       let fileId = cloudBackupMetadata ? cloudBackupMetadata.fileId : null;
 
-      // Real upload to Google Drive REST API
-      const uploadRes = await googleDriveBackupService.uploadBackup(activeToken, payload, fileId);
+      // Real upload to Google Drive REST API with automatic 401 retry
+      let uploadRes = null;
+      try {
+        uploadRes = await googleDriveBackupService.uploadBackup(token, payload, fileId);
+      } catch (uploadErr) {
+        const isAuthErr = uploadErr && uploadErr.message && (uploadErr.message.includes('401') || uploadErr.message.toLowerCase().includes('unauthorized'));
+        if (isAuthErr) {
+          console.log('[CloudBackup] 401 Unauthorized during upload. Refreshing token...');
+          const freshToken = await getValidGoogleAccessToken(true);
+          if (freshToken) {
+            token = freshToken;
+            uploadRes = await googleDriveBackupService.uploadBackup(freshToken, payload, fileId);
+          } else {
+            throw new Error('গুগল ড্রাইভ অনুমোদনের মেয়াদ শেষ হয়েছে। দয়া করে একাউন্ট পুনরায় সংযোগ করুন।');
+          }
+        } else {
+          throw uploadErr;
+        }
+      }
+
       if (!uploadRes || !uploadRes.fileId) {
         throw new Error('গুগল ড্রাইভ সার্ভার থেকে ফাইল আইডি পাওয়া যায়নি। আপলোড ব্যর্থ হয়েছে।');
       }
 
       // Verify the uploaded remote file immediately via real download
-      const verifyDownload = await googleDriveBackupService.downloadBackup(
-        googleAccessToken,
-        uploadRes.fileId,
-        googleUser.sub
-      );
+      let verifyDownload = null;
+      try {
+        verifyDownload = await googleDriveBackupService.downloadBackup(
+          token,
+          uploadRes.fileId,
+          googleUser.sub
+        );
+      } catch (downloadErr) {
+        const isAuthErr = downloadErr && downloadErr.message && (downloadErr.message.includes('401') || downloadErr.message.toLowerCase().includes('unauthorized'));
+        if (isAuthErr) {
+          const freshToken = await getValidGoogleAccessToken(true);
+          if (freshToken) {
+            token = freshToken;
+            verifyDownload = await googleDriveBackupService.downloadBackup(
+              freshToken,
+              uploadRes.fileId,
+              googleUser.sub
+            );
+          }
+        }
+        if (!verifyDownload) throw downloadErr;
+      }
+
       if (!verifyDownload || !verifyDownload.data) {
         throw new Error('গুগল ড্রাইভ থেকে আপলোডকৃত ফাইল যাচাই করা সম্ভব হয়নি।');
       }
@@ -1759,12 +1836,37 @@ function TallyKhataApp() {
   const executeCloudRestore = async () => {
     try {
       setCloudBackupStatus('restoring');
+      let token = await getValidGoogleAccessToken(false);
+      if (!token) {
+        token = await getValidGoogleAccessToken(true);
+      }
+      if (!token) {
+        throw new Error('গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় গুগল একাউন্ট সংযোগ করুন।');
+      }
 
-      const downloadRes = await googleDriveBackupService.downloadBackup(
-        googleAccessToken,
-        cloudBackupMetadata.fileId,
-        googleUser.sub
-      );
+      let downloadRes = null;
+      try {
+        downloadRes = await googleDriveBackupService.downloadBackup(
+          token,
+          cloudBackupMetadata.fileId,
+          googleUser.sub
+        );
+      } catch (dlErr) {
+        const isAuthErr = dlErr && dlErr.message && (dlErr.message.includes('401') || dlErr.message.toLowerCase().includes('unauthorized'));
+        if (isAuthErr) {
+          console.log('[CloudRestore] 401 Unauthorized during download. Refreshing token...');
+          const freshToken = await getValidGoogleAccessToken(true);
+          if (freshToken) {
+            token = freshToken;
+            downloadRes = await googleDriveBackupService.downloadBackup(
+              freshToken,
+              cloudBackupMetadata.fileId,
+              googleUser.sub
+            );
+          }
+        }
+        if (!downloadRes) throw dlErr;
+      }
 
       if (!downloadRes || !downloadRes.data) {
         throw new Error('গুগল ড্রাইভ থেকে ব্যাকআপ ডাটা ডাউনলোড ব্যর্থ হয়েছে।');
@@ -1791,6 +1893,10 @@ function TallyKhataApp() {
       if (Array.isArray(newState.walletTxns)) setWalletTxns(newState.walletTxns);
       if (newState.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(newState.tallyMessageBalance));
 
+      // Reset PIN lock state for security on restored backup
+      setPinEnabled(false);
+      setAppPin('');
+
       setCloudBackupStatus('success');
       Alert.alert(
         'রিস্টোর সফল!',
@@ -1815,8 +1921,16 @@ function TallyKhataApp() {
       );
       return;
     }
-    if (!googleAccessToken) {
-      Alert.alert('অনুমোদন প্রয়োজন', 'গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় গুগল একাউন্ট সংযোগ করুন।');
+    const token = await getValidGoogleAccessToken(false);
+    if (!token) {
+      Alert.alert(
+        'অনুমোদন প্রয়োজন',
+        'গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় গুগল একাউন্ট সংযোগ করুন।',
+        [
+          { text: 'বাতিল', style: 'cancel' },
+          { text: 'পুনরায় সংযোগ', onPress: handleNativeGoogleSignIn },
+        ]
+      );
       return;
     }
     if (!cloudBackupMetadata || !cloudBackupMetadata.fileId) {
