@@ -280,6 +280,170 @@ class ErrorBoundary extends Component {
 }
 
 // =========================================================================
+// 3.1. REUSABLE MODERN 3D TACTILE ICON & SECTION DIVIDER SYSTEM
+// =========================================================================
+const ICON_THEMES = {
+  primary: {
+    bg: '#FEF2F2',
+    borderTop: '#FFFFFF',
+    borderBottom: '#FECACA',
+    borderSides: '#FEE2E2',
+    tint: '#B81414',
+  },
+  success: {
+    bg: '#F0FDF4',
+    borderTop: '#FFFFFF',
+    borderBottom: '#BBF7D0',
+    borderSides: '#DCFCE7',
+    tint: '#0F8A0F',
+  },
+  danger: {
+    bg: '#FFF1F2',
+    borderTop: '#FFFFFF',
+    borderBottom: '#FECDD3',
+    borderSides: '#FFE4E6',
+    tint: '#DC2626',
+  },
+  warning: {
+    bg: '#FFFBEB',
+    borderTop: '#FFFFFF',
+    borderBottom: '#FDE68A',
+    borderSides: '#FEF3C7',
+    tint: '#D97706',
+  },
+  info: {
+    bg: '#F0F9FF',
+    borderTop: '#FFFFFF',
+    borderBottom: '#BAE6FD',
+    borderSides: '#E0F2FE',
+    tint: '#0284C7',
+  },
+  purple: {
+    bg: '#FAF5FF',
+    borderTop: '#FFFFFF',
+    borderBottom: '#E9D5FF',
+    borderSides: '#F3E8FF',
+    tint: '#7C3AED',
+  },
+  neutral: {
+    bg: '#F8FAFC',
+    borderTop: '#FFFFFF',
+    borderBottom: '#E2E8F0',
+    borderSides: '#EDF2F7',
+    tint: '#4B5563',
+  },
+  white: {
+    bg: 'rgba(255, 255, 255, 0.2)',
+    borderTop: 'rgba(255, 255, 255, 0.6)',
+    borderBottom: 'rgba(0, 0, 0, 0.15)',
+    borderSides: 'rgba(255, 255, 255, 0.3)',
+    tint: '#FFFFFF',
+  },
+};
+
+const AppIcon = ({
+  source,
+  size = 22,
+  containerSize = 38,
+  variant = 'neutral',
+  shape = 'rounded',
+  tintColor,
+  style,
+  imageStyle,
+  accessibilityLabel,
+}) => {
+  const theme = ICON_THEMES[variant] || ICON_THEMES.neutral;
+  const resolvedTint = tintColor !== undefined ? tintColor : theme.tint;
+
+  if (shape === 'none') {
+    return (
+      <Image
+        source={source}
+        style={[{ width: size, height: size }, resolvedTint ? { tintColor: resolvedTint } : {}, imageStyle]}
+        resizeMode="contain"
+        accessibilityLabel={accessibilityLabel}
+      />
+    );
+  }
+
+  const isCircle = shape === 'circle';
+  const radius = isCircle ? containerSize / 2 : 10;
+
+  return (
+    <View
+      style={[
+        {
+          width: containerSize,
+          height: containerSize,
+          borderRadius: radius,
+          backgroundColor: theme.bg,
+          borderTopWidth: 1.5,
+          borderTopColor: theme.borderTop,
+          borderBottomWidth: 2.5,
+          borderBottomColor: theme.borderBottom,
+          borderLeftWidth: 1,
+          borderRightWidth: 1,
+          borderColor: theme.borderSides,
+          justifyContent: 'center',
+          alignItems: 'center',
+          elevation: 2,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.08,
+          shadowRadius: 2,
+        },
+        style,
+      ]}
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Image
+        source={source}
+        style={[{ width: size, height: size }, resolvedTint ? { tintColor: resolvedTint } : {}, imageStyle]}
+        resizeMode="contain"
+      />
+    </View>
+  );
+};
+
+const TwoToneDivider = ({ style, marginVertical = 6 }) => (
+  <View style={[{ width: '100%', marginVertical }, style]}>
+    <View style={{ height: 1, backgroundColor: '#E2E8F0' }} />
+    <View style={{ height: 1, backgroundColor: '#FFFFFF' }} />
+  </View>
+);
+
+const TwoToneVerticalDivider = ({ height = 32, style }) => (
+  <View style={[{ flexDirection: 'row', height, alignItems: 'center' }, style]}>
+    <View style={{ width: 1, height: '100%', backgroundColor: '#E2E8F0' }} />
+    <View style={{ width: 1, height: '100%', backgroundColor: '#FFFFFF' }} />
+  </View>
+);
+
+const SectionHeader = ({ title, count, badge, actionText, onAction, style }) => (
+  <View style={[styles.sectionHeaderRow, style]}>
+    <View style={styles.sectionHeaderLeft}>
+      <View style={styles.sectionHeaderAccentPill} />
+      <Text style={styles.sectionHeaderTitle}>{title}</Text>
+      {count !== undefined && (
+        <View style={styles.sectionHeaderCountBadge}>
+          <Text style={styles.sectionHeaderCountText}>{count}</Text>
+        </View>
+      )}
+      {badge && (
+        <View style={styles.sectionHeaderBadge}>
+          <Text style={styles.sectionHeaderBadgeText}>{badge}</Text>
+        </View>
+      )}
+    </View>
+    {actionText && (
+      <TouchableOpacity onPress={onAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.7}>
+        <Text style={styles.sectionHeaderAction}>{actionText} ›</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+);
+
+// =========================================================================
 // 4. SEED DATA & AUTHENTIC TALLYKHATA FAQS
 // =========================================================================
 const INITIAL_ACCOUNTS = [
@@ -2514,14 +2678,14 @@ function TallyKhataApp() {
               {isCustomer ? 'কাস্টমার হিসাব' : 'সাপ্লায়ার হিসাব'}
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {selectedAccount.phone ? (
               <TouchableOpacity
                 style={styles.headerIconBtn}
                 onPress={() => handleMakeCall(selectedAccount.phone)}
                 activeOpacity={0.7}
               >
-                <Image source={require("./assets/icons/ic_call.png")} style={{ width: 20, height: 20, tintColor: '#0F8A0F' }} resizeMode="contain" />
+                <AppIcon source={require("./assets/icons/ic_call.png")} variant="success" shape="circle" size={16} containerSize={32} />
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity
@@ -2529,14 +2693,14 @@ function TallyKhataApp() {
               onPress={handleOpenEditAccount}
               activeOpacity={0.7}
             >
-              <Image source={require("./assets/icons/ic_edit.png")} style={{ width: 20, height: 20, tintColor: '#4D4D4D' }} resizeMode="contain" />
+              <AppIcon source={require("./assets/icons/ic_edit.png")} variant="neutral" shape="circle" size={16} containerSize={32} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={handleDeleteAccount}
               activeOpacity={0.7}
             >
-              <Image source={require("./assets/icons/ic_delete.png")} style={{ width: 20, height: 20, tintColor: '#B81414' }} resizeMode="contain" />
+              <AppIcon source={require("./assets/icons/ic_delete.png")} variant="danger" shape="circle" size={16} containerSize={32} />
             </TouchableOpacity>
           </View>
         </View>
@@ -2575,7 +2739,7 @@ function TallyKhataApp() {
               onPress={() => setModalTagada(true)}
               activeOpacity={0.7}
             >
-              <Image source={require('./assets/icons/ic_sms.png')} style={{ width: 20, height: 20, marginBottom: 4 }} resizeMode="contain" />
+              <AppIcon source={require('./assets/icons/ic_sms.png')} variant="primary" shape="circle" size={20} containerSize={42} style={{ marginBottom: 6 }} tintColor={null} />
               <Text style={styles.quickActionLabel}>তাগাদা পাঠান</Text>
             </TouchableOpacity>
           ) : null}
@@ -2585,7 +2749,7 @@ function TallyKhataApp() {
               onPress={() => handleMakeCall(selectedAccount.phone)}
               activeOpacity={0.7}
             >
-              <Image source={require('./assets/icons/ic_call.png')} style={{ width: 20, height: 20, marginBottom: 4, tintColor: '#0F8A0F' }} resizeMode="contain" />
+              <AppIcon source={require('./assets/icons/ic_call.png')} variant="success" shape="circle" size={20} containerSize={42} style={{ marginBottom: 6 }} />
               <Text style={styles.quickActionLabel}>কল করুন</Text>
             </TouchableOpacity>
           ) : null}
@@ -2605,10 +2769,12 @@ function TallyKhataApp() {
             }}
             activeOpacity={0.7}
           >
-            <Image source={require('./assets/icons/ic_pdf.png')} style={{ width: 20, height: 20, marginBottom: 4 }} resizeMode="contain" />
+            <AppIcon source={require('./assets/icons/ic_pdf.png')} variant="purple" shape="circle" size={20} containerSize={42} style={{ marginBottom: 6 }} />
             <Text style={styles.quickActionLabel}>স্টেটমেন্ট শেয়ার</Text>
           </TouchableOpacity>
         </View>
+
+        <TwoToneDivider marginVertical={8} />
 
         {/* Ledger Table Column Headers (layout_credit_details_table_head: লেনদেনের বিবরণ, দিলাম, পেলাম) */}
         <View style={styles.ledgerTableHeader}>
@@ -3205,39 +3371,48 @@ function TallyKhataApp() {
 
             {/* Cash Categories Breakdown List (layout_cashbook_accounts.xml) */}
             <View style={styles.cashAccountsSection}>
-              <Text style={styles.sectionHeading}>ক্যাশবক্সের হিসাব সমূহ</Text>
+              <SectionHeader title="ক্যাশবক্সের হিসাব সমূহ" count={(cashEntries || []).length} />
 
               {[
-                { cat: 'sale', label: 'ক্যাশ বেচা', icon: require('./assets/icons/ic_cash_sale.png'), isIn: true, color: '#0F8A0F' },
-                { cat: 'buy', label: 'ক্যাশ কেনা', icon: require('./assets/icons/ic_cash_buy.png'), isIn: false, color: '#B81414' },
-                { cat: 'cost', label: 'খরচ', icon: require('./assets/icons/ic_menu_cost.png'), isIn: false, color: '#B81414' },
-                { cat: 'malik_in', label: 'মালিক দিল', icon: require('./assets/icons/ic_menu_malik_report.png'), isIn: true, color: '#0F8A0F' },
-                { cat: 'malik_out', label: 'মালিক নিল', icon: require('./assets/icons/ic_malik_out.png'), isIn: false, color: '#B81414' },
-              ].map((item) => {
+                { cat: 'sale', label: 'ক্যাশ বেচা', icon: require('./assets/icons/ic_cash_sale.png'), isIn: true, variant: 'success', color: '#0F8A0F' },
+                { cat: 'buy', label: 'ক্যাশ কেনা', icon: require('./assets/icons/ic_cash_buy.png'), isIn: false, variant: 'danger', color: '#B81414' },
+                { cat: 'cost', label: 'খরচ', icon: require('./assets/icons/ic_menu_cost.png'), isIn: false, variant: 'danger', color: '#B81414' },
+                { cat: 'malik_in', label: 'মালিক দিল', icon: require('./assets/icons/ic_menu_malik_report.png'), isIn: true, variant: 'success', color: '#0F8A0F' },
+                { cat: 'malik_out', label: 'মালিক নিল', icon: require('./assets/icons/ic_malik_out.png'), isIn: false, variant: 'danger', color: '#B81414' },
+              ].map((item, index) => {
                 const catEntries = (cashEntries || []).filter((c) => c.category === item.cat);
                 const sum = catEntries.reduce((acc, cur) => acc + (Number(cur.amount) || 0), 0);
                 return (
-                  <TouchableOpacity
-                    key={item.cat}
-                    style={styles.cashAccountRow}
-                    onPress={() => {
-                      if (item.cat === 'sale' || item.cat === 'buy') setModalBechaKena(true);
-                      else if (item.cat === 'cost') setModalExpenseReport(true);
-                      else if (item.cat === 'malik_in' || item.cat === 'malik_out') setModalMalikReport(true);
-                      else setCashFilter(item.cat);
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Image source={item.icon} style={{ width: 22, height: 22, marginRight: 10 }} resizeMode="contain" />
-                      <Text style={styles.cashAccountRowLabel}>{item.label}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[styles.cashAccountRowVal, { color: item.color }]}>
-                        {hideCashAmounts ? '***' : `${item.isIn ? '+' : '-'} ৳ ${formatMoney(sum)}`}
-                      </Text>
-                      <Text style={styles.cashAccountChevron}>›</Text>
-                    </View>
-                  </TouchableOpacity>
+                  <View key={item.cat}>
+                    <TouchableOpacity
+                      style={styles.cashAccountRow}
+                      onPress={() => {
+                        if (item.cat === 'sale' || item.cat === 'buy') setModalBechaKena(true);
+                        else if (item.cat === 'cost') setModalExpenseReport(true);
+                        else if (item.cat === 'malik_in' || item.cat === 'malik_out') setModalMalikReport(true);
+                        else setCashFilter(item.cat);
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <AppIcon
+                          source={item.icon}
+                          variant={item.variant}
+                          shape="rounded"
+                          size={18}
+                          containerSize={34}
+                          style={{ marginRight: 12 }}
+                        />
+                        <Text style={styles.cashAccountRowLabel}>{item.label}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[styles.cashAccountRowVal, { color: item.color }]}>
+                          {hideCashAmounts ? '***' : `${item.isIn ? '+' : '-'} ৳ ${formatMoney(sum)}`}
+                        </Text>
+                        <Text style={styles.cashAccountChevron}>›</Text>
+                      </View>
+                    </TouchableOpacity>
+                    {index < 4 ? <TwoToneDivider marginVertical={3} /> : null}
+                  </View>
                 );
               })}
             </View>
@@ -3476,40 +3651,64 @@ function TallyKhataApp() {
               <TouchableOpacity
                 style={styles.walletServiceBtn}
                 onPress={() => setModalAddMoney(true)}
+                activeOpacity={0.75}
               >
-                <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.blueLight }]}>
-                  <Image source={require("./assets/nav/nav_tallypay.png")} style={{ width: 24, height: 24, tintColor: COLORS.blue }} resizeMode="contain" />
-                </View>
+                <AppIcon
+                  source={require("./assets/icons/ic_menu_accounts.png")}
+                  variant="info"
+                  shape="circle"
+                  size={24}
+                  containerSize={50}
+                  accessibilityLabel="অ্যাড মানি"
+                />
                 <Text style={styles.walletServiceLabel}>অ্যাড মানি</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.walletServiceBtn}
                 onPress={() => setModalMoneyOut(true)}
+                activeOpacity={0.75}
               >
-                <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.greenLight }]}>
-                  <Image source={require("./assets/icons/ic_cash_sale.png")} style={{ width: 24, height: 24, tintColor: COLORS.green }} resizeMode="contain" />
-                </View>
+                <AppIcon
+                  source={require("./assets/icons/ic_cash_sale.png")}
+                  variant="success"
+                  shape="circle"
+                  size={24}
+                  containerSize={50}
+                  accessibilityLabel="মানি আউট"
+                />
                 <Text style={styles.walletServiceLabel}>মানি আউট</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.walletServiceBtn}
                 onPress={() => setModalMobileRecharge(true)}
+                activeOpacity={0.75}
               >
-                <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.redLight }]}>
-                  <Image source={require("./assets/icons/ic_call.png")} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />
-                </View>
+                <AppIcon
+                  source={require("./assets/icons/ic_call.png")}
+                  variant="danger"
+                  shape="circle"
+                  size={24}
+                  containerSize={50}
+                  accessibilityLabel="মোবাইল রিচার্জ"
+                />
                 <Text style={styles.walletServiceLabel}>মোবাইল রিচার্জ</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.walletServiceBtn}
                 onPress={() => setModalBanglaQR(true)}
+                activeOpacity={0.75}
               >
-                <View style={[styles.walletServiceIconBg, { backgroundColor: COLORS.goldLight }]}>
-                  <Image source={require("./assets/ic_bangla_qr.png")} style={{ width: 24, height: 24 }} resizeMode="contain" />
-                </View>
+                <AppIcon
+                  source={require("./assets/ic_bangla_qr.png")}
+                  variant="warning"
+                  shape="circle"
+                  size={24}
+                  containerSize={50}
+                  accessibilityLabel="কিউআর পেমেন্ট"
+                />
                 <Text style={styles.walletServiceLabel}>কিউআর পেমেন্ট</Text>
               </TouchableOpacity>
             </View>
@@ -3555,7 +3754,7 @@ function TallyKhataApp() {
 
             {/* Wallet Transaction History */}
             <View style={{ paddingHorizontal: 12, marginTop: 16 }}>
-              <Text style={styles.sectionHeading}>সাম্প্রতিক ওয়ালেট লেনদেন</Text>
+              <SectionHeader title="সাম্প্রতিক ওয়ালেট লেনদেন" count={walletTxns.length} />
               {walletTxns.map((w) => (
                 <View key={w.id} style={styles.cashItemRow}>
                   <View style={{ flex: 1 }}>
@@ -3601,15 +3800,13 @@ function TallyKhataApp() {
             </View>
 
             {/* Group 1: টালিপে ওয়ালেট (nav_group_tp_wallet) */}
-            <View style={styles.menuGroupHeader}>
-              <Text style={styles.menuGroupTitle}>টালিপে ওয়ালেট</Text>
-            </View>
+            <SectionHeader title="টালিপে ওয়ালেট" count={3} />
             <View style={styles.menuListContainer}>
               <TouchableOpacity
                 style={styles.menuListItem}
                 onPress={() => setModalAddMoney(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_accounts.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_accounts.png')} variant="info" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>একাউন্ট সমূহ</Text>
                   <Text style={styles.menuListSub}>ব্যালেন্স ৳ {formatMoney(walletBalance)} • সংযুক্ত ব্যাংক ও MFS</Text>
@@ -3621,7 +3818,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setActiveTab('tallypay')}
               >
-                <Image source={require('./assets/icons/ic_menu_payment_messaging.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_payment_messaging.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>লেনদেন বিবরণী</Text>
                   <Text style={styles.menuListSub}>মোট {walletTxns.length} টি ওয়ালেট লেনদেন</Text>
@@ -3633,7 +3830,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalTxnLimit(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_lock.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_lock.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>লেনদেনের লিমিট ও চার্জ</Text>
                   <Text style={styles.menuListSub}>১০০% ফ্রি লেনদেন • কোনো চার্জ নেই</Text>
@@ -3643,15 +3840,13 @@ function TallyKhataApp() {
             </View>
 
             {/* Group 2: টালিখাতা হিসাব ও রিপোর্ট (nav_tallykhata) */}
-            <View style={styles.menuGroupHeader}>
-              <Text style={styles.menuGroupTitle}>টালিখাতা হিসাব ও রিপোর্ট</Text>
-            </View>
+            <SectionHeader title="টালিখাতা হিসাব ও রিপোর্ট" count={7} />
             <View style={styles.menuListContainer}>
               <TouchableOpacity
                 style={styles.menuListItem}
                 onPress={() => setModalBechaKena(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_profit.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_profit.png')} variant="success" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>বেচা কেনা হিসাব</Text>
                   <Text style={styles.menuListSub}>দৈনিক বেচা-কেনা ও লাভের হিসাব</Text>
@@ -3663,7 +3858,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalExpenseReport(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_cost.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_cost.png')} variant="danger" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>খরচ রিপোর্ট</Text>
                   <Text style={styles.menuListSub}>দোকানের সকল যাবতীয় খরচের তালিকা</Text>
@@ -3675,7 +3870,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalBakiReport(true)}
               >
-                <Image source={require('./assets/icons/ic_share.png')} style={{ width: 22, height: 22, tintColor: '#B81414' }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_baki_hisab.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>বাকি হিসাব ও তাগাদা</Text>
                   <Text style={styles.menuListSub}>মোট বাকি ৳ {formatMoney(totalCustomerDue)}</Text>
@@ -3687,7 +3882,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalFullReport(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_report.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_report.png')} variant="purple" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>সার্বিক হিসাব রিপোর্ট</Text>
                   <Text style={styles.menuListSub}>দৈনিক, মাসিক ও বার্ষিক স্টেটমেন্ট তৈরি ও শেয়ার</Text>
@@ -3699,7 +3894,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalMalikReport(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_malik_report.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_malik_report.png')} variant="success" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>মালিকের হিসাব</Text>
                   <Text style={styles.menuListSub}>মালিকের বিনিয়োগ ও ব্যক্তিগত উত্তোলন স্টেটমেন্ট</Text>
@@ -3711,7 +3906,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalAddStock(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_stock.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_stock.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>স্টক ও পণ্য হিসাব</Text>
                   <Text style={styles.menuListSub}>মোট {inventory.length} টি পণ্য • স্টক মূল্য ৳ {formatMoney(totalStockCost)}</Text>
@@ -3723,7 +3918,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalNotes(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_note.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_note.png')} variant="info" shape="rounded" size={22} containerSize={38} tintColor={null} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>ব্যবসার নোট ও মেমো</Text>
                   <Text style={styles.menuListSub}>প্রয়োজনীয় কাজ ও জরুরি মেমো</Text>
@@ -3733,15 +3928,13 @@ function TallyKhataApp() {
             </View>
 
             {/* Group 3: সেটিংস ও অন্যান্য (nav_group_others) */}
-            <View style={styles.menuGroupHeader}>
-              <Text style={styles.menuGroupTitle}>সেটিংস ও অন্যান্য</Text>
-            </View>
+            <SectionHeader title="সেটিংস ও অন্যান্য" count={5} />
             <View style={styles.menuListContainer}>
               <TouchableOpacity
                 style={styles.menuListItem}
                 onPress={() => setModalSettings(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_settings.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_settings.png')} variant="neutral" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>দোকান ও ব্যবসা সেটিংস</Text>
                   <Text style={styles.menuListSub}>দোকানের নাম, ফোন, ঠিকানা ও প্রারম্ভিক ক্যাশ</Text>
@@ -3753,7 +3946,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalPinSetup(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_lock.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_lock.png')} variant="danger" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>পিন লক ও নিরাপত্তা</Text>
                   <Text style={styles.menuListSub}>{pinEnabled ? 'PIN লক সক্রিয় রয়েছে' : '৪ ডিজিটের গোপন PIN সেট করুন'}</Text>
@@ -3768,7 +3961,7 @@ function TallyKhataApp() {
                   setModalBackupRestore(true);
                 }}
               >
-                <Image source={require('./assets/icons/ic_menu_backup.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_backup.png')} variant="success" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>ডাটা ব্যাকআপ ও রিস্টোর</Text>
                   <Text style={styles.menuListSub}>১০০% অফলাইন ডাটা সেভ ও নতুন ফোনে ট্রান্সফার</Text>
@@ -3784,7 +3977,7 @@ function TallyKhataApp() {
                   });
                 }}
               >
-                <Image source={require('./assets/icons/ic_share.png')} style={{ width: 22, height: 22, tintColor: COLORS.primary }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_share.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>রেফার করুন</Text>
                   <Text style={styles.menuListSub}>অন্যান্য ব্যবসায়ীদের টালিখাতা শেয়ার করুন</Text>
@@ -3796,7 +3989,7 @@ function TallyKhataApp() {
                 style={styles.menuListItem}
                 onPress={() => setModalSupport(true)}
               >
-                <Image source={require('./assets/icons/ic_menu_support.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <AppIcon source={require('./assets/icons/ic_menu_support.png')} variant="purple" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>ব্যবহার নির্দেশিকা ও হেল্প</Text>
                   <Text style={styles.menuListSub}>সচরাচর জিজ্ঞাসিত প্রশ্ন ও হেল্পলাইন</Text>
@@ -5278,7 +5471,7 @@ function TallyKhataApp() {
 
                   {/* 5 ALWAYS VISIBLE CORE ACTIONS (PHASE 4 SPECIFICATION) */}
                   <View style={styles.cloudControlsSection}>
-                    <Text style={styles.cloudControlsSectionTitle}>ক্লাউড ব্যাকআপ ও রিস্টোর অপশন</Text>
+                    <SectionHeader title="ক্লাউড ব্যাকআপ ও রিস্টোর অপশন" />
 
                     {/* CONTROL 1: এখন ব্যাকআপ নিন */}
                     <TouchableOpacity
@@ -5287,13 +5480,7 @@ function TallyKhataApp() {
                       disabled={cloudBackupStatus === 'backing_up'}
                       activeOpacity={0.75}
                     >
-                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#FEE2E2' }]}>
-                        <Image
-                          source={require('./assets/icons/grid_backup.png')}
-                          style={{ width: 22, height: 22, tintColor: '#B81414' }}
-                          resizeMode="contain"
-                        />
-                      </View>
+                      <AppIcon source={require('./assets/icons/grid_backup.png')} variant="danger" shape="circle" size={22} containerSize={44} style={{ marginRight: 12 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.cloudControlTitle, { color: '#B81414' }]}>
                           {cloudBackupStatus === 'backing_up' ? 'গুগল ড্রাইভে ব্যাকআপ হচ্ছে...' : 'এখন ব্যাকআপ নিন'}
@@ -5312,13 +5499,7 @@ function TallyKhataApp() {
                       disabled={cloudBackupStatus === 'restoring'}
                       activeOpacity={0.75}
                     >
-                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#DCFCE7' }]}>
-                        <Image
-                          source={require('./assets/icons/ic_cloud.png')}
-                          style={{ width: 22, height: 22, tintColor: '#0F8A0F' }}
-                          resizeMode="contain"
-                        />
-                      </View>
+                      <AppIcon source={require('./assets/icons/ic_cloud.png')} variant="success" shape="circle" size={22} containerSize={44} style={{ marginRight: 12 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.cloudControlTitle, { color: '#0F8A0F' }]}>
                           {cloudBackupStatus === 'restoring' ? 'ড্রাইভ থেকে রিস্টোর হচ্ছে...' : 'অনলাইন ব্যাকআপ রিস্টোর করুন'}
@@ -5336,13 +5517,7 @@ function TallyKhataApp() {
                       onPress={handleExportData}
                       activeOpacity={0.75}
                     >
-                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#DBEAFE' }]}>
-                        <Image
-                          source={require('./assets/icons/ic_share.png')}
-                          style={{ width: 20, height: 20, tintColor: '#2563EB' }}
-                          resizeMode="contain"
-                        />
-                      </View>
+                      <AppIcon source={require('./assets/icons/ic_share.png')} variant="info" shape="circle" size={22} containerSize={44} style={{ marginRight: 12 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.cloudControlTitle, { color: '#1E40AF' }]}>
                           ডাটা এক্সপোর্ট করুন
@@ -5360,13 +5535,7 @@ function TallyKhataApp() {
                       onPress={handleChangeGoogleAccount}
                       activeOpacity={0.75}
                     >
-                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#FEF3C7' }]}>
-                        <Image
-                          source={require('./assets/icons/ic_menu_accounts.png')}
-                          style={{ width: 20, height: 20, tintColor: '#D97706' }}
-                          resizeMode="contain"
-                        />
-                      </View>
+                      <AppIcon source={require('./assets/icons/ic_menu_accounts.png')} variant="warning" shape="circle" size={22} containerSize={44} style={{ marginRight: 12 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.cloudControlTitle, { color: '#B45309' }]}>
                           Google Drive Account পরিবর্তন করুন
@@ -5384,13 +5553,7 @@ function TallyKhataApp() {
                       onPress={handleRemoveGoogleAccount}
                       activeOpacity={0.75}
                     >
-                      <View style={[styles.cloudControlIconCircle, { backgroundColor: '#FEE2E2' }]}>
-                        <Image
-                          source={require('./assets/icons/ic_delete.png')}
-                          style={{ width: 20, height: 20, tintColor: '#DC2626' }}
-                          resizeMode="contain"
-                        />
-                      </View>
+                      <AppIcon source={require('./assets/icons/ic_delete.png')} variant="danger" shape="circle" size={22} containerSize={44} style={{ marginRight: 12 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.cloudControlTitle, { color: '#DC2626' }]}>
                           Google Account সরান
@@ -7573,11 +7736,18 @@ const styles = StyleSheet.create({
   // Ledger Table
   ledgerTableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
     marginHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#CBD5E1',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#E2E8F0',
   },
   ledgerColHeader: {
     fontSize: 12,
@@ -8467,8 +8637,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   voucherDivider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
+    height: 2,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFFFFF',
     marginVertical: 10,
   },
   voucherDetailRow: {
@@ -9882,16 +10055,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginBottom: 10,
-    elevation: 1,
+    borderRadius: 14,
+    padding: 14,
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 3,
+    borderBottomColor: '#E2E8F0',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#EDF2F7',
+    marginBottom: 12,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3,
   },
   cloudControlIconCircle: {
     width: 40,
@@ -10159,7 +10337,69 @@ const styles = StyleSheet.create({
   toggleThumbActive: {
     alignSelf: 'flex-end',
   },
+
+  // 3D Section Headers & Dynamic Dividers
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionHeaderAccentPill: {
+    width: 4,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: '#B81414',
+    marginRight: 8,
+  },
+  sectionHeaderTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#374151',
+    letterSpacing: 0.2,
+  },
+  sectionHeaderCountBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 10,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  sectionHeaderCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  sectionHeaderBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  sectionHeaderBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  sectionHeaderAction: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B81414',
+  },
 });
+
 
 // Wrap root component with crash-proof ErrorBoundary
 export default function App() {
