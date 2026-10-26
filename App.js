@@ -2267,6 +2267,10 @@ function TallyKhataApp() {
       Alert.alert('তথ্য', 'কোনো কাস্টমারের কাছে বকেয়া বাকি নেই।');
       return;
     }
+    if (remainingSmsCount <= 0) {
+      Alert.alert('ফ্রি এসএমএস সমাপ্ত', 'আপনার কোনো ফ্রি মেসেজ বা এসএমএস কোটা অবশিষ্ট নেই।');
+      return;
+    }
     Alert.alert(
       'গ্রুপ তাগাদা পাঠান',
       `মোট ${dueCustomers.length} জন বাকি কাস্টমারকে একসাথে টালি-মেসেজ পাঠাতে চান? মোট বকেয়া ৳ ${formatMoney(totalCustomerDue)}।`,
@@ -2275,13 +2279,37 @@ function TallyKhataApp() {
         {
           text: 'পাঠান',
           onPress: async () => {
-            const newCount = Math.max(0, remainingSmsCount - 1);
-            const saveRes = await persistData({ remainingSmsCount: newCount });
+            if (remainingSmsCount <= 0) {
+              Alert.alert('ফ্রি এসএমএস সমাপ্ত', 'আপনার কোনো ফ্রি মেসেজ বা এসএমএস কোটা অবশিষ্ট নেই।');
+              return;
+            }
+            const todayStr = getTodayDate();
+            const timeStr = getTimeString();
+            const newLogs = dueCustomers.map((cust) => ({
+              id: generateUniqueId('tag_'),
+              customerName: cust.name,
+              phone: cust.phone || '',
+              amount: cust.balance,
+              date: todayStr,
+              time: timeStr,
+            }));
+            setIsSaving(true);
+            const saveRes = await storageRepository.mutateStore((latestStore) => {
+              const curCount = Number(latestStore.remainingSmsCount) || 0;
+              const curLogs = latestStore.tagadaLogs || [];
+              return {
+                ...latestStore,
+                remainingSmsCount: Math.max(0, curCount - 1),
+                tagadaLogs: [...newLogs, ...curLogs],
+              };
+            });
+            setIsSaving(false);
             if (!saveRes.success) {
               Alert.alert('ত্রুটি', 'গ্রুপ তাগাদা সংরক্ষণ ব্যর্থ হয়েছে।');
               return;
             }
-            setRemainingSmsCount(newCount);
+            setRemainingSmsCount(saveRes.data.remainingSmsCount);
+            setTagadaLogs(saveRes.data.tagadaLogs);
             Alert.alert(
               'সফল',
               `সকল ${dueCustomers.length} জন বকেয়া কাস্টমারকে গ্রুপ তাগাদা মেসেজ সফলভাবে পাঠানো হয়েছে!`
@@ -3337,6 +3365,42 @@ function TallyKhataApp() {
                   <Text style={styles.emptySubText}>সব কাস্টমারের বকেয়া পরিশোধ রয়েছে।</Text>
                 </View>
               )}
+
+              {/* Tagada History / Sent Logs (পাঠানো তাগাদার হিস্ট্রি) */}
+              <View style={{ marginTop: 24, marginBottom: 12 }}>
+                <Text style={styles.sectionHeading}>পাঠানো তাগাদার হিস্ট্রি ({tagadaLogs.length})</Text>
+
+                {tagadaLogs.map((log) => (
+                  <View key={log.id} style={styles.tagadaCardItem}>
+                    <View style={[styles.profileAvatar, { backgroundColor: '#E0F2FE', width: 44, height: 44, borderRadius: 22 }]}>
+                      <Text style={[styles.profileAvatarText, { color: '#0284C7', fontSize: 18 }]}>
+                        {(log.customerName || 'ত')[0]}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.tagadaCustName}>{log.customerName}</Text>
+                      <Text style={styles.tagadaCustPhone}>{log.phone || 'মোবাইল নম্বর নেই'}</Text>
+                      <Text style={[styles.tagadaCustDue, { color: '#6B7280' }]}>
+                        পাঠানোর তারিখ: {log.date} • {log.time}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#B81414' }}>
+                        ৳ {formatMoney(log.amount)}
+                      </Text>
+                      <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
+                        <Text style={{ fontSize: 10, color: '#166534', fontWeight: 'bold' }}>পাঠানো হয়েছে</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+
+                {tagadaLogs.length === 0 && (
+                  <View style={[styles.emptyContainer, { paddingVertical: 18 }]}>
+                    <Text style={styles.emptySubText}>এখনো কোনো তাগাদা মেসেজ পাঠানো হয়নি।</Text>
+                  </View>
+                )}
+              </View>
             </View>
           </ScrollView>
         )}
@@ -4769,7 +4833,7 @@ function TallyKhataApp() {
          =================================================================== */}
       <Modal visible={modalTagada} animationType="fade" transparent onRequestClose={() => setModalTagada(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { padding: 18 }]}>
+          <View style={[styles.modalCard, { padding: 18, elevation: 12, backgroundColor: '#FFFFFF' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>তাগাদা মেসেজ</Text>
               <TouchableOpacity onPress={() => setModalTagada(false)} style={{ padding: 4 }}>
@@ -4777,27 +4841,27 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            {selectedAccount ? (
+            {(tagadaCustomer || selectedAccount) ? (
               <View style={styles.tagadaReceiverCard}>
                 <View style={styles.tagadaReceiverAvatar}>
                   <Text style={styles.tagadaReceiverAvatarText}>
-                    {(selectedAccount.name || 'খ')[0]}
+                    {((tagadaCustomer || selectedAccount).name || 'খ')[0]}
                   </Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.tagadaReceiverName}>{selectedAccount.name}</Text>
-                  <Text style={styles.tagadaReceiverPhone}>{selectedAccount.phone || 'মোবাইল নম্বর নেই'}</Text>
+                  <Text style={styles.tagadaReceiverName}>{(tagadaCustomer || selectedAccount).name}</Text>
+                  <Text style={styles.tagadaReceiverPhone}>{(tagadaCustomer || selectedAccount).phone || 'মোবাইল নম্বর নেই'}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={styles.tagadaReceiverDueLabel}>বকেয়া</Text>
-                  <Text style={styles.tagadaReceiverDueAmount}>৳ {formatMoney(selectedAccount.balance)}</Text>
+                  <Text style={styles.tagadaReceiverDueAmount}>৳ {formatMoney((tagadaCustomer || selectedAccount).balance)}</Text>
                 </View>
               </View>
             ) : null}
 
             <View style={styles.tagadaDottedBox}>
               <Text style={styles.tagadaMessageContent}>
-                {generateTagadaMessage(selectedAccount)}
+                {generateTagadaMessage(tagadaCustomer || selectedAccount)}
               </Text>
             </View>
 
@@ -4806,7 +4870,7 @@ function TallyKhataApp() {
             <View style={styles.tagadaDualBtnRow}>
               <TouchableOpacity
                 style={styles.tagadaTallyMsgBtn}
-                onPress={() => handleSendSingleTagada(selectedAccount)}
+                onPress={() => handleSendSingleTagada(tagadaCustomer || selectedAccount)}
                 activeOpacity={0.85}
               >
                 <Image
@@ -4824,7 +4888,7 @@ function TallyKhataApp() {
 
               <TouchableOpacity
                 style={styles.tagadaShareAppBtn}
-                onPress={() => handleSendTagadaWhatsApp(selectedAccount)}
+                onPress={() => handleSendTagadaWhatsApp(tagadaCustomer || selectedAccount)}
                 activeOpacity={0.85}
               >
                 <Image
@@ -7705,10 +7769,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 12,
-    marginHorizontal: 12,
-    marginVertical: 4,
+    marginVertical: 5,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -7724,10 +7787,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   tagadaCustDue: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#DC2626',
-    textAlign: 'right',
+    marginTop: 3,
+    textAlign: 'left',
   },
   tagadaActionBtn: {
     paddingHorizontal: 12,

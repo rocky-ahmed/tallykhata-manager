@@ -25,6 +25,7 @@ const VALID_COLLECTIONS = new Set([
   'journals',
   'cashEntries',
   'inventory',
+  'stock',
   'notes',
   'walletTxns',
   'businesses',
@@ -65,6 +66,12 @@ function createDefaultState() {
       { id: '3', category: 'malik_in', type: 'in', amount: 2000, desc: 'মালিকের দেওয়া নগদ টাকা (জমা)', date: '2026-10-15', time: '08:30 AM' },
     ],
     inventory: [
+      { id: '1', name: 'মিনিকেট চাল (৫০ কেজি)', unit: 'বস্তা', buyPrice: 3200, sellPrice: 3450, stock: 25 },
+      { id: '2', name: 'তীর সয়াবিন তেল (৫ লিটার)', unit: 'বোতল', buyPrice: 820, sellPrice: 875, stock: 40 },
+      { id: '3', name: 'চিনি (প্যাকেট)', unit: 'কেজি', buyPrice: 130, sellPrice: 140, stock: 65 },
+      { id: '4', name: 'মসুর ডাল (দেশি)', unit: 'কেজি', buyPrice: 135, sellPrice: 150, stock: 8 },
+    ],
+    stock: [
       { id: '1', name: 'মিনিকেট চাল (৫০ কেজি)', unit: 'বস্তা', buyPrice: 3200, sellPrice: 3450, stock: 25 },
       { id: '2', name: 'তীর সয়াবিন তেল (৫ লিটার)', unit: 'বোতল', buyPrice: 820, sellPrice: 875, stock: 40 },
       { id: '3', name: 'চিনি (প্যাকেট)', unit: 'কেজি', buyPrice: 130, sellPrice: 140, stock: 65 },
@@ -136,6 +143,11 @@ class StorageRepository {
       const v6DataStr = await this.adapter.getItem(V6_KEY);
       if (v6DataStr) {
         const parsed = JSON.parse(v6DataStr);
+        if (Array.isArray(parsed.inventory) && !Array.isArray(parsed.stock)) {
+          parsed.stock = parsed.inventory;
+        } else if (Array.isArray(parsed.stock) && !Array.isArray(parsed.inventory)) {
+          parsed.inventory = parsed.stock;
+        }
         this.currentStore = parsed;
         return { success: true, data: parsed, source: 'v6' };
       }
@@ -231,7 +243,24 @@ class StorageRepository {
             const updatedStore = {
               ...baseStore,
               [collectionName]: deduplicated,
+              ...(collectionName === 'inventory' ? { stock: deduplicated } : {}),
+              ...(collectionName === 'stock' ? { inventory: deduplicated } : {}),
             };
+
+            // Keep inventory and stock synchronized continuously (DATA-12)
+            if (Array.isArray(updatedStore.inventory) && !Array.isArray(updatedStore.stock)) {
+              updatedStore.stock = updatedStore.inventory;
+            } else if (Array.isArray(updatedStore.stock) && !Array.isArray(updatedStore.inventory)) {
+              updatedStore.inventory = updatedStore.stock;
+            } else if (Array.isArray(updatedStore.inventory) && Array.isArray(updatedStore.stock)) {
+              if (JSON.stringify(updatedStore.inventory) !== JSON.stringify(baseStore.inventory) &&
+                  JSON.stringify(updatedStore.stock) === JSON.stringify(baseStore.stock)) {
+                updatedStore.stock = updatedStore.inventory;
+              } else if (JSON.stringify(updatedStore.stock) !== JSON.stringify(baseStore.stock) &&
+                         JSON.stringify(updatedStore.inventory) === JSON.stringify(baseStore.inventory)) {
+                updatedStore.inventory = updatedStore.stock;
+              }
+            }
 
             // Write to storage adapter first
             const serialized = JSON.stringify(updatedStore);
