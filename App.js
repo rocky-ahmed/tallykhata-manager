@@ -2692,14 +2692,14 @@ function TallyKhataApp() {
         {/* Bottom Dual Entry Bar (দিলাম / পেলাম) */}
         <View style={styles.ledgerBottomBar}>
           <TouchableOpacity
-            style={[styles.bigEntryBtn, { backgroundColor: COLORS.primary }]}
+            style={[styles.bigEntryBtn, { backgroundColor: COLORS.primary, borderBottomColor: "#7F0C0C" }]}
             onPress={() => handleOpenAddTxn('given')}
             activeOpacity={0.85}
           >
             <Text style={styles.bigEntryBtnText}>- দিলাম (বাকি)</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.bigEntryBtn, { backgroundColor: COLORS.green }]}
+            style={[styles.bigEntryBtn, { backgroundColor: COLORS.green, borderBottomColor: "#065F06" }]}
             onPress={() => handleOpenAddTxn('received')}
             activeOpacity={0.85}
           >
@@ -2905,7 +2905,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>ক্যাশবক্স</Text>
+                        <Text style={styles.quickGridLabel}>ক্যাশবাক্স</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -2948,7 +2948,7 @@ function TallyKhataApp() {
                     />
                     <TextInput
                       style={{ flex: 1, fontSize: 15, color: '#111827', paddingVertical: 0 }}
-                      placeholder="খুঁজুন"
+                      placeholder="খোঁজ"
                       placeholderTextColor="#6B7280"
                       value={searchQuery}
                       onChangeText={setSearchQuery}
@@ -6784,18 +6784,20 @@ const styles = StyleSheet.create({
   // Yellow Promo Banner
   promoBannerCard: {
     backgroundColor: '#FFDE00',
-    borderRadius: 12,
+    borderRadius: 14,
     marginHorizontal: 16,
     marginTop: 6,
     marginBottom: 4,
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 0,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F5CE00',
+    borderTopColor: '#FFF380',
+    elevation: 3,
     shadowColor: '#000000',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
   },
@@ -6851,19 +6853,21 @@ const styles = StyleSheet.create({
   // Summary Card
   summaryCardContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 14,
     marginHorizontal: 16,
     marginVertical: 4,
-    paddingVertical: 10,
+    paddingVertical: 11,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
-    elevation: 2,
+    borderColor: '#EFEFEF',
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowRadius: 4,
   },
   summaryCardCol: {
     flex: 1,
@@ -6893,15 +6897,22 @@ const styles = StyleSheet.create({
 
   // Search Pill & Counter Strip
   searchPillBar: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FFFFFF',
     borderRadius: 22,
     marginHorizontal: 16,
-    marginTop: 4,
+    marginTop: 5,
     marginBottom: 4,
-    height: 40,
+    height: 42,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   counterStripRow: {
     flexDirection: 'row',
@@ -6983,12 +6994,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 24,
     right: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#B81414',
     justifyContent: 'center',
     alignItems: 'center',
+    borderTopWidth: 1.5,
+    borderTopColor: '#FF6B6B',
+    borderBottomWidth: 2.5,
+    borderBottomColor: '#8A0E0E',
     elevation: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -7595,10 +7610,18 @@ const styles = StyleSheet.create({
   },
   bigEntryBtn: {
     flex: 1,
-    height: 48,
-    borderRadius: 8,
+    height: 50,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    borderTopWidth: 1.5,
+    borderTopColor: 'rgba(255, 255, 255, 0.4)',
+    borderBottomWidth: 3.5,
+    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
   bigEntryBtnText: {
     color: '#FFFFFF',
@@ -7609,12 +7632,21 @@ const styles = StyleSheet.create({
   // --- CASHBOX TAB & SCREEN ---
   cashTopCard: {
     backgroundColor: '#FFFFFF',
-    padding: 18,
-    margin: 12,
-    borderRadius: 14,
+    padding: 0,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    alignItems: 'center',
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
   },
   cashTotalDisplay: {
     fontSize: 32,
@@ -7628,10 +7660,19 @@ const styles = StyleSheet.create({
   },
   cashActionBigBtn: {
     backgroundColor: '#0F8A0F',
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginTop: 12,
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderTopWidth: 1.5,
+    borderTopColor: 'rgba(255, 255, 255, 0.35)',
+    borderBottomWidth: 3.5,
+    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   cashActionBigBtnText: {
     color: '#FFFFFF',
@@ -8867,8 +8908,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 8,
+    borderRadius: 10,
     paddingVertical: 9,
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
   },
   cashAdjustBtnActive: {
     borderColor: '#FBD5D5',
