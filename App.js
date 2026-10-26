@@ -2765,13 +2765,13 @@ function TallyKhataApp() {
       </View>
 
       {/* --- TAB CONTENT CONTAINER --- */}
-      <View style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
+      <View style={{ flex: 1, backgroundColor: '#B81414' }}>
 
         {/* ===================================================================
             TAB 1: HOME / TALLY (টালি - 1:1 Authentic from photo_2026-10-15_18-13-34.jpg)
            =================================================================== */}
         {activeTab === 'home' && (
-          <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden' }}>
             <FlatList
               data={filteredAccounts}
               keyExtractor={(item) => item.id}
@@ -2905,7 +2905,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>ক্যাশবাক্স</Text>
+                        <Text style={styles.quickGridLabel}>ক্যাশবক্স</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -3078,7 +3078,8 @@ function TallyKhataApp() {
             TAB 2: CASHBOX (ক্যাশবক্স - layout_cashbook_dashboard_total.xml)
            =================================================================== */}
         {activeTab === 'cashbox' && (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
+          <View style={{ flex: 1, backgroundColor: '#F8F9FA', borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden' }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Cash Dashboard Card (layout_cashbook_dashboard_total.xml) */}
             <View style={styles.cashTopCard}>
               {/* Upper Box: আজকের বেচা & বর্তমান ক্যাশ */}
@@ -3288,13 +3289,15 @@ function TallyKhataApp() {
               })}
             </View>
           </ScrollView>
+          </View>
         )}
 
         {/* ===================================================================
             TAB 3: TAGADA (তাগাদা বার্তা কালেকশন - activity_tagada.xml)
            =================================================================== */}
         {activeTab === 'tagada' && (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
+          <View style={{ flex: 1, backgroundColor: '#F8F9FA', borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden' }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Tagada Top Header Bar with Back navigation */}
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
               <TouchableOpacity
@@ -3430,13 +3433,15 @@ function TallyKhataApp() {
               </View>
             </View>
           </ScrollView>
+          </View>
         )}
 
         {/* ===================================================================
             TAB 4: TALLYPAY (টালিপে ডিজিটাল ওয়ালেট ও বাংলা কিউআর)
            =================================================================== */}
         {activeTab === 'tallypay' && (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
+          <View style={{ flex: 1, backgroundColor: '#F8F9FA', borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden' }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Wallet Balance Card */}
             <View style={styles.walletCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3564,13 +3569,15 @@ function TallyKhataApp() {
               ))}
             </View>
           </ScrollView>
+          </View>
         )}
 
         {/* ===================================================================
             TAB 5: MENU / MORE (মেনু / ড্রয়ার - activity_main_drawer.xml)
            =================================================================== */}
         {activeTab === 'menu' && (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
+          <View style={{ flex: 1, backgroundColor: '#F8F9FA', borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden' }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Merchant Shop Profile Header (nav_header_main.xml) */}
             <View style={styles.menuProfileHeader}>
               <View style={styles.menuStoreAvatar}>
@@ -3806,6 +3813,7 @@ function TallyKhataApp() {
               </Text>
             </View>
           </ScrollView>
+          </View>
         )}
 
       </View>
@@ -3858,7 +3866,7 @@ function TallyKhataApp() {
             />
           )}
           <Text style={[styles.tabButtonLabel, activeTab === 'cashbox' && styles.tabButtonLabelActive]}>
-            ক্যাশবাক্স
+            ক্যাশবক্স
           </Text>
         </TouchableOpacity>
 
@@ -7473,12 +7481,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     padding: 16,
     margin: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 3,
+    borderBottomColor: '#E2E8F0',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#EDF2F7',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
   },
   profileAvatar: {
     width: 48,
@@ -7529,9 +7547,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginBottom: 8,
     paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 3,
+    borderBottomColor: '#E2E8F0',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#EDF2F7',
+    elevation: 2,
   },
   quickActionItem: {
     alignItems: 'center',
@@ -7888,8 +7912,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#B81414',
     margin: 12,
     padding: 20,
-    borderRadius: 14,
-    elevation: 3,
+    borderRadius: 16,
+    borderTopWidth: 1.5,
+    borderTopColor: '#FF6B6B',
+    borderBottomWidth: 4,
+    borderBottomColor: '#7F0C0C',
+    elevation: 6,
+    shadowColor: '#7F0C0C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
   },
   walletCardSub: {
     fontSize: 13,
@@ -7913,9 +7945,19 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginBottom: 12,
     paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 3,
+    borderBottomColor: '#E2E8F0',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#EDF2F7',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
   },
   walletServiceBtn: {
     alignItems: 'center',
@@ -7938,11 +7980,24 @@ const styles = StyleSheet.create({
   // --- MENU TAB (আরও) ---
   menuProfileHeader: {
     backgroundColor: '#FFF0F1',
+    marginHorizontal: 12,
+    marginTop: 12,
     padding: 18,
-    borderBottomWidth: 1,
+    borderRadius: 14,
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 3,
     borderBottomColor: '#FBD5D5',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#FED7D7',
     flexDirection: 'row',
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#B81414',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
   menuStoreAvatar: {
     width: 52,
@@ -7984,11 +8039,21 @@ const styles = StyleSheet.create({
   menuListContainer: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 12,
-    marginTop: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    marginTop: 10,
+    borderRadius: 14,
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 3,
+    borderBottomColor: '#E2E8F0',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#EDF2F7',
     overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
   },
   menuListItem: {
     flexDirection: 'row',
@@ -8108,17 +8173,35 @@ const styles = StyleSheet.create({
   },
   keypadBtn: {
     flex: 1,
-    height: 44,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    height: 46,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 3,
+    borderBottomColor: '#D1D5DB',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#E5E7EB',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   keypadBtnOp: {
     backgroundColor: '#FEF3C7',
+    borderTopColor: '#FFFBEB',
+    borderBottomColor: '#D97706',
+    borderColor: '#FDE68A',
   },
   keypadBtnSpecial: {
     backgroundColor: '#FEE2E2',
+    borderTopColor: '#FEF2F2',
+    borderBottomColor: '#DC2626',
+    borderColor: '#FECACA',
   },
   keypadBtnText: {
     fontSize: 20,
@@ -8157,9 +8240,21 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     maxHeight: '90%',
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#E2E8F0',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#EDF2F7',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   modalHeaderRow: {
     flexDirection: 'row',
@@ -8180,18 +8275,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   modalSimpleInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderTopColor: '#D1D5DB',
+    borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FAFAFA',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
     color: '#1A1A1A',
   },
   modalBigInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderTopColor: '#D1D5DB',
+    borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FAFAFA',
+    borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 22,
@@ -8207,9 +8308,18 @@ const styles = StyleSheet.create({
   modalBtnCancel: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: '#E5E7EB',
+    borderTopWidth: 1,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 3,
+    borderBottomColor: '#CBD5E1',
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
   },
   modalBtnCancelText: {
     fontSize: 14,
@@ -8219,9 +8329,18 @@ const styles = StyleSheet.create({
   modalBtnSubmit: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: '#B81414',
+    borderTopWidth: 1,
+    borderTopColor: '#FF6B6B',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#7F0C0C',
     alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#7F0C0C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   modalBtnSubmitText: {
     fontSize: 14,
