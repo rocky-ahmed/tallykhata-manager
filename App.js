@@ -1046,27 +1046,34 @@ function TallyKhataApp() {
     setAccName(selectedAccount.name || '');
     setAccPhone(selectedAccount.phone || '');
     setAccAddress(selectedAccount.address || '');
+    setAccInitialBal(String(selectedAccount.openingBalance || ''));
     setModalEditAccount(true);
   };
 
   const handleUpdateAccount = async () => {
     if (!selectedAccount) return;
-    const valRes = validateAccount(accName, accPhone, 0);
+    const valRes = validateAccount(accName, accPhone, accInitialBal || 0);
     if (!valRes.valid) {
       Alert.alert('সতর্কতা', valRes.error);
       return;
     }
 
+    const opening = Number(accInitialBal) || 0;
     let updatedTarget = null;
     setIsSaving(true);
     const saveRes = await storageRepository.mutateCollection('accounts', (latestAccounts) => {
       return latestAccounts.map((a) => {
         if (String(a.id) === String(selectedAccount.id)) {
+          const openingDiff = opening - (Number(a.openingBalance) || 0);
+          const currentBal = Number(a.balance) || 0;
+          const newBal = currentBal + openingDiff;
           updatedTarget = {
             ...a,
             name: valRes.name,
             phone: valRes.phone,
             address: accAddress.trim(),
+            openingBalance: opening,
+            balance: newBal,
           };
           return updatedTarget;
         }
@@ -2460,7 +2467,18 @@ function TallyKhataApp() {
   // VIEW A: CUSTOMER / SUPPLIER ACCOUNT LEDGER SCREEN (activity_customer_report_v2.xml)
   // =========================================================================
   const isCustomer = selectedAccount ? selectedAccount.type === 1 : true;
-  const accountJournals = selectedAccount ? (journals || []).filter((j) => j.accountId === selectedAccount.id) : [];
+  const rawJournals = selectedAccount ? (journals || []).filter((j) => j.accountId === selectedAccount.id) : [];
+  const openingBal = Number(selectedAccount?.openingBalance) || 0;
+  const openingEntry = (selectedAccount && openingBal > 0) ? [{
+    id: 'opening_' + selectedAccount.id,
+    isOpening: true,
+    desc: isCustomer ? 'পূর্বের বাকি (শুরুর জের)' : 'পূর্বের দেনা (শুরুর জের)',
+    amount: openingBal,
+    date: selectedAccount.createDate || '২০২৬-১০-১৫',
+    time: '',
+    type: isCustomer ? 'given' : 'received',
+  }] : [];
+  const accountJournals = [...openingEntry, ...rawJournals];
   const totalGiven = accountJournals
     .filter((j) => j.type === 'given')
     .reduce((sum, j) => sum + Number(j.amount || 0), 0);
@@ -2612,15 +2630,24 @@ function TallyKhataApp() {
             const isGiven = item.type === 'given';
             return (
               <TouchableOpacity
-                style={styles.ledgerRowCard}
+                style={[styles.ledgerRowCard, item.isOpening && { backgroundColor: '#F9FAFB' }]}
                 onPress={() => {
+                  if (item.isOpening) {
+                    Alert.alert('শুরুর জের', 'এই খাতার প্রারম্ভিক জের: ৳ ' + formatMoney(item.amount) + '।\nহিসাবের তথ্য বা জের পরিবর্তন করতে এডিট বোতাম ব্যবহার করুন।', [
+                      { text: 'ঠিক আছে', style: 'cancel' },
+                      { text: 'এডিট করুন', onPress: handleOpenEditAccount },
+                    ]);
+                    return;
+                  }
                   setSelectedVoucherTxn(item);
                   setModalVoucher(true);
                 }}
                 activeOpacity={0.7}
               >
                 <View style={{ flex: 1.6 }}>
-                  <Text style={styles.ledgerRowDesc}>{item.desc || 'সাধারণ লেনদেন'}</Text>
+                  <Text style={[styles.ledgerRowDesc, item.isOpening && { color: '#4B5563', fontWeight: 'bold' }]}>
+                    {item.desc || 'সাধারণ লেনদেন'}
+                  </Text>
                   <Text style={styles.ledgerRowDate}>
                     {formatDisplayDate(item.date)} {item.time ? '• ' + item.time : ''}
                   </Text>
@@ -2878,7 +2905,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={styles.quickGridLabel}>ক্যাশবাক্স</Text>
+                        <Text style={styles.quickGridLabel}>ক্যাশবক্স</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -2921,7 +2948,7 @@ function TallyKhataApp() {
                     />
                     <TextInput
                       style={{ flex: 1, fontSize: 15, color: '#111827', paddingVertical: 0 }}
-                      placeholder="খোঁজ"
+                      placeholder="খুঁজুন"
                       placeholderTextColor="#6B7280"
                       value={searchQuery}
                       onChangeText={setSearchQuery}
@@ -2984,7 +3011,7 @@ function TallyKhataApp() {
                       style={[styles.counterTabPill, accountTab === 'supplier' && styles.counterTabPillActive]}
                     >
                       <Text style={[styles.counterTabText, accountTab === 'supplier' && styles.counterTabTextActive]}>
-                        সাপ্লায়ার {toBengaliNumber(accounts.filter((a) => a.type === 2).length)}
+                        সাপ্লায়ার {toBengaliNumber(accounts.filter((a) => a.type === 2).length)}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -4204,6 +4231,16 @@ function TallyKhataApp() {
               onChangeText={setAccAddress}
               placeholder="ঠিকানা (ঐচ্ছিক)"
               placeholderTextColor={COLORS.textSubtle}
+            />
+
+            <Text style={styles.inputLabel}>পূর্বের বাকি (শুরুর জের)</Text>
+            <TextInput
+              style={styles.modalSimpleInput}
+              value={accInitialBal}
+              onChangeText={setAccInitialBal}
+              placeholder="০.০০"
+              placeholderTextColor={COLORS.textSubtle}
+              keyboardType="numeric"
             />
 
             <View style={styles.modalBtnRow}>
