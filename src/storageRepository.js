@@ -333,28 +333,70 @@ class StorageRepository {
 
   /**
    * Creates a safety snapshot of the current local state before restore.
+   * Scoped to an explicit snapshotId so rollbacks never apply stale snapshots from earlier sessions.
    */
-  async createLocalSafetySnapshot() {
+  async createLocalSafetySnapshot(customSnapshotId = null) {
     const currentState = this.getAuthoritativeState();
     if (currentState) {
-      await this.adapter.setItem(SAFETY_SNAPSHOT_KEY, JSON.stringify(currentState));
-      return { success: true, timestamp: new Date().toISOString() };
+      const snapshotId = customSnapshotId || ('snap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+      const record = {
+        snapshotId,
+        createdAt: new Date().toISOString(),
+        state: currentState,
+      };
+      await this.adapter.setItem(SAFETY_SNAPSHOT_KEY, JSON.stringify(record));
+      this.activeSafetySnapshot = record;
+      return { success: true, snapshotId, timestamp: record.createdAt };
     }
     return { success: false, reason: 'No state to snapshot' };
   }
 
   /**
    * Restores from the safety snapshot if an error occurred during restore.
+   * If expectedSnapshotId is provided, requires the saved snapshot to match that ID,
+   * preventing rollbacks from restoring old snapshots from prior operations.
    */
-  async rollbackToSafetySnapshot() {
-    const snapshotStr = await this.adapter.getItem(SAFETY_SNAPSHOT_KEY);
-    if (snapshotStr) {
-      const parsed = JSON.parse(snapshotStr);
-      await this.adapter.setItem(V6_KEY, snapshotStr);
-      this.currentStore = parsed;
-      return { success: true, restored: true };
+  async rollbackToSafetySnapshot(expectedSnapshotId = null) {
+    if (expectedSnapshotId !== null && expectedSnapshotId !== undefined && !expectedSnapshotId) {
+      return { success: false, reason: 'No fresh snapshot ID provided for this restore attempt' };
     }
-    return { success: false, reason: 'No safety snapshot found' };
+
+    const snapshotStr = await this.adapter.getItem(SAFETY_SNAPSHOT_KEY);
+    if (!snapshotStr) {
+      return { success: false, reason: 'No safety snapshot found' };
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(snapshotStr);
+    } catch (e) {
+      return { success: false, reason: 'Corrupted safety snapshot' };
+    }
+
+    let snapshotId = null;
+    let stateData = null;
+
+    if (parsed && typeof parsed === 'object' && parsed.snapshotId && parsed.state) {
+      snapshotId = parsed.snapshotId;
+      stateData = parsed.state;
+    } else {
+      stateData = parsed;
+    }
+
+    if (expectedSnapshotId) {
+      if (!snapshotId || snapshotId !== expectedSnapshotId) {
+        return {
+          success: false,
+          reason: 'Snapshot attempt mismatch: Expected ' + expectedSnapshotId + ', but found ' + snapshotId,
+          attemptMismatch: true,
+        };
+      }
+    }
+
+    await this.adapter.setItem(V6_KEY, JSON.stringify(stateData));
+    this.currentStore = stateData;
+    this.activeSafetySnapshot = null;
+    return { success: true, restored: true, snapshotId };
   }
 
   /**
@@ -362,18 +404,46 @@ class StorageRepository {
    * Performs validation, recalculates ledger balances, and writes atomically.
    */
   async commitRestorePayload(backupPayload, options = {}) {
-    const { manifest, data } = backupPayload;
+    if (!backupPayload || typeof backupPayload !== 'object') {
+      throw new Error('Invalid restore payload: payload must be an object');
+    }
+
+    let manifest = backupPayload.manifest || null;
+    let data = backupPayload.data || null;
+
+    // Handle legacy unwrapped format where data is at root
+    if (!data && Array.isArray(backupPayload.accounts)) {
+      data = backupPayload;
+      manifest = manifest || {
+        backupVersion: 0,
+        schemaVersion: backupPayload.version || 5,
+        legacy: true,
+      };
+    }
+
     if (!data || !Array.isArray(data.accounts)) {
       throw new Error('Invalid restore payload: accounts must be an array');
     }
 
-    // Create safety snapshot before altering live store
-    await this.createLocalSafetySnapshot();
+    // Create safety snapshot before altering live store if not already created
+    let snapshotId = options && options.snapshotId;
+    if (!snapshotId) {
+      const snapRes = await this.createLocalSafetySnapshot();
+      if (snapRes && snapRes.success) {
+        snapshotId = snapRes.snapshotId;
+      }
+    }
 
     return this.mutateStore((prevStore) => {
+      const restoredInventory = Array.isArray(data.inventory)
+        ? data.inventory
+        : (Array.isArray(data.stock) ? data.stock : []);
+
       const newStore = {
         ...createDefaultState(),
         ...data,
+        inventory: restoredInventory,
+        stock: restoredInventory,
         pinEnabled: false,
         appPin: '', // Restored backup always resets PIN lock to safe default for security
         version: 6,

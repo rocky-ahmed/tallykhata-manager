@@ -26,6 +26,9 @@ import ledgerEngine from './src/ledgerEngine';
 import { storageRepository, StorageRepository, createDefaultState } from './src/storageRepository';
 import {
   googleDriveBackupService,
+  orchestrateCloudRestore,
+  orchestrateCloudBackup,
+  verifyUploadedBackupMatches,
   buildBackupPayload,
   validateBackupIntegrity,
   BACKUP_FILENAME,
@@ -1716,6 +1719,22 @@ function TallyKhataApp() {
     }
   };
 
+  const executeCloudBackup = async () => {
+    return orchestrateCloudBackup({
+      storageRepository,
+      driveService: googleDriveBackupService,
+      getAccessToken: getValidGoogleAccessToken,
+      googleUser,
+      existingFileId: cloudBackupMetadata ? cloudBackupMetadata.fileId : null,
+      onStatusChange: setCloudBackupStatus,
+      onMetaUpdated: async (meta) => {
+        setCloudBackupMetadata(meta);
+        await persistData({ cloudBackupMetadata: meta });
+      },
+      alertFn: (title, message) => Alert.alert(title, message),
+    });
+  };
+
   const handleCloudBackupNow = async () => {
     if (!googleUser || !googleUser.sub) {
       Alert.alert(
@@ -1747,166 +1766,55 @@ function TallyKhataApp() {
       return;
     }
 
-    try {
-      setCloudBackupStatus('backing_up');
-      const currentState = storageRepository.getAuthoritativeState();
-      if (!currentState || !Array.isArray(currentState.accounts)) {
-        throw new Error('লোকাল ডাটাবেজ থেকে নির্ভরযোগ্য ডাটা প্রস্তুত করা যায়নি।');
-      }
+    return executeCloudBackup();
+  };
 
-      const payload = buildBackupPayload(currentState, googleUser);
-      let fileId = cloudBackupMetadata ? cloudBackupMetadata.fileId : null;
-
-      // Real upload to Google Drive REST API with automatic 401 retry
-      let uploadRes = null;
-      try {
-        uploadRes = await googleDriveBackupService.uploadBackup(token, payload, fileId);
-      } catch (uploadErr) {
-        const isAuthErr = uploadErr && uploadErr.message && (uploadErr.message.includes('401') || uploadErr.message.toLowerCase().includes('unauthorized'));
-        if (isAuthErr) {
-          console.log('[CloudBackup] 401 Unauthorized during upload. Refreshing token...');
-          const freshToken = await getValidGoogleAccessToken(true);
-          if (freshToken) {
-            token = freshToken;
-            uploadRes = await googleDriveBackupService.uploadBackup(freshToken, payload, fileId);
-          } else {
-            throw new Error('গুগল ড্রাইভ অনুমোদনের মেয়াদ শেষ হয়েছে। দয়া করে একাউন্ট পুনরায় সংযোগ করুন।');
-          }
-        } else {
-          throw uploadErr;
-        }
-      }
-
-      if (!uploadRes || !uploadRes.fileId) {
-        throw new Error('গুগল ড্রাইভ সার্ভার থেকে ফাইল আইডি পাওয়া যায়নি। আপলোড ব্যর্থ হয়েছে।');
-      }
-
-      // Verify the uploaded remote file immediately via real download
-      let verifyDownload = null;
-      try {
-        verifyDownload = await googleDriveBackupService.downloadBackup(
-          token,
-          uploadRes.fileId,
-          googleUser.sub
-        );
-      } catch (downloadErr) {
-        const isAuthErr = downloadErr && downloadErr.message && (downloadErr.message.includes('401') || downloadErr.message.toLowerCase().includes('unauthorized'));
-        if (isAuthErr) {
-          const freshToken = await getValidGoogleAccessToken(true);
-          if (freshToken) {
-            token = freshToken;
-            verifyDownload = await googleDriveBackupService.downloadBackup(
-              freshToken,
-              uploadRes.fileId,
-              googleUser.sub
-            );
-          }
-        }
-        if (!verifyDownload) throw downloadErr;
-      }
-
-      if (!verifyDownload || !verifyDownload.data) {
-        throw new Error('গুগল ড্রাইভ থেকে আপলোডকৃত ফাইল যাচাই করা সম্ভব হয়নি।');
-      }
-
-      const updatedMeta = {
-        fileId: uploadRes.fileId,
-        name: BACKUP_FILENAME,
-        modifiedTime: uploadRes.modifiedTime || new Date().toISOString(),
-        manifest: payload.manifest,
-      };
-
-      setCloudBackupMetadata(updatedMeta);
-      await persistData({ cloudBackupMetadata: updatedMeta });
-      setCloudBackupStatus('success');
-
-      Alert.alert(
-        'ব্যাকআপ সফল!',
-        `আপনার সম্পূর্ণ খাতার ব্যাকআপ সফলভাবে গুগল ড্রাইভে সংরক্ষিত ও যাচাইকৃত হয়েছে।\n\n` +
-        `মোট হিসাব: ${toBengaliNumber(payload.manifest.recordCounts.accounts)} টি\n` +
-        `মোট লেনদেন: ${toBengaliNumber(payload.manifest.recordCounts.journals)} টি\n` +
-        `ক্যাশবক্স এন্ট্রি: ${toBengaliNumber(payload.manifest.recordCounts.cashEntries)} টি`
-      );
-    } catch (err) {
-      setCloudBackupStatus('error');
-      Alert.alert('ব্যাকআপ ত্রুটি', err.message || 'গুগল ড্রাইভে ব্যাকআপ নিতে সমস্যা হয়েছে।');
+  const applyStateToUi = (state, { resetPin = false } = {}) => {
+    if (!state) return;
+    if (Array.isArray(state.accounts)) setAccounts(state.accounts);
+    if (Array.isArray(state.journals)) setJournals(state.journals);
+    if (Array.isArray(state.cashEntries)) setCashEntries(state.cashEntries);
+    const restoredInv = Array.isArray(state.inventory) ? state.inventory : (Array.isArray(state.stock) ? state.stock : null);
+    if (restoredInv) setInventory(restoredInv);
+    if (Array.isArray(state.notes)) setNotes(state.notes);
+    if (Array.isArray(state.businesses)) setBusinesses(state.businesses);
+    if (state.businessName) setBusinessName(state.businessName);
+    if (state.ownerName !== undefined) setOwnerName(state.ownerName);
+    if (state.ownerPhone !== undefined) setOwnerPhone(state.ownerPhone);
+    if (state.businessAddress !== undefined) setBusinessAddress(state.businessAddress);
+    if (state.openingBalance !== undefined) setOpeningBalance(Number(state.openingBalance) || 0);
+    if (state.walletBalance !== undefined) setWalletBalance(Number(state.walletBalance) || 0);
+    if (Array.isArray(state.walletTxns)) setWalletTxns(state.walletTxns);
+    if (state.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(state.tallyMessageBalance) || 50);
+    if (resetPin) {
+      setPinEnabled(false);
+      setAppPin('');
+    } else {
+      if (state.pinEnabled !== undefined) setPinEnabled(Boolean(state.pinEnabled));
+      if (state.appPin !== undefined) setAppPin(String(state.appPin));
     }
   };
 
   const executeCloudRestore = async () => {
-    try {
-      setCloudBackupStatus('restoring');
-      let token = await getValidGoogleAccessToken(false);
-      if (!token) {
-        token = await getValidGoogleAccessToken(true);
-      }
-      if (!token) {
-        throw new Error('গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় গুগল একাউন্ট সংযোগ করুন।');
-      }
-
-      let downloadRes = null;
-      try {
-        downloadRes = await googleDriveBackupService.downloadBackup(
-          token,
-          cloudBackupMetadata.fileId,
-          googleUser.sub
-        );
-      } catch (dlErr) {
-        const isAuthErr = dlErr && dlErr.message && (dlErr.message.includes('401') || dlErr.message.toLowerCase().includes('unauthorized'));
-        if (isAuthErr) {
-          console.log('[CloudRestore] 401 Unauthorized during download. Refreshing token...');
-          const freshToken = await getValidGoogleAccessToken(true);
-          if (freshToken) {
-            token = freshToken;
-            downloadRes = await googleDriveBackupService.downloadBackup(
-              freshToken,
-              cloudBackupMetadata.fileId,
-              googleUser.sub
-            );
-          }
-        }
-        if (!downloadRes) throw dlErr;
-      }
-
-      if (!downloadRes || !downloadRes.data) {
-        throw new Error('গুগল ড্রাইভ থেকে ব্যাকআপ ডাটা ডাউনলোড ব্যর্থ হয়েছে।');
-      }
-
-      const commitRes = await storageRepository.commitRestorePayload(downloadRes);
-      if (!commitRes.success) {
-        throw new Error(commitRes.error || 'রিস্টোর ডাটাবেজ কমিট ব্যর্থ হয়েছে।');
-      }
-
-      const newState = commitRes.data;
-      if (Array.isArray(newState.accounts)) setAccounts(newState.accounts);
-      if (Array.isArray(newState.journals)) setJournals(newState.journals);
-      if (Array.isArray(newState.cashEntries)) setCashEntries(newState.cashEntries);
-      if (Array.isArray(newState.stock)) setInventory(newState.stock);
-      if (Array.isArray(newState.notes)) setNotes(newState.notes);
-      if (Array.isArray(newState.businesses)) setBusinesses(newState.businesses);
-      if (newState.businessName) setBusinessName(newState.businessName);
-      if (newState.ownerName) setOwnerName(newState.ownerName);
-      if (newState.ownerPhone) setOwnerPhone(newState.ownerPhone);
-      if (newState.businessAddress) setBusinessAddress(newState.businessAddress);
-      if (newState.openingBalance !== undefined) setOpeningBalance(Number(newState.openingBalance));
-      if (newState.walletBalance !== undefined) setWalletBalance(Number(newState.walletBalance));
-      if (Array.isArray(newState.walletTxns)) setWalletTxns(newState.walletTxns);
-      if (newState.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(newState.tallyMessageBalance));
-
-      // Reset PIN lock state for security on restored backup
-      setPinEnabled(false);
-      setAppPin('');
-
-      setCloudBackupStatus('success');
-      Alert.alert(
-        'রিস্টোর সফল!',
-        'গুগল ড্রাইভ থেকে আপনার সম্পূর্ণ খাতা সফলভাবে রিস্টোর হয়েছে। পূর্ববর্তী লোকাল ডাটার একটি সেফটি কপি রাখা হয়েছে।'
-      );
-    } catch (err) {
-      setCloudBackupStatus('error');
-      await storageRepository.rollbackToSafetySnapshot();
-      Alert.alert('রিস্টোর ব্যর্থ', err.message || 'ব্যাকআপ রিস্টোর করার সময় ত্রুটি ঘটেছে। পূর্ববর্তী ডাটা অক্ষুণ্ণ রয়েছে।');
-    }
+    return orchestrateCloudRestore({
+      storageRepository,
+      driveService: googleDriveBackupService,
+      getAccessToken: getValidGoogleAccessToken,
+      fileId: cloudBackupMetadata ? cloudBackupMetadata.fileId : null,
+      userSub: googleUser ? googleUser.sub : null,
+      onStatusChange: setCloudBackupStatus,
+      onFileDiscovered: async (meta) => {
+        setCloudBackupMetadata(meta);
+        await persistData({ cloudBackupMetadata: meta });
+      },
+      onStateCommitted: (newState) => {
+        applyStateToUi(newState, { resetPin: true });
+      },
+      onRollback: (safeState) => {
+        applyStateToUi(safeState, { resetPin: false });
+      },
+      alertFn: (title, message) => Alert.alert(title, message),
+    });
   };
 
   const handleCloudRestore = async () => {
@@ -1921,7 +1829,10 @@ function TallyKhataApp() {
       );
       return;
     }
-    const token = await getValidGoogleAccessToken(false);
+    let token = await getValidGoogleAccessToken(false);
+    if (!token) {
+      token = await getValidGoogleAccessToken(true);
+    }
     if (!token) {
       Alert.alert(
         'অনুমোদন প্রয়োজন',
@@ -1933,16 +1844,62 @@ function TallyKhataApp() {
       );
       return;
     }
-    if (!cloudBackupMetadata || !cloudBackupMetadata.fileId) {
+
+    let meta = cloudBackupMetadata;
+    if (!meta || !meta.fileId) {
+      setCloudBackupStatus('checking');
+      try {
+        const remoteFile = await googleDriveBackupService.findBackupFile(token);
+        if (remoteFile) {
+          meta = {
+            fileId: remoteFile.id,
+            name: remoteFile.name,
+            size: remoteFile.size,
+            modifiedTime: remoteFile.modifiedTime,
+            appProperties: remoteFile.appProperties,
+          };
+          setCloudBackupMetadata(meta);
+          await persistData({ cloudBackupMetadata: meta });
+        }
+      } catch (findErr) {
+        const isAuthErr = findErr && findErr.message && (findErr.message.includes('401') || findErr.message.toLowerCase().includes('unauthorized'));
+        if (isAuthErr) {
+          const freshToken = await getValidGoogleAccessToken(true);
+          if (freshToken) {
+            token = freshToken;
+            try {
+              const remoteFile = await googleDriveBackupService.findBackupFile(freshToken);
+              if (remoteFile) {
+                meta = {
+                  fileId: remoteFile.id,
+                  name: remoteFile.name,
+                  size: remoteFile.size,
+                  modifiedTime: remoteFile.modifiedTime,
+                  appProperties: remoteFile.appProperties,
+                };
+                setCloudBackupMetadata(meta);
+                await persistData({ cloudBackupMetadata: meta });
+              }
+            } catch (retryErr) {
+              console.log('[CloudRestore] findBackupFile retry notice:', retryErr);
+            }
+          }
+        }
+      } finally {
+        setCloudBackupStatus('idle');
+      }
+    }
+
+    if (!meta || !meta.fileId) {
       Alert.alert('ব্যাকআপ পাওয়া যায়নি', 'আপনার এই গুগল ড্রাইভ একাউন্টে কোনো সংরক্ষিত ব্যাকআপ পাওয়া যায়নি। প্রথমে "এখন ব্যাকআপ নিন" বাটনে চাপ দিয়ে ব্যাকআপ তৈরি করুন।');
       return;
     }
 
-    const backupDate = cloudBackupMetadata.modifiedTime
-      ? new Date(cloudBackupMetadata.modifiedTime).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const backupDate = meta.modifiedTime
+      ? new Date(meta.modifiedTime).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       : 'আজ';
-    const accCount = toBengaliNumber(cloudBackupMetadata.manifest?.recordCounts?.accounts || 0);
-    const jrnCount = toBengaliNumber(cloudBackupMetadata.manifest?.recordCounts?.journals || 0);
+    const accCount = toBengaliNumber(meta.manifest?.recordCounts?.accounts || meta.appProperties?.totalAccounts || 0);
+    const jrnCount = toBengaliNumber(meta.manifest?.recordCounts?.journals || 0);
 
     Alert.alert(
       'অনলাইন ব্যাকআপ রিস্টোর',
@@ -2050,24 +2007,12 @@ function TallyKhataApp() {
   };
   // --- HANDLER: BACKUP & RESTORE ---
   const handleExportBackup = () => {
-    const backupObj = {
-      version: '4.0',
-      appName: 'TallyKhata Offline',
-      exportDate: new Date().toISOString(),
-      businessName,
-      ownerName,
-      ownerPhone,
-      businessAddress,
-      openingBalance,
-      accounts,
-      journals,
-      cashEntries,
-      inventory,
-      notes,
-      walletBalance,
-      walletTxns,
-    };
-    const jsonStr = JSON.stringify(backupObj, null, 2);
+    const currentState = storageRepository.getAuthoritativeState();
+    const payload = buildBackupPayload(
+      currentState,
+      googleUser || { sub: 'offline_export', email: '', name: businessName }
+    );
+    const jsonStr = JSON.stringify(payload, null, 2);
     setBackupJsonText(jsonStr);
     setModalBackupRestore(true);
   };
@@ -2080,52 +2025,69 @@ function TallyKhataApp() {
   };
 
   const handleImportBackup = async () => {
+    let restoreSnapshot = null;
     try {
       if (!backupJsonText.trim()) {
         Alert.alert('সতর্কতা', 'দয়া করে ব্যাকআপ JSON ডাটা পেস্ট করুন');
         return;
       }
-      const data = JSON.parse(backupJsonText);
-      if (!data.accounts || !Array.isArray(data.accounts)) {
-        Alert.alert('ত্রুটি', 'অকার্যকর ব্যাকআপ ফরম্যাট');
+      let parsed = null;
+      try {
+        parsed = JSON.parse(backupJsonText);
+      } catch (parseErr) {
+        Alert.alert('ত্রুটি', 'অকার্যকর ব্যাকআপ JSON ডাটা। দয়া করে সঠিক ফাইল পেস্ট করুন।');
         return;
       }
 
-      const saveRes = await persistData({
-        accounts: data.accounts,
-        journals: data.journals || [],
-        cashEntries: data.cashEntries || [],
-        inventory: importedStock,
-        notes: data.notes || [],
-        businessName: data.businessName,
-        ownerName: data.ownerName,
-        ownerPhone: data.ownerPhone,
-        businessAddress: data.businessAddress,
-        openingBalance: data.openingBalance,
-        walletBalance: data.walletBalance,
+      // Fresh snapshot for this offline import attempt
+      restoreSnapshot = await storageRepository.createLocalSafetySnapshot();
+
+      const commitRes = await storageRepository.commitRestorePayload(parsed, {
+        snapshotId: restoreSnapshot ? restoreSnapshot.snapshotId : null
       });
-
-      if (!saveRes.success) {
-        Alert.alert('ত্রুটি', 'ব্যাকআপ ডাটা সংরক্ষণ ব্যর্থ হয়েছে।');
+      if (!commitRes || !commitRes.success) {
+        if (restoreSnapshot && restoreSnapshot.snapshotId) {
+          try {
+            await storageRepository.rollbackToSafetySnapshot(restoreSnapshot.snapshotId);
+          } catch (rbErr) {
+            console.error('[ImportBackup] Rollback failed:', rbErr);
+          }
+        }
+        Alert.alert('ত্রুটি', (commitRes && commitRes.error) || 'ব্যাকআপ ডাটা সংরক্ষণ ব্যর্থ হয়েছে।');
         return;
       }
 
-      setAccounts(data.accounts || []);
-      setJournals(data.journals || []);
-      setCashEntries(data.cashEntries || []);
-      setInventory(importedStock);
-      setNotes(data.notes || []);
-      if (data.businessName) setBusinessName(data.businessName);
-      if (data.ownerName) setOwnerName(data.ownerName);
-      if (data.ownerPhone) setOwnerPhone(data.ownerPhone);
-      if (data.businessAddress) setBusinessAddress(data.businessAddress);
-      if (data.openingBalance !== undefined) setOpeningBalance(data.openingBalance);
-      if (data.walletBalance !== undefined) setWalletBalance(data.walletBalance);
+      const newState = commitRes.data;
+      if (Array.isArray(newState.accounts)) setAccounts(newState.accounts);
+      if (Array.isArray(newState.journals)) setJournals(newState.journals);
+      if (Array.isArray(newState.cashEntries)) setCashEntries(newState.cashEntries);
+      const restoredInv = Array.isArray(newState.inventory) ? newState.inventory : (Array.isArray(newState.stock) ? newState.stock : null);
+      if (restoredInv) setInventory(restoredInv);
+      if (Array.isArray(newState.notes)) setNotes(newState.notes);
+      if (Array.isArray(newState.businesses)) setBusinesses(newState.businesses);
+      if (newState.businessName) setBusinessName(newState.businessName);
+      if (newState.ownerName !== undefined) setOwnerName(newState.ownerName);
+      if (newState.ownerPhone !== undefined) setOwnerPhone(newState.ownerPhone);
+      if (newState.businessAddress !== undefined) setBusinessAddress(newState.businessAddress);
+      if (newState.openingBalance !== undefined) setOpeningBalance(Number(newState.openingBalance) || 0);
+      if (newState.walletBalance !== undefined) setWalletBalance(Number(newState.walletBalance) || 0);
+      if (Array.isArray(newState.walletTxns)) setWalletTxns(newState.walletTxns);
+      if (newState.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(newState.tallyMessageBalance) || 50);
+
+      setPinEnabled(false);
+      setAppPin('');
 
       setModalBackupRestore(false);
       Alert.alert('সফল', 'ডাটা সফলভাবে ব্যাকআপ থেকে পুনরুদ্ধার করা হয়েছে!');
-    } catch (e) {
-      Alert.alert('ব্যর্থ', 'JSON ফরম্যাট সঠিক নয়। সঠিক ডাটা পেস্ট করুন।');
+    } catch (err) {
+      if (restoreSnapshot && restoreSnapshot.snapshotId) {
+        try {
+          await storageRepository.rollbackToSafetySnapshot(restoreSnapshot.snapshotId);
+        } catch (rbErr) {
+          console.error('[ImportBackup] Rollback failed:', rbErr);
+        }
+      }
+      Alert.alert('রিস্টোর ব্যর্থ', err.message || 'ব্যাকআপ রিস্টোর করার সময় ত্রুটি ঘটেছে।');
     }
   };
 
