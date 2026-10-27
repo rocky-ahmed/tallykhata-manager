@@ -18,6 +18,7 @@ import {
   LogBox,
   Platform,
   BackHandler,
+  NativeModules,
 } from 'react-native';
 
 LogBox.ignoreAllLogs(true);
@@ -119,7 +120,7 @@ const toBengaliDecimal = (amount) => {
   const absNum = Math.abs(num);
   const intPart = Math.floor(absNum);
   const decPart = Math.round((absNum - intPart) * 100).toString().padStart(2, '0');
-  
+
   const absStr = intPart.toString();
   let formatted = '';
   if (absStr.length > 3) {
@@ -678,6 +679,122 @@ function TallyKhataApp() {
   const [modalExpenseReport, setModalExpenseReport] = useState(false);
   const [modalMalikReport, setModalMalikReport] = useState(false);
   const [modalMoneyOut, setModalMoneyOut] = useState(false);
+
+  // Ivy Wallet Integration States (GPL v3.0 Pinned eb08c930cba1f988a5a8a7d6b5ff15b913d3168a)
+  const [modalIvyWallet, setModalIvyWallet] = useState(false);
+  const [modalIvyGplNotice, setModalIvyGplNotice] = useState(false);
+  const [modalIvyAddTxn, setModalIvyAddTxn] = useState(false);
+  const [ivyActiveSubTab, setIvyActiveSubTab] = useState('transactions'); // 'transactions' | 'accounts' | 'budgets' | 'stats'
+  const [ivyTxnFilter, setIvyTxnFilter] = useState('all'); // 'all' | 'expense' | 'income'
+  const [ivyNewAmount, setIvyNewAmount] = useState('');
+  const [ivyNewType, setIvyNewType] = useState('expense'); // 'expense' | 'income'
+  const [ivyNewCat, setIvyNewCat] = useState('cat_food');
+  const [ivyNewAcc, setIvyNewAcc] = useState('acc_cash');
+  const [ivyNewNote, setIvyNewNote] = useState('');
+
+  const [ivyState, setIvyState] = useState({
+    accounts: [
+      { id: 'acc_cash', name: 'নগদ ক্যাশ (Cash)', type: 'cash', balance: 12500, icon: '💵', color: '#10B981' },
+      { id: 'acc_bank', name: 'ব্যাংক অ্যাকাউন্ট (Bank)', type: 'bank', balance: 45000, icon: '🏦', color: '#3B82F6' },
+      { id: 'acc_bkash', name: 'বিকাশ / নগদ (MFS)', type: 'mfs', balance: 8200, icon: '📱', color: '#EC4899' },
+      { id: 'acc_card', name: 'ক্রেডিট কার্ড (Card)', type: 'card', balance: -5400, icon: '💳', color: '#8B5CF6' },
+      { id: 'acc_invest', name: 'বিনিয়োগ (Investments)', type: 'invest', balance: 35000, icon: '📈', color: '#F59E0B' },
+    ],
+    categories: [
+      { id: 'cat_food', name: 'খাবার ও মুদি', icon: '🍔', color: '#EF4444', budget: 15000 },
+      { id: 'cat_transport', name: 'যাতায়াত ও ভাড়া', icon: '🚗', color: '#F97316', budget: 5000 },
+      { id: 'cat_bills', name: 'বিল ও ইউটিলিটি', icon: '⚡', color: '#EAB308', budget: 8000 },
+      { id: 'cat_shopping', name: 'শপিং ও পোশাক', icon: '🛍️', color: '#8B5CF6', budget: 10000 },
+      { id: 'cat_health', name: 'স্বাস্থ্য ও চিকিৎসা', icon: '💊', color: '#06B6D4', budget: 4000 },
+      { id: 'cat_salary', name: 'বেতন ও আয়', icon: '💰', color: '#10B981', budget: 0 },
+      { id: 'cat_other', name: 'অন্যান্য খরচ', icon: '📦', color: '#6B7280', budget: 3000 },
+    ],
+    transactions: [
+      { id: 'ivytxn_1', type: 'expense', amount: 850, categoryId: 'cat_food', accountId: 'acc_cash', date: getTodayDate(), time: '01:15 PM', note: 'দুপুরের খাবার ও স্ন্যাক্স' },
+      { id: 'ivytxn_2', type: 'income', amount: 50000, categoryId: 'cat_salary', accountId: 'acc_bank', date: getTodayDate(), time: '10:00 AM', note: 'মাসিক বেতন জমা' },
+      { id: 'ivytxn_3', type: 'expense', amount: 1200, categoryId: 'cat_transport', accountId: 'acc_bkash', date: getTodayDate(), time: '09:30 AM', note: 'উবার ও সিএনজি ভাড়া' },
+      { id: 'ivytxn_4', type: 'expense', amount: 2400, categoryId: 'cat_bills', accountId: 'acc_bank', date: getTodayDate(), time: 'Yesterday', note: 'ইন্টারনেট ও ডিশ বিল' },
+    ]
+  });
+
+  const IVY_STORAGE_KEY = '@ivy_wallet_state_v1';
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(IVY_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && Array.isArray(parsed.accounts)) {
+            setIvyState(parsed);
+          }
+        }
+      } catch (e) {
+        console.log('Error loading Ivy Wallet state:', e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!modalIvyWallet) return;
+    const backAction = () => {
+      setModalIvyWallet(false);
+      return true;
+    };
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [modalIvyWallet]);
+
+  const handleOpenIvyWallet = async () => {
+    try {
+      if (NativeModules && NativeModules.IvyWalletModule && NativeModules.IvyWalletModule.openIvyWallet) {
+        const res = await NativeModules.IvyWalletModule.openIvyWallet();
+        if (res) return;
+      }
+    } catch (e) {
+      console.log('Ivy native launch fallback:', e);
+    }
+    setModalIvyWallet(true);
+  };
+
+  const handleSaveIvyTxn = async () => {
+    const amt = parseFloat(ivyNewAmount);
+    if (!amt || amt <= 0 || isNaN(amt)) {
+      Alert.alert('ভুল ইনপুট', 'দয়া করে সঠিক পরিমাণ দিন');
+      return;
+    }
+    const newTxn = {
+      id: 'ivytxn_' + Date.now(),
+      type: ivyNewType,
+      amount: amt,
+      categoryId: ivyNewCat,
+      accountId: ivyNewAcc,
+      date: getTodayDate(),
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      note: ivyNewNote.trim() || (ivyNewType === 'income' ? 'আয় জমা' : 'ব্যক্তিগত খরচ'),
+    };
+    const updatedAccounts = (ivyState.accounts || []).map(acc => {
+      if (acc.id === ivyNewAcc) {
+        const diff = ivyNewType === 'income' ? amt : -amt;
+        return { ...acc, balance: (acc.balance || 0) + diff };
+      }
+      return acc;
+    });
+    const updatedState = {
+      ...ivyState,
+      accounts: updatedAccounts,
+      transactions: [newTxn, ...(ivyState.transactions || [])],
+    };
+    setIvyState(updatedState);
+    try {
+      await AsyncStorage.setItem(IVY_STORAGE_KEY, JSON.stringify(updatedState));
+    } catch (e) {
+      console.log('Error saving Ivy txn:', e);
+    }
+    setIvyNewAmount('');
+    setIvyNewNote('');
+    setModalIvyAddTxn(false);
+    Alert.alert('সফল', 'আইভি ওয়ালেট লেনদেন সফলভাবে যুক্ত হয়েছে।');
+  };
   const [reportDateTab, setReportDateTab] = useState('daily'); // 'daily' | 'monthly'
   const [selectedReportDate, setSelectedReportDate] = useState(getTodayDate());
   const [reportSummaryOnly, setReportSummaryOnly] = useState(false);
@@ -1732,7 +1849,7 @@ function TallyKhataApp() {
 
         console.log('[GoogleSignIn] Calling GoogleSignin.signIn()...');
         const res = await GoogleSignin.signIn();
-        
+
         if (res && res.type === 'cancelled') {
           setCloudBackupStatus('idle');
           return;
@@ -4025,7 +4142,7 @@ function TallyKhataApp() {
             </View>
 
             {/* Group 3: সেটিংস ও অন্যান্য (nav_group_others) */}
-            <SectionHeader title="সেটিংস ও অন্যান্য" count={6} />
+            <SectionHeader title="সেটিংস ও অন্যান্য" count={7} />
             <View style={styles.menuListContainer}>
               <TouchableOpacity
                 style={styles.menuListItem}
@@ -4038,6 +4155,25 @@ function TallyKhataApp() {
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>ব্যবসা পরিচালনা</Text>
                   <Text style={styles.menuListSub}>বর্তমান: {businessName || 'Mobile Xpress'} • একাধিক ব্যবসা ও সুইচ</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={handleOpenIvyWallet}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="আইভি ওয়ালেট (Ivy Wallet)"
+              >
+                <AppIcon source={require('./assets/icons/grid_cashbox.png')} variant="secondary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.menuListTitle}>আইভি ওয়ালেট (Ivy Wallet)</Text>
+                    <View style={styles.ivyNewBadge}>
+                      <Text style={styles.ivyNewBadgeText}>নতুন</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.menuListSub}>ব্যক্তিগত বাজেট, ইনভেস্টমেন্ট ও আধুনিক খরচ ট্র্যাকার</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
@@ -7308,6 +7444,375 @@ function TallyKhataApp() {
 
 
 
+
+
+      {/* ===================================================================
+          IVY WALLET IN-APP SCREEN (GPL v3.0, Pinned eb08c930cba1f988a5a8a7d6b5ff15b913d3168a)
+          Integrated into same package com.progoti.tallykhata.offline
+         =================================================================== */}
+      <Modal
+        visible={modalIvyWallet}
+        animationType="slide"
+        onRequestClose={() => setModalIvyWallet(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0B1120' }}>
+          {/* Header */}
+          <View style={styles.ivyHeader}>
+            <TouchableOpacity
+              style={styles.ivyBackBtn}
+              onPress={() => setModalIvyWallet(false)}
+              accessibilityLabel="পিছনে যান"
+            >
+              <Text style={styles.ivyBackIcon}>←</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.ivyHeaderTitle}>আইভি ওয়ালেট (Ivy Wallet)</Text>
+                <View style={styles.ivyFossBadge}>
+                  <Text style={styles.ivyFossBadgeText}>GPL v3</Text>
+                </View>
+              </View>
+              <Text style={styles.ivyHeaderSub}>ব্যক্তিগত ও আধুনিক ওপেন-সোর্স মানি ট্র্যাকার</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.ivyInfoBtn}
+              onPress={() => setModalIvyGplNotice(true)}
+              accessibilityLabel="লাইসেন্স ও আর্কিটেকচার তথ্য"
+            >
+              <Text style={styles.ivyInfoBtnText}>ℹ️</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }} showsVerticalScrollIndicator={false}>
+            {/* Net Worth Summary Card */}
+            {(() => {
+              const totalNetWorth = (ivyState.accounts || []).reduce((acc, a) => acc + (a.balance || 0), 0);
+              const totalIncome = (ivyState.transactions || []).filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+              const totalExpense = (ivyState.transactions || []).filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+              const netSavings = totalIncome - totalExpense;
+
+              return (
+                <View style={styles.ivyTotalCard}>
+                  <Text style={styles.ivyTotalCardLabel}>মোট ব্যক্তিগত সম্পদ (Net Worth)</Text>
+                  <Text style={styles.ivyTotalCardAmount}>৳ {totalNetWorth.toLocaleString('en-US')}</Text>
+
+                  <View style={styles.ivyStatRow}>
+                    <View style={styles.ivyStatCol}>
+                      <Text style={styles.ivyStatLabel}>মোট আয় (Income)</Text>
+                      <Text style={styles.ivyStatIncome}>+৳ {totalIncome.toLocaleString('en-US')}</Text>
+                    </View>
+                    <View style={styles.ivyStatDivider} />
+                    <View style={styles.ivyStatCol}>
+                      <Text style={styles.ivyStatLabel}>মোট খরচ (Expense)</Text>
+                      <Text style={styles.ivyStatExpense}>-৳ {totalExpense.toLocaleString('en-US')}</Text>
+                    </View>
+                    <View style={styles.ivyStatDivider} />
+                    <View style={styles.ivyStatCol}>
+                      <Text style={styles.ivyStatLabel}>নীট সেভিংস</Text>
+                      <Text style={[styles.ivyStatSavings, netSavings >= 0 ? styles.ivyGreen : styles.ivyRed]}>
+                        {netSavings >= 0 ? '+' : ''}৳ {netSavings.toLocaleString('en-US')}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })()}
+
+            {/* Sub Tabs */}
+            <View style={styles.ivySubTabsContainer}>
+              {[
+                { id: 'transactions', label: 'লেনদেন', icon: '📝' },
+                { id: 'accounts', label: 'অ্যাকাউন্ট', icon: '🏦' },
+                { id: 'budgets', label: 'বাজেট', icon: '🎯' },
+                { id: 'stats', label: 'পরিসংখ্যান', icon: '📊' },
+              ].map(tab => (
+                <TouchableOpacity
+                  key={tab.id}
+                  style={[styles.ivySubTabBtn, ivyActiveSubTab === tab.id && styles.ivySubTabBtnActive]}
+                  onPress={() => setIvyActiveSubTab(tab.id)}
+                >
+                  <Text style={[styles.ivySubTabLabel, ivyActiveSubTab === tab.id && styles.ivySubTabLabelActive]}>
+                    {tab.icon} {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Sub Tab Content */}
+            {ivyActiveSubTab === 'transactions' && (
+              <View>
+                {/* Filters and Add Txn Button */}
+                <View style={styles.ivyTxnFilterRow}>
+                  <View style={{ flexDirection: 'row', flex: 1 }}>
+                    {[
+                      { id: 'all', label: 'সব' },
+                      { id: 'expense', label: 'খরচ' },
+                      { id: 'income', label: 'আয়' },
+                    ].map(f => (
+                      <TouchableOpacity
+                        key={f.id}
+                        style={[styles.ivyFilterChip, ivyTxnFilter === f.id && styles.ivyFilterChipActive]}
+                        onPress={() => setIvyTxnFilter(f.id)}
+                      >
+                        <Text style={[styles.ivyFilterChipText, ivyTxnFilter === f.id && styles.ivyFilterChipTextActive]}>
+                          {f.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.ivyAddTxnBtn}
+                    onPress={() => setModalIvyAddTxn(true)}
+                  >
+                    <Text style={styles.ivyAddTxnBtnText}>+ নতুন লেনদেন</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Txn List */}
+                {(ivyState.transactions || [])
+                  .filter(t => ivyTxnFilter === 'all' || t.type === ivyTxnFilter)
+                  .map(t => {
+                    const cat = (ivyState.categories || []).find(c => c.id === t.categoryId) || { icon: '💸', name: 'অন্যান্য', color: '#6B7280' };
+                    const acc = (ivyState.accounts || []).find(a => a.id === t.accountId) || { name: 'ক্যাশ' };
+                    return (
+                      <View key={t.id} style={styles.ivyTxnCard}>
+                        <View style={[styles.ivyTxnIconBox, { backgroundColor: cat.color + '22' }]}>
+                          <Text style={{ fontSize: 20 }}>{cat.icon}</Text>
+                        </View>
+                        <View style={{ flex: 1, marginHorizontal: 12 }}>
+                          <Text style={styles.ivyTxnNote}>{t.note}</Text>
+                          <Text style={styles.ivyTxnSub}>{cat.name} • {acc.name} • {t.time}</Text>
+                        </View>
+                        <Text style={[styles.ivyTxnAmount, { color: t.type === 'income' ? '#10B981' : '#EF4444' }]}>
+                          {t.type === 'income' ? '+' : '-'}৳ {t.amount.toLocaleString('en-US')}
+                        </Text>
+                      </View>
+                    );
+                  })}
+              </View>
+            )}
+
+            {ivyActiveSubTab === 'accounts' && (
+              <View>
+                {(ivyState.accounts || []).map(acc => (
+                  <View key={acc.id} style={styles.ivyAccCard}>
+                    <View style={[styles.ivyAccIconBox, { backgroundColor: acc.color + '22' }]}>
+                      <Text style={{ fontSize: 22 }}>{acc.icon}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginHorizontal: 12 }}>
+                      <Text style={styles.ivyAccName}>{acc.name}</Text>
+                      <Text style={styles.ivyAccType}>{acc.type.toUpperCase()}</Text>
+                    </View>
+                    <Text style={[styles.ivyAccBalance, { color: acc.balance >= 0 ? '#10B981' : '#EF4444' }]}>
+                      ৳ {acc.balance.toLocaleString('en-US')}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {ivyActiveSubTab === 'budgets' && (
+              <View>
+                {(ivyState.categories || []).filter(c => c.budget > 0).map(cat => {
+                  const spent = (ivyState.transactions || [])
+                    .filter(t => t.type === 'expense' && t.categoryId === cat.id)
+                    .reduce((sum, t) => sum + t.amount, 0);
+                  const percent = Math.min(100, Math.round((spent / cat.budget) * 100));
+                  return (
+                    <View key={cat.id} style={styles.ivyBudgetCard}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Text style={styles.ivyBudgetName}>{cat.icon} {cat.name}</Text>
+                        <Text style={[styles.ivyBudgetPercent, { color: percent >= 90 ? '#EF4444' : '#10B981' }]}>
+                          {percent}% খরচ হয়েছে
+                        </Text>
+                      </View>
+                      <View style={styles.ivyProgressTrack}>
+                        <View style={[styles.ivyProgressBar, { width: percent + '%', backgroundColor: percent >= 90 ? '#EF4444' : cat.color }]} />
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                        <Text style={styles.ivyBudgetSub}>খরচ: ৳ {spent.toLocaleString('en-US')}</Text>
+                        <Text style={styles.ivyBudgetSub}>বাজেট: ৳ {cat.budget.toLocaleString('en-US')}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {ivyActiveSubTab === 'stats' && (
+              <View>
+                <View style={styles.ivyStatsCard}>
+                  <Text style={styles.ivyStatsCardTitle}>📊 খরচ বিভাগ অনুযায়ী বণ্টন</Text>
+                  {(ivyState.categories || []).map(cat => {
+                    const spent = (ivyState.transactions || [])
+                      .filter(t => t.type === 'expense' && t.categoryId === cat.id)
+                      .reduce((sum, t) => sum + t.amount, 0);
+                    if (spent <= 0) return null;
+                    return (
+                      <View key={cat.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                        <Text style={{ fontSize: 18, width: 30 }}>{cat.icon}</Text>
+                        <View style={{ flex: 1, marginHorizontal: 8 }}>
+                          <Text style={{ color: '#F8FAFC', fontSize: 13, fontWeight: '600' }}>{cat.name}</Text>
+                        </View>
+                        <Text style={{ color: '#EF4444', fontSize: 14, fontWeight: '700' }}>৳ {spent.toLocaleString('en-US')}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* Footer with GPL and Repo info */}
+            <View style={styles.ivyFooterBox}>
+              <Text style={styles.ivyFooterTitle}>🛡️ Ivy Wallet FOSS Integration (GPL v3.0)</Text>
+              <Text style={styles.ivyFooterSub}>
+                Pinned commit: eb08c930cba1f988a5a8a7d6b5ff15b913d3168a
+                অফলাইন আর্কিটেকচার ও ডেটা আইসোলেশন সুরক্ষিত
+              </Text>
+              <TouchableOpacity onPress={() => setModalIvyGplNotice(true)}>
+                <Text style={styles.ivyFooterLink}>লাইসেন্স ও সোর্স কোড নোটিশ দেখুন →</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Add Ivy Transaction Modal */}
+      <Modal
+        visible={modalIvyAddTxn}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalIvyAddTxn(false)}
+      >
+        <View style={styles.ivyModalOverlay}>
+          <View style={styles.ivyModalSheet}>
+            <View style={styles.ivyModalHeader}>
+              <Text style={styles.ivyModalTitle}>নতুন লেনদেন যোগ করুন</Text>
+              <TouchableOpacity style={styles.ivyModalCloseBtn} onPress={() => setModalIvyAddTxn(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Type Switcher */}
+            <View style={styles.ivyTypeSwitchRow}>
+              <TouchableOpacity
+                style={[styles.ivyTypeBtn, ivyNewType === 'expense' && styles.ivyTypeBtnExpense]}
+                onPress={() => setIvyNewType('expense')}
+              >
+                <Text style={[styles.ivyTypeBtnText, ivyNewType === 'expense' && styles.ivyTypeBtnTextActive]}>
+                  খরচ (Expense)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.ivyTypeBtn, ivyNewType === 'income' && styles.ivyTypeBtnIncome]}
+                onPress={() => setIvyNewType('income')}
+              >
+                <Text style={[styles.ivyTypeBtnText, ivyNewType === 'income' && styles.ivyTypeBtnTextActive]}>
+                  আয় (Income)
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Amount Input */}
+            <Text style={styles.ivyInputLabel}>পরিমাণ (টাকা)*</Text>
+            <TextInput
+              style={styles.ivyInput}
+              placeholder="0.00"
+              placeholderTextColor="#64748B"
+              keyboardType="numeric"
+              value={ivyNewAmount}
+              onChangeText={setIvyNewAmount}
+            />
+
+            {/* Category Selector */}
+            <Text style={styles.ivyInputLabel}>বিভাগ (Category)*</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {(ivyState.categories || []).map(cat => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.ivyCatChip, ivyNewCat === cat.id && styles.ivyCatChipActive]}
+                  onPress={() => setIvyNewCat(cat.id)}
+                >
+                  <Text style={{ marginRight: 6 }}>{cat.icon}</Text>
+                  <Text style={[styles.ivyCatChipText, ivyNewCat === cat.id && styles.ivyCatChipTextActive]}>
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Account Selector */}
+            <Text style={styles.ivyInputLabel}>অ্যাকাউন্ট*</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {(ivyState.accounts || []).map(acc => (
+                <TouchableOpacity
+                  key={acc.id}
+                  style={[styles.ivyCatChip, ivyNewAcc === acc.id && styles.ivyCatChipActive]}
+                  onPress={() => setIvyNewAcc(acc.id)}
+                >
+                  <Text style={{ marginRight: 6 }}>{acc.icon}</Text>
+                  <Text style={[styles.ivyCatChipText, ivyNewAcc === acc.id && styles.ivyCatChipTextActive]}>
+                    {acc.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Note Input */}
+            <Text style={styles.ivyInputLabel}>বিবরণ বা নোট</Text>
+            <TextInput
+              style={styles.ivyInput}
+              placeholder="লেনদেনের সংক্ষিপ্ত নোট লিখুন..."
+              placeholderTextColor="#64748B"
+              value={ivyNewNote}
+              onChangeText={setIvyNewNote}
+            />
+
+            <TouchableOpacity style={styles.ivySubmitBtn} onPress={handleSaveIvyTxn}>
+              <Text style={styles.ivySubmitBtnText}>লেনদেন সেভ করুন</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Ivy GPL Notice Modal */}
+      <Modal
+        visible={modalIvyGplNotice}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalIvyGplNotice(false)}
+      >
+        <View style={styles.ivyModalOverlay}>
+          <View style={[styles.ivyModalSheet, { maxHeight: '80%' }]}>
+            <View style={styles.ivyModalHeader}>
+              <Text style={styles.ivyModalTitle}>🛡️ Ivy Wallet GPL v3.0 লাইসেন্স নোটিশ</Text>
+              <TouchableOpacity style={styles.ivyModalCloseBtn} onPress={() => setModalIvyGplNotice(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.ivyGplHeader}>১. মুক্ত ও উন্মুক্ত সোর্স আর্কিটেকচার</Text>
+              <Text style={styles.ivyGplBody}>
+                Ivy Wallet একটি ওপেন সোর্স প্রজেক্ট যা GNU General Public License v3.0 এর অধীনে লাইসেন্সকৃত। এই ইন্টিগ্রেশনটি পিন করা কমিট eb08c930cba1f988a5a8a7d6b5ff15b913d3168a থেকে সংগৃহীত।
+              </Text>
+              <Text style={styles.ivyGplHeader}>২. সম্পূর্ণ সিঙ্গেল-প্যাকেজ অ্যাপ্লিকেশন</Text>
+              <Text style={styles.ivyGplBody}>
+                TallyKhata এবং Ivy Wallet একই অ্যান্ড্রয়েড প্যাকেজের (com.progoti.tallykhata.offline) মধ্যে ইন্টারনাল নেটিভ মডিউল ও স্ক্রিন হিসেবে হোস্ট করা হয়েছে।
+              </Text>
+              <Text style={styles.ivyGplHeader}>৩. ১০০% অফলাইন ডেটা আইসোলেশন</Text>
+              <Text style={styles.ivyGplBody}>
+                আইভি ওয়ালেটের সমস্ত হিসাব @ivy_wallet_state_v1 চাবিতে সম্পূর্ণ পৃথকভাবে সংরক্ষিত থাকে। টালিখাতার কাস্টমার লেজার বা গুগল ড্রাইভ ব্যাকআপে এর কোনো মিশ্রণ নেই।
+              </Text>
+              <Text style={styles.ivyGplHeader}>৪. সোর্স কোড ও রিপোজিটরি</Text>
+              <Text style={styles.ivyGplBody}>
+                আপস্ট্রিম রিপোজিটরি: https://github.com/rocky-ahmed/ivy-wallet
+                আর্কিটেকচার ডকুমেন্টেশন: IVY_WALLET_INTEGRATION_ARCHITECTURE.md
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
 
     </SafeAreaView>
@@ -10929,6 +11434,474 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#B81414',
   },
+  // --- IVY WALLET STYLES (GPL v3.0 Pinned eb08c930cba1f988a5a8a7d6b5ff15b913d3168a) ---
+  ivyNewBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    marginLeft: 6,
+  },
+  ivyNewBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  ivyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) + 8 : 14,
+    paddingBottom: 14,
+    backgroundColor: '#0F172A',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+  },
+  ivyBackBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ivyBackIcon: {
+    width: 18,
+    height: 18,
+    tintColor: '#F8FAFC',
+    transform: [{ rotate: '180deg' }],
+  },
+  ivyHeaderTitle: {
+    color: '#F8FAFC',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  ivyFossBadge: {
+    backgroundColor: '#065F46',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#059669',
+  },
+  ivyFossBadgeText: {
+    color: '#34D399',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  ivyHeaderSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  ivyInfoBtn: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  ivyInfoBtnText: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  ivyTotalCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 16,
+  },
+  ivyTotalCardLabel: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  ivyTotalCardAmount: {
+    color: '#F8FAFC',
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  ivyStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  ivyStatCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  ivyStatLabel: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  ivyStatIncome: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ivyStatExpense: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ivyStatSavings: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ivyStatDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#334155',
+  },
+  ivyGreen: {
+    color: '#10B981',
+  },
+  ivyRed: {
+    color: '#EF4444',
+  },
+  ivySubTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  ivySubTabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  ivySubTabBtnActive: {
+    backgroundColor: '#1E293B',
+  },
+  ivySubTabLabel: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  ivySubTabLabelActive: {
+    color: '#38BDF8',
+    fontWeight: '700',
+  },
+  ivyTxnFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  ivyFilterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#1E293B',
+    marginRight: 6,
+  },
+  ivyFilterChipActive: {
+    backgroundColor: '#0284C7',
+  },
+  ivyFilterChipText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  ivyFilterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  ivyAddTxnBtn: {
+    marginLeft: 'auto',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  ivyAddTxnBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ivyTxnCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  ivyTxnIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ivyTxnNote: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  ivyTxnSub: {
+    color: '#64748B',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  ivyTxnAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  ivyAccCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  ivyAccIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ivyAccName: {
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  ivyAccType: {
+    color: '#64748B',
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  ivyAccBalance: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  ivyBudgetCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  ivyBudgetName: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  ivyBudgetPercent: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ivyProgressTrack: {
+    height: 8,
+    backgroundColor: '#1E293B',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  ivyProgressBar: {
+    height: 8,
+    borderRadius: 4,
+  },
+  ivyBudgetSub: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  ivyStatsCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  ivyStatsCardTitle: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  ivyFooterBox: {
+    marginTop: 20,
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    alignItems: 'center',
+  },
+  ivyFooterTitle: {
+    color: '#34D399',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  ivyFooterSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  ivyFooterLink: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  ivyModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  ivyModalSheet: {
+    backgroundColor: '#0F172A',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+  },
+  ivyModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  ivyModalTitle: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  ivyModalCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ivyTypeSwitchRow: {
+    flexDirection: 'row',
+    marginBottom: 14,
+    backgroundColor: '#1E293B',
+    borderRadius: 10,
+    padding: 3,
+  },
+  ivyTypeBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  ivyTypeBtnExpense: {
+    backgroundColor: '#DC2626',
+  },
+  ivyTypeBtnIncome: {
+    backgroundColor: '#059669',
+  },
+  ivyTypeBtnText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  ivyTypeBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  ivyInputLabel: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  ivyInput: {
+    backgroundColor: '#1E293B',
+    color: '#F8FAFC',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  ivyCatChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  ivyCatChipActive: {
+    backgroundColor: '#0369A1',
+    borderColor: '#38BDF8',
+  },
+  ivyCatChipText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  ivyCatChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  ivySubmitBtn: {
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  ivySubmitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  ivyGplHeader: {
+    color: '#34D399',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  ivyGplBody: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+
 });
 
 
