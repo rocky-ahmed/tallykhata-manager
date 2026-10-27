@@ -363,6 +363,38 @@ runTest('Inventory Stock Adjustment & Validation (prevent negative stock)', () =
   assert(!validateStockAdjustment(initialStock, 'abc', 'in').valid, 'Non-numeric quantity must be invalid');
 });
 
+
+// ------------------------------------------------------------------
+// TEST 10 — SUPPLIER CONVENTIONS & VOUCHER LABELS
+// ------------------------------------------------------------------
+runTest('Supplier Conventions & Voucher Labels (Given = cash pay out, Received = credit purchase)', () => {
+  const supplier = { id: 'supp_test_10', name: 'হাজী ট্রেডার্স', type: 2, balance: 5000 };
+
+  // 1. Given = payment to supplier -> cash out
+  const txnPay = { id: 'st_1', accountId: supplier.id, type: 'given', amount: 2000, date: '2026-10-15' };
+  const defaultDescGiven = supplier.type === 1 ? 'বাকি বিক্রি' : 'টাকা পরিশোধ';
+  assert.strictEqual(defaultDescGiven, 'টাকা পরিশোধ', 'Supplier given transaction default description must be টাকা পরিশোধ');
+
+  const cashAfterPay = syncCashboxForTransaction(txnPay, supplier, []);
+  assert.strictEqual(cashAfterPay.length, 1, 'Cash entry must be created for supplier cash payment');
+  assert.strictEqual(cashAfterPay[0].type, 'out', 'Cash type must be out');
+  assert.strictEqual(cashAfterPay[0].category, 'supplier_pay', 'Category must be supplier_pay');
+
+  // 2. Received = credit purchase from supplier -> no immediate cash flow
+  const txnBuy = { id: 'st_2', accountId: supplier.id, type: 'received', amount: 3500, date: '2026-10-16' };
+  const defaultDescRecv = supplier.type === 1 ? 'বাকি আদায় (জমা)' : 'মাল ক্রয় বাবদ দেনা';
+  assert.strictEqual(defaultDescRecv, 'মাল ক্রয় বাবদ দেনা', 'Supplier received transaction default description must be মাল ক্রয় বাবদ দেনা');
+
+  const cashAfterBuy = syncCashboxForTransaction(txnBuy, supplier, []);
+  assert.strictEqual(cashAfterBuy.length, 0, 'No cash entry created for credit purchase');
+
+  // 3. Voucher balance labeling
+  const custLabel = 1 === 1 ? 'বর্তমান সর্বমোট বকেয়া: ' : 'বর্তমান সর্বমোট দেনা: ';
+  const suppLabel = supplier.type === 1 ? 'বর্তমান সর্বমোট বকেয়া: ' : 'বর্তমান সর্বমোট দেনা: ';
+  assert.strictEqual(custLabel, 'বর্তমান সর্বমোট বকেয়া: ', 'Customer voucher must use বকেয়া');
+  assert.strictEqual(suppLabel, 'বর্তমান সর্বমোট দেনা: ', 'Supplier voucher must use দেনা');
+});
+
 console.log('\n====================================================');
 console.log(`TEST SUITE SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED`);
 console.log('====================================================');

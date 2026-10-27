@@ -972,8 +972,8 @@ function TallyKhataApp() {
     const isCust = selectedAccount.type === 1;
     const txnId = generateUniqueId('txn_');
     const defaultDesc = txnType === 'given'
-      ? (isCust ? 'বাকি বিক্রি' : 'মাল ক্রয় বাবদ দেনা')
-      : (isCust ? 'বাকি আদায় (জমা)' : 'টাকা পরিশোধ');
+      ? (isCust ? 'বাকি বিক্রি' : 'টাকা পরিশোধ')
+      : (isCust ? 'বাকি আদায় (জমা)' : 'মাল ক্রয় বাবদ দেনা');
 
     const newJournal = {
       id: txnId,
@@ -2281,11 +2281,11 @@ function TallyKhataApp() {
       `${isCust ? 'কাস্টমার: ' : 'সাপ্লায়ার: '} ${account.name}\n` +
       `মোবাইল: ${account.phone || 'দেওয়া নেই'}\n` +
       `---------------------------------\n` +
-      `লেনদেনের ধরন: ${isGiven ? (isCust ? 'বাকি বিক্রি' : 'মাল ক্রয়') : (isCust ? 'বাকি আদায় (জমা)' : 'টাকা পরিশোধ')}\n` +
+      `লেনদেনের ধরন: ${isCust ? (isGiven ? 'বাকি বিক্রি' : 'বাকি আদায় (জমা)') : (isGiven ? 'টাকা পরিশোধ' : 'বাকিতে মাল ক্রয়')}\n` +
       `বিবরণ: ${txn.desc || 'সাধারণ লেনদেন'}\n` +
       `টাকার পরিমাণ: ৳ ${formatMoney(txn.amount)}\n` +
       `---------------------------------\n` +
-      `বর্তমান সর্বমোট বকেয়া: ৳ ${formatMoney(account.balance)}\n` +
+      `${isCust ? 'বর্তমান সর্বমোট বকেয়া: ' : 'বর্তমান সর্বমোট দেনা: '}৳ ${formatMoney(account.balance)}\n` +
       `=================================\n` +
       `১০০% সঠিক ও ডিজিটাল টালিখাতা হিসাব।\nধন্যবাদ, আবার আসবেন।`
     );
@@ -2864,14 +2864,14 @@ function TallyKhataApp() {
             onPress={() => handleOpenAddTxn('given')}
             activeOpacity={0.85}
           >
-            <Text style={styles.bigEntryBtnText}>- দিলাম (বাকি)</Text>
+            <Text style={styles.bigEntryBtnText}>{isCustomer ? '- দিলাম (বাকি)' : '- দিলাম (পরিশোধ)'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.bigEntryBtn, { backgroundColor: COLORS.green, borderBottomColor: "#065F06" }]}
             onPress={() => handleOpenAddTxn('received')}
             activeOpacity={0.85}
           >
-            <Text style={styles.bigEntryBtnText}>+ পেলাম (জমা)</Text>
+            <Text style={styles.bigEntryBtnText}>{isCustomer ? '+ পেলাম (জমা)' : '+ পেলাম (বাকি মাল)'}</Text>
           </TouchableOpacity>
         </View>
         </View>
@@ -4139,7 +4139,10 @@ function TallyKhataApp() {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
             <View style={styles.modalHeaderRow}>
               <Text style={[styles.modalCardTitle, { color: txnType === 'given' ? COLORS.primary : COLORS.green }]}>
-                {txnType === 'given' ? '- দিলাম (টাকা বা পণ্য বাকি)' : '+ পেলাম (নগদ বা জমা আদায়)'}
+                {isCustomer
+                  ? (txnType === 'given' ? '- দিলাম (টাকা বা পণ্য বাকি)' : '+ পেলাম (নগদ বা জমা আদায়)')
+                  : (txnType === 'given' ? '- দিলাম (টাকা পরিশোধ)' : '+ পেলাম (বাকিতে মাল ক্রয়)')
+                }
               </Text>
               <TouchableOpacity
                 onPress={() => setModalAddTxn(false)}
@@ -4366,7 +4369,10 @@ function TallyKhataApp() {
                 <View style={styles.voucherDetailRow}>
                   <Text style={styles.voucherLabel}>লেনদেনের ধরন:</Text>
                   <Text style={[styles.voucherVal, { color: selectedVoucherTxn?.type === 'given' ? COLORS.primary : COLORS.green, fontWeight: 'bold' }]}>
-                    {selectedVoucherTxn?.type === 'given' ? 'দিলাম (বাকি বিক্রি)' : 'পেলাম (জমা আদায়)'}
+                    {selectedAccount?.type === 1
+                      ? (selectedVoucherTxn?.type === 'given' ? 'দিলাম (বাকি বিক্রি)' : 'পেলাম (জমা আদায়)')
+                      : (selectedVoucherTxn?.type === 'given' ? 'দিলাম (টাকা পরিশোধ)' : 'পেলাম (বাকিতে মাল ক্রয়)')
+                    }
                   </Text>
                 </View>
                 <View style={styles.voucherDetailRow}>
@@ -4383,7 +4389,7 @@ function TallyKhataApp() {
                   </Text>
                 </View>
                 <View style={styles.voucherDetailRow}>
-                  <Text style={styles.voucherLabel}>সর্বমোট বর্তমান বাকি:</Text>
+                  <Text style={styles.voucherLabel}>{selectedAccount?.type === 1 ? 'সর্বমোট বর্তমান বাকি:' : 'সর্বমোট বর্তমান দেনা:'}</Text>
                   <Text style={[styles.voucherVal, { fontWeight: 'bold' }]}>
                     ৳ {formatMoney(selectedAccount?.balance)}
                   </Text>
@@ -4473,7 +4479,7 @@ function TallyKhataApp() {
               placeholderTextColor={COLORS.textSubtle}
             />
 
-            <Text style={styles.inputLabel}>পূর্বের বাকি (শুরুর জের)</Text>
+            <Text style={styles.inputLabel}>{selectedAccount?.type === 1 ? 'পূর্বের বাকি (শুরুর জের)' : 'পূর্বের দেনা (শুরুর জের)'}</Text>
             <TextInput
               style={styles.modalSimpleInput}
               value={accInitialBal}
@@ -4560,7 +4566,7 @@ function TallyKhataApp() {
             />
             <TextInput
               style={styles.modalSimpleInput}
-              placeholder="পূর্বের বাকি ব্যালেন্স (যদি থাকে)"
+              placeholder={accType === 1 ? "পূর্বের বাকি ব্যালেন্স (যদি থাকে)" : "পূর্বের দেনা ব্যালেন্স (যদি থাকে)"}
               placeholderTextColor={COLORS.textSubtle}
               keyboardType="numeric"
               value={accInitialBal}
