@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef, Component } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Component } from 'react';
 import {
   StyleSheet,
   Text,
@@ -89,15 +89,6 @@ const COLORS = {
 // =========================================================================
 // 2. SAFE UTILS & BENGALI FORMATTERS
 // =========================================================================
-const formatMoney = (amount) => {
-  if (amount === undefined || amount === null || isNaN(amount)) return '০';
-  const num = Math.round(Number(amount));
-  const isNeg = num < 0;
-  const absStr = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return isNeg ? '-' + absStr : absStr;
-};
-
-
 const toBengaliNumber = (amount) => {
   if (amount === undefined || amount === null || isNaN(amount)) return '০';
   const num = Math.round(Number(amount));
@@ -115,6 +106,10 @@ const toBengaliNumber = (amount) => {
   const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
   const bnStr = formatted.split('').map(c => (c >= '0' && c <= '9') ? bnDigits[parseInt(c, 10)] : c).join('');
   return isNeg ? '-' + bnStr : bnStr;
+};
+
+const formatMoney = (amount) => {
+  return toBengaliNumber(amount);
 };
 
 const toBengaliDecimal = (amount) => {
@@ -3204,7 +3199,7 @@ function TallyKhataApp() {
                     <Text style={[styles.customerCardAmount, { color: item.balance > 0 ? '#B81414' : item.balance < 0 ? '#1C7D50' : '#111827' }]}>
                       {toBengaliDecimal(item.balance)}
                     </Text>
-                    <Text style={styles.customerChevron}>></Text>
+                    <Image source={require('./assets/icons/arrow_right.png')} style={styles.customerChevron} resizeMode="contain" />
                   </TouchableOpacity>
                 );
               }}
@@ -3233,7 +3228,7 @@ function TallyKhataApp() {
             >
               <Image
                 source={require('./assets/icons/ic_add_user.png')}
-                style={{ width: 26, height: 26, tintColor: '#FFFFFF' }}
+                style={{ width: 28, height: 28, tintColor: '#FFFFFF' }}
                 resizeMode="contain"
               />
             </TouchableOpacity>
@@ -3408,7 +3403,7 @@ function TallyKhataApp() {
                         <Text style={[styles.cashAccountRowVal, { color: item.color }]}>
                           {hideCashAmounts ? '***' : `${item.isIn ? '+' : '-'} ৳ ${formatMoney(sum)}`}
                         </Text>
-                        <Text style={styles.cashAccountChevron}>›</Text>
+                        <Image source={require('./assets/icons/arrow_right.png')} style={styles.cashAccountChevron} resizeMode="contain" />
                       </View>
                     </TouchableOpacity>
                     {index < 4 ? <TwoToneDivider marginVertical={3} /> : null}
@@ -3524,7 +3519,7 @@ function TallyKhataApp() {
                 <Text style={styles.bulkTagadaTitle}>গ্রুপ তাগাদা পাঠান</Text>
                 <Text style={styles.bulkTagadaSub}>একসাথে সব {dueCustomers.length} জন বাকি কাস্টমারকে এসএমএস পাঠান</Text>
               </View>
-              <Text style={styles.bulkTagadaArrow}>›</Text>
+              <Image source={require('./assets/icons/arrow_right.png')} style={styles.bulkTagadaArrow} resizeMode="contain" />
             </TouchableOpacity>
 
             {/* Due Customers List */}
@@ -3811,7 +3806,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>একাউন্ট সমূহ</Text>
                   <Text style={styles.menuListSub}>ব্যালেন্স ৳ {formatMoney(walletBalance)} • সংযুক্ত ব্যাংক ও MFS</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3823,7 +3818,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>লেনদেন বিবরণী</Text>
                   <Text style={styles.menuListSub}>মোট {walletTxns.length} টি ওয়ালেট লেনদেন</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3835,7 +3830,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>লেনদেনের লিমিট ও চার্জ</Text>
                   <Text style={styles.menuListSub}>১০০% ফ্রি লেনদেন • কোনো চার্জ নেই</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
             </View>
 
@@ -3851,7 +3846,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>বেচা কেনা হিসাব</Text>
                   <Text style={styles.menuListSub}>দৈনিক বেচা-কেনা ও লাভের হিসাব</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3863,7 +3858,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>খরচ রিপোর্ট</Text>
                   <Text style={styles.menuListSub}>দোকানের সকল যাবতীয় খরচের তালিকা</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3875,7 +3870,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>বাকি হিসাব ও তাগাদা</Text>
                   <Text style={styles.menuListSub}>মোট বাকি ৳ {formatMoney(totalCustomerDue)}</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3887,7 +3882,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>সার্বিক হিসাব রিপোর্ট</Text>
                   <Text style={styles.menuListSub}>দৈনিক, মাসিক ও বার্ষিক স্টেটমেন্ট তৈরি ও শেয়ার</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3899,7 +3894,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>মালিকের হিসাব</Text>
                   <Text style={styles.menuListSub}>মালিকের বিনিয়োগ ও ব্যক্তিগত উত্তোলন স্টেটমেন্ট</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3911,7 +3906,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>স্টক ও পণ্য হিসাব</Text>
                   <Text style={styles.menuListSub}>মোট {inventory.length} টি পণ্য • স্টক মূল্য ৳ {formatMoney(totalStockCost)}</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3923,7 +3918,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>ব্যবসার নোট ও মেমো</Text>
                   <Text style={styles.menuListSub}>প্রয়োজনীয় কাজ ও জরুরি মেমো</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
             </View>
 
@@ -3939,7 +3934,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>দোকান ও ব্যবসা সেটিংস</Text>
                   <Text style={styles.menuListSub}>দোকানের নাম, ফোন, ঠিকানা ও প্রারম্ভিক ক্যাশ</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3951,7 +3946,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>পিন লক ও নিরাপত্তা</Text>
                   <Text style={styles.menuListSub}>{pinEnabled ? 'PIN লক সক্রিয় রয়েছে' : '৪ ডিজিটের গোপন PIN সেট করুন'}</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3966,7 +3961,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>ডাটা ব্যাকআপ ও রিস্টোর</Text>
                   <Text style={styles.menuListSub}>১০০% অফলাইন ডাটা সেভ ও নতুন ফোনে ট্রান্সফার</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3982,7 +3977,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>রেফার করুন</Text>
                   <Text style={styles.menuListSub}>অন্যান্য ব্যবসায়ীদের টালিখাতা শেয়ার করুন</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3994,7 +3989,7 @@ function TallyKhataApp() {
                   <Text style={styles.menuListTitle}>ব্যবহার নির্দেশিকা ও হেল্প</Text>
                   <Text style={styles.menuListSub}>সচরাচর জিজ্ঞাসিত প্রশ্ন ও হেল্পলাইন</Text>
                 </View>
-                <Text style={styles.menuListArrow}>›</Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
             </View>
 
@@ -4129,8 +4124,13 @@ function TallyKhataApp() {
               <Text style={[styles.modalCardTitle, { color: txnType === 'given' ? COLORS.primary : COLORS.green }]}>
                 {txnType === 'given' ? '- দিলাম (টাকা বা পণ্য বাকি)' : '+ পেলাম (নগদ বা জমা আদায়)'}
               </Text>
-              <TouchableOpacity onPress={() => setModalAddTxn(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalAddTxn(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -4284,8 +4284,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>ডিজিটাল ভাউচার (রশিদ)</Text>
-              <TouchableOpacity onPress={() => setModalVoucher(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalVoucher(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -4401,8 +4406,13 @@ function TallyKhataApp() {
               <Text style={styles.modalCardTitle}>
                 {selectedAccount?.type === 1 ? 'কাস্টমার তথ্য এডিট' : 'সাপ্লায়ার তথ্য এডিট'}
               </Text>
-              <TouchableOpacity onPress={() => setModalEditAccount(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalEditAccount(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -4464,8 +4474,13 @@ function TallyKhataApp() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>নতুন খাতা খুলুন</Text>
-              <TouchableOpacity onPress={() => setModalAddAccount(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalAddAccount(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -4542,8 +4557,13 @@ function TallyKhataApp() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>ক্যাশ বাক্সের এন্ট্রি</Text>
-              <TouchableOpacity onPress={() => setModalAddCash(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalAddCash(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -4618,8 +4638,13 @@ function TallyKhataApp() {
                 <Text style={styles.modalCardTitle}>ক্যাশবক্স মিলানো (নোট গণনা)</Text>
                 <Text style={{ fontSize: 11, color: COLORS.textMuted }}>খাতার ক্যাশ: ৳ {formatMoney(totalCash)}</Text>
               </View>
-              <TouchableOpacity onPress={() => setModalReconcileCash(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalReconcileCash(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -4737,8 +4762,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { alignItems: 'center' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>বাংলা QR কোড</Text>
-              <TouchableOpacity onPress={() => setModalBanglaQR(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalBanglaQR(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -4793,8 +4823,13 @@ function TallyKhataApp() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>ওয়ালেটে অ্যাড মানি</Text>
-              <TouchableOpacity onPress={() => setModalAddMoney(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalAddMoney(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -4845,8 +4880,13 @@ function TallyKhataApp() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>মোবাইল রিচার্জ</Text>
-              <TouchableOpacity onPress={() => setModalMobileRecharge(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalMobileRecharge(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -4903,8 +4943,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>স্টক ও পণ্য তালিকা</Text>
-              <TouchableOpacity onPress={() => setModalAddStock(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalAddStock(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5074,8 +5119,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { padding: 18, elevation: 12, backgroundColor: '#FFFFFF' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>তাগাদা মেসেজ</Text>
-              <TouchableOpacity onPress={() => setModalTagada(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalTagada(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5156,8 +5206,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { maxHeight: '85%' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>ব্যবসার নোট ও মেমো</Text>
-              <TouchableOpacity onPress={() => setModalNotes(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalNotes(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5203,8 +5258,13 @@ function TallyKhataApp() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>লাভ ও ক্ষতির হিসাব</Text>
-              <TouchableOpacity onPress={() => setModalProfitLoss(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalProfitLoss(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5245,8 +5305,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>সার্বিক হিসাব স্টেটমেন্ট</Text>
-              <TouchableOpacity onPress={() => setModalFullReport(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalFullReport(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5310,8 +5375,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>দোকান ও ব্যবসা সেটিংস</Text>
-              <TouchableOpacity onPress={() => setModalSettings(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalSettings(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5489,7 +5559,7 @@ function TallyKhataApp() {
                           খাতার সকল তথ্য ও লেনদেন গুগল ড্রাইভে নিরাপদ রাখুন
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 18, color: '#B81414', fontWeight: 'bold' }}>›</Text>
+                      <Image source={require('./assets/icons/arrow_right_red.png')} style={{ width: 14, height: 14 }} resizeMode="contain" />
                     </TouchableOpacity>
 
                     {/* CONTROL 2: অনলাইন ব্যাকআপ রিস্টোর করুন */}
@@ -5508,7 +5578,7 @@ function TallyKhataApp() {
                           গুগল ড্রাইভ থেকে আগের সংরক্ষিত ডাটা মোবাইলে ফেরত আনুন
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 18, color: '#0F8A0F', fontWeight: 'bold' }}>›</Text>
+                      <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 14, height: 14, tintColor: '#0F8A0F' }} resizeMode="contain" />
                     </TouchableOpacity>
 
                     {/* CONTROL 3: ডাটা এক্সপোর্ট করুন */}
@@ -5526,7 +5596,7 @@ function TallyKhataApp() {
                           সম্পূর্ণ খাতার ব্যাকআপ ফাইল (JSON) শেয়ার বা সেভ করুন
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 18, color: '#2563EB', fontWeight: 'bold' }}>›</Text>
+                      <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 14, height: 14, tintColor: '#2563EB' }} resizeMode="contain" />
                     </TouchableOpacity>
 
                     {/* CONTROL 4: Google Drive Account পরিবর্তন করুন */}
@@ -5544,7 +5614,7 @@ function TallyKhataApp() {
                           অন্য কোনো জিমেইল একাউন্ট নির্বাচন করতে এখানে ট্যাপ করুন
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 18, color: '#D97706', fontWeight: 'bold' }}>›</Text>
+                      <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 14, height: 14, tintColor: '#D97706' }} resizeMode="contain" />
                     </TouchableOpacity>
 
                     {/* CONTROL 5: Google Account সরান */}
@@ -5562,7 +5632,7 @@ function TallyKhataApp() {
                           গুগল ড্রাইভ সংযোগ বিচ্ছিন্ন করুন (লোকাল ডাটা অপরিবর্তিত থাকবে)
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 18, color: '#DC2626', fontWeight: 'bold' }}>›</Text>
+                      <Image source={require('./assets/icons/arrow_right_red.png')} style={{ width: 14, height: 14 }} resizeMode="contain" />
                     </TouchableOpacity>
                   </View>
 
@@ -5674,8 +5744,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { maxHeight: '80%' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>ইনবক্স ও নোটিফিকেশন</Text>
-              <TouchableOpacity onPress={() => setModalInbox(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalInbox(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5708,8 +5783,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { maxHeight: '90%' }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>হেল্প ও সচরাচর প্রশ্ন</Text>
-              <TouchableOpacity onPress={() => setModalSupport(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalSupport(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5753,8 +5833,13 @@ function TallyKhataApp() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>পিন লক সেটিংস</Text>
-              <TouchableOpacity onPress={() => setModalPinSetup(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalPinSetup(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5822,8 +5907,13 @@ function TallyKhataApp() {
             <View style={styles.bottomSheetHandle} />
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>ব্যবসা প্রতিষ্ঠান পরিবর্তন</Text>
-              <TouchableOpacity onPress={() => setModalBusinessPicker(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalBusinessPicker(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5886,8 +5976,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { padding: 18 }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>নতুন ব্যবসা প্রতিষ্ঠান</Text>
-              <TouchableOpacity onPress={() => setModalAddBusiness(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalAddBusiness(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -5955,8 +6050,12 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalBechaKena(false)} style={styles.reportHeaderBack}>
-              <Text style={styles.reportHeaderBackText}>←</Text>
+            <TouchableOpacity onPress={() => setModalBechaKena(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+              <Image
+                source={require('./assets/icons/arrow_left.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
             <Text style={styles.reportHeaderTitle}>বেচাকেনা রিপোর্ট</Text>
             <TouchableOpacity
@@ -5966,7 +6065,13 @@ function TallyKhataApp() {
                   message: `${businessName} - বেচাকেনা রিপোর্ট`,
                 });
               }}
+              activeOpacity={0.7}
             >
+              <Image
+                source={require('./assets/icons/ic_share.png')}
+                style={{ width: 14, height: 14, tintColor: '#FFFFFF', marginRight: 4 }}
+                resizeMode="contain"
+              />
               <Text style={styles.reportHeaderActionText}>শেয়ার</Text>
             </TouchableOpacity>
           </View>
@@ -6078,8 +6183,12 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalBakiReport(false)} style={styles.reportHeaderBack}>
-              <Text style={styles.reportHeaderBackText}>←</Text>
+            <TouchableOpacity onPress={() => setModalBakiReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+              <Image
+                source={require('./assets/icons/arrow_left.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
             <Text style={styles.reportHeaderTitle}>বাকি রিপোর্ট (পাওনা ও দেনা)</Text>
             <TouchableOpacity
@@ -6089,7 +6198,13 @@ function TallyKhataApp() {
                   message: `${businessName} - বাকি রিপোর্ট\nমোট পাওনা: ৳ ${formatMoney(totalCustomerDue)}\nমোট দেনা: ৳ ${formatMoney(totalSupplierDue)}`,
                 });
               }}
+              activeOpacity={0.7}
             >
+              <Image
+                source={require('./assets/icons/ic_share.png')}
+                style={{ width: 14, height: 14, tintColor: '#FFFFFF', marginRight: 4 }}
+                resizeMode="contain"
+              />
               <Text style={styles.reportHeaderActionText}>শেয়ার</Text>
             </TouchableOpacity>
           </View>
@@ -6200,8 +6315,12 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalCashReport(false)} style={styles.reportHeaderBack}>
-              <Text style={styles.reportHeaderBackText}>←</Text>
+            <TouchableOpacity onPress={() => setModalCashReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+              <Image
+                source={require('./assets/icons/arrow_left.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
             <Text style={styles.reportHeaderTitle}>ক্যাশ রিপোর্ট (ক্যাশবক্স হিসাব)</Text>
             <TouchableOpacity
@@ -6211,7 +6330,13 @@ function TallyKhataApp() {
                   message: `${businessName} - ক্যাশ রিপোর্ট\nবর্তমান ক্যাশ ব্যালেন্স: ৳ ${formatMoney(totalCash)}`,
                 });
               }}
+              activeOpacity={0.7}
             >
+              <Image
+                source={require('./assets/icons/ic_share.png')}
+                style={{ width: 14, height: 14, tintColor: '#FFFFFF', marginRight: 4 }}
+                resizeMode="contain"
+              />
               <Text style={styles.reportHeaderActionText}>শেয়ার</Text>
             </TouchableOpacity>
           </View>
@@ -6307,8 +6432,12 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalExpenseReport(false)} style={styles.reportHeaderBack}>
-              <Text style={styles.reportHeaderBackText}>←</Text>
+            <TouchableOpacity onPress={() => setModalExpenseReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+              <Image
+                source={require('./assets/icons/arrow_left.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
             <Text style={styles.reportHeaderTitle}>দোকান খরচ রিপোর্ট</Text>
             <TouchableOpacity
@@ -6319,6 +6448,7 @@ function TallyKhataApp() {
                 setModalExpenseReport(false);
                 setModalAddCash(true);
               }}
+              activeOpacity={0.7}
             >
               <Text style={styles.reportHeaderActionText}>+ খরচ লিখুন</Text>
             </TouchableOpacity>
@@ -6376,8 +6506,12 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalMalikReport(false)} style={styles.reportHeaderBack}>
-              <Text style={styles.reportHeaderBackText}>←</Text>
+            <TouchableOpacity onPress={() => setModalMalikReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+              <Image
+                source={require('./assets/icons/arrow_left.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
             <Text style={styles.reportHeaderTitle}>মালিকের হিসাব (মূলধন ও ব্যক্তিগত)</Text>
             <TouchableOpacity
@@ -6387,7 +6521,13 @@ function TallyKhataApp() {
                   message: `${businessName} - মালিকের হিসাব`,
                 });
               }}
+              activeOpacity={0.7}
             >
+              <Image
+                source={require('./assets/icons/ic_share.png')}
+                style={{ width: 14, height: 14, tintColor: '#FFFFFF', marginRight: 4 }}
+                resizeMode="contain"
+              />
               <Text style={styles.reportHeaderActionText}>শেয়ার</Text>
             </TouchableOpacity>
           </View>
@@ -6503,8 +6643,13 @@ function TallyKhataApp() {
           <View style={[styles.modalCard, { padding: 18 }]}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalCardTitle}>টাকা উত্তোলন / ট্রান্সফার</Text>
-              <TouchableOpacity onPress={() => setModalMoneyOut(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+              <TouchableOpacity
+                onPress={() => setModalMoneyOut(false)}
+                style={styles.modalCloseCircle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCloseCircleText}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -7161,9 +7306,10 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   customerChevron: {
-    fontSize: 18,
-    color: '#9CA3AF',
-    fontWeight: 'bold',
+    width: 14,
+    height: 14,
+    tintColor: '#9CA3AF',
+    marginLeft: 6,
   },
 
   // Floating Round FAB
@@ -8254,8 +8400,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   menuListArrow: {
-    fontSize: 18,
-    color: '#9CA3AF',
+    width: 14,
+    height: 14,
+    tintColor: '#9CA3AF',
   },
 
   // --- 5-BUTTON BOTTOM NAVIGATION BAR ---
@@ -8431,6 +8578,27 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
+  },
+  modalTitleBar: {
+    width: 4,
+    height: 18,
+    backgroundColor: '#B81414',
+    borderRadius: 2,
+    marginRight: 8,
+  },
+  modalCloseCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseCircleText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4B5563',
+    lineHeight: 18,
   },
   modalHeaderRow: {
     flexDirection: 'row',
@@ -9257,8 +9425,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   cashAccountChevron: {
-    fontSize: 18,
-    color: '#9CA3AF',
+    width: 14,
+    height: 14,
+    tintColor: '#9CA3AF',
     marginLeft: 8,
   },
   menuGroupHeader: {
@@ -9573,7 +9742,7 @@ const styles = StyleSheet.create({
   reportHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#D32F2F',
+    backgroundColor: '#B81414',
     paddingTop: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
@@ -9595,8 +9764,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   reportHeaderAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 6,
   },
