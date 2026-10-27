@@ -245,6 +245,7 @@ function syncCashboxForTransaction(txn, account, cashEntries = []) {
 
     const linkedEntry = {
       id: existingIdx >= 0 ? cashEntries[existingIdx].id : 'c_' + strTxnId,
+      businessId: account.businessId || txn.businessId || '1',
       linkedTxnId: strTxnId,
       category: entryCategory,
       type: entryType,

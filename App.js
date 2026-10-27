@@ -540,6 +540,7 @@ function TallyKhataApp() {
   activeTabRef.current = activeTab;
 
   // Business Profile
+  const [activeBusinessId, setActiveBusinessId] = useState('1');
   const [businessName, setBusinessName] = useState('Mobile Xpress');
   const [ownerName, setOwnerName] = useState('স্বত্বাধিকারী');
   const [ownerPhone, setOwnerPhone] = useState('01700000000');
@@ -810,6 +811,7 @@ function TallyKhataApp() {
         if (d.ownerPhone) setOwnerPhone(d.ownerPhone);
         if (d.businessAddress) setBusinessAddress(d.businessAddress);
         if (Array.isArray(d.businesses)) setBusinesses(d.businesses);
+        if (d.activeBusinessId) setActiveBusinessId(String(d.activeBusinessId));
         if (d.remainingSmsCount !== undefined) setRemainingSmsCount(Number(d.remainingSmsCount));
         if (d.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(d.tallyMessageBalance));
         if (d.googleUser) setGoogleUser(d.googleUser);
@@ -850,10 +852,28 @@ function TallyKhataApp() {
     }
   };
 
-  // --- FINANCIAL CALCULATIONS & DOUBLE-ENTRY SYNC ---
+  // --- BUSINESS-SCOPED DATA COLLECTIONS ---
+  const activeBizId = activeBusinessId || '1';
+  const businessAccounts = useMemo(() => {
+    return (accounts || []).filter((a) => String(a.businessId || '1') === String(activeBizId));
+  }, [accounts, activeBizId]);
+
+  const businessCashEntries = useMemo(() => {
+    return (cashEntries || []).filter((c) => String(c.businessId || '1') === String(activeBizId));
+  }, [cashEntries, activeBizId]);
+
+  const businessInventory = useMemo(() => {
+    return (inventory || []).filter((i) => String(i.businessId || '1') === String(activeBizId));
+  }, [inventory, activeBizId]);
+
+  const businessNotes = useMemo(() => {
+    return (notes || []).filter((n) => String(n.businessId || '1') === String(activeBizId));
+  }, [notes, activeBizId]);
+
+  // --- FINANCIAL CALCULATIONS & DOUBLE-ENTRY SYNC (BUSINESS SCOPED) ---
   let totalCustomerDue = 0;
   let totalSupplierDue = 0;
-  (accounts || []).forEach((a) => {
+  (businessAccounts || []).forEach((a) => {
     const bal = Number(a.balance) || 0;
     if (a.type === 1 && bal > 0) totalCustomerDue += bal;
     if (a.type === 2 && bal > 0) totalSupplierDue += bal;
@@ -866,7 +886,7 @@ function TallyKhataApp() {
   let todayCosts = 0;
   const todayStr = getTodayDate();
 
-  (cashEntries || []).forEach((c) => {
+  (businessCashEntries || []).forEach((c) => {
     const amt = Number(c.amount) || 0;
     if (c.type === 'in') {
       totalCash += amt;
@@ -885,7 +905,7 @@ function TallyKhataApp() {
 
   let todayBakiAday = 0;
   let todaySupplierPay = 0;
-  (cashEntries || []).forEach((c) => {
+  (businessCashEntries || []).forEach((c) => {
     const amt = Number(c.amount) || 0;
     if (c.date === todayStr) {
       if (c.category === 'baki_aday') todayBakiAday += amt;
@@ -907,7 +927,7 @@ function TallyKhataApp() {
 
   let totalStockCost = 0;
   let totalStockSaleValue = 0;
-  (inventory || []).forEach((item) => {
+  (businessInventory || []).forEach((item) => {
     const qty = Number(item.stock) || 0;
     totalStockCost += qty * (Number(item.buyPrice) || 0);
     totalStockSaleValue += qty * (Number(item.sellPrice) || 0);
@@ -978,6 +998,7 @@ function TallyKhataApp() {
     const newJournal = {
       id: txnId,
       accountId: selectedAccount.id,
+      businessId: selectedAccount.businessId || activeBusinessId || '1',
       type: txnType,
       amount: valRes.amount,
       desc: txnDesc.trim() || defaultDesc,
@@ -1179,6 +1200,7 @@ function TallyKhataApp() {
     const newId = generateUniqueId('acc_');
     const newAcc = {
       id: newId,
+      businessId: activeBusinessId || '1',
       name: valRes.name,
       phone: valRes.phone,
       address: accAddress.trim(),
@@ -1328,6 +1350,7 @@ function TallyKhataApp() {
 
     const newEntry = {
       id: generateUniqueId('cash_'),
+      businessId: activeBusinessId || '1',
       category: cashCategory,
       type: type,
       amount: amt,
@@ -1418,6 +1441,7 @@ function TallyKhataApp() {
     }
     const newP = {
       id: generateUniqueId('prod_'),
+      businessId: activeBusinessId || '1',
       name: prodName.trim(),
       unit: prodUnit.trim() || 'পিস',
       buyPrice: parseFloat(prodBuyPrice) || 0,
@@ -1492,6 +1516,7 @@ function TallyKhataApp() {
     if (!newNoteText.trim()) return;
     const newN = {
       id: generateUniqueId('note_'),
+      businessId: activeBusinessId || '1',
       text: newNoteText.trim(),
       isComplete: false,
       date: getTodayDate(),
@@ -1951,6 +1976,7 @@ function TallyKhataApp() {
     if (restoredInv) setInventory(restoredInv);
     if (Array.isArray(state.notes)) setNotes(state.notes);
     if (Array.isArray(state.businesses)) setBusinesses(state.businesses);
+    if (state.activeBusinessId) setActiveBusinessId(String(state.activeBusinessId));
     if (state.businessName) setBusinessName(state.businessName);
     if (state.ownerName !== undefined) setOwnerName(state.ownerName);
     if (state.ownerPhone !== undefined) setOwnerPhone(state.ownerPhone);
@@ -2238,6 +2264,7 @@ function TallyKhataApp() {
       if (restoredInv) setInventory(restoredInv);
       if (Array.isArray(newState.notes)) setNotes(newState.notes);
       if (Array.isArray(newState.businesses)) setBusinesses(newState.businesses);
+      if (newState.activeBusinessId) setActiveBusinessId(String(newState.activeBusinessId));
       if (newState.businessName) setBusinessName(newState.businessName);
       if (newState.ownerName !== undefined) setOwnerName(newState.ownerName);
       if (newState.ownerPhone !== undefined) setOwnerPhone(newState.ownerPhone);
@@ -2291,27 +2318,24 @@ function TallyKhataApp() {
     );
   };
 
-  // --- BUSINESS PICKER & CREATION HANDLERS ---
+  // --- BUSINESS PICKER & COMPLETE LIFECYCLE HANDLERS ---
   const handleSelectBusiness = async (biz) => {
-    const updated = businesses.map((b) => ({ ...b, isSelected: b.id === biz.id }));
-    const saveRes = await persistData({
-      businessName: biz.name,
-      ownerName: biz.owner || ownerName,
-      ownerPhone: biz.phone || ownerPhone,
-      businessAddress: biz.address || businessAddress,
-      businesses: updated,
-    });
-    if (!saveRes.success) {
-      Alert.alert('ত্রুটি', 'ব্যবসা পরিবর্তন সংরক্ষণ ব্যর্থ হয়েছে।');
+    setIsSaving(true);
+    const res = await storageRepository.selectBusiness(biz.id);
+    setIsSaving(false);
+    if (!res.success) {
+      Alert.alert('ত্রুটি', res.error?.message || 'ব্যবসা পরিবর্তন ব্যর্থ হয়েছে।');
       return;
     }
-    setBusinessName(biz.name);
-    if (biz.owner) setOwnerName(biz.owner);
-    if (biz.phone) setOwnerPhone(biz.phone);
-    if (biz.address) setBusinessAddress(biz.address);
-    setBusinesses(updated);
+    const store = res.data;
+    if (store.activeBusinessId) setActiveBusinessId(String(store.activeBusinessId));
+    if (Array.isArray(store.businesses)) setBusinesses(store.businesses);
+    if (store.businessName) setBusinessName(store.businessName);
+    if (store.ownerName) setOwnerName(store.ownerName);
+    if (store.ownerPhone) setOwnerPhone(store.ownerPhone);
+    if (store.businessAddress) setBusinessAddress(store.businessAddress);
     setModalBusinessPicker(false);
-    Alert.alert('ব্যবসা পরিবর্তন', `বর্তমানে সক্রিয়: ${biz.name}`);
+    Alert.alert('ব্যবসা পরিবর্তন', `বর্তমানে সক্রিয়: ${store.businessName || biz.name}`);
   };
 
   const handleCreateBusiness = async () => {
@@ -2319,44 +2343,113 @@ function TallyKhataApp() {
       Alert.alert('সতর্কতা', 'ব্যবসার নাম লিখুন');
       return;
     }
-    const newBiz = {
-      id: generateUniqueId('biz_'),
+    setIsSaving(true);
+    const res = await storageRepository.createBusiness({
       name: newBizName.trim(),
       owner: newBizOwner.trim() || ownerName,
       phone: newBizPhone.trim() || ownerPhone,
       address: newBizAddress.trim() || 'ঢাকা, বাংলাদেশ',
-      isSelected: true,
-    };
-    setIsSaving(true);
-    const saveRes = await storageRepository.mutateStore((latestStore) => {
-      const curBusinesses = latestStore.businesses || [];
-      const updated = [...curBusinesses.map((b) => ({ ...b, isSelected: false })), newBiz];
-      return {
-        ...latestStore,
-        businessName: newBiz.name,
-        ownerName: newBiz.owner,
-        ownerPhone: newBiz.phone,
-        businessAddress: newBiz.address,
-        businesses: updated,
-      };
+      selectImmediately: true,
     });
     setIsSaving(false);
-    if (!saveRes.success) {
-      Alert.alert('ত্রুটি', 'নতুন ব্যবসা তৈরি ও সংরক্ষণ ব্যর্থ হয়েছে।');
+    if (!res.success) {
+      Alert.alert('ত্রুটি', res.error?.message || 'নতুন ব্যবসা তৈরি ব্যর্থ হয়েছে।');
       return;
     }
-    setBusinesses(saveRes.data.businesses);
-    setBusinessName(newBiz.name);
-    if (newBiz.owner) setOwnerName(newBiz.owner);
-    if (newBiz.phone) setOwnerPhone(newBiz.phone);
-    if (newBiz.address) setBusinessAddress(newBiz.address);
+    const store = res.data;
+    if (store.activeBusinessId) setActiveBusinessId(String(store.activeBusinessId));
+    if (Array.isArray(store.businesses)) setBusinesses(store.businesses);
+    if (store.businessName) setBusinessName(store.businessName);
+    if (store.ownerName) setOwnerName(store.ownerName);
+    if (store.ownerPhone) setOwnerPhone(store.ownerPhone);
+    if (store.businessAddress) setBusinessAddress(store.businessAddress);
     setNewBizName('');
     setNewBizOwner('');
     setNewBizPhone('');
     setNewBizAddress('');
     setModalAddBusiness(false);
     setModalBusinessPicker(false);
-    Alert.alert('সফল', `নতুন ব্যবসা "${newBiz.name}" তৈরি ও সক্রিয় করা হয়েছে।`);
+    Alert.alert('সফল', `নতুন ব্যবসা "${store.businessName || newBizName}" তৈরি ও সক্রিয় করা হয়েছে।`);
+  };
+
+  const handleArchiveBusiness = (biz) => {
+    Alert.alert(
+      'ব্যবসা আর্কাইভ করবেন?',
+      `"${biz.name}" আর্কাইভ করা হলে এটি সক্রিয় তালিকা থেকে লুকানো থাকবে, কিন্তু এর সকল আর্থিক হিসাব ও লেনদেন সম্পূর্ণ সুরক্ষিত থাকবে। আপনি যেকোনো সময় এটি পুনরুদ্ধার করতে পারবেন।`,
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'আর্কাইভ করুন',
+          style: 'destructive',
+          onPress: async () => {
+            setIsSaving(true);
+            const res = await storageRepository.archiveBusiness(biz.id);
+            setIsSaving(false);
+            if (!res.success) {
+              Alert.alert('আর্কাইভ ব্যর্থ', res.error?.message || 'ব্যবসা আর্কাইভ করা সম্ভব হয়নি।');
+              return;
+            }
+            const store = res.data;
+            if (store.activeBusinessId) setActiveBusinessId(String(store.activeBusinessId));
+            if (Array.isArray(store.businesses)) setBusinesses(store.businesses);
+            if (store.businessName) setBusinessName(store.businessName);
+            if (store.ownerName) setOwnerName(store.ownerName);
+            if (store.ownerPhone) setOwnerPhone(store.ownerPhone);
+            if (store.businessAddress) setBusinessAddress(store.businessAddress);
+            Alert.alert('সফল', `"${biz.name}" সফলভাবে আর্কাইভ করা হয়েছে।`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRestoreBusiness = async (biz) => {
+    setIsSaving(true);
+    const res = await storageRepository.restoreBusiness(biz.id, { selectImmediately: true });
+    setIsSaving(false);
+    if (!res.success) {
+      Alert.alert('পুনরুদ্ধার ব্যর্থ', res.error?.message || 'ব্যবসা পুনরুদ্ধার করা সম্ভব হয়নি।');
+      return;
+    }
+    const store = res.data;
+    if (store.activeBusinessId) setActiveBusinessId(String(store.activeBusinessId));
+    if (Array.isArray(store.businesses)) setBusinesses(store.businesses);
+    if (store.businessName) setBusinessName(store.businessName);
+    if (store.ownerName) setOwnerName(store.ownerName);
+    if (store.ownerPhone) setOwnerPhone(store.ownerPhone);
+    if (store.businessAddress) setBusinessAddress(store.businessAddress);
+    Alert.alert('সফল', `"${biz.name}" সফলভাবে পুনরুদ্ধার ও সক্রিয় করা হয়েছে।`);
+  };
+
+  const handlePermanentDeleteBusiness = (biz) => {
+    Alert.alert(
+      'স্থায়ীভাবে মুছে ফেলবেন?',
+      `"${biz.name}" স্থায়ীভাবে মুছে ফেলতে চান? মনে রাখবেন, শুধুমাত্র কোনো লেনদেন বা হিসাব না থাকলেই এটি মুছে ফেলা যাবে।`,
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'মুছে ফেলুন',
+          style: 'destructive',
+          onPress: async () => {
+            setIsSaving(true);
+            const res = await storageRepository.deleteBusinessPermanently(biz.id);
+            setIsSaving(false);
+            if (!res.success) {
+              Alert.alert('মুছে ফেলা সম্ভব নয়', res.error?.message || 'ব্যবসা মুছে ফেলা সম্ভব হয়নি।');
+              return;
+            }
+            const store = res.data;
+            if (store.activeBusinessId) setActiveBusinessId(String(store.activeBusinessId));
+            if (Array.isArray(store.businesses)) setBusinesses(store.businesses);
+            if (store.businessName) setBusinessName(store.businessName);
+            if (store.ownerName) setOwnerName(store.ownerName);
+            if (store.ownerPhone) setOwnerPhone(store.ownerPhone);
+            if (store.businessAddress) setBusinessAddress(store.businessAddress);
+            Alert.alert('সফল', `"${biz.name}" স্থায়ীভাবে মুছে ফেলা হয়েছে।`);
+          },
+        },
+      ]
+    );
   };
 
   // --- CASH RECONCILIATION WITH DENOMINATIONS HANDLER ---
@@ -2533,9 +2626,9 @@ function TallyKhataApp() {
     Alert.alert('সফল', `৳ ${formatMoney(amt)} টাকা সফলভাবে ${methodLabel}-এ স্থানান্তর (লোকাল লেজার) করা হয়েছে।`);
   };
 
-  // --- FILTERED ACCOUNTS FOR TAB 1 ---
+  // --- FILTERED ACCOUNTS FOR TAB 1 (BUSINESS SCOPED) ---
   const filteredAccounts = useMemo(() => {
-    return (accounts || []).filter((a) => {
+    return (businessAccounts || []).filter((a) => {
       // Type matching
       if (accountTab === 'customer' && a.type !== 1) return false;
       if (accountTab === 'supplier' && a.type !== 2) return false;
@@ -2557,16 +2650,16 @@ function TallyKhataApp() {
       }
       return 0; // default order
     });
-  }, [accounts, accountTab, accountFilter, searchQuery]);
+  }, [businessAccounts, accountTab, accountFilter, searchQuery]);
 
   const dueCustomers = useMemo(() => {
-    return (accounts || []).filter((a) => a.type === 1 && (Number(a.balance) || 0) > 0);
-  }, [accounts]);
+    return (businessAccounts || []).filter((a) => a.type === 1 && (Number(a.balance) || 0) > 0);
+  }, [businessAccounts]);
 
   const filteredCashEntries = useMemo(() => {
-    if (cashFilter === 'all') return cashEntries || [];
-    return (cashEntries || []).filter((c) => c.category === cashFilter);
-  }, [cashEntries, cashFilter]);
+    if (cashFilter === 'all') return businessCashEntries || [];
+    return (businessCashEntries || []).filter((c) => c.category === cashFilter);
+  }, [businessCashEntries, cashFilter]);
 
 
   // =========================================================================
@@ -3166,7 +3259,7 @@ function TallyKhataApp() {
                       style={[styles.counterTabPill, accountTab === 'customer' && styles.counterTabPillActive]}
                     >
                       <Text style={[styles.counterTabText, accountTab === 'customer' && styles.counterTabTextActive]}>
-                        কাস্টমার {toBengaliNumber(accounts.filter((a) => a.type === 1).length)}
+                        কাস্টমার {toBengaliNumber(businessAccounts.filter((a) => a.type === 1).length)}
                       </Text>
                     </TouchableOpacity>
                     <Text style={styles.counterStripDivider}>/</Text>
@@ -3179,7 +3272,7 @@ function TallyKhataApp() {
                       style={[styles.counterTabPill, accountTab === 'supplier' && styles.counterTabPillActive]}
                     >
                       <Text style={[styles.counterTabText, accountTab === 'supplier' && styles.counterTabTextActive]}>
-                        সাপ্লায়ার {toBengaliNumber(accounts.filter((a) => a.type === 2).length)}
+                        সাপ্লায়ার {toBengaliNumber(businessAccounts.filter((a) => a.type === 2).length)}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -3913,7 +4006,7 @@ function TallyKhataApp() {
                 <AppIcon source={require('./assets/icons/ic_menu_stock.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={styles.menuListTitle}>স্টক ও পণ্য হিসাব</Text>
-                  <Text style={styles.menuListSub}>মোট {inventory.length} টি পণ্য • স্টক মূল্য ৳ {formatMoney(totalStockCost)}</Text>
+                  <Text style={styles.menuListSub}>মোট {businessInventory.length} টি পণ্য • স্টক মূল্য ৳ {formatMoney(totalStockCost)}</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
               </TouchableOpacity>
@@ -5020,7 +5113,7 @@ function TallyKhataApp() {
               <View style={styles.stockSummaryRow}>
                 <View style={styles.stockSummaryBox}>
                   <Text style={styles.stockSummaryBoxLabel}>মোট পণ্য</Text>
-                  <Text style={styles.stockSummaryBoxVal}>{inventory.length} টি</Text>
+                  <Text style={styles.stockSummaryBoxVal}>{businessInventory.length} টি</Text>
                 </View>
                 <View style={[styles.stockSummaryBox, { borderColor: COLORS.primary }]}>
                   <Text style={styles.stockSummaryBoxLabel}>স্টক ক্রয়মূল্য</Text>
@@ -5078,8 +5171,8 @@ function TallyKhataApp() {
                 <Text style={styles.modalBtnSubmitText}>+ পণ্য যোগ করুন</Text>
               </TouchableOpacity>
 
-              <Text style={[styles.sectionHeading, { marginTop: 16 }]}>বিদ্যমান পণ্যসমূহ</Text>
-              {inventory.map((item) => (
+              <Text style={[styles.sectionHeading, { marginTop: 16 }]}>বিদ্যমান পণ্যসমূহ ({businessInventory.length})</Text>
+              {businessInventory.map((item) => (
                 <View key={item.id} style={styles.stockItemRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.stockItemName}>{item.name}</Text>
@@ -5303,7 +5396,7 @@ function TallyKhataApp() {
             </View>
 
             <ScrollView contentContainerStyle={{ paddingBottom: 10 }}>
-              {notes.map((n) => (
+              {businessNotes.map((n) => (
                 <View key={n.id} style={styles.noteItemRow}>
                   <TouchableOpacity onPress={() => handleToggleNote(n.id)} style={{ paddingRight: 8 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: n.isComplete ? '#ECFDF5' : '#F3F4F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
@@ -6036,36 +6129,78 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 340, marginVertical: 8 }}>
-              {(businesses || []).map((biz) => {
-                const isSelected = biz.isSelected || biz.name === businessName;
+            <ScrollView style={{ maxHeight: 380, marginVertical: 8 }}>
+              <Text style={styles.bizSectionTitle}>সক্রিয় প্রতিষ্ঠানসমূহ</Text>
+              {(businesses || []).filter((b) => !b.isArchived).map((biz) => {
+                const isSelected = String(biz.id) === String(activeBusinessId) || biz.isSelected || biz.name === businessName;
+                const activeCount = (businesses || []).filter((b) => !b.isArchived).length;
                 return (
-                  <TouchableOpacity
+                  <View
                     key={biz.id}
                     style={[styles.bizPickerItem, isSelected && styles.bizPickerItemActive]}
-                    onPress={() => {
-                      handleSelectBusiness(biz);
-                      setModalBusinessPicker(false);
-                    }}
                   >
-                    <View style={styles.bizPickerAvatar}>
-                      <Image
-                        source={require('./assets/ic_tally_khata_logo_reg.png')}
-                        style={{ width: 28, height: 28 }}
-                        resizeMode="contain"
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.bizPickerName}>{biz.name}</Text>
-                      <Text style={styles.bizPickerSub}>{biz.owner || 'স্বত্বাধিকারী'} • {biz.phone || '01700000000'}</Text>
-                      {biz.address ? <Text style={[styles.bizPickerSub, { fontSize: 11 }]}>{biz.address}</Text> : null}
-                    </View>
-                    <View style={[styles.bizPickerRadio, isSelected && styles.bizPickerRadioActive]}>
-                      {isSelected ? <View style={styles.bizPickerRadioInner} /> : null}
-                    </View>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                      onPress={() => handleSelectBusiness(biz)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.bizPickerAvatar}>
+                        <Image
+                          source={require('./assets/ic_tally_khata_logo_reg.png')}
+                          style={{ width: 28, height: 28 }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.bizPickerName}>{biz.name}</Text>
+                        <Text style={styles.bizPickerSub}>{biz.owner || 'স্বত্বাধিকারী'} • {biz.phone || '01700000000'}</Text>
+                        {biz.address ? <Text style={[styles.bizPickerSub, { fontSize: 11 }]}>{biz.address}</Text> : null}
+                      </View>
+                      <View style={[styles.bizPickerRadio, isSelected && styles.bizPickerRadioActive]}>
+                        {isSelected ? <View style={styles.bizPickerRadioInner} /> : null}
+                      </View>
+                    </TouchableOpacity>
+
+                    {activeCount > 1 ? (
+                      <TouchableOpacity
+                        style={styles.bizArchiveBtn}
+                        onPress={() => handleArchiveBusiness(biz)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.bizArchiveBtnText}>আর্কাইভ</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                 );
               })}
+
+              {(businesses || []).some((b) => Boolean(b.isArchived)) ? (
+                <>
+                  <Text style={[styles.bizSectionTitle, { marginTop: 16 }]}>আর্কাইভকৃত প্রতিষ্ঠান</Text>
+                  {(businesses || []).filter((b) => Boolean(b.isArchived)).map((biz) => (
+                    <View key={biz.id} style={styles.bizArchivedCard}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.bizPickerName, { color: '#6B7280' }]}>{biz.name} (আর্কাইভ)</Text>
+                        <Text style={styles.bizPickerSub}>{biz.owner || 'স্বত্বাধিকারী'} • {biz.phone || ''}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity
+                          style={styles.bizRestoreBtn}
+                          onPress={() => handleRestoreBusiness(biz)}
+                        >
+                          <Text style={styles.bizRestoreBtnText}>পুনরুদ্ধার</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.bizDeleteBtn}
+                          onPress={() => handlePermanentDeleteBusiness(biz)}
+                        >
+                          <Text style={styles.bizDeleteBtnText}>মুছুন</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </>
+              ) : null}
             </ScrollView>
 
             <TouchableOpacity
@@ -9876,6 +10011,62 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  bizSectionTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#6B7280',
+    marginBottom: 8,
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  bizArchiveBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginLeft: 8,
+  },
+  bizArchiveBtnText: {
+    fontSize: 11,
+    color: '#4B5563',
+    fontWeight: '600',
+  },
+  bizArchivedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  bizRestoreBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#DEF7EC',
+  },
+  bizRestoreBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#03543F',
+  },
+  bizDeleteBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#FDE8E8',
+  },
+  bizDeleteBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#9B1C1C',
   },
 
   // --- AUTHENTIC FULLSCREEN REPORT SCREENS ---

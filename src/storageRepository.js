@@ -34,9 +34,9 @@ const VALID_COLLECTIONS = new Set([
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
 const DEFAULT_BUSINESSES = [
-  { id: '1', name: 'Mobile Xpress', owner: 'স্বত্বাধিকারী', phone: '01700000000', address: 'বাজার রোড, ঢাকা', isSelected: true },
-  { id: '2', name: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ', owner: 'হাজী মো: করিম', phone: '01811223344', address: 'পাইকারি আড়ৎ, ঢাকা', isSelected: false },
-  { id: '3', name: 'সোনালী ফ্যাশন ও বস্ত্রালয়', owner: 'আহমেদ উল্লাহ', phone: '01911334455', address: 'নিউ মার্কেট, ঢাকা', isSelected: false },
+  { id: '1', name: 'Mobile Xpress', owner: 'স্বত্বাধিকারী', phone: '01700000000', address: 'বাজার রোড, ঢাকা', isSelected: true, isArchived: false, createdAt: '2026-10-15T00:00:00.000Z' },
+  { id: '2', name: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ', owner: 'হাজী মো: করিম', phone: '01811223344', address: 'পাইকারি আড়ৎ, ঢাকা', isSelected: false, isArchived: false, createdAt: '2026-10-15T00:00:00.000Z' },
+  { id: '3', name: 'সোনালী ফ্যাশন ও বস্ত্রালয়', owner: 'আহমেদ উল্লাহ', phone: '01911334455', address: 'নিউ মার্কেট, ঢাকা', isSelected: false, isArchived: false, createdAt: '2026-10-15T00:00:00.000Z' },
 ];
 
 function createDefaultState() {
@@ -91,6 +91,7 @@ function createDefaultState() {
     ownerPhone: '01700000000',
     businessAddress: 'বাজার রোড, ঢাকা',
     businesses: DEFAULT_BUSINESSES,
+    activeBusinessId: '1',
     remainingSmsCount: 5,
     tallyMessageBalance: 50,
     openingBalance: 3000,
@@ -147,6 +148,19 @@ class StorageRepository {
           parsed.stock = parsed.inventory;
         } else if (Array.isArray(parsed.stock) && !Array.isArray(parsed.inventory)) {
           parsed.inventory = parsed.stock;
+        }
+        if (Array.isArray(parsed.businesses)) {
+          parsed.businesses = parsed.businesses.map((b) => ({
+            ...b,
+            isArchived: Boolean(b.isArchived),
+          }));
+          const selectedBiz = parsed.businesses.find((b) => b.isSelected && !b.isArchived) ||
+            parsed.businesses.find((b) => !b.isArchived) ||
+            parsed.businesses[0];
+          parsed.activeBusinessId = selectedBiz ? String(selectedBiz.id) : '1';
+        } else {
+          parsed.businesses = DEFAULT_BUSINESSES;
+          parsed.activeBusinessId = '1';
         }
         this.currentStore = parsed;
         return { success: true, data: parsed, source: 'v6' };
@@ -428,6 +442,310 @@ class StorageRepository {
     return { success: true, restored: true, snapshotId };
   }
 
+
+  /**
+   * Returns list of active (non-archived) businesses.
+   */
+  listActiveBusinesses(store = null) {
+    const s = store || this.currentStore;
+    const list = s && Array.isArray(s.businesses) ? s.businesses : DEFAULT_BUSINESSES;
+    return list.filter((b) => !b.isArchived);
+  }
+
+  /**
+   * Returns list of archived businesses.
+   */
+  listArchivedBusinesses(store = null) {
+    const s = store || this.currentStore;
+    const list = s && Array.isArray(s.businesses) ? s.businesses : [];
+    return list.filter((b) => Boolean(b.isArchived));
+  }
+
+  /**
+   * Returns currently active business object.
+   */
+  getActiveBusiness(store = null) {
+    const s = store || this.currentStore;
+    const list = s && Array.isArray(s.businesses) ? s.businesses : DEFAULT_BUSINESSES;
+    return (
+      list.find((b) => b.isSelected && !b.isArchived) ||
+      list.find((b) => !b.isArchived) ||
+      list[0] ||
+      DEFAULT_BUSINESSES[0]
+    );
+  }
+
+  /**
+   * Returns currently active business ID.
+   */
+  getActiveBusinessId(store = null) {
+    const active = this.getActiveBusiness(store);
+    return active ? String(active.id) : '1';
+  }
+
+  /**
+   * Filters an array of items by businessId. Items without businessId default to business '1'.
+   */
+  filterByBusiness(collection, businessId) {
+    if (!Array.isArray(collection)) return [];
+    const targetId = String(businessId || '1');
+    return collection.filter((item) => String(item.businessId || '1') === targetId);
+  }
+
+  /**
+   * Switches active business. Validates business exists and is not archived.
+   */
+  async selectBusiness(bizId) {
+    if (!bizId) return { success: false, error: new Error('Business ID is required') };
+    const targetId = String(bizId);
+
+    return this.mutateStore((prevStore) => {
+      const list = Array.isArray(prevStore.businesses) ? prevStore.businesses : DEFAULT_BUSINESSES;
+      const target = list.find((b) => String(b.id) === targetId);
+      if (!target) {
+        throw new Error('ব্যবসা প্রতিষ্ঠানটি পাওয়া যায়নি: ' + targetId);
+      }
+      if (target.isArchived) {
+        throw new Error('আর্কাইভ করা ব্যবসা সরাসরি নির্বাচন করা যাবে না। প্রথমে এটি পুনরুদ্ধার করুন।');
+      }
+
+      const updatedBusinesses = list.map((b) => ({
+        ...b,
+        isSelected: String(b.id) === targetId,
+      }));
+
+      return {
+        ...prevStore,
+        activeBusinessId: targetId,
+        businessName: target.name,
+        ownerName: target.owner || prevStore.ownerName || '',
+        ownerPhone: target.phone || prevStore.ownerPhone || '',
+        businessAddress: target.address || prevStore.businessAddress || '',
+        businesses: updatedBusinesses,
+      };
+    });
+  }
+
+  /**
+   * Creates a new business with stable unique ID, non-archived status, and validation.
+   */
+  async createBusiness(bizData) {
+    if (!bizData || typeof bizData !== 'object') {
+      return { success: false, error: new Error('ব্যবসার তথ্য সঠিক নয়') };
+    }
+    const name = String(bizData.name || '').trim();
+    if (!name) {
+      return { success: false, error: new Error('ব্যবসার নাম লেখা আবশ্যক') };
+    }
+
+    const newId = bizData.id ? String(bizData.id) : ('biz_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+    const isSelected = bizData.isSelected !== false;
+
+    const newBiz = {
+      id: newId,
+      name,
+      owner: String(bizData.owner || '').trim() || 'স্বত্বাধিকারী',
+      phone: String(bizData.phone || '').trim() || '01700000000',
+      address: String(bizData.address || '').trim() || 'ঢাকা, বাংলাদেশ',
+      isSelected,
+      isArchived: false,
+      createdAt: bizData.createdAt || new Date().toISOString(),
+    };
+
+    return this.mutateStore((prevStore) => {
+      const list = Array.isArray(prevStore.businesses) ? prevStore.businesses : DEFAULT_BUSINESSES;
+      if (list.some((b) => String(b.id) === newId)) {
+        throw new Error('এই আইডি বিশিষ্ট ব্যবসা ইতোমধ্যে বিদ্যমান: ' + newId);
+      }
+
+      const updatedBusinesses = isSelected
+        ? [...list.map((b) => ({ ...b, isSelected: false })), newBiz]
+        : [...list, newBiz];
+
+      return {
+        ...prevStore,
+        businesses: updatedBusinesses,
+        ...(isSelected
+          ? {
+              activeBusinessId: newBiz.id,
+              businessName: newBiz.name,
+              ownerName: newBiz.owner,
+              ownerPhone: newBiz.phone,
+              businessAddress: newBiz.address,
+            }
+          : {}),
+      };
+    });
+  }
+
+  /**
+   * Reversibly archives a business.
+   * Safety guard: Never allows the sole remaining active business to be archived.
+   * If the archived business was active, automatically switches to next active business.
+   */
+  async archiveBusiness(bizId) {
+    if (!bizId) return { success: false, error: new Error('Business ID is required') };
+    const targetId = String(bizId);
+
+    return this.mutateStore((prevStore) => {
+      const list = Array.isArray(prevStore.businesses) ? prevStore.businesses : DEFAULT_BUSINESSES;
+      const activeList = list.filter((b) => !b.isArchived);
+
+      if (activeList.length <= 1) {
+        throw new Error('কমপক্ষে একটি ব্যবসা সক্রিয় থাকতে হবে। একমাত্র সক্রিয় ব্যবসাটি আর্কাইভ করা যাবে না।');
+      }
+
+      const target = list.find((b) => String(b.id) === targetId);
+      if (!target) {
+        throw new Error('ব্যবসা প্রতিষ্ঠানটি পাওয়া যায়নি: ' + targetId);
+      }
+      if (target.isArchived) {
+        return prevStore; // Already archived
+      }
+
+      const remainingActive = activeList.filter((b) => String(b.id) !== targetId);
+      const wasSelected = target.isSelected || String(prevStore.activeBusinessId) === targetId;
+      const nextActive = wasSelected ? remainingActive[0] : null;
+
+      const updatedBusinesses = list.map((b) => {
+        if (String(b.id) === targetId) {
+          return {
+            ...b,
+            isArchived: true,
+            isSelected: false,
+            archivedAt: new Date().toISOString(),
+          };
+        }
+        if (nextActive && String(b.id) === String(nextActive.id)) {
+          return {
+            ...b,
+            isSelected: true,
+          };
+        }
+        return b;
+      });
+
+      return {
+        ...prevStore,
+        businesses: updatedBusinesses,
+        ...(nextActive
+          ? {
+              activeBusinessId: String(nextActive.id),
+              businessName: nextActive.name,
+              ownerName: nextActive.owner || prevStore.ownerName,
+              ownerPhone: nextActive.phone || prevStore.ownerPhone,
+              businessAddress: nextActive.address || prevStore.businessAddress,
+            }
+          : {}),
+      };
+    });
+  }
+
+  /**
+   * Restores an archived business safely.
+   */
+  async restoreBusiness(bizId, options = {}) {
+    if (!bizId) return { success: false, error: new Error('Business ID is required') };
+    const targetId = String(bizId);
+
+    return this.mutateStore((prevStore) => {
+      const list = Array.isArray(prevStore.businesses) ? prevStore.businesses : DEFAULT_BUSINESSES;
+      const target = list.find((b) => String(b.id) === targetId);
+      if (!target) {
+        throw new Error('ব্যবসা প্রতিষ্ঠানটি পাওয়া যায়নি: ' + targetId);
+      }
+      if (!target.isArchived) {
+        return prevStore; // Already active
+      }
+
+      const makeActive = Boolean(options.makeActive);
+      const updatedBusinesses = list.map((b) => {
+        if (String(b.id) === targetId) {
+          return {
+            ...b,
+            isArchived: false,
+            isSelected: makeActive ? true : Boolean(b.isSelected),
+            restoredAt: new Date().toISOString(),
+          };
+        }
+        if (makeActive) {
+          return { ...b, isSelected: false };
+        }
+        return b;
+      });
+
+      return {
+        ...prevStore,
+        businesses: updatedBusinesses,
+        ...(makeActive
+          ? {
+              activeBusinessId: target.id,
+              businessName: target.name,
+              ownerName: target.owner || prevStore.ownerName,
+              ownerPhone: target.phone || prevStore.ownerPhone,
+              businessAddress: target.address || prevStore.businessAddress,
+            }
+          : {}),
+      };
+    });
+  }
+
+  /**
+   * Permanently deletes a business ONLY if it has zero linked financial records.
+   * Guard: Refuses permanent deletion when accounts, cash entries, or stock exist.
+   * Guard: Never deletes the sole remaining active business.
+   */
+  async deleteBusinessPermanently(bizId, options = {}) {
+    if (!bizId) return { success: false, error: new Error('Business ID is required') };
+    const targetId = String(bizId);
+
+    return this.mutateStore((prevStore) => {
+      const list = Array.isArray(prevStore.businesses) ? prevStore.businesses : DEFAULT_BUSINESSES;
+      const target = list.find((b) => String(b.id) === targetId);
+      if (!target) {
+        throw new Error('ব্যবসা প্রতিষ্ঠানটি পাওয়া যায়নি: ' + targetId);
+      }
+
+      // Check linked financial records
+      const accounts = Array.isArray(prevStore.accounts) ? prevStore.accounts : [];
+      const cash = Array.isArray(prevStore.cashEntries) ? prevStore.cashEntries : [];
+      const stock = Array.isArray(prevStore.stock) ? prevStore.stock : (Array.isArray(prevStore.inventory) ? prevStore.inventory : []);
+
+      const hasAccounts = accounts.some((a) => String(a.businessId || '1') === targetId);
+      const hasCash = cash.some((c) => String(c.businessId || '1') === targetId);
+      const hasStock = stock.some((s) => String(s.businessId || '1') === targetId);
+
+      if ((hasAccounts || hasCash || hasStock) && !options.force) {
+        throw new Error(
+          'এই ব্যবসার অধীনে সংরক্ষিত আর্থিক হিসাব বা পণ্য তালিকা রয়েছে। ডেটা সুরক্ষার জন্য এটি স্থায়ীভাবে মুছে ফেলা সম্ভব নয়। আপনি এটি সুরক্ষিতভাবে আর্কাইভ করতে পারেন।'
+        );
+      }
+
+      const activeList = list.filter((b) => !b.isArchived);
+      if (activeList.length <= 1 && !target.isArchived) {
+        throw new Error('কমপক্ষে একটি ব্যবসা সক্রিয় থাকতে হবে। একমাত্র সক্রিয় ব্যবসাটি মুছে ফেলা যাবে না।');
+      }
+
+      const updatedBusinesses = list.filter((b) => String(b.id) !== targetId);
+      const wasSelected = target.isSelected || String(prevStore.activeBusinessId) === targetId;
+      const nextActive = wasSelected ? updatedBusinesses.find((b) => !b.isArchived) : null;
+
+      return {
+        ...prevStore,
+        businesses: updatedBusinesses,
+        ...(nextActive
+          ? {
+              activeBusinessId: String(nextActive.id),
+              businessName: nextActive.name,
+              ownerName: nextActive.owner || prevStore.ownerName,
+              ownerPhone: nextActive.phone || prevStore.ownerPhone,
+              businessAddress: nextActive.address || prevStore.businessAddress,
+            }
+          : {}),
+      };
+    });
+  }
+
   /**
    * Commits restored backup payload safely into storage.
    * Performs validation, recalculates ledger balances, and writes atomically.
@@ -501,6 +819,39 @@ class StorageRepository {
           }
           return acc;
         });
+      }
+
+      if (Array.isArray(newStore.businesses)) {
+        newStore.businesses = newStore.businesses.map((b) => ({
+          ...b,
+          isArchived: Boolean(b.isArchived),
+        }));
+        if (data.businessName && !Array.isArray(data.businesses) && newStore.businesses[0]) {
+          newStore.businesses[0] = {
+            ...newStore.businesses[0],
+            name: data.businessName,
+          };
+        }
+        const hasActiveSelected = newStore.businesses.some((b) => b.isSelected && !b.isArchived);
+        if (!hasActiveSelected) {
+          const firstActive = newStore.businesses.find((b) => !b.isArchived) || newStore.businesses[0];
+          if (firstActive) {
+            newStore.businesses = newStore.businesses.map((b) => ({
+              ...b,
+              isSelected: String(b.id) === String(firstActive.id),
+            }));
+            newStore.activeBusinessId = String(firstActive.id);
+            if (!newStore.businessName) {
+              newStore.businessName = firstActive.name;
+            }
+          }
+        } else {
+          const selectedBiz = newStore.businesses.find((b) => b.isSelected && !b.isArchived);
+          newStore.activeBusinessId = String(selectedBiz.id);
+          if (!newStore.businessName) {
+            newStore.businessName = selectedBiz.name;
+          }
+        }
       }
 
       return newStore;
