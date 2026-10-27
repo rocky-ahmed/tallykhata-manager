@@ -3232,6 +3232,8 @@ function TallyKhataApp() {
                 setModalAddAccount(true);
               }}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="নতুন কাস্টমার বা সাপ্লায়ার যুক্ত করুন"
             >
               <Image
                 source={require('./assets/icons/ic_add_user.png')}
@@ -4019,6 +4021,8 @@ function TallyKhataApp() {
           style={styles.tabButton}
           onPress={() => setActiveTab('home')}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="টালি ট্যাব"
         >
           {activeTab === 'home' ? (
             <View style={styles.tabActivePill}>
@@ -4044,6 +4048,8 @@ function TallyKhataApp() {
           style={styles.tabButton}
           onPress={() => setActiveTab('cashbox')}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="ক্যাশবাক্স ট্যাব"
         >
           {activeTab === 'cashbox' ? (
             <View style={styles.tabActivePill}>
@@ -4069,6 +4075,8 @@ function TallyKhataApp() {
           style={styles.tabButton}
           onPress={() => setActiveTab('tallypay')}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="টালিপে ট্যাব"
         >
           {activeTab === 'tallypay' ? (
             <View style={styles.tabActivePill}>
@@ -4094,6 +4102,8 @@ function TallyKhataApp() {
           style={styles.tabButton}
           onPress={() => setActiveTab('menu')}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="মেন্যু ট্যাব"
         >
           {activeTab === 'menu' ? (
             <View style={styles.tabActivePill}>
@@ -6157,7 +6167,9 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalBechaKena(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => setModalBechaKena(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="পেছনে যান">
               <Image
                 source={require('./assets/icons/arrow_left.png')}
                 style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
@@ -6290,7 +6302,9 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalBakiReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => setModalBakiReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="পেছনে যান">
               <Image
                 source={require('./assets/icons/arrow_left.png')}
                 style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
@@ -6422,7 +6436,9 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalCashReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => setModalCashReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="পেছনে যান">
               <Image
                 source={require('./assets/icons/arrow_left.png')}
                 style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
@@ -6539,7 +6555,9 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalExpenseReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => setModalExpenseReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="পেছনে যান">
               <Image
                 source={require('./assets/icons/arrow_left.png')}
                 style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
@@ -6613,7 +6631,9 @@ function TallyKhataApp() {
       >
         <SafeAreaView style={styles.reportContainer}>
           <View style={styles.reportHeader}>
-            <TouchableOpacity onPress={() => setModalMalikReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => setModalMalikReport(false)} style={styles.reportHeaderBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="পেছনে যান">
               <Image
                 source={require('./assets/icons/arrow_left.png')}
                 style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
@@ -6929,6 +6949,8 @@ function TallyKhataApp() {
               onPress={() => setModalTxnLimit(false)}
               style={styles.txnLimitBackBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="পেছনে যান"
             >
               <Image
                 source={require('./assets/icons/arrow_left.png')}
@@ -9859,7 +9881,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#B81414',
-    paddingTop: 12,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
     elevation: 3,
@@ -10155,7 +10177,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#B81414',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 14,
+    paddingBottom: 14,
   },
   txnLimitBackBtn: {
     padding: 4,
