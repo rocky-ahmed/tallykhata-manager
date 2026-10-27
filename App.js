@@ -432,7 +432,14 @@ const SectionHeader = ({ title, count, badge, actionText, onAction, style }) => 
     </View>
     {actionText && (
       <TouchableOpacity onPress={onAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.7}>
-        <Text style={styles.sectionHeaderAction}>{actionText} ›</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={styles.sectionHeaderAction}>{actionText}</Text>
+        <Image
+          source={require('./assets/icons/arrow_right.png')}
+          style={{ width: 11, height: 11, tintColor: COLORS.primary, marginLeft: 3 }}
+          resizeMode="contain"
+        />
+      </View>
       </TouchableOpacity>
     )}
   </View>
@@ -4130,7 +4137,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -4290,7 +4301,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -4412,7 +4427,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -4480,7 +4499,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -4563,7 +4586,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -4644,7 +4671,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -4715,7 +4746,7 @@ function TallyKhataApp() {
                     if (diff === 0) {
                       return (
                         <Text style={{ fontSize: 13, color: COLORS.green, fontWeight: 'bold' }}>
-                          ✓ ক্যাশ পুরোপুরি মিলে গেছে! কোনো গরমিল নেই।
+                          ক্যাশ পুরোপুরি মিলে গেছে! কোনো গরমিল নেই।
                         </Text>
                       );
                     } else if (diff > 0) {
@@ -4727,7 +4758,7 @@ function TallyKhataApp() {
                     } else {
                       return (
                         <Text style={{ fontSize: 13, color: COLORS.red, fontWeight: 'bold' }}>
-                          ⚠️ ড্রয়ারে ৳ {formatMoney(Math.abs(diff))} ক্যাশ ঘাটতি রয়েছে!
+                          ড্রয়ারে ৳ {formatMoney(Math.abs(diff))} ক্যাশ ঘাটতি রয়েছে!
                         </Text>
                       );
                     }
@@ -4768,7 +4799,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -4829,7 +4864,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -4886,7 +4925,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -4949,7 +4992,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5125,7 +5172,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5212,7 +5263,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5235,7 +5290,23 @@ function TallyKhataApp() {
               {notes.map((n) => (
                 <View key={n.id} style={styles.noteItemRow}>
                   <TouchableOpacity onPress={() => handleToggleNote(n.id)} style={{ paddingRight: 8 }}>
-                    <Text style={{ fontSize: 18 }}>{n.isComplete ? '✓ সম্পন্ন' : '○ বাকি'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: n.isComplete ? '#ECFDF5' : '#F3F4F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                      {n.isComplete ? (
+                        <>
+                          <Image
+                            source={require('./assets/icons/ic_check.png')}
+                            style={{ width: 12, height: 12, tintColor: COLORS.green, marginRight: 4 }}
+                            resizeMode="contain"
+                          />
+                          <Text style={{ fontSize: 12, color: COLORS.green, fontWeight: 'bold' }}>সম্পন্ন</Text>
+                        </>
+                      ) : (
+                        <>
+                          <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, borderColor: '#9CA3AF', marginRight: 4 }} />
+                          <Text style={{ fontSize: 12, color: '#6B7280' }}>বাকি</Text>
+                        </>
+                      )}
+                    </View>
                   </TouchableOpacity>
                   <Text style={[styles.noteItemText, n.isComplete && styles.noteItemTextDone]}>
                     {n.text}
@@ -5264,7 +5335,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5311,7 +5386,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5381,7 +5460,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5462,7 +5545,11 @@ function TallyKhataApp() {
                 <Text style={styles.cloudBackupHeaderTitle}>ডাটা ব্যাকআপ ও রিস্টোর</Text>
               </View>
               <TouchableOpacity onPress={() => setModalBackupRestore(false)} style={{ padding: 6 }}>
-                <Text style={{ fontSize: 18, color: '#FFFFFF', fontWeight: 'bold' }}>✕</Text>
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={{ width: 14, height: 14, tintColor: '#FFFFFF' }}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </View>
 
@@ -5750,7 +5837,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5789,7 +5880,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5839,7 +5934,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5913,7 +6012,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -5982,7 +6085,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -6649,7 +6756,11 @@ function TallyKhataApp() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCloseCircleText}>✕</Text>
+                <Image
+                source={require('./assets/icons/ic_close.png')}
+                style={styles.modalCloseIcon}
+                resizeMode="contain"
+              />
               </TouchableOpacity>
             </View>
 
@@ -8593,6 +8704,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modalCloseIcon: {
+    width: 14,
+    height: 14,
+    tintColor: '#4B5563',
   },
   modalCloseCircleText: {
     fontSize: 16,
