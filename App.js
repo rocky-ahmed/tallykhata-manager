@@ -4025,11 +4025,29 @@ function TallyKhataApp() {
             </View>
 
             {/* Group 3: সেটিংস ও অন্যান্য (nav_group_others) */}
-            <SectionHeader title="সেটিংস ও অন্যান্য" count={5} />
+            <SectionHeader title="সেটিংস ও অন্যান্য" count={6} />
             <View style={styles.menuListContainer}>
               <TouchableOpacity
                 style={styles.menuListItem}
+                onPress={() => setModalBusinessPicker(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="ব্যবসা পরিচালনা"
+              >
+                <AppIcon source={require('./assets/icons/grid_multi_biz.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>ব্যবসা পরিচালনা</Text>
+                  <Text style={styles.menuListSub}>বর্তমান: {businessName || 'Mobile Xpress'} • একাধিক ব্যবসা ও সুইচ</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
                 onPress={() => setModalSettings(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="দোকান ও ব্যবসা সেটিংস"
               >
                 <AppIcon source={require('./assets/icons/ic_menu_settings.png')} variant="neutral" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
