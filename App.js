@@ -2931,20 +2931,20 @@ function TallyKhataApp() {
       </View>
 
       {/* --- TAB CONTENT CONTAINER --- */}
-      <View style={{ flex: 1, backgroundColor: '#B81414' }}>
+      <View style={{ flex: 1, backgroundColor: '#F5F6F8' }}>
 
         {/* ===================================================================
             TAB 1: HOME / TALLY (টালি - 1:1 Authentic from photo_2026-10-15_18-13-34.jpg)
            =================================================================== */}
         {activeTab === 'home' && (
-          <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden' }}>
+          <View style={{ flex: 1, backgroundColor: '#F5F6F8' }}>
             <FlatList
               data={filteredAccounts}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingBottom: 95 }}
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={
-                <View style={{ backgroundColor: '#F8F9FA' }}>
+                <View style={{ backgroundColor: '#F5F6F8' }}>
                   {/* --- 1. PROMO BANNER (মানি ট্রান্সফার চার্জ ফ্রি!*) --- */}
                   <TouchableOpacity
                     style={styles.promoBannerCard}
@@ -3201,7 +3201,7 @@ function TallyKhataApp() {
                       <Text style={styles.customerCardName} numberOfLines={1}>{item.name}</Text>
                       <Text style={styles.customerCardTime}>{item.timeAgo || '৩ মাস'}</Text>
                     </View>
-                    <Text style={[styles.customerCardAmount, { color: item.balance > 0 ? '#B81414' : item.balance < 0 ? '#1C7D50' : '#4B5563' }]}>
+                    <Text style={[styles.customerCardAmount, { color: item.balance > 0 ? '#B81414' : item.balance < 0 ? '#1C7D50' : '#111827' }]}>
                       {toBengaliDecimal(item.balance)}
                     </Text>
                     <Text style={styles.customerChevron}>></Text>
@@ -3702,10 +3702,10 @@ function TallyKhataApp() {
                 activeOpacity={0.75}
               >
                 <AppIcon
-                  source={require("./assets/ic_bangla_qr.png")}
-                  variant="warning"
+                  source={require("./assets/icons/grid_qr.png")}
+                  tintColor={null}
                   shape="circle"
-                  size={24}
+                  size={28}
                   containerSize={50}
                   accessibilityLabel="কিউআর পেমেন্ট"
                 />
@@ -5866,7 +5866,9 @@ function TallyKhataApp() {
                 setModalAddBusiness(true);
               }}
             >
-              <Text style={{ fontSize: 18, color: '#FFFFFF' }}>➕</Text>
+              <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', marginRight: 8 }}>
+                <Text style={{ fontSize: 16, color: '#FFFFFF', fontWeight: 'bold', marginTop: -2 }}>+</Text>
+              </View>
               <Text style={styles.bizAddBtnText}>নতুন ব্যবসা প্রতিষ্ঠান যোগ করুন</Text>
             </TouchableOpacity>
           </View>
@@ -6514,16 +6516,20 @@ function TallyKhataApp() {
             <Text style={styles.inputLabel}>ট্রান্সফার মেথড নির্বাচন করুন</Text>
             <View style={styles.moneyOutMethodGrid}>
               {[
-                { id: 'bank', name: 'ব্যাংক একাউন্ট', icon: '🏦' },
-                { id: 'bkash', name: 'বিকাশ', icon: '📱' },
-                { id: 'nagad', name: 'নগদ', icon: '💸' },
+                { id: 'bank', name: 'ব্যাংক একাউন্ট', iconSource: require('./assets/icons/ic_menu_accounts.png') },
+                { id: 'bkash', name: 'বিকাশ', iconSource: require('./assets/banks/bkash90px.png') },
+                { id: 'nagad', name: 'নগদ', iconSource: require('./assets/icons/ic_cash_sale.png') },
               ].map((m) => (
                 <TouchableOpacity
                   key={m.id}
                   style={[styles.moneyOutMethodCard, moneyOutMethod === m.id && styles.moneyOutMethodCardActive]}
                   onPress={() => setMoneyOutMethod(m.id)}
                 >
-                  <Text style={{ fontSize: 22 }}>{m.icon}</Text>
+                  <Image
+                    source={m.iconSource}
+                    style={{ width: 26, height: 26, marginBottom: 4 }}
+                    resizeMode="contain"
+                  />
                   <Text style={[styles.moneyOutMethodText, moneyOutMethod === m.id && styles.moneyOutMethodTextActive]}>
                     {m.name}
                   </Text>
@@ -6957,8 +6963,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFDE00',
     borderRadius: 14,
     marginHorizontal: 16,
-    marginTop: 6,
-    marginBottom: 4,
+    marginTop: 10,
+    marginBottom: 6,
     paddingVertical: 7,
     paddingHorizontal: 12,
     flexDirection: 'row',
@@ -6996,28 +7002,28 @@ const styles = StyleSheet.create({
   // 8-Item Quick Grid
   quickGridContainer: {
     marginHorizontal: 10,
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 8,
+    marginBottom: 6,
   },
   quickGridRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   quickGridItem: {
     width: '24%',
     alignItems: 'center',
-    paddingVertical: 3,
+    paddingVertical: 2,
   },
   quickGridIcon: {
-    width: 36,
-    height: 36,
+    width: 42,
+    height: 42,
   },
   quickGridLabel: {
-    fontSize: 11,
-    color: '#212121',
-    marginTop: 3,
-    fontWeight: '500',
+    fontSize: 12,
+    color: '#1F2937',
+    marginTop: 4,
+    fontWeight: '600',
     textAlign: 'center',
   },
 
@@ -7119,7 +7125,7 @@ const styles = StyleSheet.create({
   customerListCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
