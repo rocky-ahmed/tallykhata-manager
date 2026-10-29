@@ -3824,11 +3824,17 @@ function TallyKhataApp() {
                         style={styles.quickGridItem}
                         onPress={() => setModalBusinessPicker(true)}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="ব্যবসা প্রতিষ্ঠান"
                       >
-                        <Image
+                        <AppIcon
                           source={require('./assets/icons/grid_multi_biz.png')}
-                          style={styles.quickGridIcon}
-                          resizeMode="contain"
+                          variant="primary"
+                          shape="rounded"
+                          size={26}
+                          containerSize={46}
+                          tintColor={null}
+                          style={styles.quickGrid3DIcon}
                         />
                         <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_multi_biz")}</Text>
                       </TouchableOpacity>
@@ -3837,11 +3843,17 @@ function TallyKhataApp() {
                         style={styles.quickGridItem}
                         onPress={() => setModalAddStock(true)}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="স্টক হিসাব"
                       >
-                        <Image
+                        <AppIcon
                           source={require('./assets/icons/grid_stock.png')}
-                          style={styles.quickGridIcon}
-                          resizeMode="contain"
+                          variant="warning"
+                          shape="rounded"
+                          size={26}
+                          containerSize={46}
+                          tintColor={null}
+                          style={styles.quickGrid3DIcon}
                         />
                         <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_stock")}</Text>
                       </TouchableOpacity>
@@ -3850,11 +3862,17 @@ function TallyKhataApp() {
                         style={styles.quickGridItem}
                         onPress={() => setModalNotes(true)}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="ব্যবসার নোট"
                       >
-                        <Image
+                        <AppIcon
                           source={require('./assets/icons/grid_note.png')}
-                          style={styles.quickGridIcon}
-                          resizeMode="contain"
+                          variant="info"
+                          shape="rounded"
+                          size={26}
+                          containerSize={46}
+                          tintColor={null}
+                          style={styles.quickGrid3DIcon}
                         />
                         <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_biz_note")}</Text>
                       </TouchableOpacity>
@@ -3863,11 +3881,17 @@ function TallyKhataApp() {
                         style={styles.quickGridItem}
                         onPress={() => setActiveTab('tagada')}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="গ্রুপ তাগাদা"
                       >
-                        <Image
+                        <AppIcon
                           source={require('./assets/icons/grid_bulk_tagada.png')}
-                          style={styles.quickGridIcon}
-                          resizeMode="contain"
+                          variant="danger"
+                          shape="rounded"
+                          size={26}
+                          containerSize={46}
+                          tintColor={null}
+                          style={styles.quickGrid3DIcon}
                         />
                         <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_group_tagada")}</Text>
                       </TouchableOpacity>
@@ -3882,10 +3906,14 @@ function TallyKhataApp() {
                         accessibilityRole="button"
                         accessibilityLabel="মানি ম্যানেজার"
                       >
-                        <Image
+                        <AppIcon
                           source={require('./assets/icons/grid_money_manager.png')}
-                          style={styles.quickGridIcon}
-                          resizeMode="contain"
+                          variant="secondary"
+                          shape="rounded"
+                          size={26}
+                          containerSize={46}
+                          tintColor={null}
+                          style={styles.quickGrid3DIcon}
                         />
                         <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_money_manager")}</Text>
                       </TouchableOpacity>
@@ -3894,11 +3922,17 @@ function TallyKhataApp() {
                         style={styles.quickGridItem}
                         onPress={() => setModalBackupRestore(true)}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="ডাটা ব্যাকআপ"
                       >
-                        <Image
+                        <AppIcon
                           source={require('./assets/icons/grid_backup.png')}
-                          style={styles.quickGridIcon}
-                          resizeMode="contain"
+                          variant="success"
+                          shape="rounded"
+                          size={26}
+                          containerSize={46}
+                          tintColor={null}
+                          style={styles.quickGrid3DIcon}
                         />
                         <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_backup")}</Text>
                       </TouchableOpacity>
@@ -3907,11 +3941,17 @@ function TallyKhataApp() {
                         style={styles.quickGridItem}
                         onPress={() => setModalTallyMessage(true)}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="টালি-মেসেজ"
                       >
-                        <Image
+                        <AppIcon
                           source={require('./assets/icons/grid_tally_msg.png')}
-                          style={styles.quickGridIcon}
-                          resizeMode="contain"
+                          variant="purple"
+                          shape="rounded"
+                          size={26}
+                          containerSize={46}
+                          tintColor={null}
+                          style={styles.quickGrid3DIcon}
                         />
                         <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_tally_msg")}</Text>
                       </TouchableOpacity>
@@ -3920,11 +3960,17 @@ function TallyKhataApp() {
                         style={styles.quickGridItem}
                         onPress={() => setActiveTab('cashbox')}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="ক্যাশবক্স"
                       >
-                        <Image
+                        <AppIcon
                           source={require('./assets/icons/grid_cashbox.png')}
-                          style={styles.quickGridIcon}
-                          resizeMode="contain"
+                          variant="neutral"
+                          shape="rounded"
+                          size={26}
+                          containerSize={46}
+                          tintColor={null}
+                          style={styles.quickGrid3DIcon}
                         />
                         <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_cashbox")}</Text>
                       </TouchableOpacity>
@@ -10823,6 +10869,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 2,
   },
+  quickGrid3DIcon: {
+    marginBottom: 3,
+  },
   quickGridIcon: {
     width: 42,
     height: 42,
@@ -11004,9 +11053,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 4,
     borderRadius: 16,
+    borderTopWidth: 1.5,
+    borderTopColor: '#FFFFFF',
+    borderBottomWidth: 2,
+    borderBottomColor: '#FECACA',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
   },
 
   // --- BASE & APP CONTAINER ---

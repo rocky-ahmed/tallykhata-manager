@@ -245,6 +245,14 @@ async function runAsyncTest(name, fn) {
     assert(appSource.includes("appLanguage"), "Missing appLanguage state in App.js");
   });
 
+  // Test 12: Home quick action grid and navigation pill use 3D tactile icon styling
+  runTest('App.js provides 3D dimensional icons for quick action grid and tactile navigation pill', () => {
+    const appSource = fs.readFileSync('App.js', 'utf8');
+    assert(appSource.includes('quickGrid3DIcon'), 'Missing quickGrid3DIcon style in App.js');
+    assert(appSource.includes('variant="primary"') && appSource.includes('variant="secondary"'), 'Quick grid must use colored 3D icon variants');
+    assert(appSource.includes("borderTopColor: '#FFFFFF'") && appSource.includes("borderBottomColor: '#FECACA'"), 'tabActivePill must provide 3D bevel lighting');
+  });
+
   console.log(`\n================================================================`);
   console.log(`PREFERENCES, THEME & LOCALIZATION SUMMARY: ${passed} / ${total} TESTS PASSED`);
   console.log(`================================================================\n`);
