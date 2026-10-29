@@ -688,36 +688,116 @@ function TallyKhataApp() {
   const [modalMMAddAccount, setModalMMAddAccount] = useState(false);
   const [modalMMSetBudget, setModalMMSetBudget] = useState(false);
   const [modalMMTransfer, setModalMMTransfer] = useState(false);
-  const [mmActiveSubTab, setMmActiveSubTab] = useState('transactions'); // 'transactions' | 'accounts' | 'budgets' | 'analytics'
-  const [mmTxnFilter, setMmTxnFilter] = useState('all'); // 'all' | 'expense' | 'income' | 'transfer'
-  const [mmSearchQuery, setMmSearchQuery] = useState('');
+  const [mmActiveSubTab, setMmActiveSubTab] = useState("transactions"); // "transactions" | "accounts" | "budgets" | "goals" | "analytics"
+  const [mmTxnFilter, setMmTxnFilter] = useState("all"); // "all" | "expense" | "income" | "transfer"
+  const [mmPeriod, setMmPeriod] = useState("this_month"); // "this_month" | "last_month" | "all_time"
+  const [mmSortOrder, setMmSortOrder] = useState("newest"); // "newest" | "oldest" | "amount_high" | "amount_low"
+  const [mmSearchQuery, setMmSearchQuery] = useState("");
 
   // Add Transaction Form States
-  const [mmNewAmount, setMmNewAmount] = useState('');
-  const [mmNewType, setMmNewType] = useState('expense'); // 'expense' | 'income' | 'transfer'
-  const [mmNewCat, setMmNewCat] = useState('cat_food');
-  const [mmNewAcc, setMmNewAcc] = useState('acc_cash');
-  const [mmFromAcc, setMmFromAcc] = useState('acc_bank');
-  const [mmToAcc, setMmToAcc] = useState('acc_bkash');
-  const [mmNewNote, setMmNewNote] = useState('');
+  const [mmNewAmount, setMmNewAmount] = useState("");
+  const [mmNewType, setMmNewType] = useState("expense"); // "expense" | "income" | "transfer"
+  const [mmNewCat, setMmNewCat] = useState("cat_food");
+  const [mmNewAcc, setMmNewAcc] = useState("acc_cash");
+  const [mmFromAcc, setMmFromAcc] = useState("acc_bank");
+  const [mmToAcc, setMmToAcc] = useState("acc_bkash");
+  const [mmNewNote, setMmNewNote] = useState("");
+  const [mmNewPayee, setMmNewPayee] = useState("");
+
+  // Edit Transaction Form States
+  const [modalMMEditTxn, setModalMMEditTxn] = useState(false);
+  const [mmEditTxnId, setMmEditTxnId] = useState(null);
+  const [mmEditAmount, setMmEditAmount] = useState("");
+  const [mmEditType, setMmEditType] = useState("expense");
+  const [mmEditCat, setMmEditCat] = useState("cat_food");
+  const [mmEditAcc, setMmEditAcc] = useState("acc_cash");
+  const [mmEditFromAcc, setMmEditFromAcc] = useState("acc_bank");
+  const [mmEditToAcc, setMmEditToAcc] = useState("acc_bkash");
+  const [mmEditNote, setMmEditNote] = useState("");
+  const [mmEditPayee, setMmEditPayee] = useState("");
 
   // Add Account Form States
-  const [mmNewAccName, setMmNewAccName] = useState('');
-  const [mmNewAccType, setMmNewAccType] = useState('bank');
-  const [mmNewAccBal, setMmNewAccBal] = useState('');
-  const [mmNewAccIcon, setMmNewAccIcon] = useState('🏦');
+  const [mmNewAccName, setMmNewAccName] = useState("");
+  const [mmNewAccType, setMmNewAccType] = useState("bank");
+  const [mmNewAccBal, setMmNewAccBal] = useState("");
+  const [mmNewAccIcon, setMmNewAccIcon] = useState("🏦");
 
   // Set Budget Form States
-  const [mmBudgetCat, setMmBudgetCat] = useState('cat_food');
-  const [mmBudgetLimit, setMmBudgetLimit] = useState('');
+  const [mmBudgetCat, setMmBudgetCat] = useState("cat_food");
+  const [mmBudgetLimit, setMmBudgetLimit] = useState("");
+
+  // Overall Monthly Budget
+  const [modalMMOverallBudget, setModalMMOverallBudget] = useState(false);
+  const [mmOverallBudgetInput, setMmOverallBudgetInput] = useState("");
+
+  // Add Custom Category Form States
+  const [modalMMAddCategory, setModalMMAddCategory] = useState(false);
+  const [mmNewCatName, setMmNewCatName] = useState("");
+  const [mmNewCatType, setMmNewCatType] = useState("expense");
+  const [mmNewCatIcon, setMmNewCatIcon] = useState("🏷️");
+  const [mmNewCatColor, setMmNewCatColor] = useState("#3B82F6");
+  const [mmNewCatBudget, setMmNewCatBudget] = useState("");
+
+  // Goals Form States
+  const [modalMMAddGoal, setModalMMAddGoal] = useState(false);
+  const [mmGoalTitle, setMmGoalTitle] = useState("");
+  const [mmGoalTarget, setMmGoalTarget] = useState("");
+  const [mmGoalInitial, setMmGoalInitial] = useState("");
+  const [mmGoalDate, setMmGoalDate] = useState("");
+  const [mmGoalIcon, setMmGoalIcon] = useState("🎯");
+  const [mmGoalNote, setMmGoalNote] = useState("");
+
+  // Deposit to Goal Form States
+  const [modalMMDepositGoal, setModalMMDepositGoal] = useState(false);
+  const [mmDepositGoalId, setMmDepositGoalId] = useState(null);
+  const [mmDepositAmt, setMmDepositAmt] = useState("");
+  const [mmDepositFromAcc, setMmDepositFromAcc] = useState("acc_bank");
 
   // Transfer Form States
-  const [mmTransferAmt, setMmTransferAmt] = useState('');
-  const [mmTransferFrom, setMmTransferFrom] = useState('acc_bank');
-  const [mmTransferTo, setMmTransferTo] = useState('acc_bkash');
-  const [mmTransferNote, setMmTransferNote] = useState('');
+  const [mmTransferAmt, setMmTransferAmt] = useState("");
+  const [mmTransferFrom, setMmTransferFrom] = useState("acc_bank");
+  const [mmTransferTo, setMmTransferTo] = useState("acc_bkash");
+  const [mmTransferNote, setMmTransferNote] = useState("");
+
+  // User Preferences States
+  const [modalMMPreferences, setModalMMPreferences] = useState(false);
+  const [mmPrefDefaultPeriod, setMmPrefDefaultPeriod] = useState("this_month");
+  const [mmPrefCurrencySymbol, setMmPrefCurrencySymbol] = useState("৳");
+  const [mmPrefSortOrder, setMmPrefSortOrder] = useState("newest");
+  const [mmPrefShowNetWorth, setMmPrefShowNetWorth] = useState(true);
+  const [mmPrefShowSavingsRate, setMmPrefShowSavingsRate] = useState(true);
+  const [mmPrefShowTips, setMmPrefShowTips] = useState(true);
+
+  // Category Edit / Archive States
+  const [modalMMEditCategory, setModalMMEditCategory] = useState(false);
+  const [mmEditCatId, setMmEditCatId] = useState(null);
+  const [mmEditCatName, setMmEditCatName] = useState("");
+  const [mmEditCatType, setMmEditCatType] = useState("expense");
+  const [mmEditCatIcon, setMmEditCatIcon] = useState("🏷️");
+  const [mmEditCatColor, setMmEditCatColor] = useState("#3B82F6");
+  const [mmEditCatBudget, setMmEditCatBudget] = useState("");
+  const [mmEditCatIsArchived, setMmEditCatIsArchived] = useState(false);
+  const [mmShowArchivedCats, setMmShowArchivedCats] = useState(false);
+
+  // Recurring Schedules States
+  const [modalMMRecurring, setModalMMRecurring] = useState(false);
+  const [modalMMAddRecurring, setModalMMAddRecurring] = useState(false);
+  const [mmRecEditId, setMmRecEditId] = useState(null);
+  const [mmRecTitle, setMmRecTitle] = useState("");
+  const [mmRecType, setMmRecType] = useState("expense");
+  const [mmRecAmount, setMmRecAmount] = useState("");
+  const [mmRecCat, setMmRecCat] = useState("cat_utility");
+  const [mmRecAcc, setMmRecAcc] = useState("acc_bank");
+  const [mmRecFromAcc, setMmRecFromAcc] = useState("acc_bank");
+  const [mmRecToAcc, setMmRecToAcc] = useState("acc_bkash");
+  const [mmRecCadence, setMmRecCadence] = useState("monthly");
+  const [mmRecNextDue, setMmRecNextDue] = useState("");
+  const [mmRecNote, setMmRecNote] = useState("");
+  const [mmRecPayee, setMmRecPayee] = useState("");
 
   const [moneyManagerState, setMoneyManagerState] = useState(() => moneyManagerService.getDefaultState(getTodayDate()));
+  const [mmCatSectionTab, setMmCatSectionTab] = useState("expense");
+  const mmCurrency = (moneyManagerState.preferences && moneyManagerState.preferences.currencySymbol) || "৳";
 
   const MM_STORAGE_KEY = moneyManagerService.MM_STORAGE_KEY || "@tallykhata_personal_money_manager_v2";
   useEffect(() => {
@@ -730,17 +810,36 @@ function TallyKhataApp() {
             parsed,
             moneyManagerService.getDefaultState(getTodayDate())
           );
-          setMoneyManagerState(sanitized);
+          const processed = moneyManagerService.processRecurringTransactions(sanitized, getTodayDate());
+          setMoneyManagerState(processed);
+          if (sanitized.preferences && sanitized.preferences.defaultPeriod) {
+            setMmPeriod(sanitized.preferences.defaultPeriod);
+          }
+          if (sanitized.preferences && sanitized.preferences.sortOrder) {
+            setMmSortOrder(sanitized.preferences.sortOrder);
+          }
+          if (processed !== sanitized) {
+            await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(processed));
+          }
         }
       } catch (e) {
-        console.log('Error loading Money Manager state:', e);
+        console.log("Error loading Money Manager state:", e);
       }
     })();
   }, []);
 
   useEffect(() => {
-    if (!modalMoneyManager && !modalMMAddTxn && !modalMMAddAccount && !modalMMSetBudget && !modalMMTransfer) return;
+    if (!modalMoneyManager && !modalMMAddTxn && !modalMMEditTxn && !modalMMAddAccount && !modalMMSetBudget && !modalMMTransfer && !modalMMAddCategory && !modalMMOverallBudget && !modalMMAddGoal && !modalMMDepositGoal && !modalMMPreferences && !modalMMRecurring && !modalMMAddRecurring && !modalMMEditCategory) return;
     const backAction = () => {
+      if (modalMMPreferences) { setModalMMPreferences(false); return true; }
+      if (modalMMAddRecurring) { setModalMMAddRecurring(false); return true; }
+      if (modalMMRecurring) { setModalMMRecurring(false); return true; }
+      if (modalMMEditCategory) { setModalMMEditCategory(false); return true; }
+      if (modalMMDepositGoal) { setModalMMDepositGoal(false); return true; }
+      if (modalMMAddGoal) { setModalMMAddGoal(false); return true; }
+      if (modalMMOverallBudget) { setModalMMOverallBudget(false); return true; }
+      if (modalMMAddCategory) { setModalMMAddCategory(false); return true; }
+      if (modalMMEditTxn) { setModalMMEditTxn(false); return true; }
       if (modalMMAddTxn) { setModalMMAddTxn(false); return true; }
       if (modalMMAddAccount) { setModalMMAddAccount(false); return true; }
       if (modalMMSetBudget) { setModalMMSetBudget(false); return true; }
@@ -748,9 +847,9 @@ function TallyKhataApp() {
       if (modalMoneyManager) { setModalMoneyManager(false); return true; }
       return false;
     };
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
     return () => backHandler.remove();
-  }, [modalMoneyManager, modalMMAddTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer]);
+  }, [modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory]);
 
   const handleSaveMMTxn = async () => {
     try {
@@ -762,16 +861,53 @@ function TallyKhataApp() {
         fromAccountId: mmFromAcc,
         toAccountId: mmToAcc,
         note: mmNewNote,
+        payee: mmNewPayee,
         date: getTodayDate(),
       });
       setMoneyManagerState(updatedState);
       await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
-      setMmNewAmount('');
-      setMmNewNote('');
+      setMmNewAmount("");
+      setMmNewNote("");
+      setMmNewPayee("");
       setModalMMAddTxn(false);
-      Alert.alert('সফল', mmNewType === 'transfer' ? 'টাকা স্থানান্তর সফল হয়েছে।' : 'মানি ম্যানেজার লেনদেন সফলভাবে সংরক্ষিত হয়েছে।');
+      Alert.alert("সফল", mmNewType === "transfer" ? "টাকা স্থানান্তর সফল হয়েছে।" : "মানি ম্যানেজার লেনদেন সফলভাবে সংরক্ষিত হয়েছে।");
     } catch (err) {
-      Alert.alert('ভুল তথ্য', err.message || 'লেনদেন সংরক্ষণ করা যায়নি');
+      Alert.alert("ভুল তথ্য", err.message || "লেনদেন সংরক্ষণ করা যায়নি");
+    }
+  };
+
+  const handleOpenEditMMTxn = (txn) => {
+    if (!txn) return;
+    setMmEditTxnId(txn.id);
+    setMmEditType(txn.type || "expense");
+    setMmEditAmount(String(txn.amount || ""));
+    setMmEditCat(txn.categoryId || "cat_food");
+    setMmEditAcc(txn.accountId || "acc_cash");
+    setMmEditFromAcc(txn.fromAccountId || "acc_bank");
+    setMmEditToAcc(txn.toAccountId || "acc_bkash");
+    setMmEditNote(txn.note || "");
+    setMmEditPayee(txn.payee || "");
+    setModalMMEditTxn(true);
+  };
+
+  const handleUpdateMMTxn = async () => {
+    try {
+      const updatedState = moneyManagerService.editTransaction(moneyManagerState, mmEditTxnId, {
+        type: mmEditType,
+        amount: mmEditAmount,
+        categoryId: mmEditCat,
+        accountId: mmEditAcc,
+        fromAccountId: mmEditFromAcc,
+        toAccountId: mmEditToAcc,
+        note: mmEditNote,
+        payee: mmEditPayee,
+      });
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      setModalMMEditTxn(false);
+      Alert.alert("সফল", "লেনদেন সফলভাবে হালনাগাদ করা হয়েছে।");
+    } catch (err) {
+      Alert.alert("ত্রুটি", err.message || "লেনদেন হালনাগাদ করা যায়নি");
     }
   };
 
@@ -780,20 +916,20 @@ function TallyKhataApp() {
     if (!txn) return;
 
     Alert.alert(
-      'লেনদেন মুছুন',
-      'আপনি কি নিশ্চিতভাবে এই লেনদেনটি মুছে ফেলতে চান? সংশ্লিষ্ট অ্যাকাউন্টের ব্যালেন্স সমন্বয় করা হবে।',
+      "লেনদেন মুছুন",
+      "আপনি কি নিশ্চিতভাবে এই লেনদেনটি মুছে ফেলতে চান? সংশ্লিষ্ট অ্যাকাউন্টের ব্যালেন্স সমন্বয় করা হবে।",
       [
-        { text: 'বাতিল', style: 'cancel' },
+        { text: "বাতিল", style: "cancel" },
         {
-          text: 'মুছে ফেলুন',
-          style: 'destructive',
+          text: "মুছে ফেলুন",
+          style: "destructive",
           onPress: async () => {
             try {
               const updatedState = moneyManagerService.deleteTransaction(moneyManagerState, txnId);
               setMoneyManagerState(updatedState);
               await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
             } catch (err) {
-              Alert.alert('ত্রুটি', err.message || 'লেনদেন মোছা যায়নি');
+              Alert.alert("ত্রুটি", err.message || "লেনদেন মোছা যায়নি");
             }
           }
         }
@@ -811,32 +947,43 @@ function TallyKhataApp() {
       });
       setMoneyManagerState(updatedState);
       await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
-      setMmNewAccName('');
-      setMmNewAccBal('');
+      setMmNewAccName("");
+      setMmNewAccBal("");
       setModalMMAddAccount(false);
-      Alert.alert('সফল', 'নতুন ওয়ালেট/অ্যাকাউন্ট যুক্ত হয়েছে।');
+      Alert.alert("সফল", "নতুন ওয়ালেট/অ্যাকাউন্ট যুক্ত হয়েছে।");
     } catch (err) {
-      Alert.alert('ভুল ইনপুট', err.message || 'অ্যাকাউন্ট সংরক্ষণ করা যায়নি');
+      Alert.alert("ভুল ইনপুট", err.message || "অ্যাকাউন্ট সংরক্ষণ করা যায়নি");
+    }
+  };
+
+  const handleArchiveMMAccount = async (accId, isArchived) => {
+    try {
+      const updatedState = moneyManagerService.archiveAccount(moneyManagerState, accId, isArchived);
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      Alert.alert("সফল", isArchived ? "অ্যাকাউন্টটি আর্কাইভ করা হয়েছে।" : "অ্যাকাউন্টটি পুনরায় সক্রিয় করা হয়েছে।");
+    } catch (err) {
+      Alert.alert("সতর্কতা", err.message || "অ্যাকাউন্ট আর্কাইভ করা যায়নি");
     }
   };
 
   const handleDeleteMMAccount = (accId) => {
     Alert.alert(
-      'অ্যাকাউন্ট মুছুন',
-      'আপনি কি এই অ্যাকাউন্টটি মুছে ফেলতে চান?',
+      "অ্যাকাউন্ট মুছুন",
+      "আপনি কি এই অ্যাকাউন্টটি মুছে ফেলতে চান?",
       [
-        { text: 'বাতিল', style: 'cancel' },
+        { text: "বাতিল", style: "cancel" },
         {
-          text: 'মুছে ফেলুন',
-          style: 'destructive',
+          text: "মুছে ফেলুন",
+          style: "destructive",
           onPress: async () => {
             try {
               const updatedState = moneyManagerService.deleteAccount(moneyManagerState, accId);
               setMoneyManagerState(updatedState);
               await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
-              Alert.alert('সফল', 'অ্যাকাউন্ট মুছে ফেলা হয়েছে।');
+              Alert.alert("সফল", "অ্যাকাউন্ট মুছে ফেলা হয়েছে।");
             } catch (err) {
-              Alert.alert('সতর্কতা', err.message || 'অ্যাকাউন্ট মোছা যায়নি');
+              Alert.alert("সতর্কতা", err.message || "অ্যাকাউন্ট মোছা যায়নি");
             }
           }
         }
@@ -849,18 +996,116 @@ function TallyKhataApp() {
       const updatedState = moneyManagerService.setCategoryBudget(moneyManagerState, mmBudgetCat, mmBudgetLimit);
       setMoneyManagerState(updatedState);
       await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
-      setMmBudgetLimit('');
+      setMmBudgetLimit("");
       setModalMMSetBudget(false);
-      Alert.alert('সফল', 'বাজেট সীমা সফলভাবে হালনাগাদ করা হয়েছে।');
+      Alert.alert("সফল", "বাজেট সীমা সফলভাবে হালনাগাদ করা হয়েছে।");
     } catch (err) {
-      Alert.alert('ভুল ইনপুট', err.message || 'বাজেট সংরক্ষণ করা যায়নি');
+      Alert.alert("ভুল ইনপুট", err.message || "বাজেট সংরক্ষণ করা যায়নি");
     }
+  };
+
+  const handleSaveMMOverallBudget = async () => {
+    try {
+      const updatedState = moneyManagerService.setOverallBudget(moneyManagerState, mmOverallBudgetInput);
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      setModalMMOverallBudget(false);
+      Alert.alert("সফল", "সামগ্রিক মাসিক বাজেট সফলভাবে সংরক্ষিত হয়েছে।");
+    } catch (err) {
+      Alert.alert("ভুল ইনপুট", err.message || "বাজেট সংরক্ষণ করা যায়নি");
+    }
+  };
+
+  const handleSaveMMCategory = async () => {
+    try {
+      const updatedState = moneyManagerService.addCategory(moneyManagerState, {
+        name: mmNewCatName,
+        type: mmNewCatType,
+        icon: mmNewCatIcon,
+        color: mmNewCatColor,
+        budget: mmNewCatBudget,
+      });
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      setMmNewCatName("");
+      setMmNewCatBudget("");
+      setModalMMAddCategory(false);
+      Alert.alert("সফল", "নতুন ক্যাটাগরি যুক্ত করা হয়েছে।");
+    } catch (err) {
+      Alert.alert("ভুল ইনপুট", err.message || "ক্যাটাগরি তৈরি করা যায়নি");
+    }
+  };
+
+  const handleSaveMMGoal = async () => {
+    try {
+      const updatedState = moneyManagerService.addGoal(moneyManagerState, {
+        title: mmGoalTitle,
+        targetAmount: mmGoalTarget,
+        savedAmount: mmGoalInitial,
+        targetDate: mmGoalDate,
+        icon: mmGoalIcon,
+        note: mmGoalNote,
+      });
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      setMmGoalTitle("");
+      setMmGoalTarget("");
+      setMmGoalInitial("");
+      setMmGoalDate("");
+      setMmGoalNote("");
+      setModalMMAddGoal(false);
+      Alert.alert("সফল", "নতুন সঞ্চয় লক্ষ্য তৈরি করা হয়েছে।");
+    } catch (err) {
+      Alert.alert("ভুল ইনপুট", err.message || "লক্ষ্য তৈরি করা যায়নি");
+    }
+  };
+
+  const handleDepositMMGoal = async () => {
+    try {
+      const updatedState = moneyManagerService.contributeToGoal(
+        moneyManagerState,
+        mmDepositGoalId,
+        mmDepositAmt,
+        mmDepositFromAcc
+      );
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      setMmDepositAmt("");
+      setModalMMDepositGoal(false);
+      Alert.alert("সফল", "লক্ষ্যে টাকা জমা সম্পন্ন হয়েছে।");
+    } catch (err) {
+      Alert.alert("ভুল তথ্য", err.message || "টাকা জমা করা যায়নি");
+    }
+  };
+
+  const handleDeleteMMGoal = (goalId) => {
+    Alert.alert(
+      "লক্ষ্য মুছুন",
+      "আপনি কি এই সঞ্চয় লক্ষ্যটি মুছে ফেলতে চান?",
+      [
+        { text: "বাতিল", style: "cancel" },
+        {
+          text: "মুছে ফেলুন",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const updatedState = moneyManagerService.deleteGoal(moneyManagerState, goalId);
+              setMoneyManagerState(updatedState);
+              await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+              Alert.alert("সফল", "লক্ষ্য মুছে ফেলা হয়েছে।");
+            } catch (err) {
+              Alert.alert("ত্রুটি", err.message || "লক্ষ্য মোছা যায়নি");
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleMMTransfer = async () => {
     try {
       const updatedState = moneyManagerService.addTransaction(moneyManagerState, {
-        type: 'transfer',
+        type: "transfer",
         amount: mmTransferAmt,
         fromAccountId: mmTransferFrom,
         toAccountId: mmTransferTo,
@@ -869,15 +1114,216 @@ function TallyKhataApp() {
       });
       setMoneyManagerState(updatedState);
       await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
-      setMmTransferAmt('');
-      setMmTransferNote('');
+      setMmTransferAmt("");
+      setMmTransferNote("");
       setModalMMTransfer(false);
-      Alert.alert('সফল', 'টাকা স্থানান্তর সফল হয়েছে।');
+      Alert.alert("সফল", "টাকা স্থানান্তর সফল হয়েছে।");
     } catch (err) {
-      Alert.alert('ভুল তথ্য', err.message || 'স্থানান্তর করা যায়নি');
+      Alert.alert("ভুল তথ্য", err.message || "স্থানান্তর করা যায়নি");
     }
   };
 
+  const handleSaveMMPreferences = async () => {
+    try {
+      const updatedState = moneyManagerService.updatePreferences(moneyManagerState, {
+        defaultPeriod: mmPrefDefaultPeriod,
+        currencySymbol: mmPrefCurrencySymbol,
+        sortOrder: mmPrefSortOrder,
+        showNetWorthCard: mmPrefShowNetWorth,
+        showSavingsRateCard: mmPrefShowSavingsRate,
+        showTipsCard: mmPrefShowTips,
+      });
+      setMoneyManagerState(updatedState);
+      setMmPeriod(mmPrefDefaultPeriod);
+      setMmSortOrder(mmPrefSortOrder);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      setModalMMPreferences(false);
+      Alert.alert("সফল", "সেটিংস সফলভাবে সংরক্ষিত হয়েছে।");
+    } catch (err) {
+      Alert.alert("ত্রুটি", err.message || "সেটিংস সংরক্ষণ করা যায়নি");
+    }
+  };
+
+  const handleResetMMPreferences = async () => {
+    try {
+      const updatedState = moneyManagerService.resetPreferences(moneyManagerState);
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      setMmPrefDefaultPeriod("this_month");
+      setMmPrefCurrencySymbol("৳");
+      setMmPrefSortOrder("newest");
+      setMmPeriod("this_month");
+      setMmSortOrder("newest");
+      setMmPrefShowNetWorth(true);
+      setMmPrefShowSavingsRate(true);
+      setMmPrefShowTips(true);
+      Alert.alert("সফল", "ডিফল্ট সেটিংস সফলভাবে ফিরিয়ে আনা হয়েছে।");
+    } catch (err) {
+      Alert.alert("ত্রুটি", err.message || "সেটিংস রিসেট করা যায়নি");
+    }
+  };
+
+  const handleOpenEditMMCategory = (cat) => {
+    setMmEditCatId(cat.id);
+    setMmEditCatName(cat.name);
+    setMmEditCatType(cat.type);
+    setMmEditCatIcon(cat.icon || "📦");
+    setMmEditCatColor(cat.color || "#3B82F6");
+    setMmEditCatBudget(cat.budget ? String(cat.budget) : "");
+    setMmEditCatIsArchived(Boolean(cat.isArchived));
+    setModalMMEditCategory(true);
+  };
+
+  const handleSaveMMEditCategory = async () => {
+    try {
+      const updatedState = moneyManagerService.updateCategory(moneyManagerState, mmEditCatId, {
+        name: mmEditCatName,
+        icon: mmEditCatIcon,
+        color: mmEditCatColor,
+        budget: mmEditCatBudget,
+        isArchived: mmEditCatIsArchived,
+      });
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      setModalMMEditCategory(false);
+      Alert.alert("সফল", "ক্যাটাগরি সফলভাবে আপডেট করা হয়েছে।");
+    } catch (err) {
+      Alert.alert("ভুল ইনপুট", err.message || "ক্যাটাগরি আপডেট করা যায়নি");
+    }
+  };
+
+  const handleArchiveMMCategory = async (catId, isArchived) => {
+    try {
+      const updatedState = moneyManagerService.archiveCategory(moneyManagerState, catId, isArchived);
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      Alert.alert("সফল", isArchived ? "ক্যাটাগরি আর্কাইভ করা হয়েছে।" : "ক্যাটাগরি পুনরুদ্ধার করা হয়েছে।");
+    } catch (err) {
+      Alert.alert("সতর্কতা", err.message || "ক্যাটাগরি আর্কাইভ করা যায়নি");
+    }
+  };
+
+  const handleDeleteMMCategory = (catId) => {
+    Alert.alert(
+      "ক্যাটাগরি মুছুন",
+      "আপনি কি এই ক্যাটাগরিটি মুছে ফেলতে চান?",
+      [
+        { text: "বাতিল", style: "cancel" },
+        {
+          text: "মুছে ফেলুন",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const updatedState = moneyManagerService.deleteCategory(moneyManagerState, catId);
+              setMoneyManagerState(updatedState);
+              await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+              setModalMMEditCategory(false);
+              Alert.alert("সফল", "ক্যাটাগরি মুছে ফেলা হয়েছে।");
+            } catch (err) {
+              Alert.alert("সতর্কতা", err.message || "ক্যাটাগরি মোছা যায়নি");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleSaveMMRecurring = async () => {
+    try {
+      let updatedState;
+      if (mmRecEditId) {
+        updatedState = moneyManagerService.updateRecurring(moneyManagerState, mmRecEditId, {
+          title: mmRecTitle,
+          type: mmRecType,
+          amount: mmRecAmount,
+          categoryId: mmRecType === "transfer" ? null : mmRecCat,
+          accountId: mmRecType === "transfer" ? null : mmRecAcc,
+          fromAccountId: mmRecType === "transfer" ? mmRecFromAcc : null,
+          toAccountId: mmRecType === "transfer" ? mmRecToAcc : null,
+          cadence: mmRecCadence,
+          nextDueDate: mmRecNextDue || getTodayDate(),
+          note: mmRecNote,
+          payee: mmRecPayee,
+        });
+      } else {
+        updatedState = moneyManagerService.addRecurring(moneyManagerState, {
+          title: mmRecTitle,
+          type: mmRecType,
+          amount: mmRecAmount,
+          categoryId: mmRecType === "transfer" ? null : mmRecCat,
+          accountId: mmRecType === "transfer" ? null : mmRecAcc,
+          fromAccountId: mmRecType === "transfer" ? mmRecFromAcc : null,
+          toAccountId: mmRecType === "transfer" ? mmRecToAcc : null,
+          cadence: mmRecCadence,
+          startDate: getTodayDate(),
+          nextDueDate: mmRecNextDue || getTodayDate(),
+          note: mmRecNote,
+          payee: mmRecPayee,
+        });
+      }
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+      setMmRecEditId(null);
+      setMmRecTitle("");
+      setMmRecAmount("");
+      setMmRecNote("");
+      setMmRecPayee("");
+      setModalMMAddRecurring(false);
+      Alert.alert("সফল", mmRecEditId ? "অটো-শিডিউল আপডেট করা হয়েছে।" : "নতুন অটো-শিডিউল যুক্ত হয়েছে।");
+    } catch (err) {
+      Alert.alert("ভুল ইনপুট", err.message || "শিডিউল সংরক্ষণ করা যায়নি");
+    }
+  };
+
+  const handleToggleMMRecurring = async (recId, isActive) => {
+    try {
+      const updatedState = moneyManagerService.toggleRecurringActive(moneyManagerState, recId, isActive);
+      setMoneyManagerState(updatedState);
+      await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+    } catch (err) {
+      Alert.alert("ত্রুটি", err.message || "শিডিউল স্ট্যাটাস পরিবর্তন করা যায়নি");
+    }
+  };
+
+  const handleDeleteMMRecurring = (recId) => {
+    Alert.alert(
+      "অটো-শিডিউল মুছুন",
+      "আপনি কি এই অটো-শিডিউলটি মুছে ফেলতে চান?",
+      [
+        { text: "বাতিল", style: "cancel" },
+        {
+          text: "মুছে ফেলুন",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const updatedState = moneyManagerService.deleteRecurring(moneyManagerState, recId);
+              setMoneyManagerState(updatedState);
+              await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
+              Alert.alert("সফল", "অটো-শিডিউল মুছে ফেলা হয়েছে।");
+            } catch (err) {
+              Alert.alert("ত্রুটি", err.message || "শিডিউল মোছা যায়নি");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleOpenEditMMRecurring = (rec) => {
+    setMmRecEditId(rec.id);
+    setMmRecTitle(rec.title);
+    setMmRecType(rec.type || "expense");
+    setMmRecAmount(String(rec.amount || ""));
+    setMmRecCat(rec.categoryId || "cat_utility");
+    setMmRecAcc(rec.accountId || "acc_bank");
+    setMmRecFromAcc(rec.fromAccountId || "acc_bank");
+    setMmRecToAcc(rec.toAccountId || "acc_bkash");
+    setMmRecCadence(rec.cadence || "monthly");
+    setMmRecNextDue(rec.nextDueDate || getTodayDate());
+    setMmRecNote(rec.note || "");
+    setMmRecPayee(rec.payee || "");
+    setModalMMAddRecurring(true);
+  };
   const [reportDateTab, setReportDateTab] = useState('daily'); // 'daily' | 'monthly'
   const [selectedReportDate, setSelectedReportDate] = useState(getTodayDate());
   const [reportSummaryOnly, setReportSummaryOnly] = useState(false);
@@ -7561,62 +8007,141 @@ function TallyKhataApp() {
               </View>
               <Text style={styles.mmHeaderSub}>ব্যক্তিগত আয়-ব্যয়, ওয়ালেট ও বাজেট ট্র্যাকার</Text>
             </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TouchableOpacity
+                style={styles.mmHeaderIconBtn}
+                onPress={() => {
+                  const prefs = moneyManagerState.preferences || {};
+                  setMmPrefDefaultPeriod(prefs.defaultPeriod || "this_month");
+                  setMmPrefCurrencySymbol(prefs.currencySymbol || "৳");
+                  setMmPrefSortOrder(prefs.sortOrder || "newest");
+                  setMmPrefShowNetWorth(prefs.showNetWorthCard !== false);
+                  setMmPrefShowSavingsRate(prefs.showSavingsRateCard !== false);
+                  setMmPrefShowTips(prefs.showTipsCard !== false);
+                  setModalMMPreferences(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="মানি ম্যানেজার সেটিংস"
+              >
+                <Text style={{ fontSize: 16 }}>⚙️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.mmHeaderIconBtn}
+                onPress={() => setModalMMRecurring(true)}
+                accessibilityRole="button"
+                accessibilityLabel="অটো-শিডিউল ও পুনরাবৃত্তি"
+              >
+                <Text style={{ fontSize: 16 }}>⏱️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.mmAddHeaderBtn}
+                onPress={() => {
+                  setMmNewType('expense');
+                  setMmNewAmount('');
+                  setMmNewNote('');
+                  setMmNewPayee('');
+                  setModalMMAddTxn(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="নতুন লেনদেন"
+              >
+                <Text style={styles.mmAddHeaderBtnText}>+ লেনদেন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Period Selector Pills Bar */}
+          <View style={styles.mmPeriodContainer}>
             <TouchableOpacity
-              style={styles.mmAddHeaderBtn}
-              onPress={() => {
-                setMmNewType('expense');
-                setMmNewAmount('');
-                setMmNewNote('');
-                setModalMMAddTxn(true);
-              }}
+              style={[styles.mmPeriodPill, mmPeriod === 'this_month' && styles.mmPeriodPillActive]}
+              onPress={() => setMmPeriod('this_month')}
               accessibilityRole="button"
-              accessibilityLabel="নতুন লেনদেন"
+              accessibilityLabel="এই মাসের হিসাব"
             >
-              <Text style={styles.mmAddHeaderBtnText}>+ লেনদেন</Text>
+              <Text style={[styles.mmPeriodPillText, mmPeriod === 'this_month' && styles.mmPeriodPillTextActive]}>
+                📅 এই মাস
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mmPeriodPill, mmPeriod === 'last_month' && styles.mmPeriodPillActive]}
+              onPress={() => setMmPeriod('last_month')}
+              accessibilityRole="button"
+              accessibilityLabel="গত মাসের হিসাব"
+            >
+              <Text style={[styles.mmPeriodPillText, mmPeriod === 'last_month' && styles.mmPeriodPillTextActive]}>
+                🗓️ গত মাস
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mmPeriodPill, mmPeriod === 'all_time' && styles.mmPeriodPillActive]}
+              onPress={() => setMmPeriod('all_time')}
+              accessibilityRole="button"
+              accessibilityLabel="সব সময়ের হিসাব"
+            >
+              <Text style={[styles.mmPeriodPillText, mmPeriod === 'all_time' && styles.mmPeriodPillTextActive]}>
+                ⏱️ সব সময়
+              </Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-            {/* Top Net Worth Summary Card */}
-            {(() => {
-              const totalNetWorth = (moneyManagerState.accounts || []).reduce((acc, a) => acc + (a.balance || 0), 0);
-              const totalIncome = (moneyManagerState.transactions || []).filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-              const totalExpense = (moneyManagerState.transactions || []).filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
-              const netSavings = totalIncome - totalExpense;
+          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Top Net Worth & Period Flow Card */}
+            {moneyManagerState.preferences?.showNetWorthCard !== false && (() => {
+              const totalNetWorth = (moneyManagerState.accounts || []).filter(a => !a.isArchived).reduce((acc, a) => acc + (a.balance || 0), 0);
+              const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod });
+              const pIncome = periodTxns.filter(t => t.type === 'income').reduce((acc, t) => acc + (t.amount || 0), 0);
+              const pExpense = periodTxns.filter(t => t.type === 'expense').reduce((acc, t) => acc + (t.amount || 0), 0);
+              const pSavings = pIncome - pExpense;
+              const savingsRate = pIncome > 0 ? Math.round((pSavings / pIncome) * 100) : 0;
+              const periodLabel = mmPeriod === 'this_month' ? 'এই মাস' : mmPeriod === 'last_month' ? 'গত মাস' : 'সব সময়';
 
               return (
                 <View style={styles.mmTotalCard}>
-                  <Text style={styles.mmTotalCardLabel}>মোট ব্যক্তিগত সম্পদ (Net Worth)</Text>
-                  <Text style={styles.mmTotalCardAmount}>৳ {totalNetWorth.toLocaleString('en-US')}</Text>
-                  <Text style={styles.mmTotalCardSub}>সকল ওয়ালেট ও ব্যাংক অ্যাকাউন্টের মোট জমা</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.mmTotalCardLabel}>মোট ব্যক্তিগত সম্পদ (Net Worth)</Text>
+                    <View style={styles.mmPeriodBadge}>
+                      <Text style={styles.mmPeriodBadgeText}>{periodLabel}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.mmTotalCardAmount}>{mmCurrency} {totalNetWorth.toLocaleString('en-US')}</Text>
+                  <Text style={styles.mmTotalCardSub}>সক্রিয় ওয়ালেট ও ব্যাংক অ্যাকাউন্টের ব্যালেন্স</Text>
 
                   <View style={styles.mmStatRow}>
                     <View style={styles.mmStatCol}>
-                      <Text style={styles.mmStatLabel}>মোট আয় (Income)</Text>
-                      <Text style={styles.mmStatIncome}>+৳ {totalIncome.toLocaleString('en-US')}</Text>
+                      <Text style={styles.mmStatLabel}>মোট আয় ({periodLabel})</Text>
+                      <Text style={styles.mmStatIncome}>+{mmCurrency} {pIncome.toLocaleString('en-US')}</Text>
                     </View>
                     <View style={styles.mmStatDivider} />
                     <View style={styles.mmStatCol}>
-                      <Text style={styles.mmStatLabel}>মোট ব্যয় (Expense)</Text>
-                      <Text style={styles.mmStatExpense}>-৳ {totalExpense.toLocaleString('en-US')}</Text>
+                      <Text style={styles.mmStatLabel}>মোট ব্যয় ({periodLabel})</Text>
+                      <Text style={styles.mmStatExpense}>-{mmCurrency} {pExpense.toLocaleString('en-US')}</Text>
                     </View>
                     <View style={styles.mmStatDivider} />
                     <View style={styles.mmStatCol}>
-                      <Text style={styles.mmStatLabel}>সঞ্চয় (Savings)</Text>
-                      <Text style={[styles.mmStatSavings, netSavings < 0 && { color: '#EF4444' }]}>
-                        ৳ {netSavings.toLocaleString('en-US')}
+                      <Text style={styles.mmStatLabel}>নিট সঞ্চয়</Text>
+                      <Text style={[styles.mmStatSavings, pSavings < 0 && { color: '#EF4444' }]}>
+                        {pSavings >= 0 ? '+' : ''}{mmCurrency} {pSavings.toLocaleString('en-US')}
                       </Text>
                     </View>
                   </View>
+                  {pIncome > 0 && moneyManagerState.preferences?.showSavingsRateCard !== false && (
+                    <View style={styles.mmSavingsRateRow}>
+                      <Text style={styles.mmSavingsRateText}>
+                        📊 সঞ্চয় হার: <Text style={{ color: pSavings >= 0 ? '#10B981' : '#EF4444', fontWeight: 'bold' }}>{savingsRate}%</Text> ({pSavings >= 0 ? 'আয়ের অংশ সঞ্চয় হয়েছে' : 'আয়ের চেয়ে বেশি ব্যয়'})
+                      </Text>
+                    </View>
+                  )}
                 </View>
               );
             })()}
 
-            {/* Sub-Tab Navigation Bar */}
+            {/* Sub-Tab Navigation Bar (5 tabs) */}
             <View style={styles.mmSubTabsContainer}>
               <TouchableOpacity
                 style={[styles.mmSubTabBtn, mmActiveSubTab === 'transactions' && styles.mmSubTabBtnActive]}
                 onPress={() => setMmActiveSubTab('transactions')}
+                accessibilityRole="button"
+                accessibilityLabel="লেনদেন ট্যাব"
               >
                 <Text style={[styles.mmSubTabLabel, mmActiveSubTab === 'transactions' && styles.mmSubTabLabelActive]}>
                   📋 লেনদেন
@@ -7625,6 +8150,8 @@ function TallyKhataApp() {
               <TouchableOpacity
                 style={[styles.mmSubTabBtn, mmActiveSubTab === 'accounts' && styles.mmSubTabBtnActive]}
                 onPress={() => setMmActiveSubTab('accounts')}
+                accessibilityRole="button"
+                accessibilityLabel="ওয়ালেট ট্যাব"
               >
                 <Text style={[styles.mmSubTabLabel, mmActiveSubTab === 'accounts' && styles.mmSubTabLabelActive]}>
                   👛 ওয়ালেট
@@ -7633,14 +8160,28 @@ function TallyKhataApp() {
               <TouchableOpacity
                 style={[styles.mmSubTabBtn, mmActiveSubTab === 'budgets' && styles.mmSubTabBtnActive]}
                 onPress={() => setMmActiveSubTab('budgets')}
+                accessibilityRole="button"
+                accessibilityLabel="বাজেট ট্যাব"
               >
                 <Text style={[styles.mmSubTabLabel, mmActiveSubTab === 'budgets' && styles.mmSubTabLabelActive]}>
                   🎯 বাজেট
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
+                style={[styles.mmSubTabBtn, mmActiveSubTab === 'goals' && styles.mmSubTabBtnActive]}
+                onPress={() => setMmActiveSubTab('goals')}
+                accessibilityRole="button"
+                accessibilityLabel="লক্ষ্য ট্যাব"
+              >
+                <Text style={[styles.mmSubTabLabel, mmActiveSubTab === 'goals' && styles.mmSubTabLabelActive]}>
+                  🏆 লক্ষ্য
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.mmSubTabBtn, mmActiveSubTab === 'analytics' && styles.mmSubTabBtnActive]}
                 onPress={() => setMmActiveSubTab('analytics')}
+                accessibilityRole="button"
+                accessibilityLabel="বিশ্লেষণ ট্যাব"
               >
                 <Text style={[styles.mmSubTabLabel, mmActiveSubTab === 'analytics' && styles.mmSubTabLabelActive]}>
                   📊 বিশ্লেষণ
@@ -7648,33 +8189,15 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            {/* TAB 1: TRANSACTIONS (লেনদেন) */}
+            {/* SUB-TAB 1: TRANSACTIONS LIST */}
             {mmActiveSubTab === 'transactions' && (
-              <View style={{ marginBottom: 40 }}>
-                {/* Filter Chips */}
-                <View style={styles.mmTxnFilterRow}>
-                  {['all', 'expense', 'income', 'transfer'].map(f => {
-                    const label = f === 'all' ? 'সকল' : f === 'expense' ? 'ব্যয়' : f === 'income' ? 'আয়' : 'স্থানান্তর';
-                    const active = mmTxnFilter === f;
-                    return (
-                      <TouchableOpacity
-                        key={f}
-                        style={[styles.mmFilterChip, active && styles.mmFilterChipActive]}
-                        onPress={() => setMmTxnFilter(f)}
-                      >
-                        <Text style={[styles.mmFilterChipText, active && styles.mmFilterChipTextActive]}>
-                          {label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Search Box */}
+              <View style={{ marginTop: 14 }}>
+                {/* Search Bar */}
                 <View style={styles.mmSearchBox}>
+                  <Text style={styles.mmSearchIcon}>🔍</Text>
                   <TextInput
                     style={styles.mmSearchInput}
-                    placeholder="লেনদেনের নোট বা বিবরণ দিয়ে খুঁজুন..."
+                    placeholder="লেনদেন খুঁজুন (নোট, প্রাপক, অংক)..."
                     placeholderTextColor="#64748B"
                     value={mmSearchQuery}
                     onChangeText={setMmSearchQuery}
@@ -7686,75 +8209,179 @@ function TallyKhataApp() {
                   ) : null}
                 </View>
 
-                {/* Add Transaction Button */}
-                <TouchableOpacity
-                  style={styles.mmAddTxnBtn}
-                  onPress={() => {
-                    setMmNewType('expense');
-                    setMmNewAmount('');
-                    setMmNewNote('');
-                    setModalMMAddTxn(true);
-                  }}
-                >
-                  <Text style={styles.mmAddTxnBtnText}>+ নতুন আয় বা ব্যয় যুক্ত করুন</Text>
-                </TouchableOpacity>
+                {/* Filter Pills (All / Expense / Income / Transfer) */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                  <TouchableOpacity
+                    style={[styles.mmFilterChip, mmTxnFilter === 'all' && styles.mmFilterChipActive]}
+                    onPress={() => setMmTxnFilter('all')}
+                  >
+                    <Text style={[styles.mmFilterChipText, mmTxnFilter === 'all' && styles.mmFilterChipTextActive]}>
+                      সব লেনদেন
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmFilterChip, mmTxnFilter === 'expense' && styles.mmFilterChipActive]}
+                    onPress={() => setMmTxnFilter('expense')}
+                  >
+                    <Text style={[styles.mmFilterChipText, mmTxnFilter === 'expense' && styles.mmFilterChipTextActive]}>
+                      🔴 শুধু ব্যয়
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmFilterChip, mmTxnFilter === 'income' && styles.mmFilterChipActive]}
+                    onPress={() => setMmTxnFilter('income')}
+                  >
+                    <Text style={[styles.mmFilterChipText, mmTxnFilter === 'income' && styles.mmFilterChipTextActive]}>
+                      🟢 শুধু আয়
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmFilterChip, mmTxnFilter === 'transfer' && styles.mmFilterChipActive]}
+                    onPress={() => setMmTxnFilter('transfer')}
+                  >
+                    <Text style={[styles.mmFilterChipText, mmTxnFilter === 'transfer' && styles.mmFilterChipTextActive]}>
+                      🔄 ফান্ড স্থানান্তর
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
 
-                {/* Transactions List */}
+                {/* Sort Order Chips */}
+                <View style={styles.mmSortRow}>
+                  <Text style={styles.mmSortLabel}>সাজান:</Text>
+                  <TouchableOpacity
+                    style={[styles.mmSortChip, mmSortOrder === 'newest' && styles.mmSortChipActive]}
+                    onPress={() => setMmSortOrder('newest')}
+                  >
+                    <Text style={[styles.mmSortChipText, mmSortOrder === 'newest' && styles.mmSortChipTextActive]}>
+                      নতুন আগে
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmSortChip, mmSortOrder === 'oldest' && styles.mmSortChipActive]}
+                    onPress={() => setMmSortOrder('oldest')}
+                  >
+                    <Text style={[styles.mmSortChipText, mmSortOrder === 'oldest' && styles.mmSortChipTextActive]}>
+                      পুরোনো আগে
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmSortChip, mmSortOrder === 'amount_high' && styles.mmSortChipActive]}
+                    onPress={() => setMmSortOrder('amount_high')}
+                  >
+                    <Text style={[styles.mmSortChipText, mmSortOrder === 'amount_high' && styles.mmSortChipTextActive]}>
+                      বড় অংক
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmSortChip, mmSortOrder === 'amount_low' && styles.mmSortChipActive]}
+                    onPress={() => setMmSortOrder('amount_low')}
+                  >
+                    <Text style={[styles.mmSortChipText, mmSortOrder === 'amount_low' && styles.mmSortChipTextActive]}>
+                      ছোট অংক
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Filtered & Sorted Transactions List */}
                 {(() => {
-                  let txns = (moneyManagerState.transactions || []);
-                  if (mmTxnFilter !== 'all') {
-                    txns = txns.filter(t => t.type === mmTxnFilter);
-                  }
-                  if (mmSearchQuery.trim()) {
-                    const q = mmSearchQuery.trim().toLowerCase();
-                    txns = txns.filter(t => (t.note || '').toLowerCase().includes(q));
-                  }
+                  const filteredTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, {
+                    filterType: mmTxnFilter,
+                    period: mmPeriod,
+                    searchQuery: mmSearchQuery,
+                    sortOrder: mmSortOrder,
+                  });
 
-                  if (txns.length === 0) {
+                  if (filteredTxns.length === 0) {
                     return (
                       <View style={styles.mmEmptyBox}>
-                        <Text style={{ fontSize: 36, marginBottom: 8 }}>📝</Text>
-                        <Text style={{ color: '#94A3B8', fontSize: 14, textAlign: 'center' }}>
-                          কোনো লেনদেন পাওয়া যায়নি।{"\n"}উপরের বোতামে চাপ দিয়ে নতুন লেনদেন যুক্ত করুন।
+                        <Text style={styles.mmEmptyIcon}>📝</Text>
+                        <Text style={styles.mmEmptyText}>
+                          {mmSearchQuery ? 'অনুসন্ধানের সাথে কোনো লেনদেন মেলেনি' : 'নির্বাচিত সময়ে কোনো লেনদেনের রেকর্ড নেই'}
                         </Text>
+                        <TouchableOpacity
+                          style={styles.mmEmptyBtn}
+                          onPress={() => {
+                            setMmNewType('expense');
+                            setMmNewAmount('');
+                            setMmNewNote('');
+                            setMmNewPayee('');
+                            setModalMMAddTxn(true);
+                          }}
+                        >
+                          <Text style={styles.mmEmptyBtnText}>+ প্রথম লেনদেন যুক্ত করুন</Text>
+                        </TouchableOpacity>
                       </View>
                     );
                   }
 
-                  return txns.map(t => {
-                    const cat = (moneyManagerState.categories || []).find(c => c.id === t.categoryId) || { icon: '📦', name: 'অন্যান্য', color: '#6B7280' };
-                    let accName = '';
-                    if (t.type === 'transfer') {
-                      const fromA = (moneyManagerState.accounts || []).find(a => a.id === t.fromAccountId);
-                      const toA = (moneyManagerState.accounts || []).find(a => a.id === t.toAccountId);
-                      accName = `${fromA ? fromA.name : 'হিসাব'} ➔ ${toA ? toA.name : 'হিসাব'}`;
-                    } else {
-                      const acc = (moneyManagerState.accounts || []).find(a => a.id === t.accountId);
-                      accName = acc ? acc.name : 'ওয়ালেট';
-                    }
+                  return filteredTxns.map((t) => {
+                    const isIncome = t.type === 'income';
+                    const isExpense = t.type === 'expense';
+                    const isTransfer = t.type === 'transfer';
+
+                    const cat = (moneyManagerState.categories || []).find((c) => c.id === t.categoryId);
+                    const acc = (moneyManagerState.accounts || []).find((a) => a.id === t.accountId);
+                    const fromAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === t.fromAccountId) : null;
+                    const toAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === t.toAccountId) : null;
+
+                    const title = isTransfer
+                      ? `${fromAcc ? fromAcc.name : 'অ্যাকাউন্ট'} ➔ ${toAcc ? toAcc.name : 'অ্যাকাউন্ট'}`
+                      : cat
+                      ? cat.name
+                      : 'সাধারণ লেনদেন';
+
+                    const icon = isTransfer ? '🔄' : cat ? cat.icon : '💵';
+                    const color = isTransfer ? '#3B82F6' : isIncome ? '#10B981' : '#EF4444';
 
                     return (
                       <View key={t.id} style={styles.mmTxnCard}>
-                        <View style={[styles.mmTxnIconBox, { backgroundColor: t.type === 'transfer' ? '#1E3A8A' : cat.color + '25' }]}>
-                          <Text style={{ fontSize: 20 }}>{t.type === 'transfer' ? '⇄' : cat.icon}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <View style={[styles.mmTxnIconBox, { backgroundColor: color + '22', borderColor: color + '55' }]}>
+                            <Text style={styles.mmTxnIcon}>{icon}</Text>
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.mmTxnCat} numberOfLines={1}>
+                              {title}
+                            </Text>
+                            {t.payee ? (
+                              <Text style={styles.mmTxnPayee} numberOfLines={1}>
+                                🏷️ {t.payee}
+                              </Text>
+                            ) : null}
+                            {t.note ? (
+                              <Text style={styles.mmTxnNote} numberOfLines={2}>
+                                {t.note}
+                              </Text>
+                            ) : null}
+                            <Text style={styles.mmTxnMeta}>
+                              {t.date} • {t.time || ''} {acc && !isTransfer ? `• ${acc.name}` : ''}
+                            </Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                            <Text style={[styles.mmTxnAmount, { color }]}>
+                              {isIncome ? '+৳ ' : isExpense ? '-৳ ' : '৳ '}
+                              {(t.amount || 0).toLocaleString('en-US')}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={{ flex: 1, marginHorizontal: 12 }}>
-                          <Text style={styles.mmTxnNote} numberOfLines={1}>{t.note}</Text>
-                          <Text style={styles.mmTxnSub}>{accName} • {t.date} {t.time || ''}</Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={[
-                            styles.mmTxnAmount,
-                            t.type === 'income' ? styles.mmGreen : t.type === 'transfer' ? { color: '#38BDF8' } : styles.mmRed
-                          ]}>
-                            {t.type === 'income' ? '+' : t.type === 'transfer' ? '⇄' : '-'} ৳ {t.amount.toLocaleString('en-US')}
-                          </Text>
+
+                        {/* Transaction Actions: Edit & Delete */}
+                        <View style={styles.mmTxnActionRow}>
                           <TouchableOpacity
-                            onPress={() => handleDeleteMMTxn(t.id)}
-                            style={{ padding: 4, marginTop: 4 }}
-                            accessibilityLabel="মুছে ফেলুন"
+                            style={styles.mmTxnActionBtn}
+                            onPress={() => handleOpenEditMMTxn(t)}
+                            accessibilityRole="button"
+                            accessibilityLabel="লেনদেন সম্পাদনা করুন"
                           >
-                            <Text style={{ fontSize: 12, color: '#94A3B8' }}>🗑️</Text>
+                            <Text style={styles.mmTxnActionBtnText}>✏️ সম্পাদনা</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.mmTxnDeleteBtn}
+                            onPress={() => handleDeleteMMTxn(t.id)}
+                            accessibilityRole="button"
+                            accessibilityLabel="লেনদেন মুছুন"
+                          >
+                            <Text style={styles.mmTxnDeleteBtnText}>🗑️ মুছুন</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -7764,240 +8391,612 @@ function TallyKhataApp() {
               </View>
             )}
 
-            {/* TAB 2: ACCOUNTS (ওয়ালেট ও একাউন্ট) */}
+            {/* SUB-TAB 2: ACCOUNTS & WALLETS */}
             {mmActiveSubTab === 'accounts' && (
-              <View style={{ marginBottom: 40 }}>
-                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+              <View style={{ marginTop: 14 }}>
+                <View style={styles.mmSectionHeader}>
+                  <Text style={styles.mmSectionTitle}>সক্রিয় অ্যাকাউন্ট ও ওয়ালেটসমূহ</Text>
                   <TouchableOpacity
-                    style={[styles.mmActionBtn, { flex: 1, backgroundColor: '#0D9488' }]}
+                    style={styles.mmAddSmallBtn}
                     onPress={() => {
                       setMmNewAccName('');
                       setMmNewAccBal('');
+                      setMmNewAccType('bank');
                       setModalMMAddAccount(true);
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel="নতুন ওয়ালেট যুক্ত করুন"
                   >
-                    <Text style={styles.mmActionBtnText}>+ নতুন ওয়ালেট যোগ</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.mmActionBtn, { flex: 1, backgroundColor: '#2563EB' }]}
-                    onPress={() => {
-                      setMmTransferAmt('');
-                      setMmTransferNote('');
-                      setModalMMTransfer(true);
-                    }}
-                  >
-                    <Text style={styles.mmActionBtnText}>⇄ ফান্ড ট্রান্সফার</Text>
+                    <Text style={styles.mmAddSmallBtnText}>+ নতুন ওয়ালেট</Text>
                   </TouchableOpacity>
                 </View>
 
-                {(moneyManagerState.accounts || []).map(a => (
-                  <View key={a.id} style={styles.mmAccCard}>
-                    <View style={[styles.mmAccIconBox, { backgroundColor: (a.color || '#3B82F6') + '25' }]}>
-                      <Text style={{ fontSize: 24 }}>{a.icon || '🏦'}</Text>
-                    </View>
-                    <View style={{ flex: 1, marginHorizontal: 14 }}>
-                      <Text style={styles.mmAccName}>{a.name}</Text>
-                      <Text style={styles.mmAccType}>
-                        {a.type === 'cash' ? 'ক্যাশ মানি' : a.type === 'bank' ? 'ব্যাংক হিসাব' : a.type === 'card' ? 'ক্রেডিট কার্ড' : 'মোবাইল ওয়ালেট'}
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.mmAccBalance, (a.balance || 0) < 0 && { color: '#EF4444' }]}>
-                        ৳ {(a.balance || 0).toLocaleString('en-US')}
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.mmSmallTransferBtn}
-                        onPress={() => {
-                          setMmTransferFrom(a.id);
-                          setMmTransferAmt('');
-                          setMmTransferNote('');
-                          setModalMMTransfer(true);
-                        }}
-                      >
-                        <Text style={styles.mmSmallTransferBtnText}>স্থানান্তর ➔</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-
-
-
-            {/* TAB 3: BUDGETS (বাজেট ট্র্যাকার) */}
-            {mmActiveSubTab === 'budgets' && (
-              <View style={{ marginBottom: 40 }}>
-                <View style={{ marginBottom: 14 }}>
-                  <Text style={{ color: '#E2E8F0', fontSize: 15, fontWeight: 'bold' }}>
-                    🎯 ক্যাটাগরি অনুযায়ী মাসিক বাজেট
-                  </Text>
-                  <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 2 }}>
-                    খরচের সীমা নিয়ন্ত্রণ করুন এবং অতিরিক্ত ব্যয়ের ঝুঁকি এড়ান
-                  </Text>
-                </View>
-
-                {(moneyManagerState.categories || []).filter(c => c.type === 'expense').map(c => {
-                  const spent = (moneyManagerState.transactions || [])
-                    .filter(t => t.type === 'expense' && t.categoryId === c.id)
-                    .reduce((sum, t) => sum + t.amount, 0);
-                  const budget = c.budget || 0;
-                  const percent = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
-                  const isOver = budget > 0 && spent > budget;
-                  const remaining = budget > 0 ? budget - spent : 0;
+                {(moneyManagerState.accounts || []).map((acc) => {
+                  const typeLabel =
+                    acc.type === 'cash'
+                      ? 'নগদ ক্যাশ (Cash)'
+                      : acc.type === 'bank'
+                      ? 'ব্যাংক অ্যাকাউন্ট (Bank)'
+                      : acc.type === 'mfs'
+                      ? 'মোবাইল ফাইন্যান্স (MFS)'
+                      : 'অন্যান্য ফান্ড (Other)';
 
                   return (
-                    <View key={c.id} style={styles.mmBudgetCard}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 20, marginRight: 8 }}>{c.icon}</Text>
-                        <Text style={styles.mmBudgetName}>{c.name}</Text>
-                        <View style={{ flex: 1 }} />
-                        <View style={[
-                          styles.mmBudgetBadge,
-                          isOver ? { backgroundColor: '#7F1D1D' } : percent > 80 ? { backgroundColor: '#78350F' } : { backgroundColor: '#064E3B' }
-                        ]}>
-                          <Text style={[
-                            styles.mmBudgetBadgeText,
-                            isOver ? { color: '#FCA5A5' } : percent > 80 ? { color: '#FCD34D' } : { color: '#6EE7B7' }
-                          ]}>
-                            {percent}% খরচ
-                          </Text>
+                    <View key={acc.id} style={[styles.mmAccountCard, acc.isArchived && styles.mmAccountCardArchived]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={[styles.mmAccountIconBox, { backgroundColor: (acc.color || '#3B82F6') + '22', borderColor: (acc.color || '#3B82F6') + '55' }]}>
+                          <Text style={styles.mmAccountIcon}>{acc.icon || '💼'}</Text>
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.mmAccountName} numberOfLines={1}>
+                              {acc.name}
+                            </Text>
+                            {acc.isArchived && (
+                              <View style={styles.mmArchivedBadge}>
+                                <Text style={styles.mmArchivedBadgeText}>আর্কাইভকৃত</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.mmAccountType}>{typeLabel}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                          <Text style={styles.mmAccountBalance}>{mmCurrency} {(acc.balance || 0).toLocaleString('en-US')}</Text>
                         </View>
                       </View>
 
-                      {/* Progress Bar */}
-                      <View style={styles.mmProgressTrack}>
-                        <View
-                          style={[
-                            styles.mmProgressBar,
-                            {
-                              width: `${percent}%`,
-                              backgroundColor: isOver ? '#EF4444' : percent > 80 ? '#F59E0B' : '#10B981',
+                      {/* Account Action Buttons */}
+                      <View style={styles.mmAccountActions}>
+                        <TouchableOpacity
+                          style={[styles.mmAccountActionBtn, acc.isArchived && { opacity: 0.5 }]}
+                          onPress={() => {
+                            if (acc.isArchived) {
+                              Alert.alert("সতর্কতা", "আর্কাইভ করা ওয়ালেট থেকে স্থানান্তর সম্ভব নয়। প্রথমে ওয়ালেটটি পুনরায় সক্রিয় করুন।");
+                              return;
                             }
-                          ]}
-                        />
-                      </View>
+                            setMmTransferFrom(acc.id);
+                            const other = (moneyManagerState.accounts || []).find((a) => a.id !== acc.id && !a.isArchived);
+                            if (other) setMmTransferTo(other.id);
+                            setMmTransferAmt('');
+                            setMmTransferNote('');
+                            setModalMMTransfer(true);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel="ফান্ড স্থানান্তর"
+                        >
+                          <Text style={styles.mmAccountActionText}>🔄 স্থানান্তর</Text>
+                        </TouchableOpacity>
 
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-                        <Text style={styles.mmBudgetSub}>
-                          ব্যয়: ৳ {spent.toLocaleString('en-US')} / বাজেট: ৳ {budget.toLocaleString('en-US')}
-                        </Text>
-                        <Text style={[styles.mmBudgetSub, isOver && { color: '#EF4444', fontWeight: 'bold' }]}>
-                          {isOver ? `⚠️ অতিরিক্ত ৳ ${Math.abs(remaining).toLocaleString('en-US')}` : `অবশিষ্ট ৳ ${remaining.toLocaleString('en-US')}`}
-                        </Text>
+                        <TouchableOpacity
+                          style={styles.mmAccountArchiveBtn}
+                          onPress={() => handleArchiveMMAccount(acc.id, !acc.isArchived)}
+                          accessibilityRole="button"
+                          accessibilityLabel={acc.isArchived ? "সক্রিয় করুন" : "আর্কাইভ করুন"}
+                        >
+                          <Text style={styles.mmAccountArchiveText}>
+                            {acc.isArchived ? '📥 সক্রিয় করুন' : '📦 আর্কাইভ'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.mmAccountDeleteBtn}
+                          onPress={() => handleDeleteMMAccount(acc.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel="অ্যাকাউন্ট মুছুন"
+                        >
+                          <Text style={styles.mmAccountDeleteText}>🗑️ মুছুন</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
                   );
                 })}
 
                 <TouchableOpacity
-                  style={[styles.mmActionBtn, { backgroundColor: '#059669', marginTop: 8 }]}
+                  style={styles.mmAddAccBigBtn}
                   onPress={() => {
-                    setMmBudgetLimit('');
-                    setModalMMSetBudget(true);
+                    setMmNewAccName('');
+                    setMmNewAccBal('');
+                    setMmNewAccType('bank');
+                    setModalMMAddAccount(true);
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel="নতুন ওয়ালেট যুক্ত করুন"
                 >
-                  <Text style={styles.mmActionBtnText}>+ বাজেট নির্ধারণ বা পরিবর্তন করুন</Text>
+                  <Text style={styles.mmAddAccBigBtnText}>+ নতুন ওয়ালেট / অ্যাকাউন্ট যুক্ত করুন</Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* TAB 4: ANALYTICS (বিশ্লেষণ) */}
-            {mmActiveSubTab === 'analytics' && (
-              <View style={{ marginBottom: 40 }}>
+            {/* SUB-TAB 3: BUDGETS */}
+            {mmActiveSubTab === 'budgets' && (
+              <View style={{ marginTop: 14 }}>
+                {/* Overall Monthly Budget Ceiling Card */}
                 {(() => {
-                  const totalExpense = (moneyManagerState.transactions || []).filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-                  const totalIncome = (moneyManagerState.transactions || []).filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-
-                  const categoryExpenses = {};
-                  (moneyManagerState.transactions || []).forEach(t => {
-                    if (t.type === 'expense') {
-                      categoryExpenses[t.categoryId] = (categoryExpenses[t.categoryId] || 0) + t.amount;
-                    }
-                  });
-
-                  const sortedCats = Object.keys(categoryExpenses).map(catId => {
-                    const cat = (moneyManagerState.categories || []).find(c => c.id === catId) || { name: 'অন্যান্য', icon: '📦', color: '#6B7280' };
-                    const amount = categoryExpenses[catId];
-                    const percent = totalExpense > 0 ? Math.round((amount / totalExpense) * 100) : 0;
-                    return { catId, cat, amount, percent };
-                  }).sort((a, b) => b.amount - a.amount);
+                  const overallLimit = moneyManagerState.overallMonthlyBudget || 40000;
+                  const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod });
+                  const totalSpent = periodTxns.filter((t) => t.type === 'expense').reduce((acc, t) => acc + (t.amount || 0), 0);
+                  const remaining = overallLimit - totalSpent;
+                  const pct = overallLimit > 0 ? Math.min(100, Math.round((totalSpent / overallLimit) * 100)) : 0;
+                  const isOver = totalSpent > overallLimit;
 
                   return (
-                    <>
-                      {/* Income vs Expense Comparative Card */}
-                      <View style={styles.mmStatsCard}>
-                        <Text style={styles.mmStatsCardTitle}>📊 আয় বনাম ব্যয় তুলনামূলক চিত্র</Text>
-                        <View style={{ marginTop: 12 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <Text style={{ color: '#E2E8F0', fontSize: 13 }}>মাসিক আয়</Text>
-                            <Text style={{ color: '#10B981', fontWeight: 'bold' }}>৳ {totalIncome.toLocaleString('en-US')}</Text>
+                    <View style={styles.mmOverallBudgetCard}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={styles.mmOverallBudgetTitle}>সামগ্রিক মাসিক বাজেট সীমা</Text>
+                        <View style={[styles.mmOverallBudgetBadge, isOver && { backgroundColor: '#EF4444' }]}>
+                          <Text style={styles.mmOverallBudgetBadgeText}>
+                            {isOver ? '⚠️ বাজেট অতিক্রম' : 'বাজেট সীমার মধ্যে'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.mmOverallBudgetStats}>
+                        <View>
+                          <Text style={styles.mmStatLabel}>ব্যয় হয়েছে ({mmPeriod === 'this_month' ? 'এই মাস' : mmPeriod === 'last_month' ? 'গত মাস' : 'সব সময়'})</Text>
+                          <Text style={[styles.mmOverallBudgetSpent, isOver && { color: '#EF4444' }]}>
+                            ৳ {totalSpent.toLocaleString('en-US')}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={styles.mmStatLabel}>সর্বোচ্চ সীমা</Text>
+                          <Text style={styles.mmOverallBudgetLimit}>৳ {overallLimit.toLocaleString('en-US')}</Text>
+                        </View>
+                      </View>
+
+                      {/* Progress Bar */}
+                      <View style={styles.mmProgressBarBg}>
+                        <View
+                          style={[
+                            styles.mmProgressBarFill,
+                            {
+                              width: `${pct}%`,
+                              backgroundColor: isOver ? '#EF4444' : pct > 80 ? '#F59E0B' : '#10B981',
+                            },
+                          ]}
+                        />
+                      </View>
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                        <Text style={{ color: '#94A3B8', fontSize: 12 }}>বাজেট ব্যবহৃত: {pct}%</Text>
+                        <Text style={{ color: isOver ? '#EF4444' : '#10B981', fontSize: 12, fontWeight: 'bold' }}>
+                          {isOver ? `অতিরিক্ত ব্যয়: ৳ ${Math.abs(remaining).toLocaleString('en-US')}` : `অবশিষ্ট: ৳ ${remaining.toLocaleString('en-US')}`}
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.mmOverallBudgetBtn}
+                        onPress={() => {
+                          setMmOverallBudgetInput(String(overallLimit));
+                          setModalMMOverallBudget(true);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="মাসিক বাজেট সীমা পরিবর্তন"
+                      >
+                        <Text style={styles.mmOverallBudgetBtnText}>✏️ সামগ্রিক মাসিক বাজেট পরিবর্তন</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })()}
+
+                {/* Category Section Header */}
+                <View style={[styles.mmSectionHeader, { marginTop: 16 }]}>
+                  <Text style={styles.mmSectionTitle}>
+                    {mmCatSectionTab === 'expense' ? 'ক্যাটাগরি ভিত্তিক বাজেট' : 'আয় ক্যাটাগরি ও প্রাপ্তি'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                    <TouchableOpacity
+                      style={[styles.mmAddSmallBtn, { backgroundColor: mmShowArchivedCats ? '#334155' : '#1E293B' }]}
+                      onPress={() => setMmShowArchivedCats(!mmShowArchivedCats)}
+                      accessibilityRole="button"
+                      accessibilityLabel="আর্কাইভ ক্যাটাগরি ফিল্টার"
+                    >
+                      <Text style={styles.mmAddSmallBtnText}>
+                        {mmShowArchivedCats ? '📦 আর্কাইভ লুকান' : '📂 আর্কাইভ দেখুন'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.mmAddSmallBtn}
+                      onPress={() => {
+                        setMmNewCatName('');
+                        setMmNewCatBudget('');
+                        setMmNewCatType(mmCatSectionTab);
+                        setModalMMAddCategory(true);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="নতুন ক্যাটাগরি তৈরি"
+                    >
+                      <Text style={styles.mmAddSmallBtnText}>+ নতুন ক্যাটাগরি</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Category Type Filter Pills (Expense / Income) */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, marginBottom: 12 }}>
+                  <TouchableOpacity
+                    style={[styles.mmPrefPill, mmCatSectionTab === 'expense' && styles.mmPrefPillActive]}
+                    onPress={() => setMmCatSectionTab('expense')}
+                    accessibilityRole="button"
+                    accessibilityLabel="ব্যয় বাজেট ক্যাটাগরি"
+                  >
+                    <Text style={[styles.mmPrefPillText, mmCatSectionTab === 'expense' && styles.mmPrefPillTextActive]}>
+                      🔴 ব্যয় বাজেট
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmPrefPill, mmCatSectionTab === 'income' && styles.mmPrefPillActive]}
+                    onPress={() => setMmCatSectionTab('income')}
+                    accessibilityRole="button"
+                    accessibilityLabel="আয় ক্যাটাগরি"
+                  >
+                    <Text style={[styles.mmPrefPillText, mmCatSectionTab === 'income' && styles.mmPrefPillTextActive]}>
+                      🟢 আয় ক্যাটাগরি
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {mmCatSectionTab === 'expense' ? (
+                  (() => {
+                    const categoryBudgets = moneyManagerService.calculateCategoryBudgets(moneyManagerState, mmPeriod);
+                    const expenseCats = (moneyManagerState.categories || []).filter((c) => c.type === 'expense' && (mmShowArchivedCats || !c.isArchived));
+
+                    if (expenseCats.length === 0) {
+                      return (
+                        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                          <Text style={{ color: '#64748B', fontSize: 13 }}>কোনো ব্যয় ক্যাটাগরি পাওয়া যায়নি</Text>
+                        </View>
+                      );
+                    }
+
+                    return expenseCats.map((cat) => {
+                      const budgetInfo = categoryBudgets.find((b) => b.categoryId === cat.id || b.id === cat.id);
+                      const spent = budgetInfo ? budgetInfo.spent : 0;
+                      const limit = cat.budget || 0;
+                      const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
+                      const remaining = limit - spent;
+                      const isOver = limit > 0 && spent > limit;
+
+                      return (
+                        <View key={cat.id} style={styles.mmCatBudgetCard}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={[styles.mmCatBudgetIconBox, { backgroundColor: (cat.color || '#3B82F6') + '22', borderColor: (cat.color || '#3B82F6') + '55' }]}>
+                              <Text style={{ fontSize: 18 }}>{cat.icon || '🏷️'}</Text>
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.mmCatBudgetName}>{cat.name}</Text>
+                                {cat.isArchived && (
+                                  <View style={styles.mmArchivedBadge}>
+                                    <Text style={styles.mmArchivedBadgeText}>আর্কাইভকৃত</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={styles.mmCatBudgetAmounts}>
+                                ব্যয়: {mmCurrency} {spent.toLocaleString('en-US')} {limit > 0 ? `• সীমা: ${mmCurrency} ${limit.toLocaleString('en-US')}` : '• কোনো সীমা নেই'}
+                              </Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                              <TouchableOpacity
+                                style={styles.mmCatBudgetBtn}
+                                onPress={() => {
+                                  setMmBudgetCat(cat.id);
+                                  setMmBudgetLimit(limit > 0 ? String(limit) : '');
+                                  setModalMMSetBudget(true);
+                                }}
+                                accessibilityRole="button"
+                                accessibilityLabel="বাজেট নির্ধারণ করুন"
+                              >
+                                <Text style={styles.mmCatBudgetBtnText}>✏️ বাজেট</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.mmCatBudgetBtn, { backgroundColor: '#334155' }]}
+                                onPress={() => handleOpenEditMMCategory(cat)}
+                                accessibilityRole="button"
+                                accessibilityLabel="ক্যাটাগরি সম্পাদনা"
+                              >
+                                <Text style={styles.mmCatBudgetBtnText}>⚙️</Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
-                          <View style={styles.mmProgressTrack}>
-                            <View style={[styles.mmProgressBar, { width: '100%', backgroundColor: '#10B981' }]} />
+
+                          {limit > 0 && (
+                            <View style={{ marginTop: 10 }}>
+                              <View style={styles.mmProgressBarBg}>
+                                <View
+                                  style={[
+                                    styles.mmProgressBarFill,
+                                    {
+                                      width: `${pct}%`,
+                                      backgroundColor: isOver ? '#EF4444' : pct > 80 ? '#F59E0B' : '#10B981',
+                                    },
+                                  ]}
+                                />
+                              </View>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                                <Text style={{ color: '#94A3B8', fontSize: 11 }}>ব্যবহৃত: {pct}%</Text>
+                                <Text style={{ color: isOver ? '#EF4444' : '#10B981', fontSize: 11, fontWeight: 'bold' }}>
+                                  {isOver ? `অতিরিক্ত: ${mmCurrency} ${Math.abs(remaining).toLocaleString('en-US')}` : `অবশিষ্ট: ${mmCurrency} ${remaining.toLocaleString('en-US')}`}
+                                </Text>
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    });
+                  })()
+                ) : (
+                  (() => {
+                    const incomeCats = (moneyManagerState.categories || []).filter((c) => c.type === 'income' && (mmShowArchivedCats || !c.isArchived));
+                    const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod });
+
+                    if (incomeCats.length === 0) {
+                      return (
+                        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                          <Text style={{ color: '#64748B', fontSize: 13 }}>কোনো আয় ক্যাটাগরি পাওয়া যায়নি</Text>
+                        </View>
+                      );
+                    }
+
+                    return incomeCats.map((cat) => {
+                      const earned = periodTxns
+                        .filter((t) => t.type === 'income' && t.categoryId === cat.id)
+                        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+                      return (
+                        <View key={cat.id} style={styles.mmCatBudgetCard}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={[styles.mmCatBudgetIconBox, { backgroundColor: (cat.color || '#10B981') + '22', borderColor: (cat.color || '#10B981') + '55' }]}>
+                              <Text style={{ fontSize: 18 }}>{cat.icon || '💰'}</Text>
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.mmCatBudgetName}>{cat.name}</Text>
+                                {cat.isArchived && (
+                                  <View style={styles.mmArchivedBadge}>
+                                    <Text style={styles.mmArchivedBadgeText}>আর্কাইভকৃত</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={[styles.mmCatBudgetAmounts, { color: '#10B981' }]}>
+                                মোট প্রাপ্তি ({mmPeriod === 'this_month' ? 'এই মাস' : mmPeriod === 'last_month' ? 'গত মাস' : 'সব সময়'}): +{mmCurrency} {earned.toLocaleString('en-US')}
+                              </Text>
+                            </View>
+                            <TouchableOpacity
+                              style={[styles.mmCatBudgetBtn, { backgroundColor: '#334155' }]}
+                              onPress={() => handleOpenEditMMCategory(cat)}
+                              accessibilityRole="button"
+                              accessibilityLabel="ক্যাটাগরি সম্পাদনা"
+                            >
+                              <Text style={styles.mmCatBudgetBtnText}>⚙️ সম্পাদনা</Text>
+                            </TouchableOpacity>
                           </View>
                         </View>
-                        <View style={{ marginTop: 12 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <Text style={{ color: '#E2E8F0', fontSize: 13 }}>মাসিক ব্যয়</Text>
-                            <Text style={{ color: '#EF4444', fontWeight: 'bold' }}>৳ {totalExpense.toLocaleString('en-US')}</Text>
+                      );
+                    });
+                  })()
+                )}
+              </View>
+            )}
+
+            {/* SUB-TAB 4: SAVINGS GOALS */}
+            {mmActiveSubTab === 'goals' && (
+              <View style={{ marginTop: 14 }}>
+                <View style={styles.mmSectionHeader}>
+                  <Text style={styles.mmSectionTitle}>সঞ্চয় লক্ষ্য (Savings Goals)</Text>
+                  <TouchableOpacity
+                    style={styles.mmAddSmallBtn}
+                    onPress={() => {
+                      setMmGoalTitle('');
+                      setMmGoalTarget('');
+                      setMmGoalInitial('');
+                      setMmGoalDate('');
+                      setMmGoalNote('');
+                      setModalMMAddGoal(true);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="নতুন সঞ্চয় লক্ষ্য তৈরি"
+                  >
+                    <Text style={styles.mmAddSmallBtnText}>+ নতুন লক্ষ্য</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {(() => {
+                  const goals = moneyManagerState.goals || [];
+                  if (goals.length === 0) {
+                    return (
+                      <View style={styles.mmEmptyBox}>
+                        <Text style={styles.mmEmptyIcon}>🎯</Text>
+                        <Text style={styles.mmEmptyText}>কোনো সঞ্চয় লক্ষ্য তৈরি করা হয়নি</Text>
+                        <TouchableOpacity
+                          style={styles.mmEmptyBtn}
+                          onPress={() => {
+                            setMmGoalTitle('');
+                            setMmGoalTarget('');
+                            setMmGoalInitial('');
+                            setMmGoalDate('');
+                            setMmGoalNote('');
+                            setModalMMAddGoal(true);
+                          }}
+                        >
+                          <Text style={styles.mmEmptyBtnText}>+ প্রথম সঞ্চয় লক্ষ্য তৈরি করুন</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+
+                  return goals.map((g) => {
+                    const target = g.targetAmount || 1;
+                    const saved = g.savedAmount || 0;
+                    const pct = Math.min(100, Math.round((saved / target) * 100));
+
+                    return (
+                      <View key={g.id} style={styles.mmGoalCard}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <View style={[styles.mmGoalIconBox, { backgroundColor: (g.color || '#10B981') + '22', borderColor: (g.color || '#10B981') + '55' }]}>
+                            <Text style={{ fontSize: 22 }}>{g.icon || '🎯'}</Text>
                           </View>
-                          <View style={styles.mmProgressTrack}>
-                            <View style={[styles.mmProgressBar, {
-                              width: `${totalIncome > 0 ? Math.min(100, Math.round((totalExpense / totalIncome) * 100)) : 100}%`,
-                              backgroundColor: '#EF4444'
-                            }]} />
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.mmGoalTitle} numberOfLines={1}>
+                              {g.title}
+                            </Text>
+                            {g.targetDate ? <Text style={styles.mmGoalTargetDate}>টার্গেট: {g.targetDate}</Text> : null}
+                            {g.note ? <Text style={styles.mmGoalNote} numberOfLines={1}>{g.note}</Text> : null}
+                          </View>
+                        </View>
+
+                        <View style={styles.mmGoalProgressRow}>
+                          <Text style={styles.mmGoalSaved}>জমা: ৳ {saved.toLocaleString('en-US')}</Text>
+                          <Text style={styles.mmGoalTarget}>লক্ষ্যমাত্রা: ৳ {target.toLocaleString('en-US')}</Text>
+                        </View>
+
+                        {/* Progress Bar */}
+                        <View style={styles.mmProgressBarBg}>
+                          <View
+                            style={[
+                              styles.mmProgressBarFill,
+                              {
+                                width: `${pct}%`,
+                                backgroundColor: pct >= 100 ? '#10B981' : g.color || '#3B82F6',
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 4 }}>
+                          অগ্রগতি: {pct}% {pct >= 100 ? '🎉 লক্ষ্য অর্জিত হয়েছে!' : ''}
+                        </Text>
+
+                        {/* Goal Actions */}
+                        <View style={styles.mmGoalActions}>
+                          <TouchableOpacity
+                            style={styles.mmGoalDepositBtn}
+                            onPress={() => {
+                              setMmDepositGoalId(g.id);
+                              setMmDepositAmt('');
+                              const firstActive = (moneyManagerState.accounts || []).find((a) => !a.isArchived);
+                              if (firstActive) setMmDepositFromAcc(firstActive.id);
+                              setModalMMDepositGoal(true);
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel="টাকা জমা করুন"
+                          >
+                            <Text style={styles.mmGoalDepositBtnText}>+ টাকা জমা করুন</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.mmGoalDeleteBtn}
+                            onPress={() => handleDeleteMMGoal(g.id)}
+                            accessibilityRole="button"
+                            accessibilityLabel="লক্ষ্য মুছুন"
+                          >
+                            <Text style={styles.mmGoalDeleteBtnText}>🗑️ মুছুন</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  });
+                })()}
+              </View>
+            )}
+
+            {/* SUB-TAB 5: ANALYTICS & INSIGHTS */}
+            {mmActiveSubTab === 'analytics' && (
+              <View style={{ marginTop: 14 }}>
+                {(() => {
+                  const periodMetrics = moneyManagerService.calculatePeriodMetrics(moneyManagerState, mmPeriod);
+                  const distribution = moneyManagerService.calculateCategoryDistribution(moneyManagerState, mmPeriod);
+                  const periodLabel = mmPeriod === 'this_month' ? 'এই মাস' : mmPeriod === 'last_month' ? 'গত মাস' : 'সব সময়';
+
+                  return (
+                    <View>
+                      {/* Period Overview Card */}
+                      <View style={styles.mmAnalyticsCard}>
+                        <Text style={styles.mmAnalyticsTitle}>আয় ও ব্যয় ক্যাশ ফ্লো ({periodLabel})</Text>
+                        <View style={styles.mmStatRow}>
+                          <View style={styles.mmStatCol}>
+                            <Text style={styles.mmStatLabel}>মোট আয়</Text>
+                            <Text style={styles.mmStatIncome}>+৳ {periodMetrics.income.toLocaleString('en-US')}</Text>
+                          </View>
+                          <View style={styles.mmStatDivider} />
+                          <View style={styles.mmStatCol}>
+                            <Text style={styles.mmStatLabel}>মোট ব্যয়</Text>
+                            <Text style={styles.mmStatExpense}>-৳ {periodMetrics.expense.toLocaleString('en-US')}</Text>
+                          </View>
+                          <View style={styles.mmStatDivider} />
+                          <View style={styles.mmStatCol}>
+                            <Text style={styles.mmStatLabel}>নিট সঞ্চয়</Text>
+                            <Text style={[styles.mmStatSavings, periodMetrics.netSavings < 0 && { color: '#EF4444' }]}>
+                              {periodMetrics.netSavings >= 0 ? '+' : ''}৳ {periodMetrics.netSavings.toLocaleString('en-US')}
+                            </Text>
                           </View>
                         </View>
                       </View>
 
-                      {/* Category Breakdown */}
-                      <View style={styles.mmStatsCard}>
-                        <Text style={styles.mmStatsCardTitle}>🥧 খরচের খাতভিত্তিক অনুপাত</Text>
-                        {sortedCats.length === 0 ? (
+                      {/* Category Expense Distribution Card */}
+                      <View style={[styles.mmAnalyticsCard, { marginTop: 14 }]}>
+                        <Text style={styles.mmAnalyticsTitle}>খাত অনুযায়ী ব্যয়ের অনুপাত ({periodLabel})</Text>
+                        {distribution.length === 0 ? (
                           <Text style={{ color: '#94A3B8', fontSize: 13, marginTop: 10, textAlign: 'center' }}>
-                            এখনও কোনো ব্যয়ের তথ্য নেই
+                            এই সময়ে কোনো ব্যয়ের তথ্য নেই
                           </Text>
                         ) : (
-                          sortedCats.map(item => (
-                            <View key={item.catId} style={{ marginTop: 12 }}>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <Text style={{ color: '#E2E8F0', fontSize: 13 }}>
-                                  {item.cat.icon} {item.cat.name} ({item.percent}%)
-                                </Text>
-                                <Text style={{ color: '#CBD5E1', fontSize: 13, fontWeight: 'bold' }}>
-                                  ৳ {item.amount.toLocaleString('en-US')}
+                          distribution.map((item) => (
+                            <View key={item.categoryId} style={styles.mmDistributionRow}>
+                              <View style={styles.mmDistributionLeft}>
+                                <Text style={styles.mmDistributionIcon}>{item.icon}</Text>
+                                <Text style={styles.mmDistributionName} numberOfLines={1}>
+                                  {item.categoryName}
                                 </Text>
                               </View>
-                              <View style={styles.mmProgressTrack}>
-                                <View style={[styles.mmProgressBar, { width: `${item.percent}%`, backgroundColor: item.cat.color || '#3B82F6' }]} />
+                              <View style={styles.mmDistributionRight}>
+                                <Text style={styles.mmDistributionAmount}>৳ {item.amount.toLocaleString('en-US')}</Text>
+                                <Text style={styles.mmDistributionPct}>({item.percentage}%)</Text>
+                              </View>
+                              <View style={styles.mmProgressBarBg}>
+                                <View
+                                  style={[
+                                    styles.mmProgressBarFill,
+                                    {
+                                      width: `${item.percentage}%`,
+                                      backgroundColor: item.color || '#3B82F6',
+                                    },
+                                  ]}
+                                />
                               </View>
                             </View>
                           ))
                         )}
                       </View>
 
-                      {/* Top Spending Insight */}
-                      {sortedCats.length > 0 && (
-                        <View style={[styles.mmStatsCard, { backgroundColor: '#1E293B', borderColor: '#334155' }]}>
-                          <Text style={{ color: '#FCD34D', fontSize: 14, fontWeight: 'bold', marginBottom: 4 }}>
-                            💡 সর্বোচ্চ খরচের খাত
-                          </Text>
-                          <Text style={{ color: '#E2E8F0', fontSize: 13, lineHeight: 20 }}>
-                            এই মাসে আপনার সবচেয়ে বেশি খরচ হয়েছে{' '}
-                            <Text style={{ color: '#38BDF8', fontWeight: 'bold' }}>{sortedCats[0].cat.name}</Text> খাতে (৳ {sortedCats[0].amount.toLocaleString('en-US')}), যা আপনার মোট ব্যয়ের {sortedCats[0].percent}%।
+                      {/* Smart Financial Tips Card */}
+                      {moneyManagerState.preferences?.showTipsCard !== false && (
+                      <View style={[styles.mmTipsCard, { marginTop: 14 }]}>
+                        <Text style={styles.mmTipsTitle}>💡 আর্থিক শৃঙ্খলা ও সঞ্চয় টিপস</Text>
+                        <View style={styles.mmTipRow}>
+                          <Text style={styles.mmTipText}>
+                            • <Text style={{ fontWeight: 'bold' }}>৫০-৩০-২০ নিয়ম:</Text> আয়ের ৫০% মৌলিক প্রয়োজন, ৩০% ইচ্ছা এবং অন্তত ২০% সঞ্চয় তহবিলে জমা রাখা আদর্শ।
                           </Text>
                         </View>
+                        <View style={styles.mmTipRow}>
+                          <Text style={styles.mmTipText}>
+                            • <Text style={{ fontWeight: 'bold' }}>জরুরি তহবিল:</Text> অপ্রত্যাশিত পরিস্থিতির জন্য ৩ থেকে ৬ মাসের খরচের সমান টাকা জরুরি সঞ্চয় হিসেবে আলাদা রাখুন।
+                          </Text>
+                        </View>
+                        <View style={styles.mmTipRow}>
+                          <Text style={styles.mmTipText}>
+                            • <Text style={{ fontWeight: 'bold' }}>বাজেট শৃঙ্খলা:</Text> প্রতিটি খাতের জন্য মাসিক বাজেট সীমা নির্ধারণ করে চলুন এবং অতিরিক্ত খরচ এড়ান।
+                          </Text>
+                        </View>
+                      </View>
                       )}
-                    </>
+                    </View>
                   );
                 })()}
               </View>
             )}
+
           </ScrollView>
         </SafeAreaView>
       </Modal>
 
-      {/* MODAL: ADD TRANSACTION */}
+      {/* 1. MODAL: ADD TRANSACTION */}
       <Modal
         visible={modalMMAddTxn}
         transparent
@@ -8007,54 +9006,64 @@ function TallyKhataApp() {
         <View style={styles.mmModalOverlay}>
           <View style={styles.mmModalSheet}>
             <View style={styles.mmModalHeader}>
-              <Text style={styles.mmModalTitle}>নতুন লেনদেন সংরক্ষণ</Text>
+              <Text style={styles.mmModalTitle}>নতুন লেনদেন যোগ করুন</Text>
               <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMAddTxn(false)}>
                 <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
-            {/* Type Switcher */}
-            <View style={styles.mmTypeSwitchRow}>
-              <TouchableOpacity
-                style={[styles.mmTypeBtn, mmNewType === 'expense' && styles.mmTypeBtnExpense]}
-                onPress={() => { setMmNewType('expense'); setMmNewCat('cat_food'); }}
-              >
-                <Text style={[styles.mmTypeBtnText, mmNewType === 'expense' && styles.mmTypeBtnTextActive]}>ব্যয়</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.mmTypeBtn, mmNewType === 'income' && styles.mmTypeBtnIncome]}
-                onPress={() => { setMmNewType('income'); setMmNewCat('cat_salary'); }}
-              >
-                <Text style={[styles.mmTypeBtnText, mmNewType === 'income' && styles.mmTypeBtnTextActive]}>আয়</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.mmTypeBtn, mmNewType === 'transfer' && styles.mmTypeBtnTransfer]}
-                onPress={() => setMmNewType('transfer')}
-              >
-                <Text style={[styles.mmTypeBtnText, mmNewType === 'transfer' && styles.mmTypeBtnTextActive]}>স্থানান্তর</Text>
-              </TouchableOpacity>
-            </View>
+              {/* Type Selector (Expense / Income / Transfer) */}
+              <View style={{ flexDirection: 'row', marginBottom: 14 }}>
+                <TouchableOpacity
+                  style={[styles.mmTypeBtn, mmNewType === 'expense' && styles.mmTypeBtnExpense]}
+                  onPress={() => { setMmNewType('expense'); setMmNewCat('cat_food'); }}
+                >
+                  <Text style={[styles.mmTypeBtnText, mmNewType === 'expense' && styles.mmTypeBtnTextActive]}>🔴 ব্যয় (Expense)</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mmTypeBtn, mmNewType === 'income' && styles.mmTypeBtnIncome]}
+                  onPress={() => { setMmNewType('income'); setMmNewCat('cat_salary'); }}
+                >
+                  <Text style={[styles.mmTypeBtnText, mmNewType === 'income' && styles.mmTypeBtnTextActive]}>🟢 আয় (Income)</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mmTypeBtn, mmNewType === 'transfer' && styles.mmTypeBtnTransfer]}
+                  onPress={() => setMmNewType('transfer')}
+                >
+                  <Text style={[styles.mmTypeBtnText, mmNewType === 'transfer' && styles.mmTypeBtnTextActive]}>🔄 স্থানান্তর</Text>
+                </TouchableOpacity>
+              </View>
 
-            {/* Amount Input */}
-            <Text style={styles.mmInputLabel}>টাকার পরিমাণ (৳)</Text>
-            <TextInput
-              style={styles.mmInput}
-              placeholder="0.00"
-              placeholderTextColor="#64748B"
-              keyboardType="numeric"
-              value={mmNewAmount}
-              onChangeText={setMmNewAmount}
-            />
+              {/* Amount */}
+              <Text style={styles.mmInputLabel}>টাকার পরিমাণ (৳)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="0.00"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmNewAmount}
+                onChangeText={setMmNewAmount}
+              />
 
-            {mmNewType !== 'transfer' ? (
-              <>
-                {/* Category Picker */}
-                <Text style={styles.mmInputLabel}>ক্যাটাগরি নির্বাচন</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                  {(moneyManagerState.categories || [])
-                    .filter(c => c.type === mmNewType)
-                    .map(cat => {
+              {mmNewType !== 'transfer' ? (
+                <>
+                  {/* Category Chips with + New Category Button */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.mmInputLabel}>ক্যাটাগরি নির্বাচন</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setMmNewCatName('');
+                        setMmNewCatBudget('');
+                        setMmNewCatType(mmNewType);
+                        setModalMMAddCategory(true);
+                      }}
+                    >
+                      <Text style={{ color: '#3B82F6', fontSize: 12, fontWeight: 'bold' }}>+ নতুন ক্যাটাগরি</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.categories || []).filter((c) => c.type === mmNewType && !c.isArchived).map((cat) => {
                       const sel = mmNewCat === cat.id;
                       return (
                         <TouchableOpacity
@@ -8067,85 +9076,186 @@ function TallyKhataApp() {
                         </TouchableOpacity>
                       );
                     })}
-                </ScrollView>
+                  </ScrollView>
 
-                {/* Account Picker */}
-                <Text style={styles.mmInputLabel}>কোন ওয়ালেট / অ্যাকাউন্ট</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                  {(moneyManagerState.accounts || []).map(acc => {
-                    const sel = mmNewAcc === acc.id;
-                    return (
-                      <TouchableOpacity
-                        key={acc.id}
-                        style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
-                        onPress={() => setMmNewAcc(acc.id)}
-                      >
-                        <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
-                        <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </>
-            ) : (
-              <>
-                {/* From Account Picker */}
-                <Text style={styles.mmInputLabel}>উৎস অ্যাকাউন্ট (হতে)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                  {(moneyManagerState.accounts || []).map(acc => {
-                    const sel = mmFromAcc === acc.id;
-                    return (
-                      <TouchableOpacity
-                        key={acc.id}
-                        style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
-                        onPress={() => setMmFromAcc(acc.id)}
-                      >
-                        <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
-                        <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                  {/* Account / Wallet Chips */}
+                  <Text style={styles.mmInputLabel}>ওয়ালেট বা অ্যাকাউন্ট</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.accounts || []).filter((a) => !a.isArchived).map((acc) => {
+                      const sel = mmNewAcc === acc.id;
+                      return (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                          onPress={() => setMmNewAcc(acc.id)}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                          <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              ) : (
+                <>
+                  {/* Source Wallet */}
+                  <Text style={styles.mmInputLabel}>উৎস অ্যাকাউন্ট (হতে)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.accounts || []).filter((a) => !a.isArchived).map((acc) => {
+                      const sel = mmFromAcc === acc.id;
+                      return (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                          onPress={() => setMmFromAcc(acc.id)}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                          <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
 
-                {/* To Account Picker */}
-                <Text style={styles.mmInputLabel}>গন্তব্য অ্যাকাউন্ট (এ)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                  {(moneyManagerState.accounts || []).map(acc => {
-                    const sel = mmToAcc === acc.id;
-                    return (
-                      <TouchableOpacity
-                        key={acc.id}
-                        style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
-                        onPress={() => setMmToAcc(acc.id)}
-                      >
-                        <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
-                        <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </>
-            )}
+                  {/* Destination Wallet */}
+                  <Text style={styles.mmInputLabel}>গন্তব্য অ্যাকাউন্ট (এ)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.accounts || []).filter((a) => !a.isArchived).map((acc) => {
+                      const sel = mmToAcc === acc.id;
+                      return (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                          onPress={() => setMmToAcc(acc.id)}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                          <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              )}
 
-            {/* Note Input */}
-            <Text style={styles.mmInputLabel}>বিবরণ বা নোট</Text>
-            <TextInput
-              style={styles.mmInput}
-              placeholder="লেনদেনের সংক্ষিপ্ত নোট..."
-              placeholderTextColor="#64748B"
-              value={mmNewNote}
-              onChangeText={setMmNewNote}
-            />
+              {/* Payee / Merchant */}
+              <Text style={styles.mmInputLabel}>প্রাপক বা প্রতিষ্ঠান (ঐচ্ছিক)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: স্বপ্ন সুপারশপ, ডেসকো, দোকান"
+                placeholderTextColor="#64748B"
+                value={mmNewPayee}
+                onChangeText={setMmNewPayee}
+              />
 
-            <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMTxn}>
-              <Text style={styles.mmSubmitBtnText}>লেনদেন সেভ করুন</Text>
-            </TouchableOpacity>
+              {/* Note */}
+              <Text style={styles.mmInputLabel}>নোট বা বিবরণ</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="লেনদেনের সংক্ষিপ্ত বিবরণ..."
+                placeholderTextColor="#64748B"
+                value={mmNewNote}
+                onChangeText={setMmNewNote}
+              />
+
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMTxn}>
+                <Text style={styles.mmSubmitBtnText}>+ লেনদেন সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* MODAL: ADD ACCOUNT / WALLET */}
+      {/* 2. MODAL: EDIT TRANSACTION */}
+      <Modal
+        visible={modalMMEditTxn}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMEditTxn(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={styles.mmModalSheet}>
+            <View style={styles.mmModalHeader}>
+              <Text style={styles.mmModalTitle}>লেনদেন সম্পাদনা</Text>
+              <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMEditTxn(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              <Text style={styles.mmInputLabel}>টাকার পরিমাণ (৳)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="0.00"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmEditAmount}
+                onChangeText={setMmEditAmount}
+              />
+
+              {mmEditType !== 'transfer' ? (
+                <>
+                  <Text style={styles.mmInputLabel}>ক্যাটাগরি</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.categories || []).filter((c) => c.type === mmEditType && (!c.isArchived || c.id === mmEditCat)).map((cat) => {
+                      const sel = mmEditCat === cat.id;
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                          onPress={() => setMmEditCat(cat.id)}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>{cat.icon}</Text>
+                          <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{cat.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  <Text style={styles.mmInputLabel}>অ্যাকাউন্ট</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.accounts || []).filter((a) => !a.isArchived).map((acc) => {
+                      const sel = mmEditAcc === acc.id;
+                      return (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                          onPress={() => setMmEditAcc(acc.id)}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                          <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              ) : null}
+
+              <Text style={styles.mmInputLabel}>প্রাপক বা প্রতিষ্ঠান</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: স্বপ্ন সুপারশপ"
+                placeholderTextColor="#64748B"
+                value={mmEditPayee}
+                onChangeText={setMmEditPayee}
+              />
+
+              <Text style={styles.mmInputLabel}>নোট বা বিবরণ</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="লেনদেনের বিবরণ..."
+                placeholderTextColor="#64748B"
+                value={mmEditNote}
+                onChangeText={setMmEditNote}
+              />
+
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleUpdateMMTxn}>
+                <Text style={styles.mmSubmitBtnText}>পরিবর্তন সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 3. MODAL: ADD ACCOUNT */}
       <Modal
         visible={modalMMAddAccount}
         transparent
@@ -8155,64 +9265,74 @@ function TallyKhataApp() {
         <View style={styles.mmModalOverlay}>
           <View style={styles.mmModalSheet}>
             <View style={styles.mmModalHeader}>
-              <Text style={styles.mmModalTitle}>নতুন ওয়ালেট / অ্যাকাউন্ট যোগ</Text>
+              <Text style={styles.mmModalTitle}>নতুন ওয়ালেট বা অ্যাকাউন্ট</Text>
               <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMAddAccount(false)}>
                 <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
-            <Text style={styles.mmInputLabel}>অ্যাকাউন্টের নাম</Text>
-            <TextInput
-              style={styles.mmInput}
-              placeholder="যেমন: ডাচ-বাংলা ব্যাংক, প্রাইম ব্যাংক"
-              placeholderTextColor="#64748B"
-              value={mmNewAccName}
-              onChangeText={setMmNewAccName}
-            />
+              <Text style={styles.mmInputLabel}>অ্যাকাউন্টের নাম</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: সিটি ব্যাংক, ডাচ-বাংলা, রকেট"
+                placeholderTextColor="#64748B"
+                value={mmNewAccName}
+                onChangeText={setMmNewAccName}
+              />
 
-            <Text style={styles.mmInputLabel}>অ্যাকাউন্টের ধরন</Text>
-            <View style={styles.mmTypeSwitchRow}>
-              {[
-                { type: 'cash', label: 'ক্যাশ', icon: '💵' },
-                { type: 'bank', label: 'ব্যাংক', icon: '🏦' },
-                { type: 'mfs', label: 'এমএফএস', icon: '📱' },
-                { type: 'card', label: 'কার্ড', icon: '💳' },
-              ].map(item => (
-                <TouchableOpacity
-                  key={item.type}
-                  style={[styles.mmTypeBtn, mmNewAccType === item.type && styles.mmTypeBtnIncome]}
-                  onPress={() => {
-                    setMmNewAccType(item.type);
-                    setMmNewAccIcon(item.icon);
-                  }}
-                >
-                  <Text style={[styles.mmTypeBtnText, mmNewAccType === item.type && styles.mmTypeBtnTextActive]}>
-                    {item.icon} {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <Text style={styles.mmInputLabel}>অ্যাকাউন্টের ধরন</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+                {[
+                  { id: 'cash', label: 'নগদ ক্যাশ' },
+                  { id: 'bank', label: 'ব্যাংক' },
+                  { id: 'mfs', label: 'মোবাইল ওয়ালেট' },
+                  { id: 'other', label: 'অন্যান্য' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.mmFilterChip, mmNewAccType === item.id && styles.mmFilterChipActive, { marginRight: 8, marginBottom: 8 }]}
+                    onPress={() => setMmNewAccType(item.id)}
+                  >
+                    <Text style={[styles.mmFilterChipText, mmNewAccType === item.id && styles.mmFilterChipTextActive]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <Text style={styles.mmInputLabel}>শুরুর ব্যালেন্স (৳)</Text>
-            <TextInput
-              style={styles.mmInput}
-              placeholder="0.00"
-              placeholderTextColor="#64748B"
-              keyboardType="numeric"
-              value={mmNewAccBal}
-              onChangeText={setMmNewAccBal}
-            />
+              <Text style={styles.mmInputLabel}>প্রারম্ভিক ব্যালেন্স (৳)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="0.00"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmNewAccBal}
+                onChangeText={setMmNewAccBal}
+              />
 
-            <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMAccount}>
-              <Text style={styles.mmSubmitBtnText}>অ্যাকাউন্ট তৈরি করুন</Text>
-            </TouchableOpacity>
+              <Text style={styles.mmInputLabel}>আইকন নির্বাচন</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 }}>
+                {['💵', '🏦', '📱', '💳', '💰', '🪙', '💼', '🏷️'].map((ic) => (
+                  <TouchableOpacity
+                    key={ic}
+                    style={[styles.mmIconChip, mmNewAccIcon === ic && styles.mmIconChipActive]}
+                    onPress={() => setMmNewAccIcon(ic)}
+                  >
+                    <Text style={{ fontSize: 20 }}>{ic}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMAccount}>
+                <Text style={styles.mmSubmitBtnText}>অ্যাকাউন্ট যুক্ত করুন</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* MODAL: SET BUDGET */}
+      {/* 4. MODAL: SET CATEGORY BUDGET */}
       <Modal
         visible={modalMMSetBudget}
         transparent
@@ -8222,54 +9342,329 @@ function TallyKhataApp() {
         <View style={styles.mmModalOverlay}>
           <View style={styles.mmModalSheet}>
             <View style={styles.mmModalHeader}>
-              <Text style={styles.mmModalTitle}>মাসিক বাজেট নির্ধারণ</Text>
+              <Text style={styles.mmModalTitle}>ক্যাটাগরি বাজেট নির্ধারণ</Text>
               <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMSetBudget(false)}>
                 <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
-            <Text style={styles.mmInputLabel}>ক্যাটাগরি নির্বাচন</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              {(moneyManagerState.categories || [])
-                .filter(c => c.type === 'expense')
-                .map(cat => {
+              <Text style={styles.mmInputLabel}>ক্যাটাগরি</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {(moneyManagerState.categories || []).filter((c) => c.type === 'expense').map((cat) => {
                   const sel = mmBudgetCat === cat.id;
                   return (
                     <TouchableOpacity
                       key={cat.id}
                       style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
-                      onPress={() => {
-                        setMmBudgetCat(cat.id);
-                        setMmBudgetLimit(cat.budget ? String(cat.budget) : '');
-                      }}
+                      onPress={() => setMmBudgetCat(cat.id)}
                     >
                       <Text style={{ fontSize: 16, marginRight: 6 }}>{cat.icon}</Text>
                       <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{cat.name}</Text>
                     </TouchableOpacity>
                   );
                 })}
-            </ScrollView>
+              </ScrollView>
 
-            <Text style={styles.mmInputLabel}>মাসিক বাজেট সীমা (৳)</Text>
-            <TextInput
-              style={styles.mmInput}
-              placeholder="যেমন: 15000"
-              placeholderTextColor="#64748B"
-              keyboardType="numeric"
-              value={mmBudgetLimit}
-              onChangeText={setMmBudgetLimit}
-            />
+              <Text style={styles.mmInputLabel}>মাসিক বাজেট সীমা (৳) - ০ দিলে বাজেট প্রত্যাহার হবে</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: ৫০০০"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmBudgetLimit}
+                onChangeText={setMmBudgetLimit}
+              />
 
-            <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMBudget}>
-              <Text style={styles.mmSubmitBtnText}>বাজেট সংরক্ষণ করুন</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMBudget}>
+                <Text style={styles.mmSubmitBtnText}>বাজেট সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* MODAL: QUICK TRANSFER */}
+      {/* 5. MODAL: OVERALL MONTHLY BUDGET */}
+      <Modal
+        visible={modalMMOverallBudget}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMOverallBudget(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={styles.mmModalSheet}>
+            <View style={styles.mmModalHeader}>
+              <Text style={styles.mmModalTitle}>সামগ্রিক মাসিক বাজেট সীমা</Text>
+              <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMOverallBudget(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 12 }}>
+                প্রতি মাসের সকল খরচের সর্বোচ্চ মোট সীমা নির্ধারণ করুন। এই সীমা অতিক্রম করলে অ্যাপ আপনাকে সতর্কবার্তা দেখাবে।
+              </Text>
+
+              <Text style={styles.mmInputLabel}>মোট মাসিক ব্যয় সীমা (৳)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: ৪০,০০০"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmOverallBudgetInput}
+                onChangeText={setMmOverallBudgetInput}
+              />
+
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMOverallBudget}>
+                <Text style={styles.mmSubmitBtnText}>মাসিক বাজেট সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 6. MODAL: ADD CUSTOM CATEGORY */}
+      <Modal
+        visible={modalMMAddCategory}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMAddCategory(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={styles.mmModalSheet}>
+            <View style={styles.mmModalHeader}>
+              <Text style={styles.mmModalTitle}>নতুন ক্যাটাগরি তৈরি করুন</Text>
+              <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMAddCategory(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              <Text style={styles.mmInputLabel}>ক্যাটাগরির নাম</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: ইন্টারনেট ও ওয়াইফাই, উপহার"
+                placeholderTextColor="#64748B"
+                value={mmNewCatName}
+                onChangeText={setMmNewCatName}
+              />
+
+              <Text style={styles.mmInputLabel}>ক্যাটাগরির ধরন</Text>
+              <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={[styles.mmTypeBtn, mmNewCatType === 'expense' && styles.mmTypeBtnExpense]}
+                  onPress={() => setMmNewCatType('expense')}
+                >
+                  <Text style={[styles.mmTypeBtnText, mmNewCatType === 'expense' && styles.mmTypeBtnTextActive]}>🔴 ব্যয়</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mmTypeBtn, mmNewCatType === 'income' && styles.mmTypeBtnIncome]}
+                  onPress={() => setMmNewCatType('income')}
+                >
+                  <Text style={[styles.mmTypeBtnText, mmNewCatType === 'income' && styles.mmTypeBtnTextActive]}>🟢 আয়</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.mmInputLabel}>আইকন নির্বাচন</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+                {['🛒', '🍜', '🚗', '🏥', '📚', '🎬', '👕', '💡', '✈️', '🏷️', '🎁', '💰'].map((ic) => (
+                  <TouchableOpacity
+                    key={ic}
+                    style={[styles.mmIconChip, mmNewCatIcon === ic && styles.mmIconChipActive]}
+                    onPress={() => setMmNewCatIcon(ic)}
+                  >
+                    <Text style={{ fontSize: 20 }}>{ic}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.mmInputLabel}>রং নির্বাচন</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+                {['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#64748B'].map((col) => (
+                  <TouchableOpacity
+                    key={col}
+                    style={[styles.mmColorChip, { backgroundColor: col }, mmNewCatColor === col && styles.mmColorChipActive]}
+                    onPress={() => setMmNewCatColor(col)}
+                  />
+                ))}
+              </View>
+
+              {mmNewCatType === 'expense' && (
+                <>
+                  <Text style={styles.mmInputLabel}>মাসিক বাজেট সীমা (ঐচ্ছিক, ৳)</Text>
+                  <TextInput
+                    style={styles.mmInput}
+                    placeholder="যেমন: ৩০০০"
+                    placeholderTextColor="#64748B"
+                    keyboardType="numeric"
+                    value={mmNewCatBudget}
+                    onChangeText={setMmNewCatBudget}
+                  />
+                </>
+              )}
+
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMCategory}>
+                <Text style={styles.mmSubmitBtnText}>ক্যাটাগরি সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 7. MODAL: ADD SAVINGS GOAL */}
+      <Modal
+        visible={modalMMAddGoal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMAddGoal(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={styles.mmModalSheet}>
+            <View style={styles.mmModalHeader}>
+              <Text style={styles.mmModalTitle}>নতুন সঞ্চয় লক্ষ্য তৈরি</Text>
+              <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMAddGoal(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              <Text style={styles.mmInputLabel}>লক্ষ্যের শিরোনাম</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: নতুন ল্যাপটপ, বাইক ক্রয়, ঈদ শপিং"
+                placeholderTextColor="#64748B"
+                value={mmGoalTitle}
+                onChangeText={setMmGoalTitle}
+              />
+
+              <Text style={styles.mmInputLabel}>লক্ষ্যমাত্রা (Target Amount ৳)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: ৭৫০০০"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmGoalTarget}
+                onChangeText={setMmGoalTarget}
+              />
+
+              <Text style={styles.mmInputLabel}>প্রাথমিক সঞ্চিত জমা (ঐচ্ছিক ৳)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="0.00"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmGoalInitial}
+                onChangeText={setMmGoalInitial}
+              />
+
+              <Text style={styles.mmInputLabel}>টার্গেট তারিখ (ঐচ্ছিক)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: 2026-12-31"
+                placeholderTextColor="#64748B"
+                value={mmGoalDate}
+                onChangeText={setMmGoalDate}
+              />
+
+              <Text style={styles.mmInputLabel}>আইকন নির্বাচন</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+                {['🎯', '🛡️', '🌙', '🏠', '🚗', '💍', '🎓', '💻'].map((ic) => (
+                  <TouchableOpacity
+                    key={ic}
+                    style={[styles.mmIconChip, mmGoalIcon === ic && styles.mmIconChipActive]}
+                    onPress={() => setMmGoalIcon(ic)}
+                  >
+                    <Text style={{ fontSize: 20 }}>{ic}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.mmInputLabel}>সংক্ষিপ্ত নোট বা উদ্দেশ্য</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="লক্ষ্যের বিবরণ..."
+                placeholderTextColor="#64748B"
+                value={mmGoalNote}
+                onChangeText={setMmGoalNote}
+              />
+
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMGoal}>
+                <Text style={styles.mmSubmitBtnText}>লক্ষ্য সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 8. MODAL: DEPOSIT TO GOAL */}
+      <Modal
+        visible={modalMMDepositGoal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMDepositGoal(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={styles.mmModalSheet}>
+            <View style={styles.mmModalHeader}>
+              <Text style={styles.mmModalTitle}>সঞ্চয় লক্ষ্যে টাকা জমা</Text>
+              <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMDepositGoal(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              {(() => {
+                const targetGoal = (moneyManagerState.goals || []).find((g) => g.id === mmDepositGoalId);
+                return (
+                  <View style={{ marginBottom: 12, padding: 12, backgroundColor: '#0F172A', borderRadius: 10, borderColor: '#334155', borderWidth: 1 }}>
+                    <Text style={{ color: '#F8FAFC', fontWeight: 'bold', fontSize: 15 }}>
+                      {targetGoal ? targetGoal.title : 'লক্ষ্য'}
+                    </Text>
+                    <Text style={{ color: '#94A3B8', fontSize: 13, marginTop: 4 }}>
+                      বর্তমান জমা: ৳ {(targetGoal ? targetGoal.savedAmount || 0 : 0).toLocaleString('en-US')} • লক্ষ্যমাত্রা: ৳ {(targetGoal ? targetGoal.targetAmount || 0 : 0).toLocaleString('en-US')}
+                    </Text>
+                  </View>
+                );
+              })()}
+
+              <Text style={styles.mmInputLabel}>জমার পরিমাণ (৳)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: ৫০০০"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmDepositAmt}
+                onChangeText={setMmDepositAmt}
+              />
+
+              <Text style={styles.mmInputLabel}>কোন ওয়ালেট হতে টাকা কর্তন হবে?</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                {(moneyManagerState.accounts || []).filter((a) => !a.isArchived).map((acc) => {
+                  const sel = mmDepositFromAcc === acc.id;
+                  return (
+                    <TouchableOpacity
+                      key={acc.id}
+                      style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                      onPress={() => setMmDepositFromAcc(acc.id)}
+                    >
+                      <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                      <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>
+                        {acc.name} (৳ {acc.balance.toLocaleString('en-US')})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleDepositMMGoal}>
+                <Text style={styles.mmSubmitBtnText}>জমা নিশ্চিত করুন</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 9. MODAL: QUICK TRANSFER */}
       <Modal
         visible={modalMMTransfer}
         transparent
@@ -8286,66 +9681,600 @@ function TallyKhataApp() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
-            <Text style={styles.mmInputLabel}>উৎস অ্যাকাউন্ট (হতে)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              {(moneyManagerState.accounts || []).map(acc => {
-                const sel = mmTransferFrom === acc.id;
-                return (
-                  <TouchableOpacity
-                    key={acc.id}
-                    style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
-                    onPress={() => setMmTransferFrom(acc.id)}
-                  >
-                    <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
-                    <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+              <Text style={styles.mmInputLabel}>উৎস অ্যাকাউন্ট (হতে)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {(moneyManagerState.accounts || []).filter((a) => !a.isArchived).map((acc) => {
+                  const sel = mmTransferFrom === acc.id;
+                  return (
+                    <TouchableOpacity
+                      key={acc.id}
+                      style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                      onPress={() => setMmTransferFrom(acc.id)}
+                    >
+                      <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                      <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
-            <Text style={styles.mmInputLabel}>গন্তব্য অ্যাকাউন্ট (এ)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              {(moneyManagerState.accounts || []).map(acc => {
-                const sel = mmTransferTo === acc.id;
-                return (
-                  <TouchableOpacity
-                    key={acc.id}
-                    style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
-                    onPress={() => setMmTransferTo(acc.id)}
-                  >
-                    <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
-                    <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+              <Text style={styles.mmInputLabel}>গন্তব্য অ্যাকাউন্ট (এ)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {(moneyManagerState.accounts || []).filter((a) => !a.isArchived).map((acc) => {
+                  const sel = mmTransferTo === acc.id;
+                  return (
+                    <TouchableOpacity
+                      key={acc.id}
+                      style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                      onPress={() => setMmTransferTo(acc.id)}
+                    >
+                      <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                      <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
-            <Text style={styles.mmInputLabel}>স্থানান্তরের পরিমাণ (৳)</Text>
-            <TextInput
-              style={styles.mmInput}
-              placeholder="0.00"
-              placeholderTextColor="#64748B"
-              keyboardType="numeric"
-              value={mmTransferAmt}
-              onChangeText={setMmTransferAmt}
-            />
+              <Text style={styles.mmInputLabel}>স্থানান্তরের পরিমাণ (৳)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="0.00"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmTransferAmt}
+                onChangeText={setMmTransferAmt}
+              />
 
-            <Text style={styles.mmInputLabel}>নোট বা উদ্দেশ্য</Text>
-            <TextInput
-              style={styles.mmInput}
-              placeholder="যেমন: এটিএম হতে নগদ উত্তোলন"
-              placeholderTextColor="#64748B"
-              value={mmTransferNote}
-              onChangeText={setMmTransferNote}
-            />
+              <Text style={styles.mmInputLabel}>নোট বা উদ্দেশ্য</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: এটিএম হতে নগদ উত্তোলন"
+                placeholderTextColor="#64748B"
+                value={mmTransferNote}
+                onChangeText={setMmTransferNote}
+              />
 
-            <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleMMTransfer}>
-              <Text style={styles.mmSubmitBtnText}>টাকা স্থানান্তর করুন</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleMMTransfer}>
+                <Text style={styles.mmSubmitBtnText}>টাকা স্থানান্তর করুন</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
       </Modal>
+
+      {/* 10. MODAL: USER PREFERENCES / SETTINGS */}
+      <Modal
+        visible={modalMMPreferences}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMPreferences(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={styles.mmModalSheet}>
+            <View style={styles.mmModalHeader}>
+              <Text style={styles.mmModalTitle}>মানি ম্যানেজার সেটিংস</Text>
+              <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMPreferences(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Default Period */}
+              <Text style={styles.mmInputLabel}>ডিফল্ট সময়কাল (Default Period)</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                {[
+                  { id: 'this_month', label: 'এই মাস' },
+                  { id: 'last_month', label: 'গত মাস' },
+                  { id: 'all_time', label: 'সব সময়' },
+                ].map((p) => {
+                  const sel = mmPrefDefaultPeriod === p.id;
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={[styles.mmPrefPill, sel && styles.mmPrefPillActive]}
+                      onPress={() => setMmPrefDefaultPeriod(p.id)}
+                    >
+                      <Text style={[styles.mmPrefPillText, sel && styles.mmPrefPillTextActive]}>{p.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Default Sort Order */}
+              <Text style={styles.mmInputLabel}>লেনদেন সাজানোর ক্রম (Default Sort)</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                {[
+                  { id: 'newest', label: 'নতুন আগে' },
+                  { id: 'oldest', label: 'পুরাতন আগে' },
+                  { id: 'amount_high', label: 'সর্বোচ্চ পরিমাণ' },
+                  { id: 'amount_low', label: 'সর্বনিম্ন পরিমাণ' },
+                ].map((s) => {
+                  const sel = mmPrefSortOrder === s.id;
+                  return (
+                    <TouchableOpacity
+                      key={s.id}
+                      style={[styles.mmPrefPill, sel && styles.mmPrefPillActive]}
+                      onPress={() => setMmPrefSortOrder(s.id)}
+                    >
+                      <Text style={[styles.mmPrefPillText, sel && styles.mmPrefPillTextActive]}>{s.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Currency Symbol */}
+              <Text style={styles.mmInputLabel}>মুদ্রা প্রতীক (Currency Symbol)</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                {['৳', 'BDT'].map((c) => {
+                  const sel = mmPrefCurrencySymbol === c;
+                  return (
+                    <TouchableOpacity
+                      key={c}
+                      style={[styles.mmPrefPill, sel && styles.mmPrefPillActive]}
+                      onPress={() => setMmPrefCurrencySymbol(c)}
+                    >
+                      <Text style={[styles.mmPrefPillText, sel && styles.mmPrefPillTextActive]}>{c}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Card Visibility Toggles */}
+              <Text style={styles.mmInputLabel}>ড্যাশবোর্ড কার্ড দৃশ্যমানতা</Text>
+              <TouchableOpacity
+                style={styles.mmToggleRow}
+                onPress={() => setMmPrefShowNetWorth(!mmPrefShowNetWorth)}
+              >
+                <Text style={styles.mmToggleLabel}>মোট ব্যক্তিগত সম্পদ কার্ড</Text>
+                <Text style={[styles.mmToggleBadge, mmPrefShowNetWorth ? styles.mmToggleOn : styles.mmToggleOff]}>
+                  {mmPrefShowNetWorth ? 'দৃশ্যমান' : 'লুকানো'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.mmToggleRow}
+                onPress={() => setMmPrefShowSavingsRate(!mmPrefShowSavingsRate)}
+              >
+                <Text style={styles.mmToggleLabel}>সঞ্চয় হার কার্ড</Text>
+                <Text style={[styles.mmToggleBadge, mmPrefShowSavingsRate ? styles.mmToggleOn : styles.mmToggleOff]}>
+                  {mmPrefShowSavingsRate ? 'দৃশ্যমান' : 'লুকানো'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.mmToggleRow}
+                onPress={() => setMmPrefShowTips(!mmPrefShowTips)}
+              >
+                <Text style={styles.mmToggleLabel}>আর্থিক শৃঙ্খলা ও সঞ্চয় টিপস</Text>
+                <Text style={[styles.mmToggleBadge, mmPrefShowTips ? styles.mmToggleOn : styles.mmToggleOff]}>
+                  {mmPrefShowTips ? 'দৃশ্যমান' : 'লুকানো'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={{ marginTop: 20, flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.mmResetBtn, { flex: 1 }]}
+                  onPress={handleResetMMPreferences}
+                >
+                  <Text style={styles.mmResetBtnText}>রিসেট</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mmSubmitBtn, { flex: 2, marginTop: 0 }]}
+                  onPress={handleSaveMMPreferences}
+                >
+                  <Text style={styles.mmSubmitBtnText}>সংরক্ষণ করুন</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 11. MODAL: RECURRING SCHEDULES LIST */}
+      <Modal
+        visible={modalMMRecurring}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMRecurring(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={styles.mmModalSheet}>
+            <View style={styles.mmModalHeader}>
+              <Text style={styles.mmModalTitle}>অটো-শিডিউল ও পুনরাবৃত্তি</Text>
+              <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMRecurring(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ color: '#94A3B8', fontSize: 13 }}>নিয়মিত আয়, ব্যয় বা জমার শিডিউল</Text>
+                <TouchableOpacity
+                  style={styles.mmAddSmallBtn}
+                  onPress={() => {
+                    setMmRecEditId(null);
+                    setMmRecTitle('');
+                    setMmRecType('expense');
+                    setMmRecAmount('');
+                    setMmRecCadence('monthly');
+                    setMmRecNextDue(getTodayDate());
+                    setMmRecNote('');
+                    setMmRecPayee('');
+                    setModalMMAddRecurring(true);
+                  }}
+                >
+                  <Text style={styles.mmAddSmallBtnText}>+ নতুন শিডিউল</Text>
+                </TouchableOpacity>
+              </View>
+
+              {(moneyManagerState.recurring || []).length === 0 ? (
+                <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                  <Text style={{ color: '#64748B', fontSize: 14 }}>কোনো অটো-শিডিউল তৈরি করা হয়নি</Text>
+                  <Text style={{ color: '#475569', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+                    বাসা ভাড়া, ইন্টারনেট বিল বা নিয়মিত সঞ্চয়ের জন্য শিডিউল যোগ করুন
+                  </Text>
+                </View>
+              ) : (
+                (moneyManagerState.recurring || []).map((rec) => {
+                  const isExp = rec.type === 'expense';
+                  const isInc = rec.type === 'income';
+                  const cadenceBn = rec.cadence === 'daily' ? 'দৈনিক' : rec.cadence === 'weekly' ? 'সাপ্তাহিক' : 'মাসিক';
+                  const targetAcc = (moneyManagerState.accounts || []).find(a => a.id === rec.accountId);
+
+                  return (
+                    <View key={rec.id} style={styles.mmScheduleCard}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={styles.mmScheduleTitle}>{rec.title}</Text>
+                            <View style={[styles.mmStatusBadge, rec.isActive ? styles.mmStatusActive : styles.mmStatusPaused]}>
+                              <Text style={[styles.mmStatusBadgeText, rec.isActive ? styles.mmStatusActiveText : styles.mmStatusPausedText]}>
+                                {rec.isActive ? 'সক্রিয়' : 'স্থগিত'}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.mmScheduleMeta}>
+                            🔄 {cadenceBn} • পরবর্তী: {rec.nextDueDate || 'নির্ধারিত নয়'}
+                          </Text>
+                          {targetAcc ? (
+                            <Text style={styles.mmScheduleMeta}>
+                              অ্যাকাউন্ট: {targetAcc.name}
+                            </Text>
+                          ) : null}
+                          {rec.note ? (
+                            <Text style={styles.mmScheduleNote}>{rec.note}</Text>
+                          ) : null}
+                        </View>
+                        <Text style={[styles.mmScheduleAmount, isInc ? { color: '#10B981' } : isExp ? { color: '#EF4444' } : { color: '#3B82F6' }]}>
+                          {isInc ? '+৳ ' : isExp ? '-৳ ' : '৳ '}
+                          {(rec.amount || 0).toLocaleString('en-US')}
+                        </Text>
+                      </View>
+
+                      <View style={styles.mmScheduleActionRow}>
+                        <TouchableOpacity
+                          style={[styles.mmScheduleActionBtn, { backgroundColor: rec.isActive ? '#334155' : '#065F46' }]}
+                          onPress={() => handleToggleMMRecurring(rec.id, !rec.isActive)}
+                        >
+                          <Text style={{ color: '#F8FAFC', fontSize: 12, fontWeight: '600' }}>
+                            {rec.isActive ? '⏸️ স্থগিত করুন' : '▶️ চালু করুন'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.mmScheduleActionBtn}
+                          onPress={() => handleOpenEditMMRecurring(rec)}
+                        >
+                          <Text style={{ color: '#F8FAFC', fontSize: 12, fontWeight: '600' }}>✏️ সম্পাদনা</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.mmScheduleActionBtn, { backgroundColor: '#7F1D1D' }]}
+                          onPress={() => handleDeleteMMRecurring(rec.id)}
+                        >
+                          <Text style={{ color: '#FCA5A5', fontSize: 12, fontWeight: '600' }}>🗑️ মুছুন</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 12. MODAL: ADD / EDIT RECURRING SCHEDULE */}
+      <Modal
+        visible={modalMMAddRecurring}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMAddRecurring(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={styles.mmModalSheet}>
+            <View style={styles.mmModalHeader}>
+              <Text style={styles.mmModalTitle}>
+                {mmRecEditId ? 'অটো-শিডিউল সম্পাদনা' : 'নতুন অটো-শিডিউল যোগ করুন'}
+              </Text>
+              <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMAddRecurring(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Type Selector Chips */}
+              <View style={styles.mmTypeChipContainer}>
+                <TouchableOpacity
+                  style={[styles.mmTypeChip, mmRecType === 'expense' && styles.mmTypeChipExpense]}
+                  onPress={() => { setMmRecType('expense'); setMmRecCat('cat_utility'); }}
+                >
+                  <Text style={[styles.mmTypeChipText, mmRecType === 'expense' && styles.mmTypeChipTextActive]}>ব্যয় (Expense)</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mmTypeChip, mmRecType === 'income' && styles.mmTypeChipIncome]}
+                  onPress={() => { setMmRecType('income'); setMmRecCat('cat_salary'); }}
+                >
+                  <Text style={[styles.mmTypeChipText, mmRecType === 'income' && styles.mmTypeChipTextActive]}>আয় (Income)</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mmTypeChip, mmRecType === 'transfer' && styles.mmTypeChipTransfer]}
+                  onPress={() => setMmRecType('transfer')}
+                >
+                  <Text style={[styles.mmTypeChipText, mmRecType === 'transfer' && styles.mmTypeChipTextActive]}>স্থানান্তর (Transfer)</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.mmInputLabel}>শিডিউল শিরোনাম</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: বাসা ভাড়া, ডিপিএস জমা, ওয়াইফাই বিল"
+                placeholderTextColor="#64748B"
+                value={mmRecTitle}
+                onChangeText={setMmRecTitle}
+              />
+
+              <Text style={styles.mmInputLabel}>পরিমাণ (৳)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="0.00"
+                placeholderTextColor="#64748B"
+                keyboardType="numeric"
+                value={mmRecAmount}
+                onChangeText={setMmRecAmount}
+              />
+
+              {/* Cadence Selection */}
+              <Text style={styles.mmInputLabel}>পুনরাবৃত্তির সময়কাল (Cadence)</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                {[
+                  { id: 'daily', label: 'দৈনিক (Daily)' },
+                  { id: 'weekly', label: 'সাপ্তাহিক (Weekly)' },
+                  { id: 'monthly', label: 'মাসিক (Monthly)' },
+                ].map((c) => {
+                  const sel = mmRecCadence === c.id;
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[styles.mmPrefPill, sel && styles.mmPrefPillActive]}
+                      onPress={() => setMmRecCadence(c.id)}
+                    >
+                      <Text style={[styles.mmPrefPillText, sel && styles.mmPrefPillTextActive]}>{c.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.mmInputLabel}>পরবর্তী জমার তারিখ (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#64748B"
+                value={mmRecNextDue}
+                onChangeText={setMmRecNextDue}
+              />
+
+              {mmRecType !== 'transfer' ? (
+                <>
+                  <Text style={styles.mmInputLabel}>অ্যাকাউন্ট / ওয়ালেট</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.accounts || []).filter(a => !a.isArchived).map((acc) => {
+                      const sel = mmRecAcc === acc.id;
+                      return (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                          onPress={() => setMmRecAcc(acc.id)}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                          <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  <Text style={styles.mmInputLabel}>ক্যাটাগরি</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.categories || []).filter(c => c.type === (mmRecType === 'income' ? 'income' : 'expense') && !c.isArchived).map((cat) => {
+                      const sel = mmRecCat === cat.id;
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                          onPress={() => setMmRecCat(cat.id)}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>{cat.icon}</Text>
+                          <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{cat.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.mmInputLabel}>উৎস অ্যাকাউন্ট (From Account)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.accounts || []).filter(a => !a.isArchived).map((acc) => {
+                      const sel = mmRecFromAcc === acc.id;
+                      return (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                          onPress={() => setMmRecFromAcc(acc.id)}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                          <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  <Text style={styles.mmInputLabel}>গন্তব্য অ্যাকাউন্ট (To Account)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {(moneyManagerState.accounts || []).filter(a => !a.isArchived).map((acc) => {
+                      const sel = mmRecToAcc === acc.id;
+                      return (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={[styles.mmCatChip, sel && styles.mmCatChipActive]}
+                          onPress={() => setMmRecToAcc(acc.id)}
+                        >
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>{acc.icon}</Text>
+                          <Text style={[styles.mmCatChipText, sel && styles.mmCatChipTextActive]}>{acc.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              )}
+
+              <Text style={styles.mmInputLabel}>প্রাপক / ব্যক্তি (Payee / Source)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="যেমন: বাড়িওয়ালা, অফিস, ডেসকো"
+                placeholderTextColor="#64748B"
+                value={mmRecPayee}
+                onChangeText={setMmRecPayee}
+              />
+
+              <Text style={styles.mmInputLabel}>নোট (Note)</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="অতিরিক্ত তথ্য..."
+                placeholderTextColor="#64748B"
+                value={mmRecNote}
+                onChangeText={setMmRecNote}
+              />
+
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMRecurring}>
+                <Text style={styles.mmSubmitBtnText}>
+                  {mmRecEditId ? 'শিডিউল আপডেট করুন' : 'শিডিউল সংরক্ষণ করুন'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 13. MODAL: EDIT / ARCHIVE CATEGORY */}
+      <Modal
+        visible={modalMMEditCategory}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMEditCategory(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={styles.mmModalSheet}>
+            <View style={styles.mmModalHeader}>
+              <Text style={styles.mmModalTitle}>ক্যাটাগরি সম্পাদনা ও পরিচালনা</Text>
+              <TouchableOpacity style={styles.mmModalCloseBtn} onPress={() => setModalMMEditCategory(false)}>
+                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              <Text style={styles.mmInputLabel}>ক্যাটাগরির নাম</Text>
+              <TextInput
+                style={styles.mmInput}
+                placeholder="ক্যাটাগরির নাম..."
+                placeholderTextColor="#64748B"
+                value={mmEditCatName}
+                onChangeText={setMmEditCatName}
+              />
+
+              <Text style={styles.mmInputLabel}>আইকন নির্বাচন করুন</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                {['🍲', '🚌', '💡', '🛍️', '💊', '📚', '☕', '📦', '💰', '📈', '🏦', '🎁', '📱', '🎮'].map((ic) => {
+                  const sel = mmEditCatIcon === ic;
+                  return (
+                    <TouchableOpacity
+                      key={ic}
+                      style={[styles.mmIconPickerItem, sel && styles.mmIconPickerItemActive]}
+                      onPress={() => setMmEditCatIcon(ic)}
+                    >
+                      <Text style={{ fontSize: 20 }}>{ic}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.mmInputLabel}>রঙ (Color)</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                {['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#6366F1', '#6B7280'].map((col) => {
+                  const sel = mmEditCatColor === col;
+                  return (
+                    <TouchableOpacity
+                      key={col}
+                      style={[styles.mmColorPickerItem, { backgroundColor: col }, sel && styles.mmColorPickerItemActive]}
+                      onPress={() => setMmEditCatColor(col)}
+                    />
+                  );
+                })}
+              </View>
+
+              {mmEditCatType === 'expense' && (
+                <>
+                  <Text style={styles.mmInputLabel}>মাসিক বাজেট সীমা (৳)</Text>
+                  <TextInput
+                    style={styles.mmInput}
+                    placeholder="0.00"
+                    placeholderTextColor="#64748B"
+                    keyboardType="numeric"
+                    value={mmEditCatBudget}
+                    onChangeText={setMmEditCatBudget}
+                  />
+                </>
+              )}
+
+              {/* Archive / Restore Button */}
+              <TouchableOpacity
+                style={[styles.mmArchiveBtn, { backgroundColor: mmEditCatIsArchived ? '#065F46' : '#334155', marginTop: 10 }]}
+                onPress={async () => {
+                  await handleArchiveMMCategory(mmEditCatId, !mmEditCatIsArchived);
+                  setMmEditCatIsArchived(!mmEditCatIsArchived);
+                }}
+              >
+                <Text style={{ color: '#F8FAFC', fontSize: 13, fontWeight: '600' }}>
+                  {mmEditCatIsArchived ? '📂 ক্যাটাগরি পুনরুদ্ধার করুন (Restore)' : '📦 ক্যাটাগরি আর্কাইভ করুন (Archive)'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Delete Button */}
+              <TouchableOpacity
+                style={[styles.mmArchiveBtn, { backgroundColor: '#7F1D1D', marginTop: 8 }]}
+                onPress={() => handleDeleteMMCategory(mmEditCatId)}
+              >
+                <Text style={{ color: '#FCA5A5', fontSize: 13, fontWeight: '600' }}>
+                  🗑️ ক্যাটাগরি মুছুন (Delete)
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.mmSubmitBtn} onPress={handleSaveMMEditCategory}>
+                <Text style={styles.mmSubmitBtnText}>পরিবর্তন সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
 
 
     </SafeAreaView>
@@ -12018,45 +13947,96 @@ const styles = StyleSheet.create({
   },
   mmHeaderTitle: {
     color: '#F8FAFC',
-    fontSize: 17,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  mmBadge: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  mmBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
     fontWeight: 'bold',
   },
   mmHeaderSub: {
     color: '#94A3B8',
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 2,
   },
   mmAddHeaderBtn: {
     backgroundColor: '#10B981',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
     borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   mmAddHeaderBtnText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
   },
-  mmTotalCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+
+  /* Period Selector Pills Bar */
+  mmPeriodContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
   },
-  mmTotalCardLabel: {
+  mmPeriodPill: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  mmPeriodPillActive: {
+    backgroundColor: '#2563EB',
+  },
+  mmPeriodPillText: {
     color: '#94A3B8',
     fontSize: 12,
     fontWeight: '600',
   },
+  mmPeriodPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+
+  /* Top Summary Card */
+  mmTotalCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmTotalCardLabel: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  mmPeriodBadge: {
+    backgroundColor: '#334155',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  mmPeriodBadgeText: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
   mmTotalCardAmount: {
-    color: '#FBBF24',
-    fontSize: 26,
+    color: '#F8FAFC',
+    fontSize: 28,
     fontWeight: 'bold',
     marginTop: 4,
   },
@@ -12067,7 +14047,6 @@ const styles = StyleSheet.create({
   },
   mmStatRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     marginTop: 14,
     paddingTop: 12,
     borderTopWidth: 1,
@@ -12075,131 +14054,586 @@ const styles = StyleSheet.create({
   },
   mmStatCol: {
     flex: 1,
+    alignItems: 'center',
   },
   mmStatLabel: {
     color: '#94A3B8',
     fontSize: 11,
+    marginBottom: 4,
   },
   mmStatIncome: {
     color: '#10B981',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 'bold',
+  },
+  mmHeaderIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmPrefPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmPrefPillActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#3B82F6',
+  },
+  mmPrefPillText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  mmPrefPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  mmToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmToggleLabel: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  mmToggleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  mmToggleOn: {
+    backgroundColor: '#065F46',
+    color: '#34D399',
+  },
+  mmToggleOff: {
+    backgroundColor: '#374151',
+    color: '#9CA3AF',
+  },
+  mmResetBtn: {
+    backgroundColor: '#334155',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mmResetBtnText: {
+    color: '#CBD5E1',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  mmScheduleCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmScheduleTitle: {
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  mmScheduleMeta: {
+    color: '#94A3B8',
+    fontSize: 12,
     marginTop: 2,
+  },
+  mmScheduleNote: {
+    color: '#64748B',
+    fontSize: 11,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  mmScheduleAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  mmStatusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  mmStatusActive: {
+    backgroundColor: '#065F46',
+  },
+  mmStatusPaused: {
+    backgroundColor: '#475569',
+  },
+  mmStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  mmStatusActiveText: {
+    color: '#34D399',
+  },
+  mmStatusPausedText: {
+    color: '#94A3B8',
+  },
+  mmScheduleActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+  },
+  mmScheduleActionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#334155',
+  },
+  mmIconPickerItem: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mmIconPickerItemActive: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#1E3A8A',
+  },
+  mmColorPickerItem: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  mmColorPickerItemActive: {
+    borderColor: '#FFFFFF',
+    transform: [{ scale: 1.15 }],
+  },
+  mmArchiveBtn: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mmStatExpense: {
     color: '#EF4444',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 'bold',
-    marginTop: 2,
   },
   mmStatSavings: {
-    color: '#38BDF8',
-    fontSize: 13,
+    color: '#3B82F6',
+    fontSize: 14,
     fontWeight: 'bold',
-    marginTop: 2,
   },
   mmStatDivider: {
     width: 1,
-    height: 24,
     backgroundColor: '#334155',
-    marginHorizontal: 8,
+    marginHorizontal: 4,
   },
-  mmGreen: {
-    color: '#10B981',
+  mmSavingsRateRow: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+    alignItems: 'center',
   },
-  mmRed: {
-    color: '#EF4444',
+  mmSavingsRateText: {
+    color: '#94A3B8',
+    fontSize: 12,
   },
+
+  /* Sub-Tabs */
   mmSubTabsContainer: {
     flexDirection: 'row',
+    marginTop: 14,
     backgroundColor: '#1E293B',
     borderRadius: 12,
     padding: 4,
-    marginVertical: 14,
   },
   mmSubTabBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 9,
     alignItems: 'center',
     borderRadius: 8,
   },
   mmSubTabBtnActive: {
-    backgroundColor: '#0F766E',
+    backgroundColor: '#0F172A',
   },
   mmSubTabLabel: {
     color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '500',
   },
   mmSubTabLabelActive: {
-    color: '#FFFFFF',
+    color: '#F8FAFC',
     fontWeight: 'bold',
   },
-  mmTxnFilterRow: {
-    flexDirection: 'row',
-    marginBottom: 10,
-    gap: 8,
-  },
-  mmFilterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  mmFilterChipActive: {
-    backgroundColor: '#0D9488',
-    borderColor: '#14B8A6',
-  },
-  mmFilterChipText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  mmFilterChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
+
+  /* Search & Filter & Sort */
   mmSearchBox: {
-    backgroundColor: '#1E293B',
-    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 10,
     paddingHorizontal: 12,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#334155',
+  },
+  mmSearchIcon: {
+    fontSize: 14,
+    marginRight: 8,
   },
   mmSearchInput: {
     flex: 1,
     color: '#F8FAFC',
     fontSize: 13,
-    paddingVertical: 8,
+    paddingVertical: 9,
   },
-  mmAddTxnBtn: {
-    backgroundColor: '#059669',
-    borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  mmAddTxnBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  mmEmptyBox: {
-    alignItems: 'center',
-    paddingVertical: 36,
+  mmFilterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
     backgroundColor: '#1E293B',
-    borderRadius: 12,
+    marginRight: 8,
     borderWidth: 1,
     borderColor: '#334155',
   },
-  mmTxnCard: {
+  mmFilterChipActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#3B82F6',
+  },
+  mmFilterChipText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  mmFilterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  mmSortRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  mmSortLabel: {
+    color: '#64748B',
+    fontSize: 11,
+    marginRight: 8,
+  },
+  mmSortChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: '#1E293B',
+    marginRight: 6,
+  },
+  mmSortChipActive: {
+    backgroundColor: '#334155',
+  },
+  mmSortChipText: {
+    color: '#94A3B8',
+    fontSize: 11,
+  },
+  mmSortChipTextActive: {
+    color: '#F8FAFC',
+    fontWeight: 'bold',
+  },
+
+  /* Transactions List */
+  mmTxnCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmTxnIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  mmTxnIcon: {
+    fontSize: 18,
+  },
+  mmTxnCat: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  mmTxnPayee: {
+    color: '#38BDF8',
+    fontSize: 12,
+    marginTop: 1,
+  },
+  mmTxnNote: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  mmTxnMeta: {
+    color: '#64748B',
+    fontSize: 11,
+    marginTop: 3,
+  },
+  mmTxnAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  mmTxnActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+  },
+  mmTxnActionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#334155',
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  mmTxnActionBtnText: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  mmTxnDeleteBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#7F1D1D',
+    borderRadius: 6,
+  },
+  mmTxnDeleteBtnText: {
+    color: '#FECACA',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  /* Accounts / Wallets */
+  mmSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  mmSectionTitle: {
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  mmAddSmallBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  mmAddSmallBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  mmAccountCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmAccountCardArchived: {
+    opacity: 0.6,
+  },
+  mmAccountIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  mmAccountIcon: {
+    fontSize: 22,
+  },
+  mmAccountName: {
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  mmAccountType: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  mmAccountBalance: {
+    color: '#F8FAFC',
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  mmArchivedBadge: {
+    backgroundColor: '#475569',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  mmArchivedBadgeText: {
+    color: '#CBD5E1',
+    fontSize: 10,
+  },
+  mmAccountActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+  },
+  mmAccountActionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#334155',
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  mmAccountActionText: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  mmAccountArchiveBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#1E293B',
+    borderColor: '#475569',
+    borderWidth: 1,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  mmAccountArchiveText: {
+    color: '#94A3B8',
+    fontSize: 11,
+  },
+  mmAccountDeleteBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#7F1D1D',
+    borderRadius: 6,
+  },
+  mmAccountDeleteText: {
+    color: '#FECACA',
+    fontSize: 11,
+  },
+  mmAddAccBigBtn: {
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    borderStyle: 'dashed',
+    marginTop: 6,
+    marginBottom: 14,
+  },
+  mmAddAccBigBtnText: {
+    color: '#60A5FA',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  /* Budgets */
+  mmOverallBudgetCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmOverallBudgetTitle: {
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  mmOverallBudgetBadge: {
+    backgroundColor: '#10B981',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  mmOverallBudgetBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  mmOverallBudgetStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  mmOverallBudgetSpent: {
+    color: '#F8FAFC',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  mmOverallBudgetLimit: {
+    color: '#94A3B8',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  mmProgressBarBg: {
+    height: 8,
+    backgroundColor: '#334155',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: 6,
+  },
+  mmProgressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  mmOverallBudgetBtn: {
+    marginTop: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: '#334155',
+    borderRadius: 8,
+  },
+  mmOverallBudgetBtnText: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  mmCatBudgetCard: {
     backgroundColor: '#1E293B',
     borderRadius: 12,
     padding: 12,
@@ -12207,209 +14641,254 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
   },
-  mmTxnIconBox: {
-    width: 42,
-    height: 42,
+  mmCatBudgetIconBox: {
+    width: 38,
+    height: 38,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  mmTxnNote: {
-    color: '#F8FAFC',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  mmTxnSub: {
-    color: '#94A3B8',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  mmTxnAmount: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  mmAccCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
   },
-  mmAccIconBox: {
-    width: 46,
-    height: 46,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mmAccName: {
+  mmCatBudgetName: {
     color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  mmAccType: {
+  mmCatBudgetAmounts: {
     color: '#94A3B8',
     fontSize: 12,
     marginTop: 2,
   },
-  mmAccBalance: {
-    color: '#FBBF24',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  mmSmallTransferBtn: {
+  mmCatBudgetBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     backgroundColor: '#334155',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
     borderRadius: 6,
-    marginTop: 4,
   },
-  mmSmallTransferBtnText: {
-    color: '#38BDF8',
-    fontSize: 10,
-    fontWeight: 'bold',
+  mmCatBudgetBtnText: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    fontWeight: '500',
   },
-  mmActionBtn: {
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mmActionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  mmBudgetCard: {
+
+  /* Savings Goals */
+  mmGoalCard: {
     backgroundColor: '#1E293B',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#334155',
   },
-  mmBudgetName: {
-    color: '#F8FAFC',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  mmBudgetBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  mmBudgetBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  mmProgressTrack: {
-    height: 8,
-    backgroundColor: '#334155',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  mmProgressBar: {
-    height: 8,
-    borderRadius: 4,
-  },
-  mmBudgetSub: {
-    color: '#94A3B8',
-    fontSize: 11,
-  },
-  mmStatsCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
+  mmGoalIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
   },
-  mmStatsCardTitle: {
+  mmGoalTitle: {
     color: '#F8FAFC',
     fontSize: 15,
     fontWeight: 'bold',
   },
+  mmGoalTargetDate: {
+    color: '#38BDF8',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  mmGoalNote: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  mmGoalProgressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  mmGoalSaved: {
+    color: '#10B981',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  mmGoalTarget: {
+    color: '#94A3B8',
+    fontSize: 13,
+  },
+  mmGoalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+  },
+  mmGoalDepositBtn: {
+    backgroundColor: '#10B981',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+  },
+  mmGoalDepositBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  mmGoalDeleteBtn: {
+    backgroundColor: '#7F1D1D',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  mmGoalDeleteBtnText: {
+    color: '#FECACA',
+    fontSize: 11,
+  },
+
+  /* Analytics & Insights */
+  mmAnalyticsCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmAnalyticsTitle: {
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  mmDistributionRow: {
+    marginTop: 10,
+  },
+  mmDistributionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  mmDistributionIcon: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  mmDistributionName: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+  },
+  mmDistributionRight: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 4,
+  },
+  mmDistributionAmount: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginRight: 4,
+  },
+  mmDistributionPct: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  mmTipsCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+  },
+  mmTipsTitle: {
+    color: '#60A5FA',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  mmTipRow: {
+    marginBottom: 6,
+  },
+  mmTipText: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  /* Empty State */
+  mmEmptyBox: {
+    alignItems: 'center',
+    paddingVertical: 36,
+  },
+  mmEmptyIcon: {
+    fontSize: 40,
+    marginBottom: 8,
+  },
+  mmEmptyText: {
+    color: '#94A3B8',
+    fontSize: 14,
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  mmEmptyBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  mmEmptyBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+
+  /* Modals Common */
   mmModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
   },
   mmModalSheet: {
     backgroundColor: '#0F172A',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 18,
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
-    maxHeight: '85%',
+    padding: 20,
+    maxHeight: '90%',
   },
   mmModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
   },
   mmModalTitle: {
     color: '#F8FAFC',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
   },
   mmModalCloseBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#1E293B',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mmTypeSwitchRow: {
-    flexDirection: 'row',
-    backgroundColor: '#1E293B',
-    borderRadius: 10,
     padding: 4,
-    marginBottom: 14,
-  },
-  mmTypeBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  mmTypeBtnExpense: {
-    backgroundColor: '#EF4444',
-  },
-  mmTypeBtnIncome: {
-    backgroundColor: '#10B981',
-  },
-  mmTypeBtnTransfer: {
-    backgroundColor: '#2563EB',
-  },
-  mmTypeBtnText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  mmTypeBtnTextActive: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
   },
   mmInputLabel: {
     color: '#94A3B8',
     fontSize: 12,
+    fontWeight: '500',
     marginBottom: 6,
-    fontWeight: '600',
+    marginTop: 6,
   },
   mmInput: {
     backgroundColor: '#1E293B',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     color: '#F8FAFC',
     fontSize: 15,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#334155',
   },
@@ -12418,30 +14897,88 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 20,
     backgroundColor: '#1E293B',
     marginRight: 8,
     borderWidth: 1,
     borderColor: '#334155',
   },
   mmCatChipActive: {
-    backgroundColor: '#0D9488',
-    borderColor: '#14B8A6',
+    backgroundColor: '#2563EB',
+    borderColor: '#3B82F6',
   },
   mmCatChipText: {
     color: '#94A3B8',
-    fontSize: 12,
+    fontSize: 13,
   },
   mmCatChipTextActive: {
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
+  mmTypeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: '#1E293B',
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmTypeBtnExpense: {
+    backgroundColor: '#7F1D1D',
+    borderColor: '#EF4444',
+  },
+  mmTypeBtnIncome: {
+    backgroundColor: '#064E3B',
+    borderColor: '#10B981',
+  },
+  mmTypeBtnTransfer: {
+    backgroundColor: '#1E3A8A',
+    borderColor: '#3B82F6',
+  },
+  mmTypeBtnText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  mmTypeBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  mmIconChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mmIconChipActive: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#2563EB',
+  },
+  mmColorChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+    marginBottom: 8,
+  },
+  mmColorChipActive: {
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
   mmSubmitBtn: {
     backgroundColor: '#059669',
     borderRadius: 12,
-    paddingVertical: 13,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10,
     marginBottom: 12,
   },
   mmSubmitBtnText: {
