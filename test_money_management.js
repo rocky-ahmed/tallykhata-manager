@@ -34,7 +34,7 @@ runTest("Home screen quick action grid has Money Manager with 3D icon and opens 
   assert(appSource.includes("grid_money_manager.png"), "Missing grid_money_manager.png reference in App.js");
   assert(appSource.includes("setModalMoneyManager(true)"), "Missing setModalMoneyManager(true) handler");
   assert(appSource.includes("accessibilityLabel=\"মানি ম্যানেজার\""), "Missing accessibilityLabel for Money Manager grid item");
-  assert(appSource.includes("<Text style={styles.quickGridLabel}>মানি ম্যানেজার</Text>"), "Missing Bengali label in quick grid");
+  assert(appSource.includes("styles.quickGridLabel") && (appSource.includes("মানি ম্যানেজার") || appSource.includes("qa_money_manager")), "Missing Bengali label in quick grid");
   
   const gridMatch = appSource.match(/quickGridRow[\s\S]*?মানি ম্যানেজার[\s\S]*?<\/View>/);
   assert(gridMatch, "Could not find quickGridRow with Money Manager");

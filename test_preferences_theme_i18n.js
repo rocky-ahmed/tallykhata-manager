@@ -170,6 +170,42 @@ async function runAsyncTest(name, fn) {
     assert(textEn.includes('Rahim Traders'), 'Must contain interpolated name in English');
   });
 
+  // Test 9: getThemedStyles provides complete tokens for Light and Dark modes
+  runTest('themeService.getThemedStyles returns comprehensive light and dark style tokens for all screens and Money Manager', () => {
+    const light = themeService.getThemedStyles(themeService.LIGHT_THEME, false);
+    const dark = themeService.getThemedStyles(themeService.DARK_THEME, true);
+
+    const keys = [
+      'screenBg', 'card', 'cardElevated', 'textPrimary', 'textSecondary',
+      'tabBar', 'headerNav', 'summaryCard', 'customerCard', 'cashTopCard',
+      'ledgerRow', 'modalSurface', 'mmScreen', 'mmHeader', 'mmTotalCard',
+      'mmSubTabsContainer', 'mmCard', 'mmModalSheet', 'mmInput', 'mmTxnItem'
+    ];
+
+    keys.forEach(k => {
+      assert(light[k] !== undefined, 'Light getThemedStyles missing: ' + k);
+      assert(dark[k] !== undefined, 'Dark getThemedStyles missing: ' + k);
+    });
+
+    assert.strictEqual(light.card.backgroundColor, '#FFFFFF');
+    assert.strictEqual(dark.card.backgroundColor, '#1E293B');
+    assert.strictEqual(light.mmScreen.backgroundColor, '#F8FAFC');
+    assert.strictEqual(dark.mmScreen.backgroundColor, '#0B1120');
+    assert.strictEqual(light.mmHeader.backgroundColor, '#FFFFFF');
+    assert.strictEqual(dark.mmHeader.backgroundColor, '#0F172A');
+  });
+
+  // Test 10: App.js integrates tStyles across main navigation and Money Manager
+  runTest('App.js integrates tStyles across main navigation tabs, ledger, and Money Manager modal', () => {
+    const appSource = fs.readFileSync('App.js', 'utf8');
+    assert(appSource.includes('tStyles.mmHeader'), 'Missing tStyles.mmHeader in App.js');
+    assert(appSource.includes('tStyles.mmTotalCard'), 'Missing tStyles.mmTotalCard in App.js');
+    assert(appSource.includes('tStyles.mmSubTabsContainer'), 'Missing tStyles.mmSubTabsContainer in App.js');
+    assert(appSource.includes('tStyles.tabBar'), 'Missing tStyles.tabBar in App.js');
+    assert(appSource.includes('tStyles.screenBg'), 'Missing tStyles.screenBg in App.js');
+    assert(appSource.includes('tStyles.card'), 'Missing tStyles.card in App.js');
+  });
+
   // Test 8: App.js integrates ThemeContext, themeService, and i18nService
   runTest('App.js syntax validates via Babel and exports/integrates theme and i18n', () => {
     const appSource = fs.readFileSync('App.js', 'utf8');
