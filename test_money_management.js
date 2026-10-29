@@ -1041,6 +1041,83 @@ runTest("App.js hooks hardware back press for modalMoneyManager and all 13 child
   });
 });
 
+
+// TEST 46: Complete end-to-end Money Manager lifecycle with net-worth invariance, goal deposit debit, and recurrence
+runTest("Complete end-to-end Money Manager lifecycle preserves net-worth invariance and atomic state", () => {
+  let state = mmService.getDefaultState();
+  const initialNetWorth = mmService.calculateNetWorth(state);
+
+  // 1. Add new account
+  state = mmService.addAccount(state, { name: "Emergency Fund", balance: 25000, type: "bank" });
+  const newAcc = state.accounts[state.accounts.length - 1];
+  const newAccId = newAcc.id;
+  assert.strictEqual(mmService.calculateNetWorth(state), initialNetWorth + 25000, "Net worth includes new account");
+
+  // 2. Add income
+  state = mmService.addTransaction(state, {
+    id: "tx_income_1",
+    type: "income",
+    amount: 10000,
+    accountId: newAccId,
+    categoryId: "cat_salary",
+    note: "Consulting Bonus",
+    date: new Date().toISOString().split("T")[0]
+  });
+  assert.strictEqual(state.accounts.find(a => a.id === newAccId).balance, 35000, "Account credited after income");
+
+  // 3. Add expense
+  state = mmService.addTransaction(state, {
+    type: "expense",
+    amount: 5000,
+    accountId: newAccId,
+    categoryId: "cat_food",
+    note: "Grocery Shopping",
+    date: new Date().toISOString().split("T")[0]
+  });
+  const expenseTxnId = state.transactions[0].id;
+  assert.strictEqual(state.accounts.find(a => a.id === newAccId).balance, 30000, "Account debited after expense");
+
+  // 4. Transfer funds atomically
+  const netWorthBeforeTransfer = mmService.calculateNetWorth(state);
+  state = mmService.addTransaction(state, {
+    type: "transfer",
+    amount: 10000,
+    fromAccountId: newAccId,
+    toAccountId: "acc_cash",
+    note: "ATM Withdrawal",
+    date: new Date().toISOString().split("T")[0]
+  });
+  assert.strictEqual(mmService.calculateNetWorth(state), netWorthBeforeTransfer, "Net worth invariant holds during transfer");
+  assert.strictEqual(state.accounts.find(a => a.id === newAccId).balance, 20000, "Source account debited");
+
+  // 5. Goal deposit
+  state = mmService.addGoal(state, { title: "Hajj Savings", targetAmount: 500000 });
+  const addedGoal = state.goals[state.goals.length - 1];
+  state = mmService.contributeToGoal(state, addedGoal.id, 5000, newAccId);
+  assert.strictEqual(state.accounts.find(a => a.id === newAccId).balance, 15000, "Account debited for goal deposit");
+  assert.strictEqual(state.goals.find(g => g.id === addedGoal.id).savedAmount, 5000, "Goal credited");
+
+  // 6. Recalibrate on edit
+  state = mmService.editTransaction(state, expenseTxnId, {
+    amount: 7000, // +2000 more expense
+    accountId: newAccId,
+    categoryId: "cat_food",
+    type: "expense"
+  });
+  assert.strictEqual(state.accounts.find(a => a.id === newAccId).balance, 13000, "Account adjusted after editing expense up");
+
+  // 7. Delete transaction rolls back balance
+  state = mmService.deleteTransaction(state, expenseTxnId);
+  assert.strictEqual(state.accounts.find(a => a.id === newAccId).balance, 20000, "Account rolled back after expense deletion");
+
+  // 8. Archive and restore account toggles net worth
+  const activeNetWorth = mmService.calculateNetWorth(state);
+  state = mmService.archiveAccount(state, newAccId, true);
+  assert.strictEqual(mmService.calculateNetWorth(state), activeNetWorth - 20000, "Archived account excluded from Net Worth");
+  state = mmService.archiveAccount(state, newAccId, false);
+  assert.strictEqual(mmService.calculateNetWorth(state), activeNetWorth, "Restored account included back in Net Worth");
+});
+
 console.log(`\nSUMMARY: ${passed}/${total} tests passed.`);
 if (passed === total) {
   console.log("ALL MONEY MANAGER TESTS PASSED SUCCESSFULLY!\n");
