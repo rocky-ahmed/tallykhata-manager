@@ -120,7 +120,7 @@ function calculateChecksum(dataObj) {
  * Creates a complete authenticated backup payload with manifest.
  * Privacy rule: App PIN and PIN enabled flag are scrubbed from the backup payload.
  */
-function buildBackupPayload(authoritativeState, userProfile) {
+function buildBackupPayload(authoritativeState, userProfile, options = {}) {
   if (!userProfile || !userProfile.sub) {
     throw new Error('User profile with verified "sub" identifier is required for backup ownership');
   }
@@ -157,7 +157,45 @@ function buildBackupPayload(authoritativeState, userProfile) {
     tagadaLogs: Array.isArray(authoritativeState.tagadaLogs) ? authoritativeState.tagadaLogs : [],
   };
 
+  // Include Money Manager if present
+  const mmData = authoritativeState.moneyManager || (options && options.moneyManager) || null;
+  if (mmData && typeof mmData === 'object') {
+    rawData.moneyManager = mmData;
+  }
+
+  // Include App Preferences if present
+  const prefsData = authoritativeState.preferences || (options && options.preferences) || null;
+  if (prefsData && typeof prefsData === 'object') {
+    rawData.preferences = prefsData;
+  }
+
   const checksum = calculateChecksum(rawData);
+
+  const recordCounts = {
+    accounts: accounts.length,
+    customers: accounts.filter(a => a.type === 1).length,
+    suppliers: accounts.filter(a => a.type === 2).length,
+    journals: journals.length,
+    cashEntries: cashEntries.length,
+    stock: stock.length,
+    notes: notes.length,
+    businesses: businesses.length,
+  };
+
+  const dataDomains = ['business'];
+
+  if (mmData && typeof mmData === 'object') {
+    recordCounts.mmAccounts = Array.isArray(mmData.accounts) ? mmData.accounts.length : 0;
+    recordCounts.mmTransactions = Array.isArray(mmData.transactions) ? mmData.transactions.length : 0;
+    recordCounts.mmCategories = Array.isArray(mmData.categories) ? mmData.categories.length : 0;
+    recordCounts.mmGoals = Array.isArray(mmData.goals) ? mmData.goals.length : 0;
+    recordCounts.mmRecurring = Array.isArray(mmData.recurring) ? mmData.recurring.length : 0;
+    dataDomains.push('moneyManager');
+  }
+
+  if (prefsData && typeof prefsData === 'object') {
+    dataDomains.push('preferences');
+  }
 
   const manifest = {
     backupVersion: BACKUP_FORMAT_VERSION,
@@ -169,16 +207,8 @@ function buildBackupPayload(authoritativeState, userProfile) {
       email: String(userProfile.email || ''),
       name: String(userProfile.name || ''),
     },
-    recordCounts: {
-      accounts: accounts.length,
-      customers: accounts.filter(a => a.type === 1).length,
-      suppliers: accounts.filter(a => a.type === 2).length,
-      journals: journals.length,
-      cashEntries: cashEntries.length,
-      stock: stock.length,
-      notes: notes.length,
-      businesses: businesses.length,
-    },
+    recordCounts,
+    dataDomains,
     businessSummary: {
       businessName: rawData.businessName,
       ownerPhone: rawData.ownerPhone,
@@ -186,6 +216,13 @@ function buildBackupPayload(authoritativeState, userProfile) {
     },
     checksum,
   };
+
+  if (mmData) {
+    manifest.hasMoneyManager = true;
+  }
+  if (prefsData) {
+    manifest.hasPreferences = true;
+  }
 
   return {
     manifest,
@@ -244,6 +281,68 @@ function normalizeBackupPayload(payload) {
 /**
  * Validates integrity, schema, checksum, and ownership of a downloaded backup.
  */
+
+/**
+ * Generates an in-depth preview of a backup payload for user confirmation before restoring.
+ */
+function previewBackup(backupPayload) {
+  if (!backupPayload || typeof backupPayload !== 'object') {
+    return { valid: false, error: 'অকার্যকর ব্যাকআপ অবজেক্ট।' };
+  }
+  const normalized = normalizeBackupPayload(backupPayload);
+  if (!normalized || !normalized.data) {
+    return { valid: false, error: 'ম্যানিফেস্ট বা ডাটা পাওয়া যায়নি।' };
+  }
+  const { manifest, data } = normalized;
+  const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+  const journals = Array.isArray(data.journals) ? data.journals : [];
+  const cashEntries = Array.isArray(data.cashEntries) ? data.cashEntries : [];
+  const stock = Array.isArray(data.stock) ? data.stock : (Array.isArray(data.inventory) ? data.inventory : []);
+  const businesses = Array.isArray(data.businesses) ? data.businesses : [];
+  const mm = data.moneyManager && typeof data.moneyManager === 'object' ? data.moneyManager : null;
+  const prefs = data.preferences && typeof data.preferences === 'object' ? data.preferences : null;
+
+  return {
+    valid: true,
+    manifest,
+    createdAt: manifest.createdAt,
+    appVersion: manifest.appVersion,
+    backupOwner: manifest.backupOwner,
+    hasBusinessData: accounts.length > 0 || journals.length > 0 || cashEntries.length > 0,
+    hasMoneyManager: Boolean(mm),
+    hasPreferences: Boolean(prefs),
+    domains: {
+      business: accounts.length > 0 || journals.length > 0 || cashEntries.length > 0,
+      moneyManager: Boolean(mm),
+      preferences: Boolean(prefs),
+    },
+    recordCounts: {
+      accounts: accounts.length,
+      customers: accounts.filter(a => a.type === 1).length,
+      suppliers: accounts.filter(a => a.type === 2).length,
+      journals: journals.length,
+      cashEntries: cashEntries.length,
+      stock: stock.length,
+      businesses: businesses.length,
+      mmAccounts: mm && Array.isArray(mm.accounts) ? mm.accounts.length : 0,
+      mmTransactions: mm && Array.isArray(mm.transactions) ? mm.transactions.length : 0,
+      mmCategories: mm && Array.isArray(mm.categories) ? mm.categories.length : 0,
+      mmGoals: mm && Array.isArray(mm.goals) ? mm.goals.length : 0,
+      mmRecurring: mm && Array.isArray(mm.recurring) ? mm.recurring.length : 0,
+    },
+    businessSummary: manifest.businessSummary || {
+      businessName: data.businessName || 'Mobile Xpress',
+      ownerPhone: data.ownerPhone || '',
+      totalDue: accounts.filter(a => a.type === 1 && a.balance > 0).reduce((sum, a) => sum + (Number(a.balance) || 0), 0),
+    },
+    moneyManagerSummary: mm ? {
+      accountsCount: (mm.accounts || []).length,
+      txnsCount: (mm.transactions || []).length,
+      netWorth: (mm.accounts || []).filter(a => !a.isArchived).reduce((sum, a) => sum + (Number(a.balance) || 0), 0),
+    } : null,
+  };
+}
+
 function validateBackupIntegrity(backupPayload, expectedOwnerSub = null) {
   if (!backupPayload || typeof backupPayload !== 'object') {
     return { valid: false, error: 'Malformed backup: Payload is not an object' };
@@ -538,8 +637,12 @@ async function orchestrateCloudRestore({
   getAccessToken,
   fileId = null,
   userSub = null,
+  domains = ['all'],
+  extraState = {},
   onStatusChange = null,
   onStateCommitted = null,
+  onMoneyManagerRestored = null,
+  onPreferencesRestored = null,
   onRollback = null,
   onFileDiscovered = null,
   alertFn = null,
@@ -596,6 +699,8 @@ async function orchestrateCloudRestore({
       fileId: targetFileId,
       manifest: downloadRes.manifest,
       resetPin: true,
+      domains,
+      extraState,
     });
 
     if (!commitResult || !commitResult.success) {
@@ -608,6 +713,12 @@ async function orchestrateCloudRestore({
     const finalState = storageRepository.getAuthoritativeState();
     if (typeof onStateCommitted === 'function') {
       onStateCommitted(finalState);
+    }
+    if (commitResult && commitResult.restoredMoneyManager && typeof onMoneyManagerRestored === 'function') {
+      onMoneyManagerRestored(commitResult.restoredMoneyManager);
+    }
+    if (commitResult && commitResult.restoredPreferences && typeof onPreferencesRestored === 'function') {
+      onPreferencesRestored(commitResult.restoredPreferences);
     }
 
     if (typeof onStatusChange === 'function') {
@@ -648,7 +759,7 @@ async function orchestrateCloudRestore({
           rollbackSucceeded = true;
           const revertedState = storageRepository.getAuthoritativeState();
           if (typeof onRollback === 'function') {
-            onRollback(revertedState);
+            onRollback(revertedState, rollbackRes.restoredMoneyManager, rollbackRes.restoredPreferences);
           }
         } else {
           rollbackError = new Error((rollbackRes && rollbackRes.reason) || 'Rollback rejected');
@@ -934,6 +1045,7 @@ async function orchestrateCloudBackup({
   getAccessToken,
   googleUser,
   existingFileId = null,
+  extraData = null,
   onStatusChange = null,
   onMetaUpdated = null,
   alertFn = null,
@@ -963,7 +1075,18 @@ async function orchestrateCloudBackup({
       throw new Error('লোকাল ডাটাবেজ থেকে নির্ভরযোগ্য ডাটা প্রস্তুত করা যায়নি।');
     }
 
-    const payload = buildBackupPayload(currentState, googleUser);
+    let backupState = currentState;
+    if (storageRepository && typeof storageRepository.getFullBackupState === 'function') {
+      try {
+        backupState = await storageRepository.getFullBackupState(extraData || {});
+      } catch (e) {
+        backupState = { ...currentState, ...(extraData || {}) };
+      }
+    } else if (extraData) {
+      backupState = { ...currentState, ...extraData };
+    }
+
+    const payload = buildBackupPayload(backupState, googleUser);
 
     let uploadRes = null;
     try {
@@ -1126,6 +1249,7 @@ module.exports = {
   buildBackupPayload,
   normalizeBackupPayload,
   validateBackupIntegrity,
+  previewBackup,
   toBengaliNumber,
   verifyUploadedBackupMatches,
   orchestrateCloudBackup,

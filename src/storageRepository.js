@@ -11,8 +11,20 @@
  */
 
 const SAFETY_SNAPSHOT_KEY = 'tallykhata_safety_snapshot';
+let moneyManagerService = null;
+try {
+  moneyManagerService = require('./moneyManagerService');
+} catch (e) {}
+
+let preferencesService = null;
+try {
+  preferencesService = require('./preferencesService');
+} catch (e) {}
+
+const MM_STORAGE_KEY = (moneyManagerService && moneyManagerService.MM_STORAGE_KEY) || '@tallykhata_personal_money_manager_v2';
+const PREFERENCES_STORAGE_KEY = (preferencesService && preferencesService.PREFERENCES_STORAGE_KEY) || '@tallykhata_app_preferences_v1';
+
 const {
-  generateUniqueId,
   migrateV5toV6,
   V5_KEY,
   V6_KEY,
@@ -378,14 +390,33 @@ class StorageRepository {
    * Creates a safety snapshot of the current local state before restore.
    * Scoped to an explicit snapshotId so rollbacks never apply stale snapshots from earlier sessions.
    */
-  async createLocalSafetySnapshot(customSnapshotId = null) {
+  async createLocalSafetySnapshot(customSnapshotId = null, extraState = {}) {
     const currentState = this.getAuthoritativeState();
     if (currentState) {
       const snapshotId = customSnapshotId || ('snap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+
+      let mmState = extraState && extraState.moneyManager !== undefined ? extraState.moneyManager : null;
+      if (mmState === null && this.adapter && typeof this.adapter.getItem === 'function') {
+        try {
+          const rawMM = await this.adapter.getItem(MM_STORAGE_KEY);
+          if (rawMM) mmState = JSON.parse(rawMM);
+        } catch (e) {}
+      }
+
+      let prefs = extraState && extraState.preferences !== undefined ? extraState.preferences : null;
+      if (prefs === null && this.adapter && typeof this.adapter.getItem === 'function') {
+        try {
+          const rawPrefs = await this.adapter.getItem(PREFERENCES_STORAGE_KEY);
+          if (rawPrefs) prefs = JSON.parse(rawPrefs);
+        } catch (e) {}
+      }
+
       const record = {
         snapshotId,
         createdAt: new Date().toISOString(),
         state: currentState,
+        moneyManager: mmState,
+        preferences: prefs,
       };
       await this.adapter.setItem(SAFETY_SNAPSHOT_KEY, JSON.stringify(record));
       this.activeSafetySnapshot = record;
@@ -394,11 +425,6 @@ class StorageRepository {
     return { success: false, reason: 'No state to snapshot' };
   }
 
-  /**
-   * Restores from the safety snapshot if an error occurred during restore.
-   * If expectedSnapshotId is provided, requires the saved snapshot to match that ID,
-   * preventing rollbacks from restoring old snapshots from prior operations.
-   */
   async rollbackToSafetySnapshot(expectedSnapshotId = null) {
     if (expectedSnapshotId !== null && expectedSnapshotId !== undefined && !expectedSnapshotId) {
       return { success: false, reason: 'No fresh snapshot ID provided for this restore attempt' };
@@ -418,10 +444,14 @@ class StorageRepository {
 
     let snapshotId = null;
     let stateData = null;
+    let mmData = null;
+    let prefsData = null;
 
     if (parsed && typeof parsed === 'object' && parsed.snapshotId && parsed.state) {
       snapshotId = parsed.snapshotId;
       stateData = parsed.state;
+      mmData = parsed.moneyManager || null;
+      prefsData = parsed.preferences || null;
     } else {
       stateData = parsed;
     }
@@ -438,14 +468,53 @@ class StorageRepository {
 
     await this.adapter.setItem(V6_KEY, JSON.stringify(stateData));
     this.currentStore = stateData;
+
+    if (mmData && this.adapter && typeof this.adapter.setItem === 'function') {
+      try {
+        await this.adapter.setItem(MM_STORAGE_KEY, JSON.stringify(mmData));
+      } catch (e) {}
+    }
+
+    if (prefsData && this.adapter && typeof this.adapter.setItem === 'function') {
+      try {
+        await this.adapter.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(prefsData));
+      } catch (e) {}
+    }
+
     this.activeSafetySnapshot = null;
-    return { success: true, restored: true, snapshotId };
+    return {
+      success: true,
+      restored: true,
+      snapshotId,
+      restoredState: stateData,
+      restoredMoneyManager: mmData,
+      restoredPreferences: prefsData,
+    };
   }
 
+  async getFullBackupState(extraState = {}) {
+    const authoritative = this.getAuthoritativeState();
+    let mmState = extraState && extraState.moneyManager !== undefined ? extraState.moneyManager : null;
+    if (mmState === null && this.adapter && typeof this.adapter.getItem === 'function') {
+      try {
+        const raw = await this.adapter.getItem(MM_STORAGE_KEY);
+        if (raw) mmState = JSON.parse(raw);
+      } catch (e) {}
+    }
+    let prefs = extraState && extraState.preferences !== undefined ? extraState.preferences : null;
+    if (prefs === null && this.adapter && typeof this.adapter.getItem === 'function') {
+      try {
+        const raw = await this.adapter.getItem(PREFERENCES_STORAGE_KEY);
+        if (raw) prefs = JSON.parse(raw);
+      } catch (e) {}
+    }
+    return {
+      ...authoritative,
+      moneyManager: mmState,
+      preferences: prefs,
+    };
+  }
 
-  /**
-   * Returns list of active (non-archived) businesses.
-   */
   listActiveBusinesses(store = null) {
     const s = store || this.currentStore;
     const list = s && Array.isArray(s.businesses) ? s.businesses : DEFAULT_BUSINESSES;
@@ -772,16 +841,88 @@ class StorageRepository {
       throw new Error('Invalid restore payload: accounts must be an array');
     }
 
+    const requestedDomains = (options && Array.isArray(options.domains) && options.domains.length > 0)
+      ? options.domains
+      : ['all'];
+    const shouldRestoreAll = requestedDomains.includes('all');
+    const shouldRestoreBusiness = shouldRestoreAll || requestedDomains.includes('business');
+    const shouldRestoreMM = shouldRestoreAll || requestedDomains.includes('moneyManager');
+    const shouldRestorePrefs = shouldRestoreAll || requestedDomains.includes('preferences');
+
     // Create safety snapshot before altering live store if not already created
     let snapshotId = options && options.snapshotId;
     if (!snapshotId) {
-      const snapRes = await this.createLocalSafetySnapshot();
+      const snapRes = await this.createLocalSafetySnapshot(null, options.extraState);
       if (snapRes && snapRes.success) {
         snapshotId = snapRes.snapshotId;
       }
     }
 
-    return this.mutateStore((prevStore) => {
+    let restoredMM = null;
+    if (shouldRestoreMM) {
+      if (data.moneyManager && typeof data.moneyManager === 'object') {
+        const defaultMMState = moneyManagerService ? moneyManagerService.getDefaultState() : {};
+        const sanitizedMM = moneyManagerService
+          ? moneyManagerService.sanitizeState(data.moneyManager, defaultMMState)
+          : data.moneyManager;
+        if (this.adapter && typeof this.adapter.setItem === 'function') {
+          await this.adapter.setItem(MM_STORAGE_KEY, JSON.stringify(sanitizedMM));
+        }
+        restoredMM = sanitizedMM;
+      }
+      // If data.moneyManager is not present, DO NOT touch or overwrite existing MM state (legacy safety)
+    }
+
+    let restoredPrefs = null;
+    if (shouldRestorePrefs) {
+      if (data.preferences && typeof data.preferences === 'object') {
+        const sanitizedPrefs = preferencesService
+          ? preferencesService.sanitizePreferences(data.preferences)
+          : data.preferences;
+        if (this.adapter && typeof this.adapter.setItem === 'function') {
+          await this.adapter.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(sanitizedPrefs));
+        }
+        restoredPrefs = sanitizedPrefs;
+      }
+    }
+
+    const mutateResult = await this.mutateStore((prevStore) => {
+      if (!shouldRestoreBusiness) {
+        return prevStore;
+      }
+
+      // If selective business restore is requested
+      const selectedBizId = options && options.selectedBusinessId ? String(options.selectedBusinessId) : null;
+      if (selectedBizId) {
+        const importedAccounts = (data.accounts || []).filter(a => String(a.businessId || '1') === selectedBizId);
+        const importedJournals = (data.journals || []).filter(j => String(j.businessId || '1') === selectedBizId);
+        const importedCash = (data.cashEntries || []).filter(c => String(c.businessId || '1') === selectedBizId);
+        const importedStock = ((data.stock || data.inventory) || []).filter(s => String(s.businessId || '1') === selectedBizId);
+        const importedNotes = (data.notes || []).filter(n => String(n.businessId || '1') === selectedBizId);
+
+        const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
+        const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
+        const keptCash = (prevStore.cashEntries || []).filter(c => String(c.businessId || '1') !== selectedBizId);
+        const keptStock = ((prevStore.stock || prevStore.inventory) || []).filter(s => String(s.businessId || '1') !== selectedBizId);
+        const keptNotes = (prevStore.notes || []).filter(n => String(n.businessId || '1') !== selectedBizId);
+
+        const mergedAccounts = [...keptAccounts, ...importedAccounts];
+        const mergedJournals = [...keptJournals, ...importedJournals];
+
+        return {
+          ...prevStore,
+          accounts: mergedAccounts,
+          journals: mergedJournals,
+          cashEntries: [...keptCash, ...importedCash],
+          stock: [...keptStock, ...importedStock],
+          inventory: [...keptStock, ...importedStock],
+          notes: [...keptNotes, ...importedNotes],
+          version: 6,
+          lastRestoredAt: new Date().toISOString(),
+          restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
+        };
+      }
+
       const restoredInventory = Array.isArray(data.inventory)
         ? data.inventory
         : (Array.isArray(data.stock) ? data.stock : []);
@@ -856,6 +997,17 @@ class StorageRepository {
 
       return newStore;
     });
+
+    return {
+      ...mutateResult,
+      restoredMoneyManager: restoredMM,
+      restoredPreferences: restoredPrefs,
+      restoredDomains: {
+        business: shouldRestoreBusiness,
+        moneyManager: Boolean(restoredMM),
+        preferences: Boolean(restoredPrefs),
+      },
+    };
   }
 }
 

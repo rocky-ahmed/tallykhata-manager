@@ -24,6 +24,7 @@ LogBox.ignoreAllLogs(true);
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ledgerEngine from './src/ledgerEngine';
 import * as moneyManagerService from './src/moneyManagerService';
+import * as preferencesService from './src/preferencesService';
 import { storageRepository, StorageRepository, createDefaultState } from './src/storageRepository';
 import {
   googleDriveBackupService,
@@ -32,6 +33,7 @@ import {
   verifyUploadedBackupMatches,
   buildBackupPayload,
   validateBackupIntegrity,
+  previewBackup,
   BACKUP_FILENAME,
 } from './src/googleDriveBackupService';
 
@@ -681,6 +683,10 @@ function TallyKhataApp() {
   const [modalMoneyOut, setModalMoneyOut] = useState(false);
 
   // ===================================================================
+  // GLOBAL APP PREFERENCES (থিম ও ভাষা)
+  const [appTheme, setAppTheme] = useState('light'); // 'light' | 'dark'
+  const [appLanguage, setAppLanguage] = useState('bn'); // 'bn' | 'en'
+
   // PERSONAL MONEY MANAGER (ব্যক্তিগত অর্থ ব্যবস্থাপনা) — 100% ISOLATED
   // ===================================================================
   const [modalMoneyManager, setModalMoneyManager] = useState(false);
@@ -1465,6 +1471,13 @@ function TallyKhataApp() {
         if (d.cloudBackupMetadata) setCloudBackupMetadata(d.cloudBackupMetadata);
         if (d.openingBalance !== undefined) setOpeningBalance(Number(d.openingBalance));
         if (Array.isArray(d.tagadaLogs)) setTagadaLogs(d.tagadaLogs);
+        try {
+          const storedPrefs = await preferencesService.getStoredPreferences(AsyncStorage);
+          if (storedPrefs) {
+            if (storedPrefs.theme) setAppTheme(storedPrefs.theme);
+            if (storedPrefs.language) setAppLanguage(storedPrefs.language);
+          }
+        } catch (e) {}
         if (d.pinEnabled && d.appPin) {
           setPinEnabled(true);
           setAppPin(d.appPin);
@@ -2570,6 +2583,10 @@ function TallyKhataApp() {
       getAccessToken: getValidGoogleAccessToken,
       googleUser,
       existingFileId: cloudBackupMetadata ? cloudBackupMetadata.fileId : null,
+      extraData: {
+        moneyManager: moneyManagerState,
+        preferences: { theme: appTheme, language: appLanguage },
+      },
       onStatusChange: setCloudBackupStatus,
       onMetaUpdated: async (meta) => {
         setCloudBackupMetadata(meta);
@@ -2640,13 +2657,18 @@ function TallyKhataApp() {
     }
   };
 
-  const executeCloudRestore = async () => {
+  const executeCloudRestore = async (domains = ['all']) => {
     return orchestrateCloudRestore({
       storageRepository,
       driveService: googleDriveBackupService,
       getAccessToken: getValidGoogleAccessToken,
       fileId: cloudBackupMetadata ? cloudBackupMetadata.fileId : null,
       userSub: googleUser ? googleUser.sub : null,
+      domains,
+      extraState: {
+        moneyManager: moneyManagerState,
+        preferences: { theme: appTheme, language: appLanguage },
+      },
       onStatusChange: setCloudBackupStatus,
       onFileDiscovered: async (meta) => {
         setCloudBackupMetadata(meta);
@@ -2655,8 +2677,24 @@ function TallyKhataApp() {
       onStateCommitted: (newState) => {
         applyStateToUi(newState, { resetPin: true });
       },
-      onRollback: (safeState) => {
+      onMoneyManagerRestored: (newMM) => {
+        if (newMM) {
+          setMoneyManagerState(newMM);
+        }
+      },
+      onPreferencesRestored: (newPrefs) => {
+        if (newPrefs) {
+          if (newPrefs.theme) setAppTheme(newPrefs.theme);
+          if (newPrefs.language) setAppLanguage(newPrefs.language);
+        }
+      },
+      onRollback: (safeState, safeMM, safePrefs) => {
         applyStateToUi(safeState, { resetPin: false });
+        if (safeMM) setMoneyManagerState(safeMM);
+        if (safePrefs) {
+          if (safePrefs.theme) setAppTheme(safePrefs.theme);
+          if (safePrefs.language) setAppLanguage(safePrefs.language);
+        }
       },
       alertFn: (title, message) => Alert.alert(title, message),
     });
@@ -2765,7 +2803,14 @@ function TallyKhataApp() {
   const handleExportData = async () => {
     try {
       const currentState = storageRepository.getAuthoritativeState();
-      const payload = buildBackupPayload(currentState, googleUser || { sub: 'offline_export', email: '', name: businessName });
+      const payload = buildBackupPayload(
+        {
+          ...currentState,
+          moneyManager: moneyManagerState,
+          preferences: { theme: appTheme, language: appLanguage },
+        },
+        googleUser || { sub: 'offline_export', email: '', name: businessName }
+      );
       const jsonStr = JSON.stringify(payload, null, 2);
       await Share.share({
         title: `TallyKhata Backup - ${businessName}`,
@@ -2854,7 +2899,11 @@ function TallyKhataApp() {
   const handleExportBackup = () => {
     const currentState = storageRepository.getAuthoritativeState();
     const payload = buildBackupPayload(
-      currentState,
+      {
+        ...currentState,
+        moneyManager: moneyManagerState,
+        preferences: { theme: appTheme, language: appLanguage },
+      },
       googleUser || { sub: 'offline_export', email: '', name: businessName }
     );
     const jsonStr = JSON.stringify(payload, null, 2);
