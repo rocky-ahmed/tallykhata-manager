@@ -1118,6 +1118,44 @@ runTest("Complete end-to-end Money Manager lifecycle preserves net-worth invaria
   assert.strictEqual(mmService.calculateNetWorth(state), activeNetWorth, "Restored account included back in Net Worth");
 });
 
+// TEST 47: Translation function t shadowing regression check
+runTest("App.js transaction list rendering does not shadow global translation function t", () => {
+  const ast = babel.parseSync(appSource, {
+    filename: "App.js",
+    configFile: false,
+    babelrc: false,
+    parserOpts: { plugins: ["jsx", "flow"] }
+  });
+
+  let shadowedCalls = 0;
+  function walk(node, scope = new Set()) {
+    if (!node || typeof node !== "object") return;
+    const newScope = new Set(scope);
+    if (node.type === "FunctionDeclaration" || node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression") {
+      for (const p of node.params) {
+        if (p.type === "Identifier") newScope.add(p.name);
+      }
+    }
+    if (node.type === "CallExpression" && node.callee.type === "Identifier" && node.callee.name === "t") {
+      if (newScope.has("t")) {
+        shadowedCalls++;
+      }
+    }
+    for (const key of Object.keys(node)) {
+      if (key === "loc" || key === "comments") continue;
+      const child = node[key];
+      if (Array.isArray(child)) {
+        for (const c of child) walk(c, newScope);
+      } else {
+        walk(child, newScope);
+      }
+    }
+  }
+  walk(ast.program);
+  assert.strictEqual(shadowedCalls, 0, "No CallExpression to 't' should be shadowed by local function parameters in App.js");
+  assert(appSource.includes("filteredTxns.map((txn)"), "filteredTxns.map should use 'txn' iterator to avoid shadowing 't'");
+});
+
 console.log(`\nSUMMARY: ${passed}/${total} tests passed.`);
 if (passed === total) {
   console.log("ALL MONEY MANAGER TESTS PASSED SUCCESSFULLY!\n");

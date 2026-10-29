@@ -8716,15 +8716,15 @@ function TallyKhataApp() {
                     );
                   }
 
-                  return filteredTxns.map((t) => {
-                    const isIncome = t.type === 'income';
-                    const isExpense = t.type === 'expense';
-                    const isTransfer = t.type === 'transfer';
+                  return filteredTxns.map((txn) => {
+                    const isIncome = txn.type === 'income';
+                    const isExpense = txn.type === 'expense';
+                    const isTransfer = txn.type === 'transfer';
 
-                    const cat = (moneyManagerState.categories || []).find((c) => c.id === t.categoryId);
-                    const acc = (moneyManagerState.accounts || []).find((a) => a.id === t.accountId);
-                    const fromAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === t.fromAccountId) : null;
-                    const toAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === t.toAccountId) : null;
+                    const cat = (moneyManagerState.categories || []).find((c) => c.id === txn.categoryId);
+                    const acc = (moneyManagerState.accounts || []).find((a) => a.id === txn.accountId);
+                    const fromAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === txn.fromAccountId) : null;
+                    const toAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === txn.toAccountId) : null;
 
                     const title = isTransfer
                       ? `${fromAcc ? fromAcc.name : 'অ্যাকাউন্ট'} ➔ ${toAcc ? toAcc.name : 'অ্যাকাউন্ট'}`
@@ -8736,7 +8736,7 @@ function TallyKhataApp() {
                     const color = isTransfer ? '#3B82F6' : isIncome ? '#10B981' : '#EF4444';
 
                     return (
-                      <View key={t.id} style={[styles.mmTxnCard, tStyles.mmTxnItem]}>
+                      <View key={txn.id} style={[styles.mmTxnCard, tStyles.mmTxnItem]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <View style={[styles.mmTxnIconBox, { backgroundColor: color + '22', borderColor: color + '55' }]}>
                             <Text style={styles.mmTxnIcon}>{icon}</Text>
@@ -8745,24 +8745,24 @@ function TallyKhataApp() {
                             <Text style={[styles.mmTxnCat, tStyles.mmTxnTitle]} numberOfLines={1}>
                               {title}
                             </Text>
-                            {t.payee ? (
+                            {txn.payee ? (
                               <Text style={styles.mmTxnPayee} numberOfLines={1}>
-                                🏷️ {t.payee}
+                                🏷️ {txn.payee}
                               </Text>
                             ) : null}
-                            {t.note ? (
+                            {txn.note ? (
                               <Text style={[styles.mmTxnNote, tStyles.mmTxnSub]} numberOfLines={2}>
-                                {t.note}
+                                {txn.note}
                               </Text>
                             ) : null}
                             <Text style={[styles.mmTxnMeta, tStyles.mmTxnSub]}>
-                              {t.date} • {t.time || ''} {acc && !isTransfer ? `• ${acc.name}` : ''}
+                              {txn.date} • {txn.time || ''} {acc && !isTransfer ? `• ${acc.name}` : ''}
                             </Text>
                           </View>
                           <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
                             <Text style={[styles.mmTxnAmount, { color }]}>
                               {isIncome ? '+৳ ' : isExpense ? '-৳ ' : '৳ '}
-                              {(t.amount || 0).toLocaleString('en-US')}
+                              {(txn.amount || 0).toLocaleString('en-US')}
                             </Text>
                           </View>
                         </View>
@@ -8771,7 +8771,7 @@ function TallyKhataApp() {
                         <View style={styles.mmTxnActionRow}>
                           <TouchableOpacity
                             style={styles.mmTxnActionBtn}
-                            onPress={() => handleOpenEditMMTxn(t)}
+                            onPress={() => handleOpenEditMMTxn(txn)}
                             accessibilityRole="button"
                             accessibilityLabel="লেনদেন সম্পাদনা করুন"
                           >
@@ -8779,7 +8779,7 @@ function TallyKhataApp() {
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.mmTxnDeleteBtn}
-                            onPress={() => handleDeleteMMTxn(t.id)}
+                            onPress={() => handleDeleteMMTxn(txn.id)}
                             accessibilityRole="button"
                             accessibilityLabel="লেনদেন মুছুন"
                           >
