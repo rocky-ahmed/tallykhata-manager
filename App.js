@@ -718,6 +718,7 @@ function TallyKhataApp() {
   const currentTheme = themeService.getThemeTokens(appTheme);
   const t = (k, params) => i18nService.t(k, appLanguage, params);
   const tStyles = useMemo(() => themeService.getThemedStyles(currentTheme, isDark), [currentTheme, isDark]);
+  const formatAppNumber = (n) => (appLanguage === "en" ? String(n !== undefined && n !== null ? Number(n).toLocaleString("en-IN") : "0") : toBengaliNumber(n));
 
   const themeContextValue = useMemo(() => ({
     theme: currentTheme,
@@ -3592,7 +3593,7 @@ function TallyKhataApp() {
               activeOpacity={0.7}
             >
               <AppIcon source={require('./assets/icons/ic_sms.png')} variant="primary" shape="circle" size={20} containerSize={42} style={{ marginBottom: 6 }} tintColor={null} />
-              <Text style={styles.quickActionLabel}>তাগাদা পাঠান</Text>
+              <Text style={styles.quickActionLabel}>{t('tagada_send_sms')}</Text>
             </TouchableOpacity>
           ) : null}
           {selectedAccount.phone ? (
@@ -3602,7 +3603,7 @@ function TallyKhataApp() {
               activeOpacity={0.7}
             >
               <AppIcon source={require('./assets/icons/ic_call.png')} variant="success" shape="circle" size={20} containerSize={42} style={{ marginBottom: 6 }} />
-              <Text style={styles.quickActionLabel}>কল করুন</Text>
+              <Text style={styles.quickActionLabel}>{t('ledger_call')}</Text>
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
@@ -3622,7 +3623,7 @@ function TallyKhataApp() {
             activeOpacity={0.7}
           >
             <AppIcon source={require('./assets/icons/ic_pdf.png')} variant="purple" shape="circle" size={20} containerSize={42} style={{ marginBottom: 6 }} />
-            <Text style={styles.quickActionLabel}>স্টেটমেন্ট শেয়ার</Text>
+            <Text style={styles.quickActionLabel}>{t('ledger_share_statement')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -3630,12 +3631,12 @@ function TallyKhataApp() {
 
         {/* Ledger Table Column Headers (layout_credit_details_table_head: লেনদেনের বিবরণ, দিলাম, পেলাম) */}
         <View style={[styles.ledgerTableHeader, isDark && { backgroundColor: currentTheme.cardBgElevated }]}>
-          <Text style={[styles.ledgerColHeader, isDark && tStyles.textSecondary, { flex: 1.6 }]}>লেনদেনের বিবরণ</Text>
+          <Text style={[styles.ledgerColHeader, isDark && tStyles.textSecondary, { flex: 1.6 }]}>{t("ledger_col_desc")}</Text>
           <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: isDark ? currentTheme.danger : COLORS.red }]}>
-            দিলাম
+            {t('ledger_col_gave')}
           </Text>
           <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: isDark ? currentTheme.success : COLORS.green }]}>
-            পেলাম
+            {t('ledger_col_got')}
           </Text>
         </View>
 
@@ -3698,7 +3699,7 @@ function TallyKhataApp() {
 
         {/* Bottom Summary Totals Strip (bottomLinearLayout from activity_customer_report_v2.xml) */}
         <View style={styles.ledgerBottomTotalsStrip}>
-          <Text style={styles.ledgerBottomTotalLabel}>মোট</Text>
+          <Text style={styles.ledgerBottomTotalLabel}>{t('ledger_total')}</Text>
           <View style={styles.ledgerBottomTotalCreditBox}>
             <Text style={styles.ledgerBottomTotalCreditVal}>৳ {formatMoney(totalGiven)}</Text>
           </View>
@@ -3714,14 +3715,14 @@ function TallyKhataApp() {
             onPress={() => handleOpenAddTxn('given')}
             activeOpacity={0.85}
           >
-            <Text style={styles.bigEntryBtnText}>{isCustomer ? '- দিলাম (বাকি)' : '- দিলাম (পরিশোধ)'}</Text>
+            <Text style={styles.bigEntryBtnText}>{isCustomer ? t('btn_gave_due') : t('btn_gave_payment')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.bigEntryBtn, { backgroundColor: COLORS.green, borderBottomColor: "#065F06" }]}
             onPress={() => handleOpenAddTxn('received')}
             activeOpacity={0.85}
           >
-            <Text style={styles.bigEntryBtnText}>{isCustomer ? '+ পেলাম (জমা)' : '+ পেলাম (বাকি মাল)'}</Text>
+            <Text style={styles.bigEntryBtnText}>{isCustomer ? t('btn_got_deposit') : t('btn_got_due_product')}</Text>
           </TouchableOpacity>
         </View>
         </View>
@@ -3763,7 +3764,7 @@ function TallyKhataApp() {
                 <Text style={styles.headerBadgeWhiteText}>99+</Text>
               </View>
             </View>
-            <Text style={styles.headerActionLabelWhite}>ইনবক্স</Text>
+            <Text style={styles.headerActionLabelWhite}>{t('header_inbox')}</Text>
           </TouchableOpacity>
 
           {/* Support with Bangla text */}
@@ -3777,7 +3778,7 @@ function TallyKhataApp() {
               style={styles.headerWhiteActionIcon}
               resizeMode="contain"
             />
-            <Text style={styles.headerActionLabelWhite}>সাপোর্ট</Text>
+            <Text style={styles.headerActionLabelWhite}>{t('header_support')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -3809,9 +3810,9 @@ function TallyKhataApp() {
                       resizeMode="contain"
                     />
                     <View style={styles.promoBannerTextCol}>
-                      <Text style={[styles.promoBannerBold, isDark && tStyles.textPrimary]}>মানি ট্রান্সফার</Text>
-                      <Text style={[styles.promoBannerBold, isDark && tStyles.textPrimary]}>চার্জ ফ্রি!*</Text>
-                      <Text style={[styles.promoBannerSub, isDark && tStyles.textSecondary]}>*শর্ত প্রযোজ্য</Text>
+                      <Text style={[styles.promoBannerBold, isDark && tStyles.textPrimary]}>{t('promo_transfer')}</Text>
+                      <Text style={[styles.promoBannerBold, isDark && tStyles.textPrimary]}>{t('promo_charge_free')}</Text>
+                      <Text style={[styles.promoBannerSub, isDark && tStyles.textSecondary]}>{t('promo_condition')}</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -3829,7 +3830,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>মাল্টি ব্যবসা</Text>
+                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_multi_biz")}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -3842,7 +3843,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>স্টক হিসাব</Text>
+                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_stock")}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -3855,7 +3856,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>ব্যবসার নোট</Text>
+                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_biz_note")}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -3868,7 +3869,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>গ্রুপ তাগাদা</Text>
+                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_group_tagada")}</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -3886,7 +3887,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>মানি ম্যানেজার</Text>
+                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_money_manager")}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -3899,7 +3900,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>ডাটা ব্যাকআপ</Text>
+                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_backup")}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -3912,7 +3913,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>টালি-মেসেজ</Text>
+                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_tally_msg")}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -3925,7 +3926,7 @@ function TallyKhataApp() {
                           style={styles.quickGridIcon}
                           resizeMode="contain"
                         />
-                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>ক্যাশবক্স</Text>
+                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_cashbox")}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -3938,9 +3939,9 @@ function TallyKhataApp() {
                       activeOpacity={0.8}
                     >
                       <Text style={[styles.summaryCardAmountRed, isDark && { color: currentTheme.danger }]}>
-                        {toBengaliNumber(totalCustomerDue)}
+                        {formatAppNumber(totalCustomerDue)}
                       </Text>
-                      <Text style={[styles.summaryCardLabel, isDark && tStyles.textSecondary]}>মোট পাবো</Text>
+                      <Text style={[styles.summaryCardLabel, isDark && tStyles.textSecondary]}>{t("header_total_due")}</Text>
                     </TouchableOpacity>
 
                     <View style={[styles.summaryCardDivider, isDark && tStyles.divider]} />
@@ -3953,9 +3954,9 @@ function TallyKhataApp() {
                       activeOpacity={0.8}
                     >
                       <Text style={[styles.summaryCardAmountGreen, isDark && { color: currentTheme.success }]}>
-                        {toBengaliNumber(totalSupplierDue)}
+                        {formatAppNumber(totalSupplierDue)}
                       </Text>
-                      <Text style={[styles.summaryCardLabel, isDark && tStyles.textSecondary]}>মোট দেবো</Text>
+                      <Text style={[styles.summaryCardLabel, isDark && tStyles.textSecondary]}>{t("header_total_owe")}</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -4018,7 +4019,7 @@ function TallyKhataApp() {
                       style={[styles.counterTabPill, accountTab === 'customer' && (isDark ? { backgroundColor: currentTheme.cardBg } : styles.counterTabPillActive)]}
                     >
                       <Text style={[styles.counterTabText, isDark && { color: currentTheme.textSecondary }, accountTab === 'customer' && { color: currentTheme.primary, fontWeight: 'bold' }]}>
-                        কাস্টমার {toBengaliNumber(businessAccounts.filter((a) => a.type === 1).length)}
+                        {t('header_filter_customer')} {formatAppNumber(businessAccounts.filter((a) => a.type === 1).length)}
                       </Text>
                     </TouchableOpacity>
                     <Text style={[styles.counterStripDivider, isDark && tStyles.textSecondary]}>/</Text>
@@ -4031,7 +4032,7 @@ function TallyKhataApp() {
                       style={[styles.counterTabPill, accountTab === 'supplier' && (isDark ? { backgroundColor: currentTheme.cardBg } : styles.counterTabPillActive)]}
                     >
                       <Text style={[styles.counterTabText, isDark && { color: currentTheme.textSecondary }, accountTab === 'supplier' && { color: currentTheme.primary, fontWeight: 'bold' }]}>
-                        সাপ্লায়ার {toBengaliNumber(businessAccounts.filter((a) => a.type === 2).length)}
+                        {t('header_filter_supplier')} {formatAppNumber(businessAccounts.filter((a) => a.type === 2).length)}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -4069,8 +4070,8 @@ function TallyKhataApp() {
                     style={{ width: 140, height: 140, marginBottom: 12 }}
                     resizeMode="contain"
                   />
-                  <Text style={styles.emptyText}>কোনো খাতা পাওয়া যায়নি</Text>
-                  <Text style={styles.emptySubText}>নিচের বাটন চেপে নতুন কাস্টমার বা সাপ্লায়ার যোগ করুন</Text>
+                  <Text style={styles.emptyText}>{t('empty_accounts_title')}</Text>
+                  <Text style={styles.emptySubText}>{t('empty_accounts_sub')}</Text>
                 </View>
               }
             />
@@ -4110,7 +4111,7 @@ function TallyKhataApp() {
                   <Text style={[styles.cashTopAmount, isDark && tStyles.textPrimary]}>
                     ৳ {hideCashAmounts ? '***' : formatMoney(todaySales || todayCashIn)}
                   </Text>
-                  <Text style={[styles.cashTopLabel, isDark && tStyles.textSecondary]}>আজকের বেচা</Text>
+                  <Text style={[styles.cashTopLabel, isDark && tStyles.textSecondary]}>{t("cb_today_sale")}</Text>
                 </View>
 
                 <View style={[styles.cashTopDivider, isDark && tStyles.divider]} />
@@ -4119,14 +4120,14 @@ function TallyKhataApp() {
                   <Text style={[styles.cashTopAmount, { color: isDark ? currentTheme.textPrimary : '#09101D' }]}>
                     ৳ {hideCashAmounts ? '***' : formatMoney(totalCash)}
                   </Text>
-                  <Text style={[styles.cashTopLabel, isDark && tStyles.textSecondary]}>বর্তমান ক্যাশ</Text>
+                  <Text style={[styles.cashTopLabel, isDark && tStyles.textSecondary]}>{t("cb_current_cash")}</Text>
                 </View>
               </View>
 
               {/* Lower Strip: আজ পেলাম & আজ দিলাম (aj_pelam_bg) */}
               <View style={[styles.cashTopDashboardLower, isDark && { backgroundColor: currentTheme.cardBgElevated }]}>
                 <View style={styles.cashSubCol}>
-                  <Text style={[styles.cashSubLabel, isDark && tStyles.textSecondary]}>আজ পেলাম</Text>
+                  <Text style={[styles.cashSubLabel, isDark && tStyles.textSecondary]}>{t("cb_today_got")}</Text>
                   <Text style={[styles.cashSubAmount, { color: isDark ? currentTheme.success : '#0F8A0F' }]}>
                     + ৳ {hideCashAmounts ? '***' : formatMoney(todayCashIn)}
                   </Text>
@@ -4135,7 +4136,7 @@ function TallyKhataApp() {
                 <View style={[styles.cashSubDivider, isDark && tStyles.divider]} />
 
                 <View style={styles.cashSubCol}>
-                  <Text style={[styles.cashSubLabel, isDark && tStyles.textSecondary]}>আজ দিলাম</Text>
+                  <Text style={[styles.cashSubLabel, isDark && tStyles.textSecondary]}>{t("cb_today_gave")}</Text>
                   <Text style={[styles.cashSubAmount, { color: isDark ? currentTheme.danger : '#C4161C' }]}>
                     - ৳ {hideCashAmounts ? '***' : formatMoney(todayCashOut)}
                   </Text>
@@ -4154,7 +4155,7 @@ function TallyKhataApp() {
                   style={{ width: 18, height: 18, marginRight: 6 }}
                   resizeMode="contain"
                 />
-                <Text style={[styles.cashActionBarBtnText, isDark && tStyles.textPrimary]}>রিপোর্ট</Text>
+                <Text style={[styles.cashActionBarBtnText, isDark && tStyles.textPrimary]}>{t('cb_report')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -4170,7 +4171,7 @@ function TallyKhataApp() {
                   resizeMode="contain"
                 />
                 <Text style={[styles.cashActionBarBtnText, { color: isDark ? currentTheme.primary : '#B81414', fontWeight: 'bold' }]}>
-                  ক্যাশবক্স মিলাই
+                  {t('cb_reconcile')}
                 </Text>
               </TouchableOpacity>
 
@@ -4189,14 +4190,14 @@ function TallyKhataApp() {
             {/* Baki Aday & Supplier Payment Strip (layout_baki_aday) */}
             <View style={styles.cashBakiAdayStrip}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.cashBakiAdayLabel}>বাকি আদায়</Text>
+                <Text style={styles.cashBakiAdayLabel}>{t('cb_baki_aday')}</Text>
                 <Text style={[styles.cashBakiAdayVal, { color: '#34C759' }]}>
                   ৳ {hideCashAmounts ? '***' : formatMoney(todayBakiAday || (todayCashIn > todaySales ? todayCashIn - todaySales : 0))}
                 </Text>
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.cashBakiAdayLabel}>পেমেন্ট দেয়া</Text>
+                <Text style={styles.cashBakiAdayLabel}>{t('cb_payment_given')}</Text>
                 <Text style={[styles.cashBakiAdayVal, { color: '#B81414' }]}>
                   ৳ {hideCashAmounts ? '***' : formatMoney(todaySupplierPay || (todayCashOut > todayCosts ? todayCashOut - todayCosts : 0))}
                 </Text>
@@ -4696,7 +4697,7 @@ function TallyKhataApp() {
             </View>
 
             {/* Group 2: টালিখাতা হিসাব ও রিপোর্ট (nav_tallykhata) */}
-            <SectionHeader title="টালিখাতা হিসাব ও রিপোর্ট" count={7} />
+            <SectionHeader title={t('menu_sec_tallykhata')} count={7} />
             <View style={[styles.menuListContainer, isDark && tStyles.card]}>
               <TouchableOpacity
                 style={styles.menuListItem}
@@ -4704,7 +4705,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_menu_profit.png')} variant="success" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>বেচা কেনা হিসাব</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_item_bechakena')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>দৈনিক বেচা-কেনা ও লাভের হিসাব</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4716,7 +4717,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_menu_cost.png')} variant="danger" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>খরচ রিপোর্ট</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_item_expense')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>দোকানের সকল যাবতীয় খরচের তালিকা</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4728,7 +4729,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_menu_baki_hisab.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>বাকি হিসাব ও তাগাদা</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_item_baki')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>মোট বাকি ৳ {formatMoney(totalCustomerDue)}</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4740,7 +4741,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_menu_report.png')} variant="purple" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>সার্বিক হিসাব রিপোর্ট</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_item_full_report')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>দৈনিক, মাসিক ও বার্ষিক স্টেটমেন্ট তৈরি ও শেয়ার</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4752,7 +4753,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_menu_malik_report.png')} variant="success" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>মালিকের হিসাব</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_item_malik')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>মালিকের বিনিয়োগ ও ব্যক্তিগত উত্তোলন স্টেটমেন্ট</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4764,7 +4765,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_menu_stock.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>স্টক ও পণ্য হিসাব</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_item_stock')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>মোট {businessInventory.length} টি পণ্য • স্টক মূল্য ৳ {formatMoney(totalStockCost)}</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4776,7 +4777,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_menu_note.png')} variant="info" shape="rounded" size={22} containerSize={38} tintColor={null} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>ব্যবসার নোট ও মেমো</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_item_notes')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>প্রয়োজনীয় কাজ ও জরুরি মেমো</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4784,7 +4785,7 @@ function TallyKhataApp() {
             </View>
 
             {/* Group 3: সেটিংস ও অন্যান্য (nav_group_others) */}
-            <SectionHeader title="সেটিংস ও অন্যান্য" count={7} />
+            <SectionHeader title={t('menu_sec_settings')} count={7} />
             <View style={[styles.menuListContainer, isDark && tStyles.card]}>
               <TouchableOpacity
                 style={styles.menuListItem}
@@ -4795,7 +4796,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/grid_multi_biz.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>ব্যবসা পরিচালনা</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_business_management')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>বর্তমান: {businessName || 'Mobile Xpress'} • একাধিক ব্যবসা ও সুইচ</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4810,12 +4811,12 @@ function TallyKhataApp() {
                 <AppIcon source={require('./assets/icons/grid_money_manager.png')} variant="secondary" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>মানি ম্যানেজার (ব্যক্তিগত হিসাব)</Text>
+                    <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_money_manager') || 'মানি ম্যানেজার (ব্যক্তিগত হিসাব)'}</Text>
                     <View style={styles.mmNewBadge}>
-                      <Text style={styles.mmNewBadgeText}>নতুন</Text>
+                      <Text style={styles.mmNewBadgeText}>{t('mm_badge_new')}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>ব্যক্তিগত আয়-ব্যয়, ওয়ালেট ও বাজেট ট্র্যাকার</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('menu_money_manager_sub') || 'ব্যক্তিগত আয়-ব্যয়, ওয়ালেট ও বাজেট ট্র্যাকার'}</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
@@ -4890,7 +4891,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_menu_backup.png')} variant="success" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>ডাটা ব্যাকআপ ও রিস্টোর</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_backup_restore')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>১০০% অফলাইন ডাটা সেভ ও নতুন ফোনে ট্রান্সফার</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4906,7 +4907,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_share.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>রেফার করুন</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_refer')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>অন্যান্য ব্যবসায়ীদের টালিখাতা শেয়ার করুন</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4918,7 +4919,7 @@ function TallyKhataApp() {
               >
                 <AppIcon source={require('./assets/icons/ic_menu_support.png')} variant="purple" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>ব্যবহার নির্দেশিকা ও হেল্প</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_help_support')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>সচরাচর জিজ্ঞাসিত প্রশ্ন ও হেল্পলাইন</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -8355,12 +8356,12 @@ function TallyKhataApp() {
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={[styles.mmHeaderTitle, tStyles.mmHeaderTitle]}>ব্যক্তিগত মানি ম্যানেজার</Text>
+                <Text style={[styles.mmHeaderTitle, tStyles.mmHeaderTitle]}>{t("mm_title")}</Text>
                 <View style={styles.mmBadge}>
-                  <Text style={styles.mmBadgeText}>ব্যক্তিগত</Text>
+                  <Text style={styles.mmBadgeText}>{t("mm_badge")}</Text>
                 </View>
               </View>
-              <Text style={[styles.mmHeaderSub, tStyles.mmHeaderSub]}>ব্যক্তিগত আয়-ব্যয়, ওয়ালেট ও বাজেট ট্র্যাকার</Text>
+              <Text style={[styles.mmHeaderSub, tStyles.mmHeaderSub]}>{t("mm_sub")}</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <TouchableOpacity
@@ -8400,7 +8401,7 @@ function TallyKhataApp() {
                 accessibilityRole="button"
                 accessibilityLabel="নতুন লেনদেন"
               >
-                <Text style={styles.mmAddHeaderBtnText}>+ লেনদেন</Text>
+                <Text style={styles.mmAddHeaderBtnText}>{t("mm_new_txn")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -8414,7 +8415,7 @@ function TallyKhataApp() {
               accessibilityLabel="এই মাসের হিসাব"
             >
               <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'this_month' && tStyles.mmPeriodPillTextActive]}>
-                📅 এই মাস
+                📅 {t("mm_period_this_month")}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -8424,7 +8425,7 @@ function TallyKhataApp() {
               accessibilityLabel="গত মাসের হিসাব"
             >
               <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'last_month' && tStyles.mmPeriodPillTextActive]}>
-                🗓️ গত মাস
+                🗓️ {t("mm_period_last_month")}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -8434,7 +8435,7 @@ function TallyKhataApp() {
               accessibilityLabel="সব সময়ের হিসাব"
             >
               <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'all_time' && tStyles.mmPeriodPillTextActive]}>
-                ⏱️ সব সময়
+                ⏱️ {t("mm_period_all_time")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -8453,7 +8454,7 @@ function TallyKhataApp() {
               return (
                 <View style={[styles.mmTotalCard, tStyles.mmTotalCard]}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={[styles.mmTotalCardLabel, tStyles.mmTotalCardLabel]}>মোট ব্যক্তিগত সম্পদ (Net Worth)</Text>
+                    <Text style={[styles.mmTotalCardLabel, tStyles.mmTotalCardLabel]}>{t("mm_net_worth")}</Text>
                     <View style={[styles.mmPeriodBadge, !isDark && { backgroundColor: currentTheme.cardBgElevated }]}>
                       <Text style={[styles.mmPeriodBadgeText, !isDark && { color: currentTheme.textSecondary }]}>{periodLabel}</Text>
                     </View>
@@ -8499,7 +8500,7 @@ function TallyKhataApp() {
                 accessibilityLabel="লেনদেন ট্যাব"
               >
                 <Text style={[styles.mmSubTabLabel, tStyles.mmSubTabLabel, mmActiveSubTab === 'transactions' && styles.mmSubTabLabelActive]}>
-                  📋 লেনদেন
+                  📋 {t("mm_tab_txns")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -8519,7 +8520,7 @@ function TallyKhataApp() {
                 accessibilityLabel="বাজেট ট্যাব"
               >
                 <Text style={[styles.mmSubTabLabel, tStyles.mmSubTabLabel, mmActiveSubTab === 'budgets' && styles.mmSubTabLabelActive]}>
-                  🎯 বাজেট
+                  🎯 {t("mm_tab_budgets")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -8529,7 +8530,7 @@ function TallyKhataApp() {
                 accessibilityLabel="লক্ষ্য ট্যাব"
               >
                 <Text style={[styles.mmSubTabLabel, tStyles.mmSubTabLabel, mmActiveSubTab === 'goals' && styles.mmSubTabLabelActive]}>
-                  🏆 লক্ষ্য
+                  🏆 {t("mm_tab_goals")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -8539,7 +8540,7 @@ function TallyKhataApp() {
                 accessibilityLabel="বিশ্লেষণ ট্যাব"
               >
                 <Text style={[styles.mmSubTabLabel, tStyles.mmSubTabLabel, mmActiveSubTab === 'analytics' && styles.mmSubTabLabelActive]}>
-                  📊 বিশ্লেষণ
+                  📊 {t("mm_tab_analytics")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -8552,7 +8553,7 @@ function TallyKhataApp() {
                   <Text style={styles.mmSearchIcon}>🔍</Text>
                   <TextInput
                     style={styles.mmSearchInput}
-                    placeholder="লেনদেন খুঁজুন (নোট, প্রাপক, অংক)..."
+                    placeholder={t("mm_search_placeholder")}
                     placeholderTextColor="#64748B"
                     value={mmSearchQuery}
                     onChangeText={setMmSearchQuery}
@@ -8571,7 +8572,7 @@ function TallyKhataApp() {
                     onPress={() => setMmTxnFilter('all')}
                   >
                     <Text style={[styles.mmFilterChipText, mmTxnFilter === 'all' && styles.mmFilterChipTextActive]}>
-                      সব লেনদেন
+                      {t('mm_filter_all')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -8579,7 +8580,7 @@ function TallyKhataApp() {
                     onPress={() => setMmTxnFilter('expense')}
                   >
                     <Text style={[styles.mmFilterChipText, mmTxnFilter === 'expense' && styles.mmFilterChipTextActive]}>
-                      🔴 শুধু ব্যয়
+                      {t('mm_filter_expense')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -8587,7 +8588,7 @@ function TallyKhataApp() {
                     onPress={() => setMmTxnFilter('income')}
                   >
                     <Text style={[styles.mmFilterChipText, mmTxnFilter === 'income' && styles.mmFilterChipTextActive]}>
-                      🟢 শুধু আয়
+                      {t('mm_filter_income')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -8595,20 +8596,20 @@ function TallyKhataApp() {
                     onPress={() => setMmTxnFilter('transfer')}
                   >
                     <Text style={[styles.mmFilterChipText, mmTxnFilter === 'transfer' && styles.mmFilterChipTextActive]}>
-                      🔄 ফান্ড স্থানান্তর
+                      {t('mm_filter_transfer')}
                     </Text>
                   </TouchableOpacity>
                 </ScrollView>
 
                 {/* Sort Order Chips */}
                 <View style={styles.mmSortRow}>
-                  <Text style={styles.mmSortLabel}>সাজান:</Text>
+                  <Text style={styles.mmSortLabel}>{t('mm_sort_label')}</Text>
                   <TouchableOpacity
                     style={[styles.mmSortChip, mmSortOrder === 'newest' && styles.mmSortChipActive]}
                     onPress={() => setMmSortOrder('newest')}
                   >
                     <Text style={[styles.mmSortChipText, mmSortOrder === 'newest' && styles.mmSortChipTextActive]}>
-                      নতুন আগে
+                      {t('mm_sort_newest')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -8616,7 +8617,7 @@ function TallyKhataApp() {
                     onPress={() => setMmSortOrder('oldest')}
                   >
                     <Text style={[styles.mmSortChipText, mmSortOrder === 'oldest' && styles.mmSortChipTextActive]}>
-                      পুরোনো আগে
+                      {t('mm_sort_oldest')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -8624,7 +8625,7 @@ function TallyKhataApp() {
                     onPress={() => setMmSortOrder('amount_high')}
                   >
                     <Text style={[styles.mmSortChipText, mmSortOrder === 'amount_high' && styles.mmSortChipTextActive]}>
-                      বড় অংক
+                      {t('mm_sort_high')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -8632,7 +8633,7 @@ function TallyKhataApp() {
                     onPress={() => setMmSortOrder('amount_low')}
                   >
                     <Text style={[styles.mmSortChipText, mmSortOrder === 'amount_low' && styles.mmSortChipTextActive]}>
-                      ছোট অংক
+                      {t('mm_sort_low')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -8651,7 +8652,7 @@ function TallyKhataApp() {
                       <View style={styles.mmEmptyBox}>
                         <Text style={styles.mmEmptyIcon}>📝</Text>
                         <Text style={styles.mmEmptyText}>
-                          {mmSearchQuery ? 'অনুসন্ধানের সাথে কোনো লেনদেন মেলেনি' : 'নির্বাচিত সময়ে কোনো লেনদেনের রেকর্ড নেই'}
+                          {mmSearchQuery ? t('mm_empty_filtered') : t('mm_empty_period')}
                         </Text>
                         <TouchableOpacity
                           style={styles.mmEmptyBtn}
@@ -8663,7 +8664,7 @@ function TallyKhataApp() {
                             setModalMMAddTxn(true);
                           }}
                         >
-                          <Text style={styles.mmEmptyBtnText}>+ প্রথম লেনদেন যুক্ত করুন</Text>
+                          <Text style={styles.mmEmptyBtnText}>{t('mm_first_txn')}</Text>
                         </TouchableOpacity>
                       </View>
                     );
@@ -8728,7 +8729,7 @@ function TallyKhataApp() {
                             accessibilityRole="button"
                             accessibilityLabel="লেনদেন সম্পাদনা করুন"
                           >
-                            <Text style={styles.mmTxnActionBtnText}>✏️ সম্পাদনা</Text>
+                            <Text style={styles.mmTxnActionBtnText}>✏️ {t('btn_edit')}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.mmTxnDeleteBtn}
@@ -8736,7 +8737,7 @@ function TallyKhataApp() {
                             accessibilityRole="button"
                             accessibilityLabel="লেনদেন মুছুন"
                           >
-                            <Text style={styles.mmTxnDeleteBtnText}>🗑️ মুছুন</Text>
+                            <Text style={styles.mmTxnDeleteBtnText}>🗑️ {t('btn_delete')}</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -8819,7 +8820,7 @@ function TallyKhataApp() {
                           accessibilityRole="button"
                           accessibilityLabel="ফান্ড স্থানান্তর"
                         >
-                          <Text style={styles.mmAccountActionText}>🔄 স্থানান্তর</Text>
+                          <Text style={styles.mmAccountActionText}>{t('mm_transfer_btn')}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -8829,7 +8830,7 @@ function TallyKhataApp() {
                           accessibilityLabel={acc.isArchived ? "সক্রিয় করুন" : "আর্কাইভ করুন"}
                         >
                           <Text style={styles.mmAccountArchiveText}>
-                            {acc.isArchived ? '📥 সক্রিয় করুন' : '📦 আর্কাইভ'}
+                            {acc.isArchived ? t('mm_unarchive_btn') : t('mm_archive_btn')}
                           </Text>
                         </TouchableOpacity>
 
@@ -8857,7 +8858,7 @@ function TallyKhataApp() {
                   accessibilityRole="button"
                   accessibilityLabel="নতুন ওয়ালেট যুক্ত করুন"
                 >
-                  <Text style={styles.mmAddAccBigBtnText}>+ নতুন ওয়ালেট / অ্যাকাউন্ট যুক্ত করুন</Text>
+                  <Text style={styles.mmAddAccBigBtnText}>{t('mm_add_wallet')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -8877,7 +8878,7 @@ function TallyKhataApp() {
                   return (
                     <View style={[styles.mmOverallBudgetCard, tStyles.mmCard]}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={[styles.mmOverallBudgetTitle, tStyles.mmCardTitle]}>সামগ্রিক মাসিক বাজেট সীমা</Text>
+                        <Text style={[styles.mmOverallBudgetTitle, tStyles.mmCardTitle]}>{t('mm_overall_budget')}</Text>
                         <View style={[styles.mmOverallBudgetBadge, isOver && { backgroundColor: '#EF4444' }]}>
                           <Text style={styles.mmOverallBudgetBadgeText}>
                             {isOver ? '⚠️ বাজেট অতিক্রম' : 'বাজেট সীমার মধ্যে'}
@@ -8960,7 +8961,7 @@ function TallyKhataApp() {
                       accessibilityRole="button"
                       accessibilityLabel="নতুন ক্যাটাগরি তৈরি"
                     >
-                      <Text style={styles.mmAddSmallBtnText}>+ নতুন ক্যাটাগরি</Text>
+                      <Text style={styles.mmAddSmallBtnText}>{t('mm_new_cat_btn')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -8974,7 +8975,7 @@ function TallyKhataApp() {
                     accessibilityLabel="ব্যয় বাজেট ক্যাটাগরি"
                   >
                     <Text style={[styles.mmPrefPillText, mmCatSectionTab === 'expense' && styles.mmPrefPillTextActive]}>
-                      🔴 ব্যয় বাজেট
+                      {t('mm_expense_budget')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -8984,7 +8985,7 @@ function TallyKhataApp() {
                     accessibilityLabel="আয় ক্যাটাগরি"
                   >
                     <Text style={[styles.mmPrefPillText, mmCatSectionTab === 'income' && styles.mmPrefPillTextActive]}>
-                      🟢 আয় ক্যাটাগরি
+                      {t('mm_income_category')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -9040,7 +9041,7 @@ function TallyKhataApp() {
                                 accessibilityRole="button"
                                 accessibilityLabel="বাজেট নির্ধারণ করুন"
                               >
-                                <Text style={styles.mmCatBudgetBtnText}>✏️ বাজেট</Text>
+                                <Text style={styles.mmCatBudgetBtnText}>{t('mm_budget_btn')}</Text>
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={[styles.mmCatBudgetBtn, { backgroundColor: '#334155' }]}
@@ -9150,7 +9151,7 @@ function TallyKhataApp() {
                     accessibilityRole="button"
                     accessibilityLabel="নতুন সঞ্চয় লক্ষ্য তৈরি"
                   >
-                    <Text style={styles.mmAddSmallBtnText}>+ নতুন লক্ষ্য</Text>
+                    <Text style={styles.mmAddSmallBtnText}>{t('mm_add_goal')}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -9160,7 +9161,7 @@ function TallyKhataApp() {
                     return (
                       <View style={styles.mmEmptyBox}>
                         <Text style={styles.mmEmptyIcon}>🎯</Text>
-                        <Text style={styles.mmEmptyText}>কোনো সঞ্চয় লক্ষ্য তৈরি করা হয়নি</Text>
+                        <Text style={styles.mmEmptyText}>{t('mm_empty_goals')}</Text>
                         <TouchableOpacity
                           style={styles.mmEmptyBtn}
                           onPress={() => {
@@ -9172,7 +9173,7 @@ function TallyKhataApp() {
                             setModalMMAddGoal(true);
                           }}
                         >
-                          <Text style={styles.mmEmptyBtnText}>+ প্রথম সঞ্চয় লক্ষ্য তৈরি করুন</Text>
+                          <Text style={styles.mmEmptyBtnText}>{t('mm_first_goal_btn')}</Text>
                         </TouchableOpacity>
                       </View>
                     );
@@ -9233,7 +9234,7 @@ function TallyKhataApp() {
                             accessibilityRole="button"
                             accessibilityLabel="টাকা জমা করুন"
                           >
-                            <Text style={styles.mmGoalDepositBtnText}>+ টাকা জমা করুন</Text>
+                            <Text style={styles.mmGoalDepositBtnText}>{t('mm_deposit_btn')}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.mmGoalDeleteBtn}

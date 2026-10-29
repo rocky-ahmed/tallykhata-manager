@@ -149,7 +149,17 @@ async function runAsyncTest(name, fn) {
       'btn_give_credit', 'btn_receive_cash', 'btn_save', 'btn_cancel',
       'menu_title', 'menu_appearance', 'menu_language', 'menu_business_management',
       'menu_money_manager', 'menu_backup_restore', 'backup_title', 'backup_now',
-      'restore_online', 'mm_title', 'mm_tab_txns', 'mm_tab_wallets', 'mm_tab_budgets'
+      'restore_online', 'mm_title', 'mm_tab_txns', 'mm_tab_wallets', 'mm_tab_budgets',
+      'qa_backup', 'qa_tally_msg', 'qa_group_tagada', 'qa_biz_note', 'ledger_col_desc',
+      'cb_cash_in_hand', 'mm_badge', 'mm_sub', 'mm_new_txn', 'mm_period_this_month', 'mm_period_last_month', 'mm_period_all_time',
+      'header_inbox', 'header_support', 'cb_report', 'cb_baki_aday', 'cb_payment_given',
+      'tallypay_merchant_wallet', 'empty_accounts_title', 'ledger_call', 'ledger_share_statement',
+      'ledger_total', 'btn_gave_due', 'btn_gave_payment', 'btn_got_deposit', 'btn_got_due_product',
+      'menu_sec_tallykhata', 'menu_item_bechakena', 'menu_item_expense', 'menu_item_baki',
+      'menu_item_full_report', 'menu_item_malik', 'menu_item_stock', 'menu_item_notes',
+      'mm_filter_all', 'mm_filter_expense', 'mm_filter_income', 'mm_filter_transfer',
+      'mm_sort_label', 'mm_sort_newest', 'mm_sort_oldest', 'mm_sort_high', 'mm_sort_low',
+      'mm_overall_budget', 'mm_add_wallet', 'mm_wallets_title'
     ];
 
     testKeys.forEach(k => {
@@ -168,6 +178,20 @@ async function runAsyncTest(name, fn) {
 
     const textEn = i18nService.t('menu_business_sub', 'en', { name: 'Rahim Traders' });
     assert(textEn.includes('Rahim Traders'), 'Must contain interpolated name in English');
+  });
+
+  // Test 11: App.js wires localization across quick grid, ledger headers, and money manager
+  runTest('App.js wires localization across quick grid, ledger headers, and money manager', () => {
+    const appSource = fs.readFileSync('App.js', 'utf8');
+    assert(appSource.includes('t("qa_multi_biz")') || appSource.includes("t('qa_multi_biz')"), 'Missing qa_multi_biz in App.js');
+    assert(appSource.includes('t("qa_money_manager")') || appSource.includes("t('qa_money_manager')"), 'Missing qa_money_manager in App.js');
+    assert(appSource.includes('t("mm_title")') || appSource.includes("t('mm_title')"), 'Missing mm_title in App.js');
+    assert(appSource.includes('t("mm_tab_txns")') || appSource.includes("t('mm_tab_txns')"), 'Missing mm_tab_txns in App.js');
+    assert(appSource.includes('t("cb_current_cash")') || appSource.includes("t('cb_current_cash')"), 'Missing cb_current_cash in App.js');
+    assert(appSource.includes("t('header_inbox')"), 'Missing header_inbox in App.js');
+    assert(appSource.includes("t('promo_transfer')"), 'Missing promo_transfer in App.js');
+    assert(appSource.includes("t('menu_sec_tallykhata')"), 'Missing menu_sec_tallykhata in App.js');
+    assert(appSource.includes("t('mm_filter_all')"), 'Missing mm_filter_all in App.js');
   });
 
   // Test 9: getThemedStyles provides complete tokens for Light and Dark modes
