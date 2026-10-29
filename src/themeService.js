@@ -1,0 +1,238 @@
+/**
+ * src/themeService.js
+ * App-wide Light and Dark theme token definition and icon palettes for TallyKhata.
+ */
+
+const LIGHT_THEME = {
+  mode: 'light',
+  isDark: false,
+  screenBg: '#F4F6F8',
+  headerBg: '#B81414',
+  headerText: '#FFFFFF',
+  cardBg: '#FFFFFF',
+  cardBgElevated: '#FFFFFF',
+  cardBorder: '#E2E8F0',
+  inputBg: '#F8FAFC',
+  inputBorder: '#CBD5E1',
+  inputText: '#1E293B',
+  inputPlaceholder: '#94A3B8',
+  textPrimary: '#1E293B',
+  textSecondary: '#64748B',
+  textMuted: '#94A3B8',
+  textInverted: '#FFFFFF',
+  tabBarBg: '#FFFFFF',
+  tabBarBorder: '#E2E8F0',
+  tabActive: '#B81414',
+  tabInactive: '#64748B',
+  modalSurface: '#FFFFFF',
+  modalHandle: '#CBD5E1',
+  modalOverlay: 'rgba(0, 0, 0, 0.55)',
+  divider: '#E2E8F0',
+  primary: '#B81414',
+  primaryLight: '#FEF2F2',
+  success: '#10B981',
+  successLight: '#F0FDF4',
+  danger: '#EF4444',
+  dangerLight: '#FFF1F2',
+  warning: '#F59E0B',
+  warningLight: '#FFFBEB',
+  info: '#3B82F6',
+  infoLight: '#F0F9FF',
+  purple: '#8B5CF6',
+  purpleLight: '#FAF5FF',
+  neutral: '#4B5563',
+  neutralLight: '#F8FAFC',
+  statusBar: 'light-content',
+};
+
+const DARK_THEME = {
+  mode: 'dark',
+  isDark: true,
+  screenBg: '#0F172A',
+  headerBg: '#1C1917',
+  headerText: '#F8FAFC',
+  cardBg: '#1E293B',
+  cardBgElevated: '#334155',
+  cardBorder: '#334155',
+  inputBg: '#0F172A',
+  inputBorder: '#475569',
+  inputText: '#F8FAFC',
+  inputPlaceholder: '#64748B',
+  textPrimary: '#F8FAFC',
+  textSecondary: '#94A3B8',
+  textMuted: '#64748B',
+  textInverted: '#0F172A',
+  tabBarBg: '#1E293B',
+  tabBarBorder: '#334155',
+  tabActive: '#EF4444',
+  tabInactive: '#94A3B8',
+  modalSurface: '#1E293B',
+  modalHandle: '#475569',
+  modalOverlay: 'rgba(0, 0, 0, 0.75)',
+  divider: '#334155',
+  primary: '#EF4444',
+  primaryLight: '#3F1212',
+  success: '#34D399',
+  successLight: '#064E3B',
+  danger: '#F87171',
+  dangerLight: '#450A0A',
+  warning: '#FBBF24',
+  warningLight: '#451A03',
+  info: '#60A5FA',
+  infoLight: '#172554',
+  purple: '#C084FC',
+  purpleLight: '#3B0764',
+  neutral: '#CBD5E1',
+  neutralLight: '#1E293B',
+  statusBar: 'light-content',
+};
+
+function getThemeTokens(mode = 'light') {
+  return mode === 'dark' ? DARK_THEME : LIGHT_THEME;
+}
+
+const LIGHT_ICON_THEMES = {
+  primary: {
+    bg: '#FEF2F2',
+    borderTop: '#FFFFFF',
+    borderBottom: '#FECACA',
+    borderSides: '#FEE2E2',
+    tint: '#B81414',
+  },
+  success: {
+    bg: '#F0FDF4',
+    borderTop: '#FFFFFF',
+    borderBottom: '#BBF7D0',
+    borderSides: '#DCFCE7',
+    tint: '#0F8A0F',
+  },
+  danger: {
+    bg: '#FFF1F2',
+    borderTop: '#FFFFFF',
+    borderBottom: '#FECDD3',
+    borderSides: '#FFE4E6',
+    tint: '#DC2626',
+  },
+  warning: {
+    bg: '#FFFBEB',
+    borderTop: '#FFFFFF',
+    borderBottom: '#FDE68A',
+    borderSides: '#FEF3C7',
+    tint: '#D97706',
+  },
+  info: {
+    bg: '#F0F9FF',
+    borderTop: '#FFFFFF',
+    borderBottom: '#BAE6FD',
+    borderSides: '#E0F2FE',
+    tint: '#0284C7',
+  },
+  purple: {
+    bg: '#FAF5FF',
+    borderTop: '#FFFFFF',
+    borderBottom: '#E9D5FF',
+    borderSides: '#F3E8FF',
+    tint: '#7C3AED',
+  },
+  neutral: {
+    bg: '#F8FAFC',
+    borderTop: '#FFFFFF',
+    borderBottom: '#E2E8F0',
+    borderSides: '#EDF2F7',
+    tint: '#4B5563',
+  },
+  secondary: {
+    bg: "#EEF2FF",
+    borderTop: "#FFFFFF",
+    borderBottom: "#C7D2FE",
+    borderSides: "#E0E7FF",
+    tint: "#4F46E5",
+  },
+  white: {
+    bg: 'rgba(255, 255, 255, 0.2)',
+    borderTop: 'rgba(255, 255, 255, 0.6)',
+    borderBottom: 'rgba(0, 0, 0, 0.15)',
+    borderSides: 'rgba(255, 255, 255, 0.3)',
+    tint: '#FFFFFF',
+  },
+};
+
+const DARK_ICON_THEMES = {
+  secondary: {
+    bg: "#1E1B4B",
+    borderTop: "#3730A3",
+    borderBottom: "#0F0E2A",
+    borderSides: "#312E81",
+    tint: "#818CF8",
+  },
+  primary: {
+    bg: '#3B1818',
+    borderTop: '#552222',
+    borderBottom: '#220808',
+    borderSides: '#441414',
+    tint: '#EF4444',
+  },
+  success: {
+    bg: '#064E3B',
+    borderTop: '#047857',
+    borderBottom: '#022C22',
+    borderSides: '#065F46',
+    tint: '#34D399',
+  },
+  danger: {
+    bg: '#450A0A',
+    borderTop: '#7F1D1D',
+    borderBottom: '#280505',
+    borderSides: '#5C0D0D',
+    tint: '#F87171',
+  },
+  warning: {
+    bg: '#451A03',
+    borderTop: '#78350F',
+    borderBottom: '#270E02',
+    borderSides: '#5E2405',
+    tint: '#FBBF24',
+  },
+  info: {
+    bg: '#172554',
+    borderTop: '#1E40AF',
+    borderBottom: '#0F172A',
+    borderSides: '#1D4ED8',
+    tint: '#60A5FA',
+  },
+  purple: {
+    bg: '#3B0764',
+    borderTop: '#581C87',
+    borderBottom: '#200538',
+    borderSides: '#4C1D95',
+    tint: '#C084FC',
+  },
+  neutral: {
+    bg: '#1E293B',
+    borderTop: '#334155',
+    borderBottom: '#0F172A',
+    borderSides: '#293548',
+    tint: '#CBD5E1',
+  },
+  white: {
+    bg: 'rgba(255, 255, 255, 0.15)',
+    borderTop: 'rgba(255, 255, 255, 0.4)',
+    borderBottom: 'rgba(0, 0, 0, 0.3)',
+    borderSides: 'rgba(255, 255, 255, 0.2)',
+    tint: '#F8FAFC',
+  },
+};
+
+function getIconTheme(variant = 'neutral', mode = 'light') {
+  const table = mode === 'dark' ? DARK_ICON_THEMES : LIGHT_ICON_THEMES;
+  return table[variant] || table.neutral;
+}
+
+module.exports = {
+  LIGHT_THEME,
+  DARK_THEME,
+  getThemeTokens,
+  LIGHT_ICON_THEMES,
+  DARK_ICON_THEMES,
+  getIconTheme,
+};

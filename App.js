@@ -25,6 +25,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ledgerEngine from './src/ledgerEngine';
 import * as moneyManagerService from './src/moneyManagerService';
 import * as preferencesService from './src/preferencesService';
+import * as themeService from './src/themeService';
+import * as i18nService from './src/i18nService';
+
+export const ThemeContext = React.createContext({
+  theme: themeService.LIGHT_THEME,
+  mode: 'light',
+  language: 'bn',
+  t: (k, params) => i18nService.t(k, 'bn', params),
+});
 import { storageRepository, StorageRepository, createDefaultState } from './src/storageRepository';
 import {
   googleDriveBackupService,
@@ -349,8 +358,11 @@ const AppIcon = ({
   style,
   imageStyle,
   accessibilityLabel,
+  themeMode,
 }) => {
-  const theme = ICON_THEMES[variant] || ICON_THEMES.neutral;
+  const ctx = React.useContext(ThemeContext);
+  const resolvedMode = themeMode || (ctx && ctx.mode) || 'light';
+  const theme = themeService.getIconTheme(variant, resolvedMode);
   const resolvedTint = tintColor !== undefined ? tintColor : theme.tint;
 
   if (shape === 'none') {
@@ -403,19 +415,27 @@ const AppIcon = ({
   );
 };
 
-const TwoToneDivider = ({ style, marginVertical = 6 }) => (
-  <View style={[{ width: '100%', marginVertical }, style]}>
-    <View style={{ height: 1, backgroundColor: '#E2E8F0' }} />
-    <View style={{ height: 1, backgroundColor: '#FFFFFF' }} />
-  </View>
-);
+const TwoToneDivider = ({ style, marginVertical = 6 }) => {
+  const ctx = React.useContext(ThemeContext);
+  const isDark = ctx && ctx.mode === 'dark';
+  return (
+    <View style={[{ width: '100%', marginVertical }, style]}>
+      <View style={{ height: 1, backgroundColor: isDark ? '#334155' : '#E2E8F0' }} />
+      <View style={{ height: 1, backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }} />
+    </View>
+  );
+};
 
-const TwoToneVerticalDivider = ({ height = 32, style }) => (
-  <View style={[{ flexDirection: 'row', height, alignItems: 'center' }, style]}>
-    <View style={{ width: 1, height: '100%', backgroundColor: '#E2E8F0' }} />
-    <View style={{ width: 1, height: '100%', backgroundColor: '#FFFFFF' }} />
-  </View>
-);
+const TwoToneVerticalDivider = ({ height = 32, style }) => {
+  const ctx = React.useContext(ThemeContext);
+  const isDark = ctx && ctx.mode === 'dark';
+  return (
+    <View style={[{ flexDirection: 'row', height, alignItems: 'center' }, style]}>
+      <View style={{ width: 1, height: '100%', backgroundColor: isDark ? '#334155' : '#E2E8F0' }} />
+      <View style={{ width: 1, height: '100%', backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }} />
+    </View>
+  );
+};
 
 const SectionHeader = ({ title, count, badge, actionText, onAction, style }) => (
   <View style={[styles.sectionHeaderRow, style]}>
@@ -686,6 +706,38 @@ function TallyKhataApp() {
   // GLOBAL APP PREFERENCES (থিম ও ভাষা)
   const [appTheme, setAppTheme] = useState('light'); // 'light' | 'dark'
   const [appLanguage, setAppLanguage] = useState('bn'); // 'bn' | 'en'
+  const [modalThemePicker, setModalThemePicker] = useState(false);
+  const [modalLanguagePicker, setModalLanguagePicker] = useState(false);
+
+  const isDark = appTheme === 'dark';
+  const currentTheme = themeService.getThemeTokens(appTheme);
+  const t = (k, params) => i18nService.t(k, appLanguage, params);
+
+  const themeContextValue = useMemo(() => ({
+    theme: currentTheme,
+    mode: appTheme,
+    language: appLanguage,
+    t,
+  }), [appTheme, appLanguage, currentTheme]);
+
+  const handleToggleTheme = async (newTheme) => {
+    const target = newTheme || (appTheme === 'dark' ? 'light' : 'dark');
+    setAppTheme(target);
+    try {
+      await preferencesService.savePreferences(AsyncStorage, { theme: target, language: appLanguage });
+    } catch (e) {
+      console.warn('Failed to persist theme:', e);
+    }
+  };
+
+  const handleSelectLanguage = async (newLang) => {
+    setAppLanguage(newLang);
+    try {
+      await preferencesService.savePreferences(AsyncStorage, { theme: appTheme, language: newLang });
+    } catch (e) {
+      console.warn('Failed to persist language:', e);
+    }
+  };
 
   // PERSONAL MONEY MANAGER (ব্যক্তিগত অর্থ ব্যবস্থাপনা) — 100% ISOLATED
   // ===================================================================
@@ -1417,6 +1469,8 @@ function TallyKhataApp() {
       if (modalMalikReport) { setModalMalikReport(false); return true; }
       if (modalMoneyOut) { setModalMoneyOut(false); return true; }
       if (modalTxnLimit) { setModalTxnLimit(false); return true; }
+      if (modalThemePicker) { setModalThemePicker(false); return true; }
+      if (modalLanguagePicker) { setModalLanguagePicker(false); return true; }
 
       // Return to home screen from account_ledger
       if (currentScreenRef.current !== 'home') {
@@ -1441,7 +1495,7 @@ function TallyKhataApp() {
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalTagada, modalVoucher, modalPinSetup, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
-    modalMalikReport, modalMoneyOut, modalTxnLimit, currentScreen, activeTab
+    modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, currentScreen, activeTab
   ]);
 
   const loadSavedData = async () => {
@@ -3441,7 +3495,8 @@ function TallyKhataApp() {
     .reduce((sum, j) => sum + Number(j.amount || 0), 0);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ThemeContext.Provider value={themeContextValue}>
+    <SafeAreaView style={[styles.container, isDark && { backgroundColor: currentTheme.screenBg }]}>
       <StatusBar
         barStyle={currentScreen === 'account_ledger' ? 'dark-content' : 'light-content'}
         backgroundColor={currentScreen === 'account_ledger' ? '#FFFFFF' : '#B81414'}
@@ -4760,6 +4815,40 @@ function TallyKhataApp() {
 
               <TouchableOpacity
                 style={styles.menuListItem}
+                onPress={() => setModalThemePicker(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="থিম ও প্রদর্শন"
+              >
+                <AppIcon source={require('./assets/icons/ic_eye_open.png')} variant="purple" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>{t('menu_appearance')}</Text>
+                  <Text style={styles.menuListSub}>
+                    {appTheme === 'dark' ? t('theme_dark') : t('theme_light')} • {t('menu_appearance_sub')}
+                  </Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={() => setModalLanguagePicker(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="ভাষা পরিবর্তন"
+              >
+                <AppIcon source={require('./assets/icons/ic_crown.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.menuListTitle}>{t('menu_language')}</Text>
+                  <Text style={styles.menuListSub}>
+                    {appLanguage === 'bn' ? 'বাংলা' : 'English'} • {t('menu_language_sub')}
+                  </Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={styles.menuListArrow} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
                 onPress={() => setModalSettings(true)}
                 activeOpacity={0.7}
                 accessibilityRole="button"
@@ -4960,6 +5049,216 @@ function TallyKhataApp() {
       {/* ===================================================================
           MODAL: ADD TRANSACTION WITH AUTHENTIC BUILT-IN CALCULATOR KEYPAD
          =================================================================== */}
+      {/* ===================================================================
+          MODAL: THEME SELECTION (Light / Dark Appearance)
+         =================================================================== */}
+      <Modal
+        visible={modalThemePicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalThemePicker(false)}
+      >
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.bottomSheetCard, isDark && { backgroundColor: currentTheme.modalSurface }]}>
+            <View style={styles.bottomSheetHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.bottomSheetTitle, isDark && { color: currentTheme.textPrimary }]}>
+                  {t('menu_appearance')}
+                </Text>
+                <Text style={[styles.bottomSheetSub, isDark && { color: currentTheme.textSecondary }]}>
+                  {t('menu_appearance_sub')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalThemePicker(false)}
+                style={[styles.modalCloseCircle, isDark && { backgroundColor: currentTheme.cardBorder }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && { tintColor: currentTheme.textSecondary }]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingVertical: 12 }}>
+              <TouchableOpacity
+                style={[
+                  styles.themeOptionCard,
+                  appTheme === 'light' && styles.themeOptionCardActive,
+                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
+                  appTheme === 'light' && isDark && { borderColor: currentTheme.primary }
+                ]}
+                onPress={() => {
+                  handleToggleTheme('light');
+                  setModalThemePicker(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: '#FEF3C7' }]}>
+                  <Text style={{ fontSize: 20 }}>☀️</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    {t('theme_light')}
+                  </Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
+                    উজ্জ্বল ও ক্লাসিক টালিখাতা ডিজাইন
+                  </Text>
+                </View>
+                {appTheme === 'light' ? (
+                  <View style={[styles.themeCheckCircle, { backgroundColor: COLORS.primary }]}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.themeOptionCard,
+                  appTheme === 'dark' && styles.themeOptionCardActive,
+                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
+                  appTheme === 'dark' && { borderColor: isDark ? currentTheme.primary : COLORS.primary }
+                ]}
+                onPress={() => {
+                  handleToggleTheme('dark');
+                  setModalThemePicker(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: '#1E293B' }]}>
+                  <Text style={{ fontSize: 20 }}>🌙</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    {t('theme_dark')}
+                  </Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
+                    চোখের জন্য আরামদায়ক ও ব্যাটারি সেভিং
+                  </Text>
+                </View>
+                {appTheme === 'dark' ? (
+                  <View style={[styles.themeCheckCircle, { backgroundColor: isDark ? currentTheme.primary : COLORS.primary }]}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: LANGUAGE SELECTION (Bangla / English)
+         =================================================================== */}
+      <Modal
+        visible={modalLanguagePicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalLanguagePicker(false)}
+      >
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.bottomSheetCard, isDark && { backgroundColor: currentTheme.modalSurface }]}>
+            <View style={styles.bottomSheetHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.bottomSheetTitle, isDark && { color: currentTheme.textPrimary }]}>
+                  {t('menu_language')}
+                </Text>
+                <Text style={[styles.bottomSheetSub, isDark && { color: currentTheme.textSecondary }]}>
+                  {t('menu_language_sub')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalLanguagePicker(false)}
+                style={[styles.modalCloseCircle, isDark && { backgroundColor: currentTheme.cardBorder }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && { tintColor: currentTheme.textSecondary }]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingVertical: 12 }}>
+              <TouchableOpacity
+                style={[
+                  styles.themeOptionCard,
+                  appLanguage === 'bn' && styles.themeOptionCardActive,
+                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
+                  appLanguage === 'bn' && isDark && { borderColor: currentTheme.primary }
+                ]}
+                onPress={() => {
+                  handleSelectLanguage('bn');
+                  setModalLanguagePicker(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: '#F0FDF4' }]}>
+                  <Text style={{ fontSize: 20 }}>🇧🇩</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    বাংলা (Bangla)
+                  </Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
+                    সহজ ও প্রমিত বাংলা ভাষা
+                  </Text>
+                </View>
+                {appLanguage === 'bn' ? (
+                  <View style={[styles.themeCheckCircle, { backgroundColor: COLORS.primary }]}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.themeOptionCard,
+                  appLanguage === 'en' && styles.themeOptionCardActive,
+                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
+                  appLanguage === 'en' && { borderColor: isDark ? currentTheme.primary : COLORS.primary }
+                ]}
+                onPress={() => {
+                  handleSelectLanguage('en');
+                  setModalLanguagePicker(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                  <Text style={{ fontSize: 20 }}>🇬🇧</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    English
+                  </Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
+                    English language interface
+                  </Text>
+                </View>
+                {appLanguage === 'en' ? (
+                  <View style={[styles.themeCheckCircle, { backgroundColor: isDark ? currentTheme.primary : COLORS.primary }]}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={modalAddTxn} animationType="slide" transparent onRequestClose={() => setModalAddTxn(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '95%' }]}>
@@ -10327,6 +10626,7 @@ function TallyKhataApp() {
 
 
     </SafeAreaView>
+    </ThemeContext.Provider>
   );
 }
 
@@ -10336,6 +10636,53 @@ function TallyKhataApp() {
 // 5. AUTHENTIC TALLYKHATA STYLESHEET (All 255 Keys Verified)
 // =========================================================================
 const styles = StyleSheet.create({
+  // --- THEME & LANGUAGE PICKER STYLES ---
+  themeOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+  },
+  themeOptionCardActive: {
+    borderColor: '#B81414',
+    backgroundColor: '#FEF2F2',
+  },
+  themeOptionIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themeOptionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  themeOptionSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  themeCheckCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themeUncheckCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+  },
+
   // --- AUTHENTIC 1:1 VISUAL PARITY STYLES (photo_2026-10-15_18-13-34.jpg) ---
   topHeaderBarRed: {
     backgroundColor: '#B81414',
