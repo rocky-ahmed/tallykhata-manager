@@ -7999,9 +7999,9 @@ function TallyKhataApp() {
 
           <ScrollView style={{ flex: 1 }}>
             <View style={styles.reportKpiRow}>
-              <View style={[styles.reportKpiCard, { backgroundColor: '#1E293B' }]}>
-                <Text style={[styles.reportKpiLabel, { color: '#94A3B8' }]}>{tStatic("বর্তমান ক্যাশবক্স ব্যালেন্স")}</Text>
-                <Text style={[styles.reportKpiValue, { color: '#FFFFFF', fontSize: 22 }]}>{tStatic("৳                    ৳ ")}{formatMoney(totalCash)}
+              <View style={[styles.reportKpiCard, { backgroundColor: currentTheme.cardBgElevated }]}>
+                <Text style={[styles.reportKpiLabel, { color: currentTheme.textSecondary }]}>{tStatic("বর্তমান ক্যাশবক্স ব্যালেন্স")}</Text>
+                <Text style={[styles.reportKpiValue, { color: currentTheme.textPrimary, fontSize: 22 }]}>{tStatic("৳                    ৳ ")}{formatMoney(totalCash)}
                 </Text>
               </View>
             </View>
@@ -8908,7 +8908,7 @@ function TallyKhataApp() {
                   />
                   {mmSearchQuery ? (
                     <TouchableOpacity onPress={() => setMmSearchQuery('')} style={{ padding: 4 }}>
-                      <Text style={{ color: '#94A3B8', fontSize: 14 }}>✕</Text>
+                      <Text style={{ color: currentTheme.textSecondary, fontSize: 14 }}>✕</Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -9162,7 +9162,7 @@ function TallyKhataApp() {
                           style={[[styles.mmAccountActionBtn, tStyles.mmAccountActionBtn], acc.isArchived && { opacity: 0.5 }]}
                           onPress={() => {
                             if (acc.isArchived) {
-                              Alert.alert(tStatic("সতর্কতা"), tStatic("আর্কাইভ করা ওয়ালেট থেকে স্থানান্তর সম্ভব নয়। প্রথমে ওয়ালেটটি পুনরায় সক্রিয় করুন।"));
+                              Alert.alert(t("mm_alert_warning"), t("mm_archived_wallet_transfer_error"));
                               return;
                             }
                             setMmTransferFrom(acc.id);
@@ -9760,7 +9760,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_add_txn_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddTxn(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -9928,7 +9928,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_edit_transaction_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMEditTxn(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10019,7 +10019,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_new_wallet_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddAccount(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10036,10 +10036,10 @@ function TallyKhataApp() {
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>{t('mm_account_type')}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
                 {[
-                  { id: 'cash', label: tStatic("নগদ ক্যাশ") },
-                  { id: 'bank', label: tStatic("ব্যাংক") },
-                  { id: 'mfs', label: tStatic("মোবাইল ওয়ালেট") },
-                  { id: 'other', label: tStatic("অন্যান্য") },
+                  { id: 'cash', label: t('mm_account_cash_short') },
+                  { id: 'bank', label: t('mm_account_bank_short') },
+                  { id: 'mfs', label: t('mm_account_mfs_short') },
+                  { id: 'other', label: t('mm_account_other_short') },
                 ].map((item) => (
                   <TouchableOpacity
                     key={item.id}
@@ -10096,7 +10096,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_set_category_budget_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMSetBudget(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10148,12 +10148,12 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_overall_budget_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMOverallBudget(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
-              <Text style={{ color: '#94A3B8', fontSize: 13, marginBottom: 12 }}>
+              <Text style={{ color: currentTheme.textSecondary, fontSize: 13, marginBottom: 12 }}>
                 {t('mm_overall_budget_explainer')}
               </Text>
 
@@ -10187,7 +10187,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_create_category_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddCategory(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10275,7 +10275,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_create_goal_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddGoal(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10382,7 +10382,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_deposit_to_goal_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMDepositGoal(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10565,7 +10565,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_transfer_funds_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMTransfer(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10643,7 +10643,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_settings_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMPreferences(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10780,7 +10780,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_schedules_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMRecurring(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10832,7 +10832,7 @@ function TallyKhataApp() {
                             </View>
                           </View>
                           <Text style={[styles.mmScheduleMeta, tStyles.mmScheduleMeta]}>
-                            🔄 {cadenceBn} {t('mm_next_due_prefix')} {rec.nextDueDate || tStatic("নির্ধারিত নয়")}
+                            🔄 {cadenceBn} {t('mm_next_due_prefix')} {rec.nextDueDate || t('mm_not_set')}
                           </Text>
                           {targetAcc ? (
                             <Text style={[styles.mmScheduleMeta, tStyles.mmScheduleMeta]}>
@@ -10893,7 +10893,7 @@ function TallyKhataApp() {
                 {mmRecEditId ? t('mm_add_edit_schedule_title') : t('mm_new_schedule_title')}
               </Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddRecurring(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -10943,9 +10943,9 @@ function TallyKhataApp() {
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>{t('mm_cadence_label')}</Text>
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                 {[
-                  { id: 'daily', label: tStatic("দৈনিক (Daily)") },
-                  { id: 'weekly', label: tStatic("সাপ্তাহিক (Weekly)") },
-                  { id: 'monthly', label: tStatic("মাসিক (Monthly)") },
+                  { id: 'daily', label: t('mm_cadence_daily') },
+                  { id: 'weekly', label: t('mm_cadence_weekly') },
+                  { id: 'monthly', label: t('mm_cadence_monthly') },
                 ].map((c) => {
                   const sel = mmRecCadence === c.id;
                   return (
@@ -11083,7 +11083,7 @@ function TallyKhataApp() {
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_manage_category_title')}</Text>
               <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMEditCategory(false)}>
-                <Text style={{ color: '#94A3B8', fontSize: 16 }}>✕</Text>
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
