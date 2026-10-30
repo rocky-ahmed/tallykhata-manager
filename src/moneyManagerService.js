@@ -5,6 +5,16 @@
 const MM_STORAGE_KEY = "@tallykhata_personal_money_manager_v2";
 const MM_SCHEMA_VERSION = 3;
 
+
+/**
+ * Standard monetary rounding helper to avoid JavaScript floating-point precision issues
+ * (e.g. 0.1 + 0.2 = 0.30000000000000004). Rounds to 2 decimal places.
+ */
+function roundMoney(val) {
+  const num = Number(val) || 0;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+
 const DEFAULT_PREFERENCES = {
   defaultPeriod: "this_month", // "this_month" | "last_month" | "all_time"
   currencySymbol: "৳",
@@ -213,9 +223,9 @@ function calculateNetWorth(accountsOrState) {
     ? state.accounts
     : [];
   // Archiving disables new activity but does not make the wallet's remaining money disappear.
-  const accountNetWorth = accounts.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+  const accountNetWorth = accounts.reduce((sum, acc) => sum + roundMoney(acc.balance || 0), 0);
   const allocatedGoalFunds = state ? getTrackedGoalBalances(state).total : 0;
-  return accountNetWorth + allocatedGoalFunds;
+  return roundMoney(accountNetWorth + allocatedGoalFunds);
 }
 
 function isGoalAllocationTransaction(transaction) {
@@ -239,10 +249,10 @@ function getTrackedGoalBalances(state) {
     target.set(transaction.goalId, (target.get(transaction.goalId) || 0) + amount);
   });
   const balances = new Map();
-  activeGoalIds.forEach(goalId => balances.set(goalId, Math.max(0, (deposits.get(goalId) || 0) - (withdrawals.get(goalId) || 0))));
+  activeGoalIds.forEach(goalId => balances.set(goalId, Math.max(0, roundMoney((deposits.get(goalId) || 0) - (withdrawals.get(goalId) || 0)))));
   return {
     balances,
-    total: Array.from(balances.values()).reduce((sum, amount) => sum + amount, 0),
+    total: roundMoney(Array.from(balances.values()).reduce((sum, amount) => sum + amount, 0)),
   };
 }
 
@@ -658,7 +668,7 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
 
 function addTransaction(state, params) {
   const { type, amount, categoryId, accountId, fromAccountId, toAccountId, note, payee, date, time } = params;
-  const amt = parseFloat(toEnglishDigits(amount));
+  const amt = roundMoney(parseFloat(toEnglishDigits(amount)));
   if (!amt || isNaN(amt) || amt <= 0) {
     throw new Error("দয়া করে সঠিক ইতিবাচক পরিমাণ দিন");
   }
@@ -782,7 +792,7 @@ function editTransaction(state, txnId, newParams) {
 
   // 2. Validate new params with fallback to existing transaction
   const type = newParams.type || txn.type;
-  const amt = newParams.amount !== undefined ? parseFloat(toEnglishDigits(newParams.amount)) : parseFloat(txn.amount);
+  const amt = roundMoney(newParams.amount !== undefined ? parseFloat(toEnglishDigits(newParams.amount)) : parseFloat(txn.amount));
   if (!amt || isNaN(amt) || amt <= 0) {
     throw new Error("দয়া করে সঠিক ইতিবাচক পরিমাণ দিন");
   }
@@ -905,7 +915,7 @@ function deleteTransaction(state, txnId) {
   }
 
   let updatedAccounts = [...(state.accounts || [])];
-  const amt = Number(txn.amount || 0);
+  const amt = roundMoney(txn.amount || 0);
 
   if (txn.type === "expense") {
     if (isGoalAllocationTransaction(txn) && txn.goalId && state.goals?.some(goal => goal.id === txn.goalId)
@@ -913,11 +923,11 @@ function deleteTransaction(state, txnId) {
       throw new Error("লক্ষ্যে জমা থাকা অর্থ ইতিমধ্যে ব্যবহার হয়েছে; আগে উত্তোলনটি ফিরিয়ে আনুন");
     }
     updatedAccounts = updatedAccounts.map(acc =>
-      acc.id === txn.accountId ? { ...acc, balance: (acc.balance || 0) + amt } : acc
+      acc.id === txn.accountId ? { ...acc, balance: roundMoney((acc.balance || 0) + amt) } : acc
     );
   } else if (txn.type === "income") {
     updatedAccounts = updatedAccounts.map(acc =>
-      acc.id === txn.accountId ? { ...acc, balance: (acc.balance || 0) - amt } : acc
+      acc.id === txn.accountId ? { ...acc, balance: roundMoney((acc.balance || 0) - amt) } : acc
     );
   } else if (txn.type === "transfer") {
     updatedAccounts = updatedAccounts.map(acc => {
@@ -956,7 +966,7 @@ function addAccount(state, params) {
   if (!name || !name.trim()) {
     throw new Error("অ্যাকাউন্টের নাম আবশ্যক");
   }
-  const initBal = parseFloat(toEnglishDigits(balance)) || 0;
+  const initBal = roundMoney(parseFloat(toEnglishDigits(balance)) || 0);
   const newAcc = {
     id: "acc_" + Date.now(),
     name: name.trim(),
@@ -1275,7 +1285,7 @@ function contributeToGoal(state, goalId, amount, fromAccountId) {
   const goal = (state.goals || []).find(g => g.id === goalId);
   if (!goal) throw new Error("লক্ষ্যটি পাওয়া যায়নি");
 
-  const numAmt = parseFloat(toEnglishDigits(amount));
+  const numAmt = roundMoney(parseFloat(toEnglishDigits(amount)));
   if (isNaN(numAmt) || numAmt <= 0) {
     throw new Error("সঠিক জমার পরিমাণ প্রদান করুন");
   }
@@ -1293,7 +1303,7 @@ function contributeToGoal(state, goalId, amount, fromAccountId) {
   if ((acc.balance || 0) < numAmt) {
     throw new Error("নির্বাচিত অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই");
   }
-  updatedAccounts = updatedAccounts.map(a => a.id === fromAccountId ? { ...a, balance: (a.balance || 0) - numAmt } : a);
+  updatedAccounts = updatedAccounts.map(a => a.id === fromAccountId ? { ...a, balance: roundMoney((a.balance || 0) - numAmt) } : a);
 
   const newTxn = {
     id: "mmtxn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
@@ -1351,7 +1361,7 @@ function withdrawFromGoal(state, goalId, amount, toAccountId) {
   if (!acc) throw new Error("নির্বাচিত অ্যাকাউন্ট পাওয়া যায়নি");
   if (acc.isArchived) throw new Error("আর্কাইভ করা ওয়ালেটে টাকা উত্তোলন করা যাবে না");
 
-  updatedAccounts = updatedAccounts.map(a => a.id === toAccountId ? { ...a, balance: (a.balance || 0) + numAmt } : a);
+  updatedAccounts = updatedAccounts.map(a => a.id === toAccountId ? { ...a, balance: roundMoney((a.balance || 0) + numAmt) } : a);
 
   const newTxn = {
     id: "mmtxn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
@@ -1393,7 +1403,7 @@ function deleteGoal(state, goalId, refundToAccountId = null, options = {}) {
   let updatedAccounts = state.accounts || [];
   let updatedTxns = state.transactions || [];
 
-  const refundAmount = getGoalFundedAmount(state, goalId);
+  const refundAmount = roundMoney(getGoalFundedAmount(state, goalId));
   const savedAmount = Math.max(0, Number(goal.savedAmount || 0));
   if (Math.abs(savedAmount - refundAmount) > 0.005 && options.allowUntrackedSavings !== true) {
     throw new Error("লক্ষ্যের সঞ্চয় ও ওয়ালেট বরাদ্দের মধ্যে অমিল আছে।");
@@ -1405,7 +1415,7 @@ function deleteGoal(state, goalId, refundToAccountId = null, options = {}) {
     const acc = updatedAccounts.find(a => a.id === refundToAccountId);
     if (!acc) throw new Error("নির্বাচিত অ্যাকাউন্ট পাওয়া যায়নি");
     if (acc.isArchived) throw new Error("আর্কাইভ করা ওয়ালেটে টাকা ফেরত দেওয়া যাবে না");
-    updatedAccounts = updatedAccounts.map(a => a.id === refundToAccountId ? { ...a, balance: (a.balance || 0) + refundAmount } : a);
+    updatedAccounts = updatedAccounts.map(a => a.id === refundToAccountId ? { ...a, balance: roundMoney((a.balance || 0) + refundAmount) } : a);
     const refundTxn = {
       id: "mmtxn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
       type: "income",
@@ -1554,7 +1564,7 @@ function processRecurringTransactions(state, todayDateStr) {
             if (acc && !acc.isArchived && (!cat || !cat.isArchived)) {
               const diff = recCopy.type === "income" ? amt : -amt;
               currentAccounts = currentAccounts.map(a => {
-                if (a.id === targetAccId) return { ...a, balance: (a.balance || 0) + diff };
+                if (a.id === targetAccId) return { ...a, balance: roundMoney((a.balance || 0) + diff) };
                 return a;
               });
               const newTxn = {
@@ -1819,4 +1829,5 @@ module.exports = {
   toggleRecurringActive,
   deleteRecurring,
   archiveCategory,
+  roundMoney,
 };

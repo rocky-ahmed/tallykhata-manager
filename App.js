@@ -54,7 +54,7 @@ import {
 // Google OAuth Configuration
 // Package: com.progoti.tallykhata.offline
 // Local Debug Keystore SHA-1: 5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
-const GOOGLE_WEB_CLIENT_ID = '1009081420727-rbto5d1l56pm7743cuijuaceps4503gk.apps.googleusercontent.com';
+const GOOGLE_WEB_CLIENT_ID = (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) || '1009081420727-rbto5d1l56pm7743cuijuaceps4503gk.apps.googleusercontent.com';
 
 // Initialize production storage repository adapter with AsyncStorage
 storageRepository.setStorageAdapter(AsyncStorage);

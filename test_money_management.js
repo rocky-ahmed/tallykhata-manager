@@ -1645,6 +1645,39 @@ runTest("Money Manager seed dates and transaction metadata remain calendar-consi
   assert(currentAppSource.includes("!/^(today|yesterday)$/i.test(String(txn.time).trim())"), "Legacy relative labels must not conflict with stored transaction dates");
 });
 
+
+// TEST 64: Monetary rounding eliminates floating-point precision drift across multi-step transactions and transfers.
+runTest("mmService.roundMoney eliminates floating-point drift across multi-step transactions and transfers", () => {
+  assert.strictEqual(mmService.roundMoney(0.1 + 0.2), 0.3, "0.1 + 0.2 must round exactly to 0.3");
+  assert.strictEqual(mmService.roundMoney(14999.999999999998), 15000, "Floating point subtraction artifacts must be eliminated");
+
+  let state = mmService.getDefaultState("2026-10-30");
+  const cashAcc = state.accounts.find(a => a.id === "acc_cash");
+  const initBal = cashAcc.balance;
+
+  // Perform multiple decimal transactions
+  state = mmService.addTransaction(state, {
+    type: "expense",
+    amount: "10.15",
+    accountId: "acc_cash",
+    categoryId: "cat_food",
+  });
+  state = mmService.addTransaction(state, {
+    type: "expense",
+    amount: "20.25",
+    accountId: "acc_cash",
+    categoryId: "cat_food",
+  });
+
+  const updatedCash = state.accounts.find(a => a.id === "acc_cash");
+  assert.strictEqual(updatedCash.balance, mmService.roundMoney(initBal - 30.40));
+
+  // Net worth calculation remains exact decimal
+  const netWorth = mmService.calculateNetWorth(state);
+  assert.strictEqual(netWorth, mmService.roundMoney(netWorth));
+  assert.strictEqual(String(netWorth).includes("99999999"), false, "Net worth must not contain floating point repeating decimals");
+});
+
 console.log(`\nSUMMARY: ${passed}/${total} tests passed.`);
 if (passed === total) {
   console.log("ALL MONEY MANAGER TESTS PASSED SUCCESSFULLY!\n");

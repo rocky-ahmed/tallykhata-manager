@@ -11,7 +11,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#B81414"
+        "backgroundColor": "#B81414",
+        "foregroundImage": "./assets/icons/ic_tally_khata_logo_reg.png"
       },
       "package": "com.progoti.tallykhata.offline"
     },
@@ -25,6 +26,7 @@
           "enforceContrast": false
         }
       ]
-    ]
+    ],
+    "icon": "./assets/icons/ic_tally_khata_logo_reg.png"
   }
 }

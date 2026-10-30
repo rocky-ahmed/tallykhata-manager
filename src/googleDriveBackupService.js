@@ -418,11 +418,38 @@ class GoogleDriveBackupService {
   }
 
   /**
+   * Reusable fetch with AbortController timeout guard.
+   */
+  async fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+    const fetchFn = this.getFetch();
+    if (typeof AbortController === 'undefined') {
+      return await fetchFn(url, options);
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      try { controller.abort(); } catch (_) {}
+    }, timeoutMs);
+    try {
+      const mergedOptions = {
+        ...options,
+        signal: options.signal || controller.signal,
+      };
+      return await fetchFn(url, mergedOptions);
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error('Google Drive request timed out after ' + Math.round(timeoutMs / 1000) + 's');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
    * Fetches the user profile from Google OAuth UserInfo endpoint.
    */
   async getUserInfo(accessToken) {
-    const fetchFn = this.getFetch();
-    const res = await fetchFn('https://www.googleapis.com/oauth2/v3/userinfo', {
+    const res = await this.fetchWithTimeout('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: 'Bearer ' + accessToken },
     });
     if (!res.ok) {
@@ -435,11 +462,10 @@ class GoogleDriveBackupService {
    * Locates the existing backup file in Google Drive AppData folder.
    */
   async findBackupFile(accessToken) {
-    const fetchFn = this.getFetch();
     const query = encodeURIComponent("name = '" + BACKUP_FILENAME + "' and trashed = false");
     const url = this.driveApiBase + '/files?spaces=appDataFolder&q=' + query + '&fields=files(id,name,size,modifiedTime,createdTime,appProperties,description)';
 
-    const res = await fetchFn(url, {
+    const res = await this.fetchWithTimeout(url, {
       headers: { Authorization: 'Bearer ' + accessToken },
     });
 
@@ -463,11 +489,10 @@ class GoogleDriveBackupService {
     if (!fileId || typeof fileId !== 'string' || !fileId.trim()) {
       throw new Error('ফাইল আইডি প্রদান করা হয়নি।');
     }
-    const fetchFn = this.getFetch();
     const fields = 'id,name,mimeType,parents,spaces,size,modifiedTime,createdTime,appProperties,description';
     const url = this.driveApiBase + '/files/' + encodeURIComponent(fileId.trim()) + '?supportsAllDrives=false&fields=' + encodeURIComponent(fields);
 
-    const res = await fetchFn(url, {
+    const res = await this.fetchWithTimeout(url, {
       headers: { Authorization: 'Bearer ' + accessToken },
     });
 
@@ -489,10 +514,9 @@ class GoogleDriveBackupService {
    * Downloads and validates the backup file from Google Drive.
    */
   async downloadBackup(accessToken, fileId, expectedSub = null) {
-    const fetchFn = this.getFetch();
     const url = this.driveApiBase + '/files/' + fileId + '?alt=media';
 
-    const res = await fetchFn(url, {
+    const res = await this.fetchWithTimeout(url, {
       headers: { Authorization: 'Bearer ' + accessToken },
     });
 
@@ -570,14 +594,14 @@ class GoogleDriveBackupService {
       method = 'POST';
     }
 
-    const res = await fetchFn(uploadUrl, {
+    const res = await this.fetchWithTimeout(uploadUrl, {
       method,
       headers: {
         Authorization: 'Bearer ' + accessToken,
         'Content-Type': 'multipart/related; boundary=' + boundary,
       },
       body: multipartRequestBody,
-    });
+    }, 60000);
 
     if (!res.ok) {
       const errText = await res.text();
