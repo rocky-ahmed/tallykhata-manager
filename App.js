@@ -4231,25 +4231,7 @@ function TallyKhataApp() {
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={
                 <View style={[{ backgroundColor: '#F5F6F8' }, isDark && tStyles.screenBg]}>
-                  {/* --- 1. PROMO BANNER (মানি ট্রান্সফার চার্জ ফ্রি!*) --- */}
-                  <TouchableOpacity
-                    style={[styles.promoBannerCard, isDark && tStyles.card]}
-                    onPress={() => setActiveTab('tallypay')}
-                    activeOpacity={0.85}
-                  >
-                    <Image
-                      source={require('./assets/icons/ic_sqr_value_banner.png')}
-                      style={styles.promoBannerImg}
-                      resizeMode="contain"
-                    />
-                    <View style={styles.promoBannerTextCol}>
-                      <Text style={[styles.promoBannerBold, isDark && tStyles.textPrimary]}>{t('promo_transfer')}</Text>
-                      <Text style={[styles.promoBannerBold, isDark && tStyles.textPrimary]}>{t('promo_charge_free')}</Text>
-                      <Text style={[styles.promoBannerSub, isDark && tStyles.textSecondary]}>{t('promo_condition')}</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* --- 2. 8-ITEM AUTHENTIC QUICK ACTIONS GRID --- */}
+                  {/* --- 8-ITEM AUTHENTIC QUICK ACTIONS GRID --- */}
                   <View style={styles.quickGridContainer}>
                     {/* Row 1 */}
                     <View style={styles.quickGridRow}>
@@ -5034,39 +5016,6 @@ function TallyKhataApp() {
                   accessibilityLabel={tStatic("কিউআর পেমেন্ট")}
                 />
                 <Text style={styles.walletServiceLabel}>{tStatic("কিউআর পেমেন্ট")}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Authentic SQR Promo Banner (layoutSqrPromo from fragment_tp_wallet_main.xml) */}
-            <View style={styles.walletPromoCard}>
-              <Image
-                source={require('./assets/ic_qr_support_all_apps.png')}
-                style={{ width: '100%', height: 75, marginBottom: 12 }}
-                resizeMode="contain"
-              />
-              <Text style={styles.walletPromoTitle}>{tStatic("টালিপে QR — ব্যবসায়ীদের জন্য সেরা বাংলা QR                 টালিপে QR — ব্যবসায়ীদের জন্য সেরা বাংলা QR")}</Text>
-              <View style={styles.walletPromoBenefitRow}>
-                <Image
-                  source={require('./assets/icons/ic_check.png')}
-                  style={{ width: 16, height: 16, tintColor: '#0F8A0F', marginRight: 8, marginTop: 2 }}
-                  resizeMode="contain"
-                />
-                <Text style={styles.walletPromoBenefitText}>{tStatic("টালিপে QR-এ পেমেন্ট নিন নগদ, বিকাশ, রকেট সহ সকল ব্যাংক অ্যাপ থেকে।                   টালিপে QR-এ পেমেন্ট নিন নগদ, বিকাশ, রকেট সহ সকল ব্যাংক অ্যাপ থেকে।")}</Text>
-              </View>
-              <View style={styles.walletPromoBenefitRow}>
-                <Image
-                  source={require('./assets/icons/ic_check.png')}
-                  style={{ width: 16, height: 16, tintColor: '#0F8A0F', marginRight: 8, marginTop: 2 }}
-                  resizeMode="contain"
-                />
-                <Text style={styles.walletPromoBenefitText}>{tStatic("ইনস্ট্যান্ট পেমেন্ট বা টাকা ট্রান্সফার করুন ব্যাংক বা MFS একাউন্টে।                   ইনস্ট্যান্ট পেমেন্ট বা টাকা ট্রান্সফার করুন ব্যাংক বা MFS একাউন্টে।")}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.walletPromoCtaBtn}
-                onPress={() => setModalBanglaQR(true)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.walletPromoCtaText}>{tStatic("টালিপে QR নিন")}</Text>
               </TouchableOpacity>
             </View>
 
@@ -8745,19 +8694,6 @@ function TallyKhataApp() {
               </View>
             ) : (
               <View>
-                {/* Free Transactions Announcement */}
-                <View style={styles.txnChargeBanner}>
-                  <Image
-                    source={require('./assets/ic_bangla_qr.png')}
-                    style={{ width: 36, height: 36, marginRight: 12 }}
-                    resizeMode="contain"
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1B5E20' }}>{tStatic("১০০% ফ্রি লেনদেন                       ১০০% ফ্রি লেনদেন")}</Text>
-                    <Text style={{ fontSize: 12, color: '#2E7D32', marginTop: 2 }}>{tStatic("বাংলা QR এবং টালিখাতা অ্যাপে অধিকাংশ সার্ভিস সম্পূর্ণ ফ্রি!                       বাংলা QR এবং টালিখাতা অ্যাপে অধিকাংশ সার্ভিস সম্পূর্ণ ফ্রি!")}</Text>
-                  </View>
-                </View>
-
                 {/* Charges List Card */}
                 <Text style={styles.txnLimitSectionTitle}>{tStatic("সার্ভিস চার্জ তালিকা")}</Text>
                 <View style={styles.txnLimitCard}>
@@ -11750,51 +11686,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Yellow Promo Banner
-  promoBannerCard: {
-    backgroundColor: '#FFDE00',
-    borderRadius: 14,
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 6,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#F5CE00',
-    borderTopColor: '#FFF380',
-    elevation: 3,
-    shadowColor: '#000000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-  },
-  promoBannerImg: {
-    width: 52,
-    height: 60,
-  },
-  promoBannerTextCol: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  promoBannerBold: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-    lineHeight: 23,
-  },
-  promoBannerSub: {
-    fontSize: 9,
-    color: '#374151',
-    alignSelf: 'flex-end',
-    marginTop: 2,
-  },
-
   // 8-Item Quick Grid
   quickGridContainer: {
     marginHorizontal: 10,
-    marginTop: 8,
+    marginTop: 12,
     marginBottom: 6,
   },
   quickGridRow: {
@@ -14158,51 +14053,6 @@ const styles = StyleSheet.create({
     color: '#0F8A0F',
   },
 
-  // --- AUTHENTIC TALLYPAY WALLET PROMO CARD (layoutSqrPromo) ---
-  walletPromoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 12,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-  },
-  walletPromoTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 10,
-  },
-  walletPromoBenefitRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  walletPromoBenefitText: {
-    fontSize: 12,
-    color: '#4B5563',
-    flex: 1,
-    lineHeight: 18,
-  },
-  walletPromoCtaBtn: {
-    backgroundColor: '#B81414',
-    borderRadius: 24,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  walletPromoCtaText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-
   // --- AUTHENTIC TAGADA MODAL & RECEIVER CARD (layout_tagada_receiver_user_info) ---
   tagadaReceiverCard: {
     flexDirection: 'row',
@@ -14824,7 +14674,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#374151',
     marginBottom: 8,
-    marginTop: 4,
+    marginTop: 12,
     marginLeft: 4,
   },
   txnLimitCard: {
@@ -14859,16 +14709,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     color: '#111827',
-  },
-  txnChargeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#C8E6C9',
-    marginBottom: 16,
   },
   // Cloud Backup & Restore Styles
   cloudBackupHeader: {

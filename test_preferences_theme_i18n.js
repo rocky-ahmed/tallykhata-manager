@@ -256,7 +256,7 @@ async function runAsyncTest(name, fn) {
     assert(appSource.includes('t("mm_tab_txns")') || appSource.includes("t('mm_tab_txns')"), 'Missing mm_tab_txns in App.js');
     assert(appSource.includes('t("cb_current_cash")') || appSource.includes("t('cb_current_cash')"), 'Missing cb_current_cash in App.js');
     assert(appSource.includes("t('header_inbox')"), 'Missing header_inbox in App.js');
-    assert(appSource.includes("t('promo_transfer')"), 'Missing promo_transfer in App.js');
+    assert(appSource.includes('t("qa_money_manager")') || appSource.includes("t('qa_money_manager')"), 'Missing qa_money_manager in App.js');
     assert(appSource.includes("t('menu_sec_tallykhata')"), 'Missing menu_sec_tallykhata in App.js');
     assert(appSource.includes("t('mm_filter_all')"), 'Missing mm_filter_all in App.js');
   });
