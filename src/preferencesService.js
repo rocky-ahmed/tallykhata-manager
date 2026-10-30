@@ -63,9 +63,10 @@ function resolveEffectiveLanguage(languagePreference, systemLocale) {
   if (languagePreference === LANGUAGES.EN) return 'en';
   if (languagePreference === LANGUAGES.BN) return 'bn';
   // SYSTEM mode
-  const loc = (systemLocale || '').toLowerCase().trim();
-  if (loc.startsWith('en')) return 'en';
-  if (loc.startsWith('bn')) return 'bn';
+  const loc = String(systemLocale || '').trim().replace(/_/g, '-').toLowerCase();
+  const languageCode = loc.match(/^([a-z]{2,3})(?:-|$)/)?.[1];
+  if (languageCode === 'en') return 'en';
+  if (languageCode === 'bn') return 'bn';
   return 'bn'; // stable default fallback for unsupported system locales
 }
 

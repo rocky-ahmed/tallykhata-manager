@@ -33,7 +33,7 @@ runTest("App.js compiles with zero syntax errors via Babel parser", () => {
 runTest("Home screen quick action grid has Money Manager with 3D icon and opens modalMoneyManager", () => {
   assert(appSource.includes("grid_money_manager.png"), "Missing grid_money_manager.png reference in App.js");
   assert(appSource.includes("setModalMoneyManager(true)"), "Missing setModalMoneyManager(true) handler");
-  assert(appSource.includes("accessibilityLabel=\"মানি ম্যানেজার\""), "Missing accessibilityLabel for Money Manager grid item");
+  assert(appSource.includes('accessibilityLabel={tStatic("মানি ম্যানেজার")}'), "Missing localized accessibilityLabel for Money Manager grid item");
   assert(appSource.includes("styles.quickGridLabel") && (appSource.includes("মানি ম্যানেজার") || appSource.includes("qa_money_manager")), "Missing Bengali label in quick grid");
   
   const gridMatch = appSource.match(/quickGridRow[\s\S]*?মানি ম্যানেজার[\s\S]*?<\/View>/);
@@ -102,7 +102,7 @@ runTest("mmService initializes default state and sanitizes partial saved data", 
 });
 
 // TEST 9: Net Worth & Account Balances Calculation
-runTest("mmService.calculateNetWorth accurately sums all active account balances", () => {
+runTest("mmService.calculateNetWorth includes active and archived wallet balances", () => {
   const accounts = [
     { id: "acc_1", name: "ক্যাশ টাকা", balance: 5000 },
     { id: "acc_2", name: "ব্যাংক অ্যাকাউন্ট", balance: 25000 },
@@ -374,7 +374,7 @@ runTest("mmService.editTransaction accurately recalibrates balances on amount, a
 });
 
 // TEST 23: archiveAccount toggling and net worth calculation
-runTest("mmService.archiveAccount toggles archive status and excludes archived accounts from Net Worth", () => {
+runTest("mmService.archiveAccount toggles status without making wallet funds disappear from Net Worth", () => {
   let state = {
     accounts: [
       { id: "acc_cash", name: "Cash", balance: 10000, isArchived: false },
@@ -389,7 +389,7 @@ runTest("mmService.archiveAccount toggles archive status and excludes archived a
   // Archive acc_old
   state = mmService.archiveAccount(state, "acc_old", true);
   assert.strictEqual(state.accounts.find(a => a.id === "acc_old").isArchived, true);
-  assert.strictEqual(mmService.calculateNetWorth(state), 10000, "Archived account must be excluded from net worth");
+  assert.strictEqual(mmService.calculateNetWorth(state), 15000, "Archiving an account must not remove its balance from net worth");
 
   // Unarchive acc_old
   state = mmService.archiveAccount(state, "acc_old", false);
@@ -467,6 +467,7 @@ runTest("mmService savings goals allow adding, contributing (with balance debit)
     title: "নতুন ল্যাপটপ",
     targetAmount: 80000,
     savedAmount: 20000,
+    initialAccountId: "acc_bank",
     targetDate: "2026-12-31",
     icon: "💻",
     note: "কাজের জন্য ম্যাকবুক"
@@ -474,22 +475,31 @@ runTest("mmService savings goals allow adding, contributing (with balance debit)
   assert.strictEqual(state.goals.length, 1);
   const laptopGoal = state.goals[0];
   assert.strictEqual(laptopGoal.savedAmount, 20000);
+  assert.strictEqual(state.accounts[0].balance, 30000, "Initial goal savings must be debited from its selected wallet");
+  assert.strictEqual(state.transactions.length, 1, "Initial savings must be recorded as an internal allocation");
+  assert.strictEqual(mmService.getGoalFundedAmount(state, laptopGoal.id), 20000);
+  assert.strictEqual(mmService.calculateNetWorth(state), 50000, "Initial goal allocation must preserve net worth");
 
   // Contribute 10000 from acc_bank
   state = mmService.contributeToGoal(state, laptopGoal.id, 10000, "acc_bank");
   assert.strictEqual(state.goals[0].savedAmount, 30000);
-  assert.strictEqual(state.accounts[0].balance, 40000, "Source bank account was not debited");
-  assert(state.transactions.length === 1, "Goal deposit transaction was not recorded");
+  assert.strictEqual(state.accounts[0].balance, 20000, "Source bank account was not debited");
+  assert(state.transactions.length === 2, "Goal deposit transaction was not recorded");
   assert.strictEqual(state.transactions[0].amount, 10000);
+  assert.strictEqual(mmService.calculateNetWorth(state), 50000, "Further goal deposits must preserve net worth");
+  assert.strictEqual(mmService.calculateCashFlow(state.transactions, "all_time").totalExpense, 0, "Goal allocations are not household expenses");
 
   // Fail if bank balance insufficient
   assert.throws(() => {
-    mmService.contributeToGoal(state, laptopGoal.id, 50000, "acc_bank"); // balance is 40000
+    mmService.contributeToGoal(state, laptopGoal.id, 50000, "acc_bank"); // balance is 20000
   }, /পর্যাপ্ত ব্যালেন্স নেই/);
 
-  // Delete Goal
-  state = mmService.deleteGoal(state, laptopGoal.id);
+  // Funded goals cannot be deleted without returning their allocation.
+  assert.throws(() => mmService.deleteGoal(state, laptopGoal.id), /লক্ষ্যে জমা থাকা অর্থ আগে সক্রিয় ওয়ালেটে ফেরত নিন/);
+  state = mmService.deleteGoal(state, laptopGoal.id, "acc_bank");
   assert.strictEqual(state.goals.length, 0);
+  assert.strictEqual(state.accounts[0].balance, 50000, "Deleting with refund returns all allocated savings");
+  assert.strictEqual(mmService.calculateNetWorth(state), 50000, "Goal refund must preserve net worth");
 });
 
 // TEST 27: filterAndSortTransactions multi-criteria testing
@@ -581,8 +591,9 @@ runTest("mmService preferences can be customized and reset to defaults", () => {
 });
 
 // TEST 31: App.js Android Hardware Back-Handler Support for All MM Modals
-runTest("App.js hooks hardware back press for modalMoneyManager and all 9 child modals", () => {
+runTest("App.js hooks hardware back press for modalMoneyManager and its child modals", () => {
   assert(appSource.includes("modalMMDepositGoal"), "modalMMDepositGoal back handler missing");
+  assert(appSource.includes("modalMMWithdrawGoal"), "modalMMWithdrawGoal back handler missing");
   assert(appSource.includes("modalMMAddGoal"), "modalMMAddGoal back handler missing");
   assert(appSource.includes("modalMMOverallBudget"), "modalMMOverallBudget back handler missing");
   assert(appSource.includes("modalMMAddCategory"), "modalMMAddCategory back handler missing");
@@ -1018,14 +1029,15 @@ runTest("mmService preference sanitization handles malformed or out-of-range pre
   assert.strictEqual(updated.preferences.sortOrder, "amount_high");
 });
 
-// TEST 45: App.js verifies all 13 back handler modal hooks and UI controls
-runTest("App.js hooks hardware back press for modalMoneyManager and all 13 child modals", () => {
+// TEST 45: App.js verifies back handlers for parent and child modal hooks.
+runTest("App.js hooks hardware back press for modalMoneyManager and all child modals", () => {
   const expectedModals = [
     "modalMMPreferences",
     "modalMMAddRecurring",
     "modalMMRecurring",
     "modalMMEditCategory",
     "modalMMDepositGoal",
+    "modalMMWithdrawGoal",
     "modalMMAddGoal",
     "modalMMOverallBudget",
     "modalMMAddCategory",
@@ -1113,7 +1125,7 @@ runTest("Complete end-to-end Money Manager lifecycle preserves net-worth invaria
   // 8. Archive and restore account toggles net worth
   const activeNetWorth = mmService.calculateNetWorth(state);
   state = mmService.archiveAccount(state, newAccId, true);
-  assert.strictEqual(mmService.calculateNetWorth(state), activeNetWorth - 20000, "Archived account excluded from Net Worth");
+  assert.strictEqual(mmService.calculateNetWorth(state), activeNetWorth, "Archiving must not remove wallet funds from Net Worth");
   state = mmService.archiveAccount(state, newAccId, false);
   assert.strictEqual(mmService.calculateNetWorth(state), activeNetWorth, "Restored account included back in Net Worth");
 });
@@ -1160,15 +1172,16 @@ runTest("App.js transaction list rendering does not shadow global translation fu
 runTest("mmService.withdrawFromGoal enforces active account, sufficient funds, and credits balance atomically", () => {
   let state = {
     accounts: [
-      { id: "acc_cash", name: "Cash", balance: 10000, isArchived: false },
+      { id: "acc_cash", name: "Cash", balance: 5000, isArchived: false },
       { id: "acc_arc", name: "Old Bank", balance: 5000, isArchived: true }
     ],
     categories: [{ id: "cat_investment", name: "Investment", type: "expense" }],
-    transactions: [],
+    transactions: [{ id: "seed-deposit", type: "expense", amount: 5000, accountId: "acc_cash", goalId: "g1", isGoalTransfer: true, goalAction: "deposit", date: "2026-10-01" }],
     goals: [
       { id: "g1", title: "Emergency Fund", targetAmount: 20000, savedAmount: 5000 }
     ]
   };
+  const initialNetWorth = mmService.calculateNetWorth(state);
 
   // 1. Rejects non-positive amount
   assert.throws(() => mmService.withdrawFromGoal(state, "g1", 0, "acc_cash"), /সঠিক/);
@@ -1180,45 +1193,78 @@ runTest("mmService.withdrawFromGoal enforces active account, sufficient funds, a
   // 4. Successful withdrawal
   state = mmService.withdrawFromGoal(state, "g1", 2000, "acc_cash");
   assert.strictEqual(state.goals[0].savedAmount, 3000);
-  assert.strictEqual(state.accounts[0].balance, 12000);
-  assert.strictEqual(state.transactions.length, 1);
+  assert.strictEqual(state.accounts[0].balance, 7000);
+  assert.strictEqual(state.transactions.length, 2);
   assert.strictEqual(state.transactions[0].type, "income");
   assert.strictEqual(state.transactions[0].amount, 2000);
   assert.strictEqual(state.transactions[0].goalId, "g1");
+  assert.strictEqual(mmService.getGoalFundedAmount(state, "g1"), 3000);
+  assert.strictEqual(mmService.calculateNetWorth(state), initialNetWorth, "Withdrawal moves goal savings back into a wallet without changing net worth");
+
+  // Reversing the withdrawal restores both the goal allocation and receiving wallet.
+  state = mmService.deleteTransaction(state, state.transactions[0].id);
+  assert.strictEqual(state.goals[0].savedAmount, 5000);
+  assert.strictEqual(state.accounts[0].balance, 5000);
+  assert.strictEqual(mmService.getGoalFundedAmount(state, "g1"), 5000);
+  assert.strictEqual(mmService.calculateNetWorth(state), initialNetWorth);
 });
 
 // TEST 49: deleteGoal supports optional refund to active account
 runTest("mmService.deleteGoal supports optional refund to active account and creates refund transaction", () => {
   let state = {
     accounts: [
-      { id: "acc_cash", name: "Cash", balance: 10000, isArchived: false },
+      { id: "acc_cash", name: "Cash", balance: 0, isArchived: false },
       { id: "acc_arc", name: "Old Bank", balance: 5000, isArchived: true }
     ],
     categories: [{ id: "cat_investment", name: "Investment", type: "expense" }],
-    transactions: [],
+    transactions: [{ id: "seed-deposit", type: "expense", amount: 15000, accountId: "acc_cash", goalId: "g1", isGoalTransfer: true, goalAction: "deposit", date: "2026-10-01" }],
     goals: [
       { id: "g1", title: "Laptop Fund", targetAmount: 50000, savedAmount: 15000 }
     ]
   };
+  const initialNetWorth = mmService.calculateNetWorth(state);
 
-  // Delete without refund
-  let withoutRefund = mmService.deleteGoal(state, "g1");
-  assert.strictEqual(withoutRefund.goals.length, 0);
-  assert.strictEqual(withoutRefund.accounts[0].balance, 10000);
-  assert.strictEqual(withoutRefund.transactions.length, 0);
+  // Deleting with wallet-funded savings requires an explicit refund destination.
+  assert.throws(() => mmService.deleteGoal(state, "g1"), /লক্ষ্যে জমা থাকা অর্থ আগে সক্রিয় ওয়ালেটে ফেরত নিন/);
+  assert.strictEqual(state.goals.length, 1, "Rejected deletion must not mutate the original state");
 
   // Delete with refund to active account
   let withRefund = mmService.deleteGoal(state, "g1", "acc_cash");
   assert.strictEqual(withRefund.goals.length, 0);
-  assert.strictEqual(withRefund.accounts[0].balance, 25000);
-  assert.strictEqual(withRefund.transactions.length, 1);
+  assert.strictEqual(withRefund.accounts[0].balance, 15000);
+  assert.strictEqual(withRefund.transactions.length, 2);
   assert.strictEqual(withRefund.transactions[0].type, "income");
   assert.strictEqual(withRefund.transactions[0].amount, 15000);
+  assert.strictEqual(mmService.calculateNetWorth(withRefund), initialNetWorth, "Refund must preserve net worth");
 
-  // Delete with refund to archived account (does not refund to archived)
-  let withArcRefund = mmService.deleteGoal(state, "g1", "acc_arc");
-  assert.strictEqual(withArcRefund.goals.length, 0);
-  assert.strictEqual(withArcRefund.accounts[1].balance, 5000);
+  // Refunding to an archived wallet is rejected without mutating state.
+  assert.throws(() => mmService.deleteGoal(state, "g1", "acc_arc"), /আর্কাইভ করা ওয়ালেটে টাকা ফেরত দেওয়া যাবে না/);
+  assert.strictEqual(state.accounts[1].balance, 5000);
+});
+
+// TEST 58: Legacy goal balances without matching wallet allocations cannot be silently discarded.
+runTest("mmService protects untracked legacy goal savings from withdrawal or deletion", () => {
+  const state = {
+    accounts: [{ id: "acc_cash", name: "Cash", balance: 10000, isArchived: false }],
+    transactions: [],
+    goals: [{ id: "g_legacy", title: "Legacy goal", targetAmount: 50000, savedAmount: 12000 }],
+  };
+  const before = JSON.stringify(state);
+  assert.strictEqual(mmService.getGoalFundedAmount(state, "g_legacy"), 0);
+  assert.throws(() => mmService.deleteGoal(state, "g_legacy"), /লক্ষ্যের সঞ্চয় ও ওয়ালেট বরাদ্দের মধ্যে অমিল আছে/);
+  assert.throws(() => mmService.withdrawFromGoal(state, "g_legacy", 1000, "acc_cash"), /লক্ষ্যে পর্যাপ্ত সঞ্চিত অর্থ নেই/);
+  assert.strictEqual(JSON.stringify(state), before, "Rejected goal operations must not mutate legacy data");
+
+  const walletOnly = mmService.reconcileGoalBalance(state, "g_legacy", "use_wallet_allocations");
+  assert.strictEqual(walletOnly.goals[0].savedAmount, 0, "Wallet-only reconciliation must use recorded allocations");
+  assert.strictEqual(walletOnly.accounts[0].balance, 10000, "Reconciliation must not change the wallet balance");
+  assert.strictEqual(mmService.calculateNetWorth(walletOnly), 10000);
+
+  const externalSavings = mmService.reconcileGoalBalance(state, "g_legacy", "record_existing_savings");
+  assert.strictEqual(externalSavings.goals[0].savedAmount, 12000);
+  assert.strictEqual(mmService.getGoalFundedAmount(externalSavings, "g_legacy"), 12000);
+  assert.strictEqual(mmService.calculateNetWorth(externalSavings), 22000, "Explicit external savings reconciliation adds a separately held asset to net worth");
+  assert.strictEqual(mmService.calculateCashFlow(externalSavings.transactions, "all_time").totalExpense, 0, "Opening balance is not a household expense");
 });
 
 // TEST 50: editTransaction and deleteTransaction recalibrate goal.savedAmount when goalId is present
@@ -1484,6 +1530,8 @@ runTest("App.js wires modalMMCustomDateRange, custom period pill, and date input
   assert(currentAppSource.includes("mm_step_prev_day"), "App.js missing step prev day button");
   assert(currentAppSource.includes("mm_step_next_day"), "App.js missing step next day button");
   assert(currentAppSource.includes("mm_step_today"), "App.js missing step today button");
+  assert(currentAppSource.includes("getMonthCalendarDates"), "App.js missing in-app month calendar grid");
+  assert(currentAppSource.includes("mm_quick_last_7_days"), "App.js missing localized quick range presets");
 
   // Verify shiftDateStr logic across leap year and boundaries
   assert.strictEqual(mmService.shiftDateStr("2026-10-15", -1), "2026-10-14");
@@ -1491,6 +1539,110 @@ runTest("App.js wires modalMMCustomDateRange, custom period pill, and date input
   assert.strictEqual(mmService.shiftDateStr("2024-02-28", 1), "2024-02-29");
   assert.strictEqual(mmService.shiftDateStr("2026-02-28", 1), "2026-03-01");
   assert.strictEqual(mmService.shiftDateStr("2025-12-31", 1), "2026-01-01");
+});
+
+// TEST 57: Goal withdrawal is accessible, rendered, and keeps internal allocation actions safe.
+runTest("Money Manager renders the goal withdrawal form and hides direct edits for internal goal allocations", () => {
+  const currentAppSource = fs.readFileSync('App.js', 'utf8');
+  assert(currentAppSource.includes('visible={modalMMWithdrawGoal}'), 'Goal withdrawal modal must be rendered');
+  assert(currentAppSource.includes('onPress={handleWithdrawMMGoal}'), 'Goal withdrawal modal must submit through the validated handler');
+  assert(currentAppSource.includes("!isGoalAllocation && ("), 'Internal goal allocations must not expose ordinary edit actions');
+  assert(currentAppSource.includes("t('mm_confirm_reverse_goal_allocation')"), 'Goal reversal confirmation must be localized');
+  assert(currentAppSource.includes("!moneyManagerService.isGoalAllocationTransaction(transaction)"), 'Overall monthly budget must ignore internal goal transfers');
+});
+
+// TEST 59: Bengali numeral entry is accepted by common Money Manager amount workflows.
+runTest("Money Manager normalizes Bengali numerals for transactions, accounts, budgets, and recurring amounts", () => {
+  let state = {
+    accounts: [{ id: "acc_main", name: "Main", balance: 10000, isArchived: false }],
+    categories: [{ id: "cat_food", name: "Food", type: "expense", budget: 0, isArchived: false }],
+    transactions: [],
+    recurring: [],
+    goals: [],
+  };
+  state = mmService.addTransaction(state, { type: "expense", amount: "১২৫০", accountId: "acc_main", categoryId: "cat_food" });
+  assert.strictEqual(state.transactions[0].amount, 1250);
+  assert.strictEqual(state.accounts[0].balance, 8750);
+  state = mmService.addAccount(state, { name: "Second wallet", balance: "৫০০" });
+  assert.strictEqual(state.accounts.find(account => account.name === "Second wallet").balance, 500);
+  state = mmService.setCategoryBudget(state, "cat_food", "৩০০০");
+  state = mmService.setOverallBudget(state, "৮০০০");
+  assert.strictEqual(state.categories[0].budget, 3000);
+  assert.strictEqual(state.overallMonthlyBudget, 8000);
+  state = mmService.addRecurring(state, {
+    title: "Internet",
+    type: "expense",
+    amount: "৫৫০",
+    categoryId: "cat_food",
+    accountId: "acc_main",
+    cadence: "monthly",
+  });
+  assert.strictEqual(state.recurring[0].amount, 550);
+});
+
+// TEST 60: Calendar view model reads its state only after the state hook is initialized.
+runTest("Money Manager calendar render initializes calendar state before deriving its month grid", () => {
+  const stateIndex = appSource.indexOf("const [mmCalendarMonth, setMmCalendarMonth]");
+  const derivedIndex = appSource.indexOf("const mmCalendarMonthParts =");
+  assert(stateIndex >= 0, "Calendar month state hook is missing");
+  assert(derivedIndex >= 0, "Calendar month derived state is missing");
+  assert(stateIndex < derivedIndex, "Calendar render must not read mmCalendarMonth before its state hook initializes");
+});
+
+// TEST 61: Calendar grid and quick ranges cover calendar boundaries using local date strings.
+runTest("Money Manager calendar grid and quick presets handle month, year, and leap-day boundaries", () => {
+  const february = mmService.getMonthCalendarDates(2024, 2);
+  assert.strictEqual(february.length, 42, "Month calendar should render six complete weeks");
+  assert(february.includes("2024-02-29"), "Leap day should be selectable in the calendar grid");
+  assert.strictEqual(mmService.shiftMonthStr("2025-12", 1), "2026-01", "Next-month navigation should cross the year boundary");
+  assert.strictEqual(mmService.shiftMonthStr("2026-01", -1), "2025-12", "Previous-month navigation should cross the year boundary");
+
+  const lastSeven = mmService.getQuickDateRange("last_7_days", "2026-01-03");
+  assert.deepStrictEqual(lastSeven, { valid: true, startDate: "2025-12-28", endDate: "2026-01-03" });
+  const lastThirty = mmService.getQuickDateRange("last_30_days", "2026-03-01");
+  assert.deepStrictEqual(lastThirty, { valid: true, startDate: "2026-01-31", endDate: "2026-03-01" });
+  const thisYear = mmService.getQuickDateRange("this_year", "2024-02-29");
+  assert.deepStrictEqual(thisYear, { valid: true, startDate: "2024-01-01", endDate: "2024-02-29" });
+  assert.deepStrictEqual(mmService.getQuickDateRange("today", "২০২৬-১০-৩০"), {
+    valid: true, startDate: "2026-10-30", endDate: "2026-10-30",
+  });
+});
+
+// TEST 62: Search and type filters compose with inclusive custom date filtering.
+runTest("Money Manager custom date range combines with search and transaction type filters", () => {
+  const txns = [
+    { id: "inside-expense", type: "expense", amount: 450, date: "2026-10-10T23:59:59", note: "grocery shop" },
+    { id: "inside-income", type: "income", amount: 1200, date: "2026-10-11", note: "salary" },
+    { id: "outside-expense", type: "expense", amount: 300, date: "2026-10-12", note: "grocery shop" },
+  ];
+  const result = mmService.filterAndSortTransactions(txns, {
+    period: "custom",
+    customRange: { startDate: "2026-10-10", endDate: "2026-10-11" },
+    filterType: "expense",
+    searchQuery: "grocery",
+  });
+  assert.deepStrictEqual(result.map(transaction => transaction.id), ["inside-expense"]);
+});
+
+// TEST 63: Seeded relative-date labels match their actual dates and localized rendering removes legacy contradictions.
+runTest("Money Manager seed dates and transaction metadata remain calendar-consistent and localized", () => {
+  const seeded = mmService.getDefaultState("2026-10-30");
+  const yesterday = seeded.transactions.find(transaction => transaction.id === "mmtxn_5");
+  assert.strictEqual(yesterday.date, "2026-10-29", "Yesterday sample must store the previous local calendar date");
+  assert(!/^(today|yesterday)$/i.test(yesterday.time), "Relative date labels must not be stored in the time field");
+
+  const legacyDate = "2026-10-28";
+  assert.strictEqual(mmService.normalizeToLocalDate(legacyDate), legacyDate, "Date-only values must not shift through UTC parsing");
+  const offsetTimestamp = "2026-10-30T23:30:00-05:00";
+  const offsetExpected = (() => {
+    const date = new Date(offsetTimestamp);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  })();
+  assert.strictEqual(mmService.normalizeToLocalDate(offsetTimestamp), offsetExpected, "Timezone offset timestamps should resolve to the device-local calendar date");
+
+  const currentAppSource = fs.readFileSync("App.js", "utf8");
+  assert(currentAppSource.includes("formatDisplayDate(txn.date)"), "Transaction dates should use localized date rendering");
+  assert(currentAppSource.includes("!/^(today|yesterday)$/i.test(String(txn.time).trim())"), "Legacy relative labels must not conflict with stored transaction dates");
 });
 
 console.log(`\nSUMMARY: ${passed}/${total} tests passed.`);

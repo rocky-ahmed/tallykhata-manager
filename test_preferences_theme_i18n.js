@@ -69,6 +69,21 @@ async function runAsyncTest(name, fn) {
     assert.strictEqual(validDarkEn.language, 'en');
   });
 
+  // System modes must remain stored as preferences while the device determines their effective values.
+  runTest('System theme and locale resolve without overwriting the selected modes', () => {
+    const system = preferencesService.sanitizePreferences({ theme: 'system', language: 'system' });
+    assert.strictEqual(system.theme, 'system');
+    assert.strictEqual(system.language, 'system');
+    assert.strictEqual(preferencesService.resolveEffectiveTheme(system.theme, 'dark'), 'dark');
+    assert.strictEqual(preferencesService.resolveEffectiveTheme(system.theme, 'light'), 'light');
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage(system.language, 'en-US'), 'en');
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage(system.language, 'en_US'), 'en');
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage(system.language, 'bn-BD'), 'bn');
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage(system.language, 'fr-FR'), 'bn');
+    assert.strictEqual(system.theme, 'system');
+    assert.strictEqual(system.language, 'system');
+  });
+
   // Test 2: Preferences storage persistence
   await runAsyncTest('getStoredPreferences and savePreferences persist to storage adapter', async () => {
     const adapter = createMockAdapter();
@@ -140,6 +155,58 @@ async function runAsyncTest(name, fn) {
     assert(negBn.startsWith('-'), 'Negative currency must have negative sign');
   });
 
+  runTest('static app copy is English in English mode and repeated legacy UI phrases render once', () => {
+    const appSource = fs.readFileSync('App.js', 'utf8');
+    const ast = babel.parseSync(appSource, {
+      filename: 'App.js',
+      configFile: false,
+      babelrc: false,
+      parserOpts: { plugins: ['jsx', 'flow'] },
+    });
+    const untranslated = [];
+    let checked = 0;
+    function visit(node) {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'CallExpression'
+        && node.callee?.type === 'Identifier'
+        && ['tStatic', 'translateStaticText'].includes(node.callee.name)
+        && node.arguments[0]?.type === 'StringLiteral') {
+        checked++;
+        const rendered = i18nService.translateStaticText(node.arguments[0].value, 'en');
+        if (/[\u0980-\u09FF]/.test(rendered.replace(/৳/g, ''))) {
+          untranslated.push({ line: node.loc?.start.line, source: node.arguments[0].value, rendered });
+        }
+      }
+      for (const [key, value] of Object.entries(node)) {
+        if (['loc', 'start', 'end', 'extra'].includes(key)) continue;
+        if (Array.isArray(value)) value.forEach(visit);
+        else if (value && typeof value === 'object') visit(value);
+      }
+    }
+    visit(ast);
+    assert(checked > 150, `Expected broad static UI coverage, checked only ${checked} strings`);
+    assert.deepStrictEqual(untranslated, [], `Untranslated English UI strings: ${JSON.stringify(untranslated)}`);
+    assert.strictEqual(i18nService.translateStaticText('  লিমিট                 লিমিট  ', 'bn'), '  লিমিট  ');
+    assert.strictEqual(i18nService.translateStaticText('৳ ১০০০', 'en'), '৳ 1000');
+  });
+
+  runTest('built-in Money Manager labels localize only while their seed values remain unchanged', () => {
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('category', 'cat_food', 'খাবার ও মুদি বাজার', 'en'), 'Food and groceries');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('account', 'acc_cash', 'নগদ ক্যাশ (Cash)', 'en'), 'Cash');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('account', 'acc_cash', 'নগদ ক্যাশ (Cash)', 'bn'), 'নগদ টাকা');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('account', 'acc_cash', 'নগদ টাকা', 'bn'), 'নগদ টাকা');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('goal', 'goal_emergency', 'জরুরি তহবিল (Emergency Fund)', 'bn'), 'জরুরি তহবিল');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('schedule', 'rec_internet', 'ইন্টারনেট বিল (WiFi)', 'en'), 'Internet bill (Wi-Fi)');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('account', 'acc_cash', 'নগদ ক্যাশ (Cash)', 'bn'), 'নগদ টাকা');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('account', 'acc_cash', 'নগদ টাকা', 'bn'), 'নগদ টাকা');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('goal', 'goal_emergency', 'জরুরি তহবিল (Emergency Fund)', 'bn'), 'জরুরি তহবিল');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('schedule', 'rec_internet', 'ইন্টারনেট বিল (WiFi)', 'en'), 'Internet bill (Wi-Fi)');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('transaction', 'mmtxn_2', 'সাপ্তাহিক বাজার ও সদাই', 'en', 'note'), 'Weekly groceries');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('category', 'custom_category', 'খাবার ও মুদি বাজার', 'en'), 'খাবার ও মুদি বাজার');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('category', 'cat_food', 'আমার পছন্দের বাজার', 'en'), 'আমার পছন্দের বাজার');
+    assert.strictEqual(i18nService.translateMoneyManagerDefaultValue('transaction', 'custom_txn', 'ব্যক্তিগত নোট', 'en', 'note'), 'ব্যক্তিগত নোট');
+  });
+
   // Test 6: i18n translations coverage
   runTest('i18nService provides complete translations for navigation, menus, and actions', () => {
     const testKeys = [
@@ -192,6 +259,45 @@ async function runAsyncTest(name, fn) {
     assert(appSource.includes("t('promo_transfer')"), 'Missing promo_transfer in App.js');
     assert(appSource.includes("t('menu_sec_tallykhata')"), 'Missing menu_sec_tallykhata in App.js');
     assert(appSource.includes("t('mm_filter_all')"), 'Missing mm_filter_all in App.js');
+  });
+
+  runTest('Android follows system appearance and system language comes from Expo device locales', () => {
+    const appConfig = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+    const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+    const appSource = fs.readFileSync('App.js', 'utf8');
+    assert.strictEqual(appConfig.expo.userInterfaceStyle, 'automatic');
+    assert(packageJson.dependencies['expo-system-ui'], 'System appearance requires the Expo system-ui native module');
+    assert(packageJson.dependencies['expo-navigation-bar'], 'Android navigation bars must follow the global theme');
+    assert(appSource.includes("from 'expo-localization'"), 'Missing Expo Localization integration');
+    assert(appSource.includes('Localization.getLocales()'), 'System language must read the device locale');
+    assert(appSource.includes('setSystemLocale(getDeviceLanguageTag())'), 'System locale must refresh on app resume');
+    assert(appSource.includes("NavigationBar.setStyle(isDark ? 'dark' : 'light')"), 'Android navigation contrast must follow the effective app theme');
+    assert(appSource.includes('SystemUI.setBackgroundColorAsync(currentTheme.screenBg)'), 'Android system UI background must follow the active theme');
+    const navigationBarPlugin = appConfig.expo.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === 'expo-navigation-bar');
+    assert(navigationBarPlugin, 'Expo config must include the Android navigation bar plugin');
+    assert.strictEqual(navigationBarPlugin[1].style, 'light', 'New installs must use dark navigation buttons on the default light surface');
+    assert(!appSource.includes('Intl.DateTimeFormat().resolvedOptions().locale'), 'Do not use Intl as the Android system-locale source');
+  });
+
+  runTest('Menu and customer list dividers use the active theme tokens', () => {
+    const dark = themeService.getThemedStyles(themeService.getThemeTokens('dark'), true);
+    const light = themeService.getThemedStyles(themeService.getThemeTokens('light'), false);
+    const appSource = fs.readFileSync('App.js', 'utf8');
+    assert.strictEqual(dark.menuListItem.borderBottomColor, themeService.DARK_THEME.divider);
+    assert.strictEqual(light.menuListItem.borderBottomColor, themeService.LIGHT_THEME.divider);
+    assert.strictEqual(dark.customerListCard.borderBottomColor, themeService.DARK_THEME.divider);
+    assert(appSource.includes('style={[styles.menuListItem, isDark && tStyles.menuListItem]}'), 'Menu rows must apply the active divider token');
+    assert(!appSource.includes('style={styles.menuListItem}'), 'No Menu row should retain the unthemed separator');
+    assert(appSource.includes('styles.customerListCard, isDark && tStyles.customerListCard'), 'Customer rows must apply the dark divider token');
+  });
+
+  runTest('Every literal app translation key used by App.js exists in both supported languages', () => {
+    const appSource = fs.readFileSync('App.js', 'utf8');
+    const keys = new Set([...appSource.matchAll(/\bt\(\s*["']([^"']+)["']/g)].map(match => match[1]));
+    for (const key of keys) {
+      assert(i18nService.STRINGS.bn[key], `Missing Bangla translation for ${key}`);
+      assert(i18nService.STRINGS.en[key], `Missing English translation for ${key}`);
+    }
   });
 
   // Test 9: getThemedStyles provides complete tokens for Light and Dark modes
@@ -297,6 +403,9 @@ async function runAsyncTest(name, fn) {
     assert(appSource.includes("resolveEffectiveLanguage"), 'App.js missing resolveEffectiveLanguage');
     assert(appSource.includes("theme_system"), 'App.js missing theme_system translation key');
     assert(appSource.includes("lang_system"), 'App.js missing lang_system translation key');
+    assert(appSource.includes("t('lang_english_sub')"), 'English language option must be localized in both app languages');
+    assert(appSource.includes("t('lang_bn_sub')"), 'Bangla language option must be localized in both app languages');
+    assert(appSource.includes("t('theme_light_sub')") && appSource.includes("t('theme_dark_sub')"), 'Theme option descriptions must be localized');
   });
 
   console.log(`\n================================================================`);

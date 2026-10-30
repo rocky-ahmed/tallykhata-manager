@@ -331,12 +331,15 @@ async function runAllTests() {
     const appSource = fs.readFileSync("App.js", "utf8");
     assert.ok(appSource.includes("ব্যবসা পরিচালনা"), "Menu must contain 'ব্যবসা পরিচালনা' title");
     assert.ok(appSource.includes("grid_multi_biz.png"), "Menu entry must use matching multi-business icon");
-    assert.ok(appSource.includes("accessibilityLabel=\"ব্যবসা পরিচালনা\""), "Menu entry must have proper accessibilityLabel");
+    assert.ok(appSource.includes('accessibilityLabel={tStatic("ব্যবসা পরিচালনা")}'), "Menu entry must localize its accessibilityLabel");
+    const i18nService = require("./src/i18nService");
+    assert.strictEqual(i18nService.translateStaticText("ব্যবসা পরিচালনা", "bn"), "ব্যবসা পরিচালনা");
+    assert.strictEqual(i18nService.translateStaticText("ব্যবসা পরিচালনা", "en"), "Manage businesses");
     assert.ok(appSource.includes("accessibilityRole=\"button\""), "Menu entry must declare button role");
 
     // Must trigger the shared business picker without duplicating state or lifecycle
-    const menuSnippetMatch = appSource.match(/accessibilityLabel=\"ব্যবসা পরিচালনা\"[\s\S]*?onPress=\{\(\)\s*=>\s*setModalBusinessPicker\(true\)\}/) ||
-                             appSource.match(/onPress=\{\(\)\s*=>\s*setModalBusinessPicker\(true\)\}[\s\S]*?accessibilityLabel=\"ব্যবসা পরিচালনা\"/);
+    const menuSnippetMatch = appSource.match(/accessibilityLabel=\{tStatic\("ব্যবসা পরিচালনা"\)\}[\s\S]*?onPress=\{\(\)\s*=>\s*setModalBusinessPicker\(true\)\}/) ||
+                             appSource.match(/onPress=\{\(\)\s*=>\s*setModalBusinessPicker\(true\)\}[\s\S]*?accessibilityLabel=\{tStatic\("ব্যবসা পরিচালনা"\)\}/);
     assert.ok(menuSnippetMatch, "Menu entry must trigger setModalBusinessPicker(true)");
   });
 

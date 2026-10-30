@@ -16,10 +16,10 @@ const DEFAULT_PREFERENCES = {
 };
 
 const DEFAULT_ACCOUNTS = [
-  { id: "acc_cash", name: "নগদ ক্যাশ (Cash)", type: "cash", balance: 15000, icon: "💵", color: "#10B981", isArchived: false },
-  { id: "acc_bank", name: "ব্যাংক অ্যাকাউন্ট (Bank)", type: "bank", balance: 52000, icon: "🏦", color: "#3B82F6", isArchived: false },
-  { id: "acc_bkash", name: "বিকাশ ওয়ালেট (bKash)", type: "mfs", balance: 8500, icon: "📱", color: "#EC4899", isArchived: false },
-  { id: "acc_nagad", name: "নগদ ওয়ালেট (Nagad)", type: "mfs", balance: 4200, icon: "💳", color: "#F97316", isArchived: false },
+  { id: "acc_cash", name: "নগদ টাকা", type: "cash", balance: 15000, icon: "💵", color: "#10B981", isArchived: false },
+  { id: "acc_bank", name: "ব্যাংক হিসাব", type: "bank", balance: 52000, icon: "🏦", color: "#3B82F6", isArchived: false },
+  { id: "acc_bkash", name: "বিকাশ ওয়ালেট", type: "mfs", balance: 8500, icon: "📱", color: "#EC4899", isArchived: false },
+  { id: "acc_nagad", name: "নগদ ওয়ালেট", type: "mfs", balance: 4200, icon: "💳", color: "#F97316", isArchived: false },
 ];
 
 const DEFAULT_CATEGORIES = [
@@ -41,7 +41,7 @@ const DEFAULT_CATEGORIES = [
 const DEFAULT_RECURRING = [
   {
     id: "rec_rent",
-    title: "বাসা ভাড়া (House Rent)",
+    title: "বাসা ভাড়া",
     type: "expense",
     amount: 15000,
     categoryId: "cat_utility",
@@ -58,7 +58,7 @@ const DEFAULT_RECURRING = [
   },
   {
     id: "rec_internet",
-    title: "ইন্টারনেট বিল (WiFi)",
+    title: "ইন্টারনেট বিল",
     type: "expense",
     amount: 1200,
     categoryId: "cat_utility",
@@ -78,9 +78,9 @@ const DEFAULT_RECURRING = [
 const DEFAULT_GOALS = [
   {
     id: "goal_emergency",
-    title: "জরুরি তহবিল (Emergency Fund)",
+    title: "জরুরি তহবিল",
     targetAmount: 50000,
-    savedAmount: 20000,
+    savedAmount: 0,
     targetDate: "2026-12-31",
     icon: "🛡️",
     color: "#10B981",
@@ -88,9 +88,9 @@ const DEFAULT_GOALS = [
   },
   {
     id: "goal_eid",
-    title: "ঈদ ও উৎসব সঞ্চয় (Festival Fund)",
+    title: "ঈদ ও উৎসব সঞ্চয়",
     targetAmount: 25000,
-    savedAmount: 12000,
+    savedAmount: 0,
     targetDate: "2027-04-01",
     icon: "🌙",
     color: "#3B82F6",
@@ -99,7 +99,7 @@ const DEFAULT_GOALS = [
 ];
 
 function getDefaultState(todayDateStr) {
-  const d = todayDateStr || new Date().toISOString().split("T")[0];
+  const d = todayDateStr || getLocalDateString();
   return {
     version: MM_SCHEMA_VERSION,
     overallMonthlyBudget: 40000,
@@ -113,7 +113,7 @@ function getDefaultState(todayDateStr) {
       { id: "mmtxn_2", type: "expense", amount: 1450, categoryId: "cat_food", accountId: "acc_cash", date: d, time: "01:30 PM", note: "সাপ্তাহিক বাজার ও সদাই", payee: "স্বপ্ন সুপারশপ" },
       { id: "mmtxn_3", type: "expense", amount: 1850, categoryId: "cat_utility", accountId: "acc_bkash", date: d, time: "04:15 PM", note: "বিদ্যুৎ ও ওয়াইফাই বিল", payee: "ডেসকো ও লিংক৩" },
       { id: "mmtxn_4", type: "transfer", amount: 5000, fromAccountId: "acc_bank", toAccountId: "acc_bkash", date: d, time: "09:00 AM", note: "ব্যাংক হতে বিকাশে ট্রান্সফার", payee: "" },
-      { id: "mmtxn_5", type: "expense", amount: 650, categoryId: "cat_transport", accountId: "acc_cash", date: d, time: "Yesterday", note: "সিএনজি ও যাতায়াত ভাড়া", payee: "যাতায়াত" },
+      { id: "mmtxn_5", type: "expense", amount: 650, categoryId: "cat_transport", accountId: "acc_cash", date: shiftDateStr(d, -1), time: "07:30 PM", note: "সিএনজি ও যাতায়াত ভাড়া", payee: "যাতায়াত" },
     ],
   };
 }
@@ -204,14 +204,85 @@ function sanitizeState(parsed, defaultState) {
 }
 
 function calculateNetWorth(accountsOrState) {
+  const state = !Array.isArray(accountsOrState) && accountsOrState && typeof accountsOrState === "object"
+    ? accountsOrState
+    : null;
   const accounts = Array.isArray(accountsOrState)
     ? accountsOrState
-    : accountsOrState && Array.isArray(accountsOrState.accounts)
-    ? accountsOrState.accounts
+    : state && Array.isArray(state.accounts)
+    ? state.accounts
     : [];
-  return accounts
-    .filter(a => !a.isArchived)
-    .reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+  // Archiving disables new activity but does not make the wallet's remaining money disappear.
+  const accountNetWorth = accounts.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+  const allocatedGoalFunds = state ? getTrackedGoalBalances(state).total : 0;
+  return accountNetWorth + allocatedGoalFunds;
+}
+
+function isGoalAllocationTransaction(transaction) {
+  if (!transaction) return false;
+  if (transaction.isGoalTransfer === true) return true;
+  // Backward compatibility for goal transactions written before the internal-allocation flag existed.
+  return Boolean(transaction.goalId && ["Goal Deposit", "Goal Withdrawal"].includes(transaction.time));
+}
+
+function getTrackedGoalBalances(state) {
+  const activeGoalIds = new Set((state && Array.isArray(state.goals) ? state.goals : []).map(goal => goal.id));
+  const deposits = new Map();
+  const withdrawals = new Map();
+  (state && Array.isArray(state.transactions) ? state.transactions : []).forEach(transaction => {
+    if (!isGoalAllocationTransaction(transaction) || !transaction.goalId || !activeGoalIds.has(transaction.goalId)) return;
+    const action = transaction.goalAction || (transaction.time === "Goal Withdrawal" ? "withdrawal" : "deposit");
+    if (action === "refund") return;
+    const amount = Number(transaction.amount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const target = action === "withdrawal" ? withdrawals : deposits;
+    target.set(transaction.goalId, (target.get(transaction.goalId) || 0) + amount);
+  });
+  const balances = new Map();
+  activeGoalIds.forEach(goalId => balances.set(goalId, Math.max(0, (deposits.get(goalId) || 0) - (withdrawals.get(goalId) || 0))));
+  return {
+    balances,
+    total: Array.from(balances.values()).reduce((sum, amount) => sum + amount, 0),
+  };
+}
+
+function getGoalFundedAmount(state, goalId) {
+  return getTrackedGoalBalances(state).balances.get(goalId) || 0;
+}
+
+function reconcileGoalBalance(state, goalId, strategy) {
+  const goal = (state.goals || []).find(item => item.id === goalId);
+  if (!goal) throw new Error("লক্ষ্যটি পাওয়া যায়নি");
+  const savedAmount = Math.max(0, Number(goal.savedAmount || 0));
+  const fundedAmount = getGoalFundedAmount(state, goalId);
+  if (Math.abs(savedAmount - fundedAmount) <= 0.005) return state;
+
+  if (strategy === "use_wallet_allocations") {
+    return {
+      ...state,
+      goals: (state.goals || []).map(item => item.id === goalId ? { ...item, savedAmount: fundedAmount } : item),
+    };
+  }
+
+  if (strategy === "record_existing_savings" && savedAmount > fundedAmount) {
+    const openingTxn = {
+      id: "mmtxn_goal_opening_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+      type: "expense",
+      amount: savedAmount - fundedAmount,
+      accountId: null,
+      categoryId: null,
+      goalId,
+      isGoalTransfer: true,
+      goalAction: "opening",
+      date: getLocalDateString(),
+      time: "Goal Opening Balance",
+      note: "",
+      payee: goal.title,
+    };
+    return { ...state, transactions: [openingTxn, ...(state.transactions || [])] };
+  }
+
+  throw new Error("লক্ষ্যের সঞ্চয় ও ওয়ালেট বরাদ্দের মধ্যে অমিল আছে।");
 }
 
 function toEnglishDigits(str) {
@@ -220,15 +291,45 @@ function toEnglishDigits(str) {
   return String(str).replace(/[০-৯]/g, d => bnToEn[d] || d);
 }
 
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function shiftMonthStr(monthStr, months = 0) {
+  const match = String(monthStr || '').match(/^(\d{4})-(\d{2})$/);
+  if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) return getLocalDateString().slice(0, 7);
+  const shifted = new Date(Number(match[1]), Number(match[2]) - 1 + Number(months || 0), 1);
+  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getMonthCalendarDates(year, month, weekStartsOn = 0) {
+  const firstWeekday = Number(weekStartsOn);
+  if (!isValidCalendarDate(Number(year), Number(month), 1) || !Number.isInteger(firstWeekday) || firstWeekday < 0 || firstWeekday > 6) return [];
+  const firstOfMonth = new Date(Number(year), Number(month) - 1, 1);
+  const start = new Date(firstOfMonth);
+  const dayOffset = (firstOfMonth.getDay() - firstWeekday + 7) % 7;
+  start.setDate(start.getDate() - dayOffset);
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return getLocalDateString(date);
+  });
+}
+
 function isValidCalendarDate(year, month, day) {
-  if (isNaN(year) || isNaN(month) || isNaN(day)) return false;
-  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
-  const dt = new Date(Date.UTC(year, month - 1, day));
-  return dt.getUTCFullYear() === year && (dt.getUTCMonth() + 1) === month && dt.getUTCDate() === day;
+  const y = Number(year), m = Number(month), d = Number(day);
+  if (![y, m, d].every(Number.isInteger) || y < 0 || y > 9999 || m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(0);
+  dt.setUTCHours(0, 0, 0, 0);
+  dt.setUTCFullYear(y, m - 1, d);
+  return dt.getUTCFullYear() === y && (dt.getUTCMonth() + 1) === m && dt.getUTCDate() === d;
 }
 
 function shiftDateStr(dateStr, days = 0) {
-  const norm = normalizeToLocalDate(dateStr) || new Date().toISOString().split('T')[0];
+  const norm = normalizeToLocalDate(dateStr) || getLocalDateString();
   const parts = norm.split('-').map(Number);
   const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + Number(days || 0)));
   const y = d.getUTCFullYear();
@@ -237,11 +338,23 @@ function shiftDateStr(dateStr, days = 0) {
   return `${y}-${m}-${day}`;
 }
 
+function getQuickDateRange(preset, todayDateStr = getLocalDateString()) {
+  const today = normalizeToLocalDate(todayDateStr);
+  if (!today) return { valid: false, error: 'invalid_calendar_date' };
+  let startDate = today;
+  if (preset === 'last_7_days') startDate = shiftDateStr(today, -6);
+  else if (preset === 'last_30_days') startDate = shiftDateStr(today, -29);
+  else if (preset === 'this_year') startDate = `${today.slice(0, 4)}-01-01`;
+  else if (preset !== 'today') return { valid: false, error: 'invalid_preset' };
+  return validateCustomDateRange(startDate, today);
+}
+
 function normalizeToLocalDate(dateStr) {
   if (!dateStr) return '';
   const str = toEnglishDigits(String(dateStr)).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    return str;
+    const [year, month, day] = str.split('-').map(Number);
+    return isValidCalendarDate(year, month, day) ? str : '';
   }
   const dt = new Date(str);
   if (!isNaN(dt.getTime())) {
@@ -250,10 +363,7 @@ function normalizeToLocalDate(dateStr) {
     const d = String(dt.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }
-  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-    return str.slice(0, 10);
-  }
-  return str;
+  return '';
 }
 
 function validateCustomDateRange(startDate, endDate) {
@@ -284,11 +394,15 @@ function validateCustomDateRange(startDate, endDate) {
 }
 
 function isDateInPeriod(dateStr, period, customRange = null) {
-  if (!dateStr || period === "all_time") return true;
+  if (period === "all_time") return true;
+  if (!dateStr) return false;
   const normalizedDate = normalizeToLocalDate(dateStr);
+  if (!normalizedDate) return false;
   if (period === "custom") {
-    if (!customRange || !customRange.startDate || !customRange.endDate) return true;
-    return normalizedDate >= customRange.startDate && normalizedDate <= customRange.endDate;
+    if (!customRange || !customRange.startDate || !customRange.endDate) return false;
+    const range = validateCustomDateRange(customRange.startDate, customRange.endDate);
+    if (!range.valid) return false;
+    return normalizedDate >= range.startDate && normalizedDate <= range.endDate;
   }
   const now = new Date();
   const parts = normalizedDate.split("-").map(Number);
@@ -319,6 +433,7 @@ function calculateCashFlow(transactions, period, customRange = null) {
   let totalTransfer = 0;
 
   for (const t of transactions) {
+    if (isGoalAllocationTransaction(t)) continue;
     if (period && !isDateInPeriod(t.date, period, customRange)) continue;
     const amt = Number(t.amount || 0);
     if (t.type === "income") totalIncome += amt;
@@ -353,6 +468,7 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
   }
 
   const expTransactions = (transactions || []).filter(t => {
+    if (isGoalAllocationTransaction(t)) return false;
     if (t.type !== "expense") return false;
     if (period && !isDateInPeriod(t.date, period, customRange)) return false;
     return true;
@@ -437,6 +553,7 @@ function filterAndSortTransactions(txnsOrState, filterParams = {}) {
   const { filterType, accountId, categoryId, searchQuery, period, sortOrder, customRange } = filterParams;
 
   let result = transactions.filter(t => {
+    if (isGoalAllocationTransaction(t) && filterType && filterType !== "all") return false;
     if (filterType && filterType !== "all" && t.type !== filterType) {
       return false;
     }
@@ -494,7 +611,8 @@ function filterTransactions(transactions, filterParams) {
 }
 
 function calculatePeriodMetrics(state, period = "this_month", customRange = null) {
-  const txns = filterAndSortTransactions(state.transactions || [], { period, customRange });
+  const txns = filterAndSortTransactions(state.transactions || [], { period, customRange })
+    .filter(transaction => !isGoalAllocationTransaction(transaction));
   const totalIncome = txns.filter(t => t.type === "income").reduce((sum, t) => sum + (t.amount || 0), 0);
   const totalExpense = txns.filter(t => t.type === "expense").reduce((sum, t) => sum + (t.amount || 0), 0);
   const netSavings = totalIncome - totalExpense;
@@ -540,12 +658,12 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
 
 function addTransaction(state, params) {
   const { type, amount, categoryId, accountId, fromAccountId, toAccountId, note, payee, date, time } = params;
-  const amt = parseFloat(amount);
+  const amt = parseFloat(toEnglishDigits(amount));
   if (!amt || isNaN(amt) || amt <= 0) {
     throw new Error("দয়া করে সঠিক ইতিবাচক পরিমাণ দিন");
   }
 
-  const d = date || new Date().toISOString().split("T")[0];
+  const d = date || getLocalDateString();
   const t = time || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
   if (type === "transfer") {
@@ -642,6 +760,10 @@ function editTransaction(state, txnId, newParams) {
   if (!txn) {
     throw new Error("সম্পাদনার জন্য লেনদেনটি পাওয়া যায়নি");
   }
+  const isGoalTransfer = isGoalAllocationTransaction(txn);
+  if (isGoalTransfer && newParams.type && newParams.type !== txn.type) {
+    throw new Error("লক্ষ্যে জমা বা উত্তোলনের ধরন পরিবর্তন করা যাবে না");
+  }
 
   // 1. Revert previous impact of old txn
   let tempAccounts = [...(state.accounts || [])];
@@ -660,15 +782,27 @@ function editTransaction(state, txnId, newParams) {
 
   // 2. Validate new params with fallback to existing transaction
   const type = newParams.type || txn.type;
-  const amt = newParams.amount !== undefined ? parseFloat(newParams.amount) : parseFloat(txn.amount);
+  const amt = newParams.amount !== undefined ? parseFloat(toEnglishDigits(newParams.amount)) : parseFloat(txn.amount);
   if (!amt || isNaN(amt) || amt <= 0) {
     throw new Error("দয়া করে সঠিক ইতিবাচক পরিমাণ দিন");
+  }
+  if (isGoalTransfer && txn.goalId) {
+    const goal = (state.goals || []).find(item => item.id === txn.goalId);
+    if (goal) {
+      const currentFunded = getGoalFundedAmount(state, txn.goalId);
+      const difference = amt - oldAmt;
+      const nextFunded = currentFunded + (txn.goalAction === "withdrawal" ? -difference : difference);
+      if (nextFunded < 0) throw new Error("লক্ষ্যে পর্যাপ্ত সঞ্চিত অর্থ নেই");
+      if (txn.goalAction === "withdrawal" && Number(goal.savedAmount || 0) - difference < 0) {
+        throw new Error("লক্ষ্যে পর্যাপ্ত সঞ্চিত অর্থ নেই");
+      }
+    }
   }
   const accountId = newParams.accountId !== undefined ? newParams.accountId : txn.accountId;
   const fromAccountId = newParams.fromAccountId !== undefined ? newParams.fromAccountId : txn.fromAccountId;
   const toAccountId = newParams.toAccountId !== undefined ? newParams.toAccountId : txn.toAccountId;
   const categoryId = newParams.categoryId !== undefined ? newParams.categoryId : txn.categoryId;
-  const d = newParams.date || txn.date || new Date().toISOString().split("T")[0];
+  const d = newParams.date || txn.date || getLocalDateString();
   const t = newParams.time || txn.time || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   const note = newParams.note !== undefined ? newParams.note : txn.note;
   const payee = newParams.payee !== undefined ? newParams.payee : txn.payee;
@@ -774,6 +908,10 @@ function deleteTransaction(state, txnId) {
   const amt = Number(txn.amount || 0);
 
   if (txn.type === "expense") {
+    if (isGoalAllocationTransaction(txn) && txn.goalId && state.goals?.some(goal => goal.id === txn.goalId)
+        && getGoalFundedAmount(state, txn.goalId) < amt) {
+      throw new Error("লক্ষ্যে জমা থাকা অর্থ ইতিমধ্যে ব্যবহার হয়েছে; আগে উত্তোলনটি ফিরিয়ে আনুন");
+    }
     updatedAccounts = updatedAccounts.map(acc =>
       acc.id === txn.accountId ? { ...acc, balance: (acc.balance || 0) + amt } : acc
     );
@@ -818,7 +956,7 @@ function addAccount(state, params) {
   if (!name || !name.trim()) {
     throw new Error("অ্যাকাউন্টের নাম আবশ্যক");
   }
-  const initBal = parseFloat(balance) || 0;
+  const initBal = parseFloat(toEnglishDigits(balance)) || 0;
   const newAcc = {
     id: "acc_" + Date.now(),
     name: name.trim(),
@@ -912,7 +1050,7 @@ function addCategory(state, params) {
     throw new Error("ক্যাটাগরির নাম আবশ্যক");
   }
   const catType = type === "income" ? "income" : "expense";
-  const numBudget = parseFloat(budget) || 0;
+  const numBudget = parseFloat(toEnglishDigits(budget)) || 0;
   if (numBudget < 0) {
     throw new Error("সঠিক বাজেট সীমা প্রদান করুন");
   }
@@ -938,7 +1076,7 @@ function updateCategory(state, categoryId, params) {
   if (!cat) throw new Error("ক্যাটাগরি পাওয়া যায়নি");
 
   const { name, icon, color, budget, isArchived } = params;
-  const numBudget = budget !== undefined ? parseFloat(budget) : cat.budget;
+  const numBudget = budget !== undefined ? parseFloat(toEnglishDigits(budget)) : cat.budget;
   if (isNaN(numBudget) || numBudget < 0) {
     throw new Error("সঠিক বাজেট সীমা প্রদান করুন");
   }
@@ -1013,7 +1151,7 @@ function deleteCategory(state, categoryId) {
 }
 
 function setCategoryBudget(state, categoryId, limit) {
-  const numLimit = parseFloat(limit);
+  const numLimit = parseFloat(toEnglishDigits(limit));
   if (isNaN(numLimit) || numLimit < 0) {
     throw new Error("সঠিক বাজেট সীমা প্রদান করুন");
   }
@@ -1032,7 +1170,7 @@ function setCategoryBudget(state, categoryId, limit) {
 }
 
 function setOverallBudget(state, limit) {
-  const numLimit = parseFloat(limit);
+  const numLimit = parseFloat(toEnglishDigits(limit));
   if (isNaN(numLimit) || numLimit < 0) {
     throw new Error("সঠিক সামগ্রিক বাজেট সীমা প্রদান করুন");
   }
@@ -1043,15 +1181,18 @@ function setOverallBudget(state, limit) {
 }
 
 function addGoal(state, params) {
-  const { title, targetAmount, savedAmount, targetDate, icon, color, note } = params;
+  const { title, targetAmount, savedAmount, initialAccountId, targetDate, icon, color, note } = params;
   if (!title || !title.trim()) {
     throw new Error("লক্ষ্যের নাম আবশ্যক");
   }
-  const numTarget = parseFloat(targetAmount);
+  const numTarget = parseFloat(toEnglishDigits(targetAmount));
   if (isNaN(numTarget) || numTarget <= 0) {
     throw new Error("সঠিক লক্ষ্যমাত্রা (Target Amount) প্রদান করুন");
   }
-  const initSaved = parseFloat(savedAmount) || 0;
+  const initSaved = savedAmount === undefined || savedAmount === null || savedAmount === "" ? 0 : parseFloat(toEnglishDigits(savedAmount));
+  if (!Number.isFinite(initSaved) || initSaved < 0 || initSaved > numTarget) {
+    throw new Error("সঠিক প্রাথমিক সঞ্চয়ের পরিমাণ প্রদান করুন");
+  }
 
   const newGoal = {
     id: "goal_" + Date.now(),
@@ -1064,8 +1205,37 @@ function addGoal(state, params) {
     note: note ? note.trim() : "",
   };
 
+  let updatedAccounts = state.accounts || [];
+  let updatedTransactions = state.transactions || [];
+  if (initSaved > 0) {
+    if (!initialAccountId) throw new Error("প্রাথমিক সঞ্চয়ের জন্য একটি সক্রিয় ওয়ালেট নির্বাচন করুন");
+    const account = updatedAccounts.find(item => item.id === initialAccountId);
+    if (!account) throw new Error("নির্বাচিত অ্যাকাউন্ট পাওয়া যায়নি");
+    if (account.isArchived) throw new Error("আর্কাইভ করা ওয়ালেট হতে টাকা জমা করা যাবে না");
+    if (Number(account.balance || 0) < initSaved) throw new Error("নির্বাচিত অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই");
+    updatedAccounts = updatedAccounts.map(item => item.id === initialAccountId
+      ? { ...item, balance: Number(item.balance || 0) - initSaved }
+      : item);
+    updatedTransactions = [{
+      id: "mmtxn_goal_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+      type: "expense",
+      amount: initSaved,
+      accountId: initialAccountId,
+      categoryId: null,
+      goalId: newGoal.id,
+      isGoalTransfer: true,
+      goalAction: "deposit",
+      date: getLocalDateString(),
+      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+      note: "",
+      payee: newGoal.title,
+    }, ...updatedTransactions];
+  }
+
   return {
     ...state,
+    accounts: updatedAccounts,
+    transactions: updatedTransactions,
     goals: [...(state.goals || []), newGoal],
   };
 }
@@ -1075,7 +1245,7 @@ function updateGoal(state, goalId, params) {
   if (!goal) throw new Error("লক্ষ্যটি পাওয়া যায়নি");
 
   const { title, targetAmount, targetDate, icon, color, note } = params;
-  const numTarget = targetAmount !== undefined ? parseFloat(targetAmount) : goal.targetAmount;
+  const numTarget = targetAmount !== undefined ? parseFloat(toEnglishDigits(targetAmount)) : goal.targetAmount;
   if (isNaN(numTarget) || numTarget <= 0) {
     throw new Error("সঠিক লক্ষ্যমাত্রা প্রদান করুন");
   }
@@ -1105,7 +1275,7 @@ function contributeToGoal(state, goalId, amount, fromAccountId) {
   const goal = (state.goals || []).find(g => g.id === goalId);
   if (!goal) throw new Error("লক্ষ্যটি পাওয়া যায়নি");
 
-  const numAmt = parseFloat(amount);
+  const numAmt = parseFloat(toEnglishDigits(amount));
   if (isNaN(numAmt) || numAmt <= 0) {
     throw new Error("সঠিক জমার পরিমাণ প্রদান করুন");
   }
@@ -1130,11 +1300,13 @@ function contributeToGoal(state, goalId, amount, fromAccountId) {
     type: "expense",
     amount: numAmt,
     accountId: fromAccountId,
-    categoryId: "cat_investment",
+    categoryId: null,
     goalId: goalId,
-    date: new Date().toISOString().split("T")[0],
-    time: "Goal Deposit",
-    note: "সঞ্চয় জমা: " + goal.title,
+    isGoalTransfer: true,
+    goalAction: "deposit",
+    date: getLocalDateString(),
+    time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+    note: "",
     payee: goal.title,
   };
   updatedTxns = [newTxn, ...updatedTxns];
@@ -1161,12 +1333,12 @@ function withdrawFromGoal(state, goalId, amount, toAccountId) {
   const goal = (state.goals || []).find(g => g.id === goalId);
   if (!goal) throw new Error("লক্ষ্যটি পাওয়া যায়নি");
 
-  const numAmt = parseFloat(amount);
+  const numAmt = parseFloat(toEnglishDigits(amount));
   if (isNaN(numAmt) || numAmt <= 0) {
     throw new Error("সঠিক উত্তোলনের পরিমাণ প্রদান করুন");
   }
 
-  if ((goal.savedAmount || 0) < numAmt) {
+  if ((goal.savedAmount || 0) < numAmt || getGoalFundedAmount(state, goalId) < numAmt) {
     throw new Error("লক্ষ্যে পর্যাপ্ত সঞ্চিত অর্থ নেই");
   }
 
@@ -1186,11 +1358,13 @@ function withdrawFromGoal(state, goalId, amount, toAccountId) {
     type: "income",
     amount: numAmt,
     accountId: toAccountId,
-    categoryId: "cat_investment",
+    categoryId: null,
     goalId: goalId,
-    date: new Date().toISOString().split("T")[0],
-    time: "Goal Withdrawal",
-    note: "লক্ষ্য হতে উত্তোলন: " + goal.title,
+    isGoalTransfer: true,
+    goalAction: "withdrawal",
+    date: getLocalDateString(),
+    time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+    note: "",
     payee: goal.title,
   };
 
@@ -1212,31 +1386,41 @@ function withdrawFromGoal(state, goalId, amount, toAccountId) {
   };
 }
 
-function deleteGoal(state, goalId, refundToAccountId = null) {
+function deleteGoal(state, goalId, refundToAccountId = null, options = {}) {
   const goal = (state.goals || []).find(g => g.id === goalId);
   if (!goal) return state;
 
   let updatedAccounts = state.accounts || [];
   let updatedTxns = state.transactions || [];
 
-  if (refundToAccountId && (goal.savedAmount || 0) > 0) {
+  const refundAmount = getGoalFundedAmount(state, goalId);
+  const savedAmount = Math.max(0, Number(goal.savedAmount || 0));
+  if (Math.abs(savedAmount - refundAmount) > 0.005 && options.allowUntrackedSavings !== true) {
+    throw new Error("লক্ষ্যের সঞ্চয় ও ওয়ালেট বরাদ্দের মধ্যে অমিল আছে।");
+  }
+  if (refundAmount > 0 && !refundToAccountId) {
+    throw new Error("লক্ষ্যে জমা থাকা অর্থ আগে সক্রিয় ওয়ালেটে ফেরত নিন");
+  }
+  if (refundAmount > 0) {
     const acc = updatedAccounts.find(a => a.id === refundToAccountId);
-    if (acc && !acc.isArchived) {
-      const refundAmt = Number(goal.savedAmount);
-      updatedAccounts = updatedAccounts.map(a => a.id === refundToAccountId ? { ...a, balance: (a.balance || 0) + refundAmt } : a);
-      const refundTxn = {
-        id: "mmtxn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-        type: "income",
-        amount: refundAmt,
-        accountId: refundToAccountId,
-        categoryId: "cat_investment",
-        date: new Date().toISOString().split("T")[0],
-        time: "Goal Refund",
-        note: "লক্ষ্য বাতিলজনিত অর্থ ফেরত: " + goal.title,
-        payee: goal.title,
-      };
-      updatedTxns = [refundTxn, ...updatedTxns];
-    }
+    if (!acc) throw new Error("নির্বাচিত অ্যাকাউন্ট পাওয়া যায়নি");
+    if (acc.isArchived) throw new Error("আর্কাইভ করা ওয়ালেটে টাকা ফেরত দেওয়া যাবে না");
+    updatedAccounts = updatedAccounts.map(a => a.id === refundToAccountId ? { ...a, balance: (a.balance || 0) + refundAmount } : a);
+    const refundTxn = {
+      id: "mmtxn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+      type: "income",
+      amount: refundAmount,
+      accountId: refundToAccountId,
+      categoryId: null,
+      goalId: goalId,
+      isGoalTransfer: true,
+      goalAction: "refund",
+      date: getLocalDateString(),
+      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+      note: "",
+      payee: goal.title,
+    };
+    updatedTxns = [refundTxn, ...updatedTxns];
   }
 
   return {
@@ -1277,10 +1461,10 @@ function resetPreferences(state) {
 
 
 function calculateNextDueDate(dateStr, cadence) {
-  if (!dateStr) return new Date().toISOString().split("T")[0];
+  if (!dateStr) return getLocalDateString();
   const parts = String(dateStr).split("-").map(Number);
   if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) {
-    return new Date().toISOString().split("T")[0];
+    return getLocalDateString();
   }
   const [y, m, d] = parts;
   if (cadence === "daily") {
@@ -1311,7 +1495,7 @@ function calculateNextDueDate(dateStr, cadence) {
 
 function processRecurringTransactions(state, todayDateStr) {
   if (!state || typeof state !== "object") return state;
-  const today = todayDateStr || new Date().toISOString().split("T")[0];
+  const today = todayDateStr || getLocalDateString();
   const recurringList = Array.isArray(state.recurring) ? state.recurring : [];
   if (recurringList.length === 0) return state;
 
@@ -1413,12 +1597,12 @@ function addRecurring(state, params) {
   if (!title || !title.trim()) {
     throw new Error("শিডিউলের শিরোনাম আবশ্যক");
   }
-  const amt = parseFloat(amount);
+  const amt = parseFloat(toEnglishDigits(amount));
   if (!amt || isNaN(amt) || amt <= 0) {
     throw new Error("দয়া করে সঠিক ইতিবাচক পরিমাণ দিন");
   }
   const cad = ["daily", "weekly", "monthly"].includes(cadence) ? cadence : "monthly";
-  const start = startDate || new Date().toISOString().split("T")[0];
+  const start = startDate || getLocalDateString();
   const nextDue = nextDueDate || start;
 
   if (type === "transfer") {
@@ -1484,7 +1668,7 @@ function updateRecurring(state, recurringId, params) {
   if (!rec) throw new Error("শিডিউল পাওয়া যায়নি");
 
   const { title, type, amount, categoryId, accountId, fromAccountId, toAccountId, cadence, nextDueDate, note, payee, isActive } = params;
-  const amt = amount !== undefined ? parseFloat(amount) : rec.amount;
+  const amt = amount !== undefined ? parseFloat(toEnglishDigits(amount)) : rec.amount;
   if (isNaN(amt) || amt <= 0) {
     throw new Error("দয়া করে সঠিক ইতিবাচক পরিমাণ দিন");
   }
@@ -1589,14 +1773,19 @@ module.exports = {
   getDefaultState,
   sanitizeState,
   calculateNetWorth,
+  isGoalAllocationTransaction,
   calculateCashFlow,
   calculateCategoryBudgets,
   calculateCategoryDistribution,
   calculatePeriodMetrics,
   toEnglishDigits,
+  getLocalDateString,
+  shiftMonthStr,
+  getMonthCalendarDates,
   isValidCalendarDate,
   normalizeToLocalDate,
   shiftDateStr,
+  getQuickDateRange,
   validateCustomDateRange,
   isDateInPeriod,
   filterAndSortTransactions,
@@ -1617,6 +1806,8 @@ module.exports = {
   updateGoal,
   contributeToGoal,
   withdrawFromGoal,
+  getGoalFundedAmount,
+  reconcileGoalBalance,
   deleteGoal,
   updatePreferences,
   resetPreferences,

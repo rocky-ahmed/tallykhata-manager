@@ -4,7 +4,7 @@
     "slug": "tallykhata-offline",
     "version": "4.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#B81414"
@@ -16,7 +16,15 @@
       "package": "com.progoti.tallykhata.offline"
     },
     "plugins": [
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-localization",
+      [
+        "expo-navigation-bar",
+        {
+          "style": "light",
+          "enforceContrast": false
+        }
+      ]
     ]
   }
 }
