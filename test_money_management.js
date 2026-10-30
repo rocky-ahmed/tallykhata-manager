@@ -1156,6 +1156,178 @@ runTest("App.js transaction list rendering does not shadow global translation fu
   assert(appSource.includes("filteredTxns.map((txn)"), "filteredTxns.map should use 'txn' iterator to avoid shadowing 't'");
 });
 
+// TEST 48: withdrawFromGoal decreases goal.savedAmount and credits active account
+runTest("mmService.withdrawFromGoal enforces active account, sufficient funds, and credits balance atomically", () => {
+  let state = {
+    accounts: [
+      { id: "acc_cash", name: "Cash", balance: 10000, isArchived: false },
+      { id: "acc_arc", name: "Old Bank", balance: 5000, isArchived: true }
+    ],
+    categories: [{ id: "cat_investment", name: "Investment", type: "expense" }],
+    transactions: [],
+    goals: [
+      { id: "g1", title: "Emergency Fund", targetAmount: 20000, savedAmount: 5000 }
+    ]
+  };
+
+  // 1. Rejects non-positive amount
+  assert.throws(() => mmService.withdrawFromGoal(state, "g1", 0, "acc_cash"), /সঠিক/);
+  // 2. Rejects exceeding saved amount
+  assert.throws(() => mmService.withdrawFromGoal(state, "g1", 6000, "acc_cash"), /পর্যাপ্ত/);
+  // 3. Rejects archived account
+  assert.throws(() => mmService.withdrawFromGoal(state, "g1", 2000, "acc_arc"), /আর্কাইভ/);
+
+  // 4. Successful withdrawal
+  state = mmService.withdrawFromGoal(state, "g1", 2000, "acc_cash");
+  assert.strictEqual(state.goals[0].savedAmount, 3000);
+  assert.strictEqual(state.accounts[0].balance, 12000);
+  assert.strictEqual(state.transactions.length, 1);
+  assert.strictEqual(state.transactions[0].type, "income");
+  assert.strictEqual(state.transactions[0].amount, 2000);
+  assert.strictEqual(state.transactions[0].goalId, "g1");
+});
+
+// TEST 49: deleteGoal supports optional refund to active account
+runTest("mmService.deleteGoal supports optional refund to active account and creates refund transaction", () => {
+  let state = {
+    accounts: [
+      { id: "acc_cash", name: "Cash", balance: 10000, isArchived: false },
+      { id: "acc_arc", name: "Old Bank", balance: 5000, isArchived: true }
+    ],
+    categories: [{ id: "cat_investment", name: "Investment", type: "expense" }],
+    transactions: [],
+    goals: [
+      { id: "g1", title: "Laptop Fund", targetAmount: 50000, savedAmount: 15000 }
+    ]
+  };
+
+  // Delete without refund
+  let withoutRefund = mmService.deleteGoal(state, "g1");
+  assert.strictEqual(withoutRefund.goals.length, 0);
+  assert.strictEqual(withoutRefund.accounts[0].balance, 10000);
+  assert.strictEqual(withoutRefund.transactions.length, 0);
+
+  // Delete with refund to active account
+  let withRefund = mmService.deleteGoal(state, "g1", "acc_cash");
+  assert.strictEqual(withRefund.goals.length, 0);
+  assert.strictEqual(withRefund.accounts[0].balance, 25000);
+  assert.strictEqual(withRefund.transactions.length, 1);
+  assert.strictEqual(withRefund.transactions[0].type, "income");
+  assert.strictEqual(withRefund.transactions[0].amount, 15000);
+
+  // Delete with refund to archived account (does not refund to archived)
+  let withArcRefund = mmService.deleteGoal(state, "g1", "acc_arc");
+  assert.strictEqual(withArcRefund.goals.length, 0);
+  assert.strictEqual(withArcRefund.accounts[1].balance, 5000);
+});
+
+// TEST 50: editTransaction and deleteTransaction recalibrate goal.savedAmount when goalId is present
+runTest("mmService.editTransaction and deleteTransaction recalibrate goal.savedAmount when goalId is present", () => {
+  let state = {
+    accounts: [{ id: "acc_cash", name: "Cash", balance: 20000, isArchived: false }],
+    categories: [{ id: "cat_investment", name: "Investment", type: "expense" }],
+    transactions: [],
+    goals: [{ id: "g1", title: "Hajj", targetAmount: 100000, savedAmount: 0 }]
+  };
+
+  // Deposit 5000 to goal
+  state = mmService.contributeToGoal(state, "g1", 5000, "acc_cash");
+  assert.strictEqual(state.goals[0].savedAmount, 5000);
+  const txnId = state.transactions[0].id;
+
+  // Edit deposit transaction from 5000 to 7000
+  state = mmService.editTransaction(state, txnId, { amount: 7000 });
+  assert.strictEqual(state.goals[0].savedAmount, 7000);
+
+  // Edit deposit transaction down to 4000
+  state = mmService.editTransaction(state, txnId, { amount: 4000 });
+  assert.strictEqual(state.goals[0].savedAmount, 4000);
+
+  // Delete deposit transaction -> goal should decrease by 4000 back to 0
+  state = mmService.deleteTransaction(state, txnId);
+  assert.strictEqual(state.goals[0].savedAmount, 0);
+});
+
+// TEST 51: processRecurringTransactions ignores archived accounts and categories safely
+runTest("mmService.processRecurringTransactions ignores archived accounts and categories safely", () => {
+  let state = {
+    accounts: [
+      { id: "acc_act", name: "Active Cash", balance: 10000, isArchived: false },
+      { id: "acc_arc", name: "Old Bank", balance: 5000, isArchived: true }
+    ],
+    categories: [
+      { id: "cat_exp", name: "Expense", type: "expense", isArchived: false },
+      { id: "cat_arc", name: "Old Cat", type: "expense", isArchived: true }
+    ],
+    transactions: [],
+    recurring: [
+      {
+        id: "rec_1",
+        title: "Valid Schedule",
+        amount: 500,
+        type: "expense",
+        accountId: "acc_act",
+        categoryId: "cat_exp",
+        frequency: "daily",
+        nextDueDate: "2026-10-20",
+        isActive: true
+      },
+      {
+        id: "rec_arc_acc",
+        title: "Archived Account Schedule",
+        amount: 800,
+        type: "expense",
+        accountId: "acc_arc",
+        categoryId: "cat_exp",
+        frequency: "daily",
+        nextDueDate: "2026-10-20",
+        isActive: true
+      },
+      {
+        id: "rec_arc_cat",
+        title: "Archived Category Schedule",
+        amount: 600,
+        type: "expense",
+        accountId: "acc_act",
+        categoryId: "cat_arc",
+        frequency: "daily",
+        nextDueDate: "2026-10-20",
+        isActive: true
+      }
+    ]
+  };
+
+  const processed = mmService.processRecurringTransactions(state, "2026-10-20");
+  // Only rec_1 should create transaction
+  assert.strictEqual(processed.transactions.length, 1);
+  assert.strictEqual(processed.transactions[0].amount, 500);
+  assert.strictEqual(processed.accounts[0].balance, 9500);
+  assert.strictEqual(processed.accounts[1].balance, 5000, "Archived account balance unchanged");
+});
+
+// TEST 52: themeService provides comprehensive themed style tokens for Money Manager
+runTest("themeService provides comprehensive themed style tokens for Money Manager", () => {
+  const themeService = require('./src/themeService');
+  const lightStyles = themeService.getThemedStyles(themeService.LIGHT_THEME, false);
+  const darkStyles = themeService.getThemedStyles(themeService.DARK_THEME, true);
+
+  assert(lightStyles.mmSearchBox, 'lightStyles.mmSearchBox missing');
+  assert(darkStyles.mmSearchBox, 'darkStyles.mmSearchBox missing');
+  assert.strictEqual(lightStyles.mmSearchBox.backgroundColor, '#FFFFFF');
+  assert.strictEqual(darkStyles.mmSearchBox.backgroundColor, '#1E293B');
+
+  assert(lightStyles.mmAccountCard, 'lightStyles.mmAccountCard missing');
+  assert.strictEqual(lightStyles.mmAccountCard.backgroundColor, '#FFFFFF');
+  assert.strictEqual(darkStyles.mmAccountCard.backgroundColor, '#1E293B');
+
+  assert(lightStyles.mmGoalCard, 'lightStyles.mmGoalCard missing');
+  assert.strictEqual(lightStyles.mmGoalCard.backgroundColor, '#FFFFFF');
+  assert.strictEqual(darkStyles.mmGoalCard.backgroundColor, '#1E293B');
+
+  assert(appSource.includes('tStyles.mmSearchBox'), 'App.js missing tStyles.mmSearchBox');
+  assert(appSource.includes('tStyles.mmFilterChip'), 'App.js missing tStyles.mmFilterChip');
+});
+
 console.log(`\nSUMMARY: ${passed}/${total} tests passed.`);
 if (passed === total) {
   console.log("ALL MONEY MANAGER TESTS PASSED SUCCESSFULLY!\n");

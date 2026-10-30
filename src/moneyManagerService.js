@@ -642,6 +642,21 @@ function editTransaction(state, txnId, newParams) {
     });
   }
 
+  let updatedGoals = state.goals || [];
+  if (txn.goalId) {
+    const diff = amt - oldAmt;
+    updatedGoals = updatedGoals.map(g => {
+      if (g.id === txn.goalId) {
+        if (type === "expense") {
+          return { ...g, savedAmount: Math.max(0, (g.savedAmount || 0) + diff) };
+        } else if (type === "income") {
+          return { ...g, savedAmount: Math.max(0, (g.savedAmount || 0) - diff) };
+        }
+      }
+      return g;
+    });
+  }
+
   const updatedTxn = {
     ...txn,
     type,
@@ -650,6 +665,7 @@ function editTransaction(state, txnId, newParams) {
     accountId: type === "transfer" ? null : accountId,
     fromAccountId: type === "transfer" ? fromAccountId : null,
     toAccountId: type === "transfer" ? toAccountId : null,
+    goalId: txn.goalId || null,
     date: d,
     time: t,
     note: (note !== undefined ? note : txn.note || "").trim() || (type === "transfer" ? "অ্যাকাউন্ট স্থানান্তর" : type === "income" ? "আয় প্রাপ্তি" : "ব্যক্তিগত ব্যয়"),
@@ -661,6 +677,7 @@ function editTransaction(state, txnId, newParams) {
   return {
     ...state,
     accounts: tempAccounts,
+    goals: updatedGoals,
     transactions: updatedTransactions,
   };
 }
@@ -690,11 +707,26 @@ function deleteTransaction(state, txnId) {
     });
   }
 
+  let updatedGoals = state.goals || [];
+  if (txn.goalId) {
+    updatedGoals = updatedGoals.map(g => {
+      if (g.id === txn.goalId) {
+        if (txn.type === "expense") {
+          return { ...g, savedAmount: Math.max(0, (g.savedAmount || 0) - amt) };
+        } else if (txn.type === "income") {
+          return { ...g, savedAmount: (g.savedAmount || 0) + amt };
+        }
+      }
+      return g;
+    });
+  }
+
   const updatedTransactions = (state.transactions || []).filter(t => t.id !== txnId);
 
   return {
     ...state,
     accounts: updatedAccounts,
+    goals: updatedGoals,
     transactions: updatedTransactions,
   };
 }
@@ -1017,6 +1049,7 @@ function contributeToGoal(state, goalId, amount, fromAccountId) {
     amount: numAmt,
     accountId: fromAccountId,
     categoryId: "cat_investment",
+    goalId: goalId,
     date: new Date().toISOString().split("T")[0],
     time: "Goal Deposit",
     note: "সঞ্চয় জমা: " + goal.title,
@@ -1042,9 +1075,92 @@ function contributeToGoal(state, goalId, amount, fromAccountId) {
   };
 }
 
-function deleteGoal(state, goalId) {
+function withdrawFromGoal(state, goalId, amount, toAccountId) {
+  const goal = (state.goals || []).find(g => g.id === goalId);
+  if (!goal) throw new Error("লক্ষ্যটি পাওয়া যায়নি");
+
+  const numAmt = parseFloat(amount);
+  if (isNaN(numAmt) || numAmt <= 0) {
+    throw new Error("সঠিক উত্তোলনের পরিমাণ প্রদান করুন");
+  }
+
+  if ((goal.savedAmount || 0) < numAmt) {
+    throw new Error("লক্ষ্যে পর্যাপ্ত সঞ্চিত অর্থ নেই");
+  }
+
+  if (!toAccountId) {
+    throw new Error("দয়া করে টাকা জমার জন্য একটি সক্রিয় ওয়ালেট নির্বাচন করুন");
+  }
+
+  let updatedAccounts = state.accounts || [];
+  const acc = updatedAccounts.find(a => a.id === toAccountId);
+  if (!acc) throw new Error("নির্বাচিত অ্যাকাউন্ট পাওয়া যায়নি");
+  if (acc.isArchived) throw new Error("আর্কাইভ করা ওয়ালেটে টাকা উত্তোলন করা যাবে না");
+
+  updatedAccounts = updatedAccounts.map(a => a.id === toAccountId ? { ...a, balance: (a.balance || 0) + numAmt } : a);
+
+  const newTxn = {
+    id: "mmtxn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+    type: "income",
+    amount: numAmt,
+    accountId: toAccountId,
+    categoryId: "cat_investment",
+    goalId: goalId,
+    date: new Date().toISOString().split("T")[0],
+    time: "Goal Withdrawal",
+    note: "লক্ষ্য হতে উত্তোলন: " + goal.title,
+    payee: goal.title,
+  };
+
+  const updatedGoals = (state.goals || []).map(g => {
+    if (g.id === goalId) {
+      return {
+        ...g,
+        savedAmount: Math.max(0, (g.savedAmount || 0) - numAmt),
+      };
+    }
+    return g;
+  });
+
   return {
     ...state,
+    accounts: updatedAccounts,
+    transactions: [newTxn, ...(state.transactions || [])],
+    goals: updatedGoals,
+  };
+}
+
+function deleteGoal(state, goalId, refundToAccountId = null) {
+  const goal = (state.goals || []).find(g => g.id === goalId);
+  if (!goal) return state;
+
+  let updatedAccounts = state.accounts || [];
+  let updatedTxns = state.transactions || [];
+
+  if (refundToAccountId && (goal.savedAmount || 0) > 0) {
+    const acc = updatedAccounts.find(a => a.id === refundToAccountId);
+    if (acc && !acc.isArchived) {
+      const refundAmt = Number(goal.savedAmount);
+      updatedAccounts = updatedAccounts.map(a => a.id === refundToAccountId ? { ...a, balance: (a.balance || 0) + refundAmt } : a);
+      const refundTxn = {
+        id: "mmtxn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+        type: "income",
+        amount: refundAmt,
+        accountId: refundToAccountId,
+        categoryId: "cat_investment",
+        date: new Date().toISOString().split("T")[0],
+        time: "Goal Refund",
+        note: "লক্ষ্য বাতিলজনিত অর্থ ফেরত: " + goal.title,
+        payee: goal.title,
+      };
+      updatedTxns = [refundTxn, ...updatedTxns];
+    }
+  }
+
+  return {
+    ...state,
+    accounts: updatedAccounts,
+    transactions: updatedTxns,
     goals: (state.goals || []).filter(g => g.id !== goalId),
   };
 }
@@ -1141,7 +1257,7 @@ function processRecurringTransactions(state, todayDateStr) {
           if (recCopy.type === "transfer") {
             const fromAcc = currentAccounts.find(a => a.id === recCopy.fromAccountId);
             const toAcc = currentAccounts.find(a => a.id === recCopy.toAccountId);
-            if (fromAcc && toAcc && fromAcc.balance >= amt) {
+            if (fromAcc && toAcc && !fromAcc.isArchived && !toAcc.isArchived && fromAcc.balance >= amt) {
               currentAccounts = currentAccounts.map(a => {
                 if (a.id === recCopy.fromAccountId) return { ...a, balance: (a.balance || 0) - amt };
                 if (a.id === recCopy.toAccountId) return { ...a, balance: (a.balance || 0) + amt };
@@ -1168,7 +1284,8 @@ function processRecurringTransactions(state, todayDateStr) {
           } else {
             const targetAccId = recCopy.accountId;
             const acc = currentAccounts.find(a => a.id === targetAccId);
-            if (acc) {
+            const cat = recCopy.categoryId ? (state.categories || []).find(c => c.id === recCopy.categoryId) : null;
+            if (acc && !acc.isArchived && (!cat || !cat.isArchived)) {
               const diff = recCopy.type === "income" ? amt : -amt;
               currentAccounts = currentAccounts.map(a => {
                 if (a.id === targetAccId) return { ...a, balance: (a.balance || 0) + diff };
@@ -1412,6 +1529,7 @@ module.exports = {
   addGoal,
   updateGoal,
   contributeToGoal,
+  withdrawFromGoal,
   deleteGoal,
   updatePreferences,
   resetPreferences,

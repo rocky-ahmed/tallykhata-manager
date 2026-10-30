@@ -8556,7 +8556,7 @@ function TallyKhataApp() {
                 accessibilityLabel="ওয়ালেট ট্যাব"
               >
                 <Text style={[styles.mmSubTabLabel, tStyles.mmSubTabLabel, mmActiveSubTab === 'accounts' && styles.mmSubTabLabelActive]}>
-                  👛 ওয়ালেট
+                  👛 {t("mm_tab_wallets")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -8595,12 +8595,12 @@ function TallyKhataApp() {
             {mmActiveSubTab === 'transactions' && (
               <View style={{ marginTop: 14 }}>
                 {/* Search Bar */}
-                <View style={styles.mmSearchBox}>
-                  <Text style={styles.mmSearchIcon}>🔍</Text>
+                <View style={[styles.mmSearchBox, tStyles.mmSearchBox]}>
+                  <Text style={[styles.mmSearchIcon, tStyles.mmSearchIcon]}>🔍</Text>
                   <TextInput
-                    style={styles.mmSearchInput}
+                    style={[styles.mmSearchInput, tStyles.mmSearchInput]}
                     placeholder={t("mm_search_placeholder")}
-                    placeholderTextColor="#64748B"
+                    placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                     value={mmSearchQuery}
                     onChangeText={setMmSearchQuery}
                   />
@@ -8614,34 +8614,34 @@ function TallyKhataApp() {
                 {/* Filter Pills (All / Expense / Income / Transfer) */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
                   <TouchableOpacity
-                    style={[styles.mmFilterChip, mmTxnFilter === 'all' && styles.mmFilterChipActive]}
+                    style={[styles.mmFilterChip, tStyles.mmFilterChip, mmTxnFilter === 'all' && styles.mmFilterChipActive]}
                     onPress={() => setMmTxnFilter('all')}
                   >
-                    <Text style={[styles.mmFilterChipText, mmTxnFilter === 'all' && styles.mmFilterChipTextActive]}>
+                    <Text style={[styles.mmFilterChipText, tStyles.mmFilterChipText, mmTxnFilter === 'all' && styles.mmFilterChipTextActive]}>
                       {t('mm_filter_all')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.mmFilterChip, mmTxnFilter === 'expense' && styles.mmFilterChipActive]}
+                    style={[styles.mmFilterChip, tStyles.mmFilterChip, mmTxnFilter === 'expense' && styles.mmFilterChipActive]}
                     onPress={() => setMmTxnFilter('expense')}
                   >
-                    <Text style={[styles.mmFilterChipText, mmTxnFilter === 'expense' && styles.mmFilterChipTextActive]}>
+                    <Text style={[styles.mmFilterChipText, tStyles.mmFilterChipText, mmTxnFilter === 'expense' && styles.mmFilterChipTextActive]}>
                       {t('mm_filter_expense')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.mmFilterChip, mmTxnFilter === 'income' && styles.mmFilterChipActive]}
+                    style={[styles.mmFilterChip, tStyles.mmFilterChip, mmTxnFilter === 'income' && styles.mmFilterChipActive]}
                     onPress={() => setMmTxnFilter('income')}
                   >
-                    <Text style={[styles.mmFilterChipText, mmTxnFilter === 'income' && styles.mmFilterChipTextActive]}>
+                    <Text style={[styles.mmFilterChipText, tStyles.mmFilterChipText, mmTxnFilter === 'income' && styles.mmFilterChipTextActive]}>
                       {t('mm_filter_income')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.mmFilterChip, mmTxnFilter === 'transfer' && styles.mmFilterChipActive]}
+                    style={[styles.mmFilterChip, tStyles.mmFilterChip, mmTxnFilter === 'transfer' && styles.mmFilterChipActive]}
                     onPress={() => setMmTxnFilter('transfer')}
                   >
-                    <Text style={[styles.mmFilterChipText, mmTxnFilter === 'transfer' && styles.mmFilterChipTextActive]}>
+                    <Text style={[styles.mmFilterChipText, tStyles.mmFilterChipText, mmTxnFilter === 'transfer' && styles.mmFilterChipTextActive]}>
                       {t('mm_filter_transfer')}
                     </Text>
                   </TouchableOpacity>
@@ -8649,36 +8649,36 @@ function TallyKhataApp() {
 
                 {/* Sort Order Chips */}
                 <View style={styles.mmSortRow}>
-                  <Text style={styles.mmSortLabel}>{t('mm_sort_label')}</Text>
+                  <Text style={[styles.mmSortLabel, tStyles.mmSortLabel]}>{t('mm_sort_label')}</Text>
                   <TouchableOpacity
-                    style={[styles.mmSortChip, mmSortOrder === 'newest' && styles.mmSortChipActive]}
+                    style={[styles.mmSortChip, tStyles.mmSortChip, mmSortOrder === 'newest' && styles.mmSortChipActive]}
                     onPress={() => setMmSortOrder('newest')}
                   >
-                    <Text style={[styles.mmSortChipText, mmSortOrder === 'newest' && styles.mmSortChipTextActive]}>
+                    <Text style={[styles.mmSortChipText, tStyles.mmSortChipText, mmSortOrder === 'newest' && styles.mmSortChipTextActive]}>
                       {t('mm_sort_newest')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.mmSortChip, mmSortOrder === 'oldest' && styles.mmSortChipActive]}
+                    style={[styles.mmSortChip, tStyles.mmSortChip, mmSortOrder === 'oldest' && styles.mmSortChipActive]}
                     onPress={() => setMmSortOrder('oldest')}
                   >
-                    <Text style={[styles.mmSortChipText, mmSortOrder === 'oldest' && styles.mmSortChipTextActive]}>
+                    <Text style={[styles.mmSortChipText, tStyles.mmSortChipText, mmSortOrder === 'oldest' && styles.mmSortChipTextActive]}>
                       {t('mm_sort_oldest')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.mmSortChip, mmSortOrder === 'amount_high' && styles.mmSortChipActive]}
+                    style={[styles.mmSortChip, tStyles.mmSortChip, mmSortOrder === 'amount_high' && styles.mmSortChipActive]}
                     onPress={() => setMmSortOrder('amount_high')}
                   >
-                    <Text style={[styles.mmSortChipText, mmSortOrder === 'amount_high' && styles.mmSortChipTextActive]}>
+                    <Text style={[styles.mmSortChipText, tStyles.mmSortChipText, mmSortOrder === 'amount_high' && styles.mmSortChipTextActive]}>
                       {t('mm_sort_high')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.mmSortChip, mmSortOrder === 'amount_low' && styles.mmSortChipActive]}
+                    style={[styles.mmSortChip, tStyles.mmSortChip, mmSortOrder === 'amount_low' && styles.mmSortChipActive]}
                     onPress={() => setMmSortOrder('amount_low')}
                   >
-                    <Text style={[styles.mmSortChipText, mmSortOrder === 'amount_low' && styles.mmSortChipTextActive]}>
+                    <Text style={[styles.mmSortChipText, tStyles.mmSortChipText, mmSortOrder === 'amount_low' && styles.mmSortChipTextActive]}>
                       {t('mm_sort_low')}
                     </Text>
                   </TouchableOpacity>
@@ -8695,9 +8695,9 @@ function TallyKhataApp() {
 
                   if (filteredTxns.length === 0) {
                     return (
-                      <View style={styles.mmEmptyBox}>
+                      <View style={[styles.mmEmptyBox, tStyles.mmEmptyBox]}>
                         <Text style={styles.mmEmptyIcon}>📝</Text>
-                        <Text style={styles.mmEmptyText}>
+                        <Text style={[styles.mmEmptyText, tStyles.mmEmptyText]}>
                           {mmSearchQuery ? t('mm_empty_filtered') : t('mm_empty_period')}
                         </Text>
                         <TouchableOpacity
@@ -8797,7 +8797,7 @@ function TallyKhataApp() {
             {mmActiveSubTab === 'accounts' && (
               <View style={{ marginTop: 14 }}>
                 <View style={styles.mmSectionHeader}>
-                  <Text style={styles.mmSectionTitle}>সক্রিয় অ্যাকাউন্ট ও ওয়ালেটসমূহ</Text>
+                  <Text style={[styles.mmSectionTitle, tStyles.mmSectionTitle]}>{t("mm_wallets_title")}</Text>
                   <TouchableOpacity
                     style={styles.mmAddSmallBtn}
                     onPress={() => {
@@ -8824,14 +8824,14 @@ function TallyKhataApp() {
                       : 'অন্যান্য ফান্ড (Other)';
 
                   return (
-                    <View key={acc.id} style={[styles.mmAccountCard, acc.isArchived && styles.mmAccountCardArchived]}>
+                    <View key={acc.id} style={[styles.mmAccountCard, tStyles.mmAccountCard, acc.isArchived && styles.mmAccountCardArchived]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <View style={[styles.mmAccountIconBox, { backgroundColor: (acc.color || '#3B82F6') + '22', borderColor: (acc.color || '#3B82F6') + '55' }]}>
                           <Text style={styles.mmAccountIcon}>{acc.icon || '💼'}</Text>
                         </View>
                         <View style={{ flex: 1, marginLeft: 12 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.mmAccountName} numberOfLines={1}>
+                            <Text style={[styles.mmAccountName, tStyles.mmAccountName]} numberOfLines={1}>
                               {acc.name}
                             </Text>
                             {acc.isArchived && (
@@ -8866,27 +8866,27 @@ function TallyKhataApp() {
                           accessibilityRole="button"
                           accessibilityLabel="ফান্ড স্থানান্তর"
                         >
-                          <Text style={styles.mmAccountActionText}>{t('mm_transfer_btn')}</Text>
+                          <Text style={[styles.mmAccountActionText, tStyles.mmAccountActionText]}>{t('mm_transfer_btn')}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={styles.mmAccountArchiveBtn}
+                          style={[styles.mmAccountArchiveBtn, tStyles.mmAccountArchiveBtn]}
                           onPress={() => handleArchiveMMAccount(acc.id, !acc.isArchived)}
                           accessibilityRole="button"
                           accessibilityLabel={acc.isArchived ? "সক্রিয় করুন" : "আর্কাইভ করুন"}
                         >
-                          <Text style={styles.mmAccountArchiveText}>
+                          <Text style={[styles.mmAccountArchiveText, tStyles.mmAccountArchiveText]}>
                             {acc.isArchived ? t('mm_unarchive_btn') : t('mm_archive_btn')}
                           </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={styles.mmAccountDeleteBtn}
+                          style={[styles.mmAccountDeleteBtn, tStyles.mmAccountDeleteBtn]}
                           onPress={() => handleDeleteMMAccount(acc.id)}
                           accessibilityRole="button"
                           accessibilityLabel="অ্যাকাউন্ট মুছুন"
                         >
-                          <Text style={styles.mmAccountDeleteText}>🗑️ মুছুন</Text>
+                          <Text style={[styles.mmAccountDeleteText, tStyles.mmAccountDeleteText]}>🗑️ মুছুন</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -8924,7 +8924,7 @@ function TallyKhataApp() {
                   return (
                     <View style={[styles.mmOverallBudgetCard, tStyles.mmCard]}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={[styles.mmOverallBudgetTitle, tStyles.mmCardTitle]}>{t('mm_overall_budget')}</Text>
+                        <Text style={[styles.mmOverallBudgetTitle, tStyles.mmOverallBudgetTitle]}>{t('mm_overall_budget')}</Text>
                         <View style={[styles.mmOverallBudgetBadge, isOver && { backgroundColor: '#EF4444' }]}>
                           <Text style={styles.mmOverallBudgetBadgeText}>
                             {isOver ? '⚠️ বাজেট অতিক্রম' : 'বাজেট সীমার মধ্যে'}
@@ -8935,18 +8935,18 @@ function TallyKhataApp() {
                       <View style={styles.mmOverallBudgetStats}>
                         <View>
                           <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>ব্যয় হয়েছে ({mmPeriod === 'this_month' ? 'এই মাস' : mmPeriod === 'last_month' ? 'গত মাস' : 'সব সময়'})</Text>
-                          <Text style={[styles.mmOverallBudgetSpent, isOver && { color: '#EF4444' }]}>
+                          <Text style={[styles.mmOverallBudgetSpent, tStyles.mmOverallBudgetSpent, isOver && { color: '#EF4444' }]}>
                             ৳ {totalSpent.toLocaleString('en-US')}
                           </Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
                           <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>সর্বোচ্চ সীমা</Text>
-                          <Text style={styles.mmOverallBudgetLimit}>৳ {overallLimit.toLocaleString('en-US')}</Text>
+                          <Text style={[styles.mmOverallBudgetLimit, tStyles.mmOverallBudgetLimit]}>৳ {overallLimit.toLocaleString('en-US')}</Text>
                         </View>
                       </View>
 
                       {/* Progress Bar */}
-                      <View style={styles.mmProgressBarBg}>
+                      <View style={[styles.mmProgressBarBg, tStyles.mmProgressBarBg]}>
                         <View
                           style={[
                             styles.mmProgressBarFill,
@@ -9058,7 +9058,7 @@ function TallyKhataApp() {
                       const isOver = limit > 0 && spent > limit;
 
                       return (
-                        <View key={cat.id} style={styles.mmCatBudgetCard}>
+                        <View key={cat.id} style={[styles.mmCatBudgetCard, tStyles.mmCatBudgetCard]}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <View style={[styles.mmCatBudgetIconBox, { backgroundColor: (cat.color || '#3B82F6') + '22', borderColor: (cat.color || '#3B82F6') + '55' }]}>
                               <Text style={{ fontSize: 18 }}>{cat.icon || '🏷️'}</Text>
@@ -9072,7 +9072,7 @@ function TallyKhataApp() {
                                   </View>
                                 )}
                               </View>
-                              <Text style={styles.mmCatBudgetAmounts}>
+                              <Text style={[styles.mmCatBudgetAmounts, tStyles.mmCatBudgetAmounts]}>
                                 ব্যয়: {mmCurrency} {spent.toLocaleString('en-US')} {limit > 0 ? `• সীমা: ${mmCurrency} ${limit.toLocaleString('en-US')}` : '• কোনো সীমা নেই'}
                               </Text>
                             </View>
@@ -9240,7 +9240,7 @@ function TallyKhataApp() {
                             <Text style={styles.mmGoalTitle} numberOfLines={1}>
                               {g.title}
                             </Text>
-                            {g.targetDate ? <Text style={styles.mmGoalTargetDate}>টার্গেট: {g.targetDate}</Text> : null}
+                            {g.targetDate ? <Text style={[styles.mmGoalTargetDate, tStyles.mmGoalTargetDate]}>টার্গেট: {g.targetDate}</Text> : null}
                             {g.note ? <Text style={styles.mmGoalNote} numberOfLines={1}>{g.note}</Text> : null}
                           </View>
                         </View>
@@ -9288,7 +9288,7 @@ function TallyKhataApp() {
                             accessibilityRole="button"
                             accessibilityLabel="লক্ষ্য মুছুন"
                           >
-                            <Text style={styles.mmGoalDeleteBtnText}>🗑️ মুছুন</Text>
+                            <Text style={[styles.mmGoalDeleteBtnText, tStyles.mmGoalDeleteBtnText]}>🗑️ মুছুন</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -9348,8 +9348,8 @@ function TallyKhataApp() {
                                 </Text>
                               </View>
                               <View style={styles.mmDistributionRight}>
-                                <Text style={styles.mmDistributionAmount}>৳ {item.amount.toLocaleString('en-US')}</Text>
-                                <Text style={styles.mmDistributionPct}>({item.percentage}%)</Text>
+                                <Text style={[styles.mmDistributionAmount, tStyles.mmDistributionAmount]}>৳ {item.amount.toLocaleString('en-US')}</Text>
+                                <Text style={[styles.mmDistributionPct, tStyles.mmDistributionPct]}>({item.percentage}%)</Text>
                               </View>
                               <View style={styles.mmProgressBarBg}>
                                 <View
@@ -9440,9 +9440,9 @@ function TallyKhataApp() {
               {/* Amount */}
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>টাকার পরিমাণ (৳)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="0.00"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmNewAmount}
                 onChangeText={setMmNewAmount}
@@ -9541,9 +9541,9 @@ function TallyKhataApp() {
               {/* Payee / Merchant */}
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>প্রাপক বা প্রতিষ্ঠান (ঐচ্ছিক)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: স্বপ্ন সুপারশপ, ডেসকো, দোকান"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmNewPayee}
                 onChangeText={setMmNewPayee}
               />
@@ -9551,9 +9551,9 @@ function TallyKhataApp() {
               {/* Note */}
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>নোট বা বিবরণ</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="লেনদেনের সংক্ষিপ্ত বিবরণ..."
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmNewNote}
                 onChangeText={setMmNewNote}
               />
@@ -9585,9 +9585,9 @@ function TallyKhataApp() {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>টাকার পরিমাণ (৳)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="0.00"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmEditAmount}
                 onChangeText={setMmEditAmount}
@@ -9633,18 +9633,18 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>প্রাপক বা প্রতিষ্ঠান</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: স্বপ্ন সুপারশপ"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmEditPayee}
                 onChangeText={setMmEditPayee}
               />
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>নোট বা বিবরণ</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="লেনদেনের বিবরণ..."
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmEditNote}
                 onChangeText={setMmEditNote}
               />
@@ -9676,9 +9676,9 @@ function TallyKhataApp() {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>অ্যাকাউন্টের নাম</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: সিটি ব্যাংক, ডাচ-বাংলা, রকেট"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmNewAccName}
                 onChangeText={setMmNewAccName}
               />
@@ -9705,9 +9705,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>প্রারম্ভিক ব্যালেন্স (৳)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="0.00"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmNewAccBal}
                 onChangeText={setMmNewAccBal}
@@ -9770,9 +9770,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>মাসিক বাজেট সীমা (৳) - ০ দিলে বাজেট প্রত্যাহার হবে</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: ৫০০০"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmBudgetLimit}
                 onChangeText={setMmBudgetLimit}
@@ -9809,9 +9809,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>মোট মাসিক ব্যয় সীমা (৳)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: ৪০,০০০"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmOverallBudgetInput}
                 onChangeText={setMmOverallBudgetInput}
@@ -9844,9 +9844,9 @@ function TallyKhataApp() {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>ক্যাটাগরির নাম</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: ইন্টারনেট ও ওয়াইফাই, উপহার"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmNewCatName}
                 onChangeText={setMmNewCatName}
               />
@@ -9897,7 +9897,7 @@ function TallyKhataApp() {
                   <TextInput
                     style={[styles.mmInput, tStyles.mmInput]}
                     placeholder="যেমন: ৩০০০"
-                    placeholderTextColor="#64748B"
+                    placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                     keyboardType="numeric"
                     value={mmNewCatBudget}
                     onChangeText={setMmNewCatBudget}
@@ -9932,18 +9932,18 @@ function TallyKhataApp() {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>লক্ষ্যের শিরোনাম</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: নতুন ল্যাপটপ, বাইক ক্রয়, ঈদ শপিং"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmGoalTitle}
                 onChangeText={setMmGoalTitle}
               />
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>লক্ষ্যমাত্রা (Target Amount ৳)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: ৭৫০০০"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmGoalTarget}
                 onChangeText={setMmGoalTarget}
@@ -9951,9 +9951,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>প্রাথমিক সঞ্চিত জমা (ঐচ্ছিক ৳)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="0.00"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmGoalInitial}
                 onChangeText={setMmGoalInitial}
@@ -9961,9 +9961,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>টার্গেট তারিখ (ঐচ্ছিক)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: 2026-12-31"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmGoalDate}
                 onChangeText={setMmGoalDate}
               />
@@ -9983,9 +9983,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>সংক্ষিপ্ত নোট বা উদ্দেশ্য</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="লক্ষ্যের বিবরণ..."
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmGoalNote}
                 onChangeText={setMmGoalNote}
               />
@@ -10031,9 +10031,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>জমার পরিমাণ (৳)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: ৫০০০"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmDepositAmt}
                 onChangeText={setMmDepositAmt}
@@ -10119,9 +10119,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>স্থানান্তরের পরিমাণ (৳)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="0.00"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmTransferAmt}
                 onChangeText={setMmTransferAmt}
@@ -10129,9 +10129,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>নোট বা উদ্দেশ্য</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: এটিএম হতে নগদ উত্তোলন"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmTransferNote}
                 onChangeText={setMmTransferNote}
               />
@@ -10324,7 +10324,7 @@ function TallyKhataApp() {
                   const targetAcc = (moneyManagerState.accounts || []).find(a => a.id === rec.accountId);
 
                   return (
-                    <View key={rec.id} style={styles.mmScheduleCard}>
+                    <View key={rec.id} style={[styles.mmScheduleCard, tStyles.mmScheduleCard]}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <View style={{ flex: 1, marginRight: 8 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -10335,7 +10335,7 @@ function TallyKhataApp() {
                               </Text>
                             </View>
                           </View>
-                          <Text style={styles.mmScheduleMeta}>
+                          <Text style={[styles.mmScheduleMeta, tStyles.mmScheduleMeta]}>
                             🔄 {cadenceBn} • পরবর্তী: {rec.nextDueDate || 'নির্ধারিত নয়'}
                           </Text>
                           {targetAcc ? (
@@ -10344,7 +10344,7 @@ function TallyKhataApp() {
                             </Text>
                           ) : null}
                           {rec.note ? (
-                            <Text style={styles.mmScheduleNote}>{rec.note}</Text>
+                            <Text style={[styles.mmScheduleNote, tStyles.mmScheduleNote]}>{rec.note}</Text>
                           ) : null}
                         </View>
                         <Text style={[styles.mmScheduleAmount, isInc ? { color: '#10B981' } : isExp ? { color: '#EF4444' } : { color: '#3B82F6' }]}>
@@ -10427,18 +10427,18 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>শিডিউল শিরোনাম</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: বাসা ভাড়া, ডিপিএস জমা, ওয়াইফাই বিল"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmRecTitle}
                 onChangeText={setMmRecTitle}
               />
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>পরিমাণ (৳)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="0.00"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 keyboardType="numeric"
                 value={mmRecAmount}
                 onChangeText={setMmRecAmount}
@@ -10467,9 +10467,9 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>পরবর্তী জমার তারিখ (YYYY-MM-DD)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="YYYY-MM-DD"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmRecNextDue}
                 onChangeText={setMmRecNextDue}
               />
@@ -10550,18 +10550,18 @@ function TallyKhataApp() {
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>প্রাপক / ব্যক্তি (Payee / Source)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="যেমন: বাড়িওয়ালা, অফিস, ডেসকো"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmRecPayee}
                 onChangeText={setMmRecPayee}
               />
 
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>নোট (Note)</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="অতিরিক্ত তথ্য..."
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmRecNote}
                 onChangeText={setMmRecNote}
               />
@@ -10595,9 +10595,9 @@ function TallyKhataApp() {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>ক্যাটাগরির নাম</Text>
               <TextInput
-                style={styles.mmInput}
+                style={[styles.mmInput, tStyles.mmInput]}
                 placeholder="ক্যাটাগরির নাম..."
-                placeholderTextColor="#64748B"
+                placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                 value={mmEditCatName}
                 onChangeText={setMmEditCatName}
               />
@@ -10638,7 +10638,7 @@ function TallyKhataApp() {
                   <TextInput
                     style={[styles.mmInput, tStyles.mmInput]}
                     placeholder="0.00"
-                    placeholderTextColor="#64748B"
+                    placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
                     keyboardType="numeric"
                     value={mmEditCatBudget}
                     onChangeText={setMmEditCatBudget}
@@ -14604,15 +14604,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   mmScheduleCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmScheduleTitle: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 15,
     fontWeight: 'bold',
   },
@@ -14728,7 +14728,7 @@ const styles = StyleSheet.create({
   mmSubTabsContainer: {
     flexDirection: 'row',
     marginTop: 14,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#F1F5F9',
     borderRadius: 12,
     padding: 4,
   },
@@ -14739,15 +14739,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   mmSubTabBtnActive: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
   },
   mmSubTabLabel: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 11,
     fontWeight: '500',
   },
   mmSubTabLabelActive: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontWeight: 'bold',
   },
 
@@ -14755,12 +14755,12 @@ const styles = StyleSheet.create({
   mmSearchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 10,
     paddingHorizontal: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmSearchIcon: {
     fontSize: 14,
@@ -14768,7 +14768,7 @@ const styles = StyleSheet.create({
   },
   mmSearchInput: {
     flex: 1,
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 13,
     paddingVertical: 9,
   },
@@ -14776,17 +14776,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#F1F5F9',
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmFilterChipActive: {
     backgroundColor: '#2563EB',
     borderColor: '#3B82F6',
   },
   mmFilterChipText: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 12,
     fontWeight: '500',
   },
@@ -14808,29 +14808,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 14,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#F1F5F9',
     marginRight: 6,
   },
   mmSortChipActive: {
-    backgroundColor: '#334155',
+    backgroundColor: '#2563EB',
   },
   mmSortChipText: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 11,
   },
   mmSortChipTextActive: {
-    color: '#F8FAFC',
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
 
   /* Transactions List */
   mmTxnCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmTxnIconBox: {
     width: 40,
@@ -14844,7 +14844,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   mmTxnCat: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -14854,7 +14854,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   mmTxnNote: {
-    color: '#94A3B8',
+    color: '#475569',
     fontSize: 12,
     marginTop: 2,
   },
@@ -14873,17 +14873,17 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#334155',
+    borderTopColor: '#E2E8F0',
   },
   mmTxnActionBtn: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: '#334155',
+    backgroundColor: '#F1F5F9',
     borderRadius: 6,
     marginRight: 8,
   },
   mmTxnActionBtnText: {
-    color: '#CBD5E1',
+    color: '#334155',
     fontSize: 11,
     fontWeight: '500',
   },
@@ -14907,7 +14907,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   mmSectionTitle: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 15,
     fontWeight: 'bold',
   },
@@ -14923,12 +14923,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   mmAccountCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmAccountCardArchived: {
     opacity: 0.6,
@@ -14945,17 +14945,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   mmAccountName: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 15,
     fontWeight: '600',
   },
   mmAccountType: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 12,
     marginTop: 2,
   },
   mmAccountBalance: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 17,
     fontWeight: 'bold',
   },
@@ -14976,31 +14976,31 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#334155',
+    borderTopColor: '#E2E8F0',
   },
   mmAccountActionBtn: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: '#334155',
+    backgroundColor: '#F1F5F9',
     borderRadius: 6,
     marginRight: 8,
   },
   mmAccountActionText: {
-    color: '#CBD5E1',
+    color: '#334155',
     fontSize: 11,
     fontWeight: '500',
   },
   mmAccountArchiveBtn: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: '#1E293B',
-    borderColor: '#475569',
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
     borderWidth: 1,
     borderRadius: 6,
     marginRight: 8,
   },
   mmAccountArchiveText: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 11,
   },
   mmAccountDeleteBtn: {
@@ -15032,14 +15032,14 @@ const styles = StyleSheet.create({
 
   /* Budgets */
   mmOverallBudgetCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmOverallBudgetTitle: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 15,
     fontWeight: 'bold',
   },
@@ -15061,7 +15061,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   mmOverallBudgetSpent: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 18,
     fontWeight: 'bold',
     marginTop: 2,
@@ -15074,7 +15074,7 @@ const styles = StyleSheet.create({
   },
   mmProgressBarBg: {
     height: 8,
-    backgroundColor: '#334155',
+    backgroundColor: '#E2E8F0',
     borderRadius: 4,
     overflow: 'hidden',
     marginTop: 6,
@@ -15087,21 +15087,21 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 8,
     alignItems: 'center',
-    backgroundColor: '#334155',
+    backgroundColor: '#F1F5F9',
     borderRadius: 8,
   },
   mmOverallBudgetBtnText: {
-    color: '#CBD5E1',
+    color: '#334155',
     fontSize: 12,
     fontWeight: 'bold',
   },
   mmCatBudgetCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmCatBudgetIconBox: {
     width: 38,
@@ -15112,7 +15112,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   mmCatBudgetName: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -15124,23 +15124,23 @@ const styles = StyleSheet.create({
   mmCatBudgetBtn: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: '#334155',
+    backgroundColor: '#F1F5F9',
     borderRadius: 6,
   },
   mmCatBudgetBtnText: {
-    color: '#CBD5E1',
+    color: '#334155',
     fontSize: 11,
     fontWeight: '500',
   },
 
   /* Savings Goals */
   mmGoalCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmGoalIconBox: {
     width: 44,
@@ -15151,7 +15151,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   mmGoalTitle: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 15,
     fontWeight: 'bold',
   },
@@ -15185,7 +15185,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#334155',
+    borderTopColor: '#E2E8F0',
   },
   mmGoalDepositBtn: {
     backgroundColor: '#10B981',
@@ -15212,14 +15212,14 @@ const styles = StyleSheet.create({
 
   /* Analytics & Insights */
   mmAnalyticsCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmAnalyticsTitle: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 15,
     fontWeight: 'bold',
     marginBottom: 8,
@@ -15237,7 +15237,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   mmDistributionName: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 13,
     fontWeight: '500',
     flex: 1,
@@ -15248,7 +15248,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   mmDistributionAmount: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 13,
     fontWeight: 'bold',
     marginRight: 4,
@@ -15313,7 +15313,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   mmModalSheet: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -15326,10 +15326,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
+    borderBottomColor: '#E2E8F0',
   },
   mmModalTitle: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 17,
     fontWeight: 'bold',
   },
@@ -15344,15 +15344,15 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   mmInput: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#F8FAFC',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 11,
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 15,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#CBD5E1',
   },
   mmCatChip: {
     flexDirection: 'row',
@@ -15360,10 +15360,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#F1F5F9',
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmCatChipActive: {
     backgroundColor: '#2563EB',
@@ -15382,10 +15382,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     borderRadius: 8,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#F1F5F9',
     marginHorizontal: 4,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmTypeBtnExpense: {
     backgroundColor: '#7F1D1D',
@@ -15412,13 +15412,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
   },
   mmIconChipActive: {
     borderColor: '#3B82F6',
