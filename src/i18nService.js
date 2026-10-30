@@ -1227,6 +1227,22 @@ const STRINGS = {
 // This is display-only: it is applied to literal UI text and never to names,
 // notes, payees, or other values loaded from user storage.
 const APP_STATIC_TEXT_EN = {
+  "নির্বাচিত ক্ষেত্র:": "Selected scope:",
+  "গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে।\n\n• রিস্টোরের ক্ষেত্র:": "A local safety backup of current data will be created before restoring from Google Drive.\n\n• Restore scope:",
+  "গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে। • রিস্টোরের ক্ষেত্র:": "A local safety backup of current data will be created before restoring from Google Drive. • Restore scope:",
+
+  "সক্রিয় ব্যবসার আইডি পাওয়া যায়নি। ক্যাশবক্স সমন্বয় করা সম্ভব নয়।": "Active business ID not found. Cannot reconcile cashbox.",
+  "নির্বাচিত ব্যবসাটি অকার্যকর বা পাওয়া যায়নি। অনুগ্রহ করে সঠিক ব্যবসা নির্বাচন করুন।": "The selected business is invalid or not found. Please select a valid business.",
+  "সব ডেটা": "All Data",
+  "শুধুমাত্র ব্যবসার খাতা": "Business Data Only",
+  "ব্যক্তিগত আয়-ব্যয়": "Personal Finance",
+  "গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে।\n\n• রিস্টোরের ক্ষেত্র: ": "A local safety backup of current data will be created before restoring from Google Drive.\n\n• Restore scope: ",
+  "নির্বাচিত ব্যবসাটি অকার্যকর বা পাওয়া যায়নি।": "The selected business is invalid or not found.",
+  "রিস্টোর করার ক্ষেত্র নির্বাচন করুন:": "Select data domain to restore:",
+  "অফলাইন ব্যাকআপ রিস্টোর": "Offline Backup Restore",
+  "নির্বাচিত ক্ষেত্র: ": "Selected scope: ",
+  "আপনি কি নিশ্চিত অফলাইন ব্যাকআপ রিস্টোর করতে চান?": "Are you sure you want to restore offline backup?",
+
   'একটি সমস্যা হয়েছে': 'Something went wrong',
   'পুনরায় চেষ্টা করুন': 'Try again',
   'ডাটা রিসেট করে শুরু করুন': 'Reset data and start over',

@@ -92,23 +92,24 @@ function establishAccountOpeningBalance(account, allJournals = []) {
 
   const isCust = account.type === 1;
   const targetAccId = String(account.id);
-  let jNet = 0;
+  let jNetPaisa = 0;
   let hasInvalid = false;
 
   for (const j of allJournals) {
-    if (String(j.accountId) === targetAccId) {
-      const amt = Number(j.amount);
-      if (isNaN(amt)) {
+    if (String(j.accountId) === targetAccId && (!account.businessId || !j.businessId || String(j.businessId) === String(account.businessId))) {
+      const numAmt = Number(j.amount);
+      if (isNaN(numAmt)) {
         hasInvalid = true;
         break;
       }
+      const amtPaisa = Math.round(numAmt * 100);
       if (isCust) {
-        if (j.type === 'given') jNet += amt;
-        else if (j.type === 'received') jNet -= amt;
+        if (j.type === 'given') jNetPaisa += amtPaisa;
+        else if (j.type === 'received') jNetPaisa -= amtPaisa;
         else hasInvalid = true;
       } else {
-        if (j.type === 'received') jNet += amt;
-        else if (j.type === 'given') jNet -= amt;
+        if (j.type === 'received') jNetPaisa += amtPaisa;
+        else if (j.type === 'given') jNetPaisa -= amtPaisa;
         else hasInvalid = true;
       }
     }
@@ -116,7 +117,8 @@ function establishAccountOpeningBalance(account, allJournals = []) {
 
   const storedBal = Number(account.balance);
   if (!isNaN(storedBal) && !hasInvalid) {
-    return Math.round((storedBal - jNet) * 100) / 100;
+    const storedPaisa = Math.round(storedBal * 100);
+    return Math.round(storedPaisa - jNetPaisa) / 100;
   }
   return 0;
 }
@@ -147,7 +149,7 @@ function recalculateAccountRunningBalances(account, allJournals = []) {
   const otherJournals = [];
 
   for (const j of allJournals) {
-    if (String(j.accountId) === targetAccId) {
+    if (String(j.accountId) === targetAccId && (!account.businessId || !j.businessId || String(j.businessId) === String(account.businessId))) {
       targetJournals.push({ ...j });
     } else {
       otherJournals.push(j);
@@ -180,21 +182,22 @@ function recalculateAccountRunningBalances(account, allJournals = []) {
     openingBal = Number(account.initialBalance) || 0;
   }
 
-  // Calculate sequential running balance starting from openingBal baseline
-  let running = openingBal;
+  // Calculate sequential running balance starting from openingBal baseline in integer paisa
+  let runningPaisa = Math.round(openingBal * 100);
   for (const j of targetJournals) {
-    const amt = Number(j.amount) || 0;
+    const numAmt = Number(j.amount) || 0;
+    const amtPaisa = Math.round(numAmt * 100);
     if (isCustomer) {
-      if (j.type === 'given') running += amt;
-      else if (j.type === 'received') running -= amt;
+      if (j.type === 'given') runningPaisa += amtPaisa;
+      else if (j.type === 'received') runningPaisa -= amtPaisa;
     } else {
-      if (j.type === 'received') running += amt;
-      else if (j.type === 'given') running -= amt;
+      if (j.type === 'received') runningPaisa += amtPaisa;
+      else if (j.type === 'given') runningPaisa -= amtPaisa;
     }
-    j.runningBalance = Math.round(running * 100) / 100;
+    j.runningBalance = runningPaisa / 100;
   }
 
-  const finalBalance = Math.round(running * 100) / 100;
+  const finalBalance = runningPaisa / 100;
   const updatedAccount = {
     ...account,
     balance: finalBalance,
@@ -362,6 +365,85 @@ function migrateV5toV6(rawV5Data) {
   }
 }
 
+
+function calculateAggregateMetrics(accounts = [], journals = [], businessId = null) {
+  let totalReceivablePaisa = 0;
+  let totalPayablePaisa = 0;
+  let customerCount = 0;
+  let supplierCount = 0;
+
+  for (const acc of accounts) {
+    if (!acc) continue;
+    if (businessId && acc.businessId && String(acc.businessId) !== String(businessId)) {
+      continue;
+    }
+    const bal = Number(acc.balance) || 0;
+    const balPaisa = Math.round(bal * 100);
+    if (acc.type === 1) {
+      customerCount++;
+      if (balPaisa > 0) totalReceivablePaisa += balPaisa;
+    } else if (acc.type === 2) {
+      supplierCount++;
+      if (balPaisa > 0) totalPayablePaisa += balPaisa;
+    }
+  }
+
+  return {
+    totalReceivable: totalReceivablePaisa / 100,
+    totalPayable: totalPayablePaisa / 100,
+    netBalance: (totalReceivablePaisa - totalPayablePaisa) / 100,
+    customerCount,
+    supplierCount,
+  };
+}
+
+function deriveCashBoxSummary(cashEntries = [], businessId = null) {
+  let totalInPaisa = 0;
+  let totalOutPaisa = 0;
+
+  for (const entry of cashEntries) {
+    if (!entry) continue;
+    if (businessId && entry.businessId && String(entry.businessId) !== String(businessId)) {
+      continue;
+    }
+    const numAmt = Number(entry.amount) || 0;
+    const amtPaisa = Math.round(numAmt * 100);
+    if (entry.type === 'in') {
+      totalInPaisa += amtPaisa;
+    } else if (entry.type === 'out') {
+      totalOutPaisa += amtPaisa;
+    }
+  }
+
+  const cashIn = totalInPaisa / 100;
+  const cashOut = totalOutPaisa / 100;
+  const balance = (totalInPaisa - totalOutPaisa) / 100;
+
+  return {
+    cashIn,
+    cashOut,
+    balance,
+    netCash: balance,
+  };
+}
+
+function indexJournalsByAccount(allJournals = [], businessId = null) {
+  const map = new Map();
+  for (const j of allJournals) {
+    if (!j || j.accountId === undefined || j.accountId === null) continue;
+    const effectiveBizId = j.businessId || businessId || 'default';
+    if (businessId && j.businessId && String(j.businessId) !== String(businessId)) {
+      continue;
+    }
+    const key = `${effectiveBizId}:${j.accountId}`;
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push(j);
+  }
+  return map;
+}
+
 const ledgerEngine = {
   generateUniqueId,
   validateTransaction,
@@ -372,6 +454,9 @@ const ledgerEngine = {
   syncCashboxForTransaction,
   removeCashEntriesForTransactions,
   migrateV5toV6,
+  calculateAggregateMetrics,
+  deriveCashBoxSummary,
+  indexJournalsByAccount,
   V5_KEY,
   V6_KEY,
   V5_BACKUP_KEY,

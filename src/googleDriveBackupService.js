@@ -214,6 +214,14 @@ function buildBackupPayload(authoritativeState, userProfile, options = {}) {
       ownerPhone: rawData.ownerPhone,
       totalDue: accounts.filter(a => a.type === 1 && a.balance > 0).reduce((sum, a) => sum + (Number(a.balance) || 0), 0),
     },
+    moneyManagerSummary: mmData && typeof mmData === 'object' ? {
+      accountsCount: (mmData.accounts || []).length,
+      txnsCount: (mmData.transactions || []).length,
+      categoriesCount: (mmData.categories || []).length,
+      goalsCount: (mmData.goals || []).length,
+      recurringCount: (mmData.recurring || []).length,
+      netWorth: (mmData.accounts || []).filter(a => !a.isArchived).reduce((sum, a) => sum + (Number(a.balance) || 0), 0),
+    } : null,
     checksum,
   };
 
@@ -463,7 +471,7 @@ class GoogleDriveBackupService {
    */
   async findBackupFile(accessToken) {
     const query = encodeURIComponent("name = '" + BACKUP_FILENAME + "' and trashed = false");
-    const url = this.driveApiBase + '/files?spaces=appDataFolder&q=' + query + '&fields=files(id,name,size,modifiedTime,createdTime,appProperties,description)';
+    const url = this.driveApiBase + '/files?spaces=appDataFolder&q=' + query + '&fields=files(id,name,size,modifiedTime,createdTime,appProperties,description)&orderBy=modifiedTime desc';
 
     const res = await this.fetchWithTimeout(url, {
       headers: { Authorization: 'Bearer ' + accessToken },
@@ -568,6 +576,8 @@ class GoogleDriveBackupService {
         schemaVersion: String(backupPayload.manifest.schemaVersion),
         createdAt: backupPayload.manifest.createdAt,
         totalAccounts: String(backupPayload.manifest.recordCounts.accounts),
+        totalJournals: String(backupPayload.manifest.recordCounts.journals || 0),
+        hasMoneyManager: String(Boolean(backupPayload.manifest.hasMoneyManager)),
       },
     };
 
@@ -711,7 +721,7 @@ async function orchestrateCloudRestore({
     }
 
     // Create fresh safety snapshot strictly bound to this restore attempt
-    restoreSnapshot = await storageRepository.createLocalSafetySnapshot();
+    restoreSnapshot = await storageRepository.createLocalSafetySnapshot(null, extraState);
     if (!restoreSnapshot || !restoreSnapshot.success) {
       const failReason = restoreSnapshot && restoreSnapshot.reason ? restoreSnapshot.reason : 'অজানা ত্রুটি';
       throw new Error('রিস্টোর করার পূর্বে লোকাল সেফটি স্ন্যাপশট প্রস্তুত করা যায়নি: ' + failReason);
@@ -725,6 +735,7 @@ async function orchestrateCloudRestore({
       resetPin: true,
       domains,
       extraState,
+      snapshotId: restoreSnapshot.snapshotId,
     });
 
     if (!commitResult || !commitResult.success) {
@@ -1030,6 +1041,18 @@ function verifyUploadedBackupMatches(uploadedPayload, downloadedResult, expected
     };
   }
 
+  if (uploadedManifest.hasMoneyManager) {
+    if (
+      Number(expCounts.mmAccounts || 0) !== Number(downCounts.mmAccounts || 0) ||
+      Number(expCounts.mmTransactions || 0) !== Number(downCounts.mmTransactions || 0)
+    ) {
+      return {
+        valid: false,
+        reason: 'মানি ম্যানেজার রেকর্ড কাউন্ট অমিল: হিসাব (' + (expCounts.mmAccounts || 0) + ' vs ' + (downCounts.mmAccounts || 0) + '), লেনদেন (' + (expCounts.mmTransactions || 0) + ' vs ' + (downCounts.mmTransactions || 0) + ')',
+      };
+    }
+  }
+
   if (
     uploadedManifest.schemaVersion !== downloadedManifest.schemaVersion ||
     uploadedManifest.backupFormatVersion !== downloadedManifest.backupFormatVersion
@@ -1117,6 +1140,7 @@ async function orchestrateCloudBackup({
       uploadRes = await driveService.uploadBackup(token, payload, existingFileId);
     } catch (uploadErr) {
       const isAuthErr = uploadErr && uploadErr.message && (uploadErr.message.includes('401') || uploadErr.message.toLowerCase().includes('unauthorized'));
+      const isNotFoundErr = uploadErr && uploadErr.message && (uploadErr.message.includes('404') || uploadErr.message.toLowerCase().includes('not found'));
       if (isAuthErr && typeof getAccessToken === 'function') {
         console.log('[CloudBackup] 401 Unauthorized during upload. Refreshing token...');
         const freshToken = await getAccessToken(true);
@@ -1124,6 +1148,9 @@ async function orchestrateCloudBackup({
           token = freshToken;
           uploadRes = await driveService.uploadBackup(freshToken, payload, existingFileId);
         }
+      } else if (isNotFoundErr && existingFileId) {
+        console.log('[CloudBackup] 404 Not Found on existing file PATCH. Creating fresh backup in appDataFolder...');
+        uploadRes = await driveService.uploadBackup(token, payload, null);
       }
       if (!uploadRes) throw uploadErr;
     }

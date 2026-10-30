@@ -610,6 +610,8 @@ function TallyKhataApp() {
   const [appPin, setAppPin] = useState('');
   const [isLocked, setIsLocked] = useState(false);
   const [pinInput, setPinInput] = useState('');
+  const pinEnabledRef = useRef(pinEnabled);
+  pinEnabledRef.current = pinEnabled;
 
   // Selected Entities
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -704,6 +706,13 @@ function TallyKhataApp() {
   const [cloudBackupStatus, setCloudBackupStatus] = useState('idle'); // 'idle' | 'checking' | 'backing_up' | 'restoring' | 'success' | 'error'
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
   const [cloudRestoreConfirmVisible, setCloudRestoreConfirmVisible] = useState(false);
+  const [restoreDomain, setRestoreDomain] = useState('all'); // 'all' | 'business' | 'moneyManager'
+
+  const getSelectedRestoreDomains = (dom = restoreDomain) => {
+    if (dom === 'business') return ['business'];
+    if (dom === 'moneyManager') return ['moneyManager'];
+    return ['all'];
+  };
 
   // Business Picker State (BusinessPickerBottomSheet)
   const [businesses, setBusinesses] = useState([
@@ -752,7 +761,11 @@ function TallyKhataApp() {
       : null;
     const appStateSub = (typeof AppState !== 'undefined' && AppState.addEventListener)
       ? AppState.addEventListener('change', (nextState) => {
-          if (nextState === 'active') {
+          if (nextState === 'background' || nextState === 'inactive') {
+            if (pinEnabledRef.current) {
+              setIsLocked(true);
+            }
+          } else if (nextState === 'active') {
             try {
               if (typeof Appearance !== 'undefined' && Appearance.getColorScheme) {
                 setSystemColorScheme(Appearance.getColorScheme() || 'light');
@@ -792,7 +805,13 @@ function TallyKhataApp() {
   const tMMSeed = (kind, id, value, field = '') => (
     i18nService.translateMoneyManagerDefaultValue(kind, id, value, effectiveLanguage, field)
   );
-  const tStyles = useMemo(() => themeService.getThemedStyles(currentTheme, isDark), [currentTheme, isDark]);
+  const tStyles = useMemo(() => {
+    const base = themeService.getThemedStyles(currentTheme, isDark);
+    return {
+      ...base,
+      text: base.textPrimary,
+    };
+  }, [currentTheme, isDark]);
   const formatAppNumber = (n) => (effectiveLanguage === "en" ? String(n !== undefined && n !== null ? Number(n).toLocaleString("en-IN") : "0") : toBengaliNumber(n));
   const formatMoney = (amount) => (effectiveLanguage === 'en'
     ? (Number(amount) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
@@ -2457,6 +2476,16 @@ function TallyKhataApp() {
   };
 
   const handleSaveReconciliation = async () => {
+    if (!activeBusinessId || typeof activeBusinessId !== 'string' || !activeBusinessId.trim()) {
+      Alert.alert(tStatic("ত্রুটি"), tStatic("সক্রিয় ব্যবসার আইডি পাওয়া যায়নি। ক্যাশবক্স সমন্বয় করা সম্ভব নয়।"));
+      return;
+    }
+    const currentBiz = Array.isArray(businesses) ? businesses.find((b) => String(b.id) === String(activeBusinessId) && !b.isArchived) : null;
+    if (!currentBiz) {
+      Alert.alert(tStatic("ত্রুটি"), tStatic("নির্বাচিত ব্যবসাটি অকার্যকর বা পাওয়া যায়নি। অনুগ্রহ করে সঠিক ব্যবসা নির্বাচন করুন।"));
+      return;
+    }
+
     const counted = parseFloat(countedCash);
     if (isNaN(counted)) {
       Alert.alert(tStatic("সতর্কতা"), tStatic("ড্রয়ারের আসল ক্যাশ টাকার পরিমাণ লিখুন"));
@@ -2468,9 +2497,10 @@ function TallyKhataApp() {
       setModalReconcileCash(false);
       return;
     }
-    // Record adjustment
+    // Record adjustment explicitly tagged with active business
     const adjEntry = {
       id: generateUniqueId('adj_'),
+      businessId: String(activeBusinessId),
       category: diff > 0 ? 'malik_in' : 'cost',
       type: diff > 0 ? 'in' : 'out',
       amount: Math.abs(diff),
@@ -2491,6 +2521,7 @@ function TallyKhataApp() {
     setModalReconcileCash(false);
     Alert.alert(tStatic("সফল"), tStatic("ক্যাশবক্স সমন্বয় রেকর্ড সম্পন্ন হয়েছে।"));
   };
+  const handleReconcileCash = handleSaveReconciliation;
 
   // --- HANDLER: STOCK INVENTORY ---
   const handleSaveProduct = async () => {
@@ -2977,6 +3008,19 @@ function TallyKhataApp() {
   };
 
   const executeCloudBackup = async () => {
+    let latestMM = moneyManagerState;
+    try {
+      const persisted = await AsyncStorage.getItem(MM_STORAGE_KEY);
+      if (persisted) {
+        const parsed = JSON.parse(persisted);
+        if (parsed && typeof parsed === 'object') {
+          latestMM = parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('[executeCloudBackup] Failed to read persisted Money Manager state:', e);
+    }
+
     return orchestrateCloudBackup({
       storageRepository,
       driveService: googleDriveBackupService,
@@ -2984,7 +3028,7 @@ function TallyKhataApp() {
       googleUser,
       existingFileId: cloudBackupMetadata ? cloudBackupMetadata.fileId : null,
       extraData: {
-        moneyManager: moneyManagerState,
+        moneyManager: latestMM,
         preferences: { theme: appTheme, language: appLanguage },
       },
       onStatusChange: setCloudBackupStatus,
@@ -3075,11 +3119,21 @@ function TallyKhataApp() {
         await persistData({ cloudBackupMetadata: meta });
       },
       onStateCommitted: (newState) => {
-        applyStateToUi(newState, { resetPin: true });
+        const isBusinessRestored = !domains || domains.includes('all') || domains.includes('business');
+        applyStateToUi(newState, { resetPin: isBusinessRestored });
       },
-      onMoneyManagerRestored: (newMM) => {
+      onMoneyManagerRestored: async (newMM) => {
         if (newMM) {
-          setMoneyManagerState(newMM);
+          let processed = newMM;
+          try {
+            if (moneyManagerService && typeof moneyManagerService.processRecurringTransactions === 'function') {
+              processed = moneyManagerService.processRecurringTransactions(newMM, getTodayDate());
+            }
+          } catch (_) {}
+          setMoneyManagerState(processed);
+          try {
+            await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(processed));
+          } catch (_) {}
         }
       },
       onPreferencesRestored: (newPrefs) => {
@@ -3182,14 +3236,22 @@ function TallyKhataApp() {
       ? new Date(meta.modifiedTime).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       : 'আজ';
     const accCount = toBengaliNumber(meta.manifest?.recordCounts?.accounts || meta.appProperties?.totalAccounts || 0);
-    const jrnCount = toBengaliNumber(meta.manifest?.recordCounts?.journals || 0);
+    const jrnCount = toBengaliNumber(meta.manifest?.recordCounts?.journals || meta.appProperties?.totalJournals || 0);
+
+    const domainLabels = {
+      all: tStatic("সব ডেটা"),
+      business: tStatic("শুধুমাত্র ব্যবসার খাতা"),
+      moneyManager: tStatic("ব্যক্তিগত আয়-ব্যয়"),
+    };
+    const domainText = domainLabels[restoreDomain] || tStatic("সব ডেটা");
+    const chosenDomains = getSelectedRestoreDomains(restoreDomain);
 
     Alert.alert(
       tStatic("অনলাইন ব্যাকআপ রিস্টোর"),
-      `${tStatic("গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে।\n\n• ব্যাকআপের তারিখ: ")}${backupDate}${tStatic("\n• মোট হিসাব: ")}${accCount}${tStatic(" টি\n• মোট লেনদেন: ")}${jrnCount}${tStatic(" টি\n\nআপনি কি নিশ্চিত রিস্টোর করতে চান?")}`,
+      `${tStatic("গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে।\n\n• রিস্টোরের ক্ষেত্র: ")}${domainText}${tStatic("\n• ব্যাকআপের তারিখ: ")}${backupDate}${tStatic("\n• মোট হিসাব: ")}${accCount}${tStatic(" টি\n• মোট লেনদেন: ")}${jrnCount}${tStatic(" টি\n\nআপনি কি নিশ্চিত রিস্টোর করতে চান?")}`,
       [
         { text: tStatic("বাতিল"), style: 'cancel' },
-        { text: tStatic("হ্যাঁ, রিস্টোর করুন"), onPress: executeCloudRestore },
+        { text: tStatic("হ্যাঁ, রিস্টোর করুন"), onPress: () => executeCloudRestore(chosenDomains) },
       ]
     );
   };
@@ -3312,7 +3374,8 @@ function TallyKhataApp() {
     });
   };
 
-  const handleImportBackup = async () => {
+  const handleImportBackup = async (overrideDomains = null) => {
+    const chosenDomains = overrideDomains || getSelectedRestoreDomains(restoreDomain);
     let restoreSnapshot = null;
     try {
       if (!backupJsonText.trim()) {
@@ -3328,10 +3391,18 @@ function TallyKhataApp() {
       }
 
       // Fresh snapshot for this offline import attempt
-      restoreSnapshot = await storageRepository.createLocalSafetySnapshot();
+      restoreSnapshot = await storageRepository.createLocalSafetySnapshot(null, {
+        moneyManager: moneyManagerState,
+        preferences: { theme: appTheme, language: appLanguage },
+      });
 
       const commitRes = await storageRepository.commitRestorePayload(parsed, {
-        snapshotId: restoreSnapshot ? restoreSnapshot.snapshotId : null
+        snapshotId: restoreSnapshot ? restoreSnapshot.snapshotId : null,
+        domains: chosenDomains,
+        extraState: {
+          moneyManager: moneyManagerState,
+          preferences: { theme: appTheme, language: appLanguage },
+        },
       });
       if (!commitRes || !commitRes.success) {
         if (restoreSnapshot && restoreSnapshot.snapshotId) {
@@ -3345,26 +3416,41 @@ function TallyKhataApp() {
         return;
       }
 
-      const newState = commitRes.data;
-      if (Array.isArray(newState.accounts)) setAccounts(newState.accounts);
-      if (Array.isArray(newState.journals)) setJournals(newState.journals);
-      if (Array.isArray(newState.cashEntries)) setCashEntries(newState.cashEntries);
-      const restoredInv = Array.isArray(newState.inventory) ? newState.inventory : (Array.isArray(newState.stock) ? newState.stock : null);
-      if (restoredInv) setInventory(restoredInv);
-      if (Array.isArray(newState.notes)) setNotes(newState.notes);
-      if (Array.isArray(newState.businesses)) setBusinesses(newState.businesses);
-      if (newState.activeBusinessId) setActiveBusinessId(String(newState.activeBusinessId));
-      if (newState.businessName) setBusinessName(newState.businessName);
-      if (newState.ownerName !== undefined) setOwnerName(newState.ownerName);
-      if (newState.ownerPhone !== undefined) setOwnerPhone(newState.ownerPhone);
-      if (newState.businessAddress !== undefined) setBusinessAddress(newState.businessAddress);
-      if (newState.openingBalance !== undefined) setOpeningBalance(Number(newState.openingBalance) || 0);
-      if (newState.walletBalance !== undefined) setWalletBalance(Number(newState.walletBalance) || 0);
-      if (Array.isArray(newState.walletTxns)) setWalletTxns(newState.walletTxns);
-      if (newState.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(newState.tallyMessageBalance) || 50);
+      const shouldRestoreAll = chosenDomains.includes('all');
+      const shouldRestoreBusiness = shouldRestoreAll || chosenDomains.includes('business');
+      const shouldRestoreMM = shouldRestoreAll || chosenDomains.includes('moneyManager');
+      const shouldRestorePrefs = shouldRestoreAll || chosenDomains.includes('preferences');
 
-      setPinEnabled(false);
-      setAppPin('');
+      if (shouldRestoreBusiness) {
+        const newState = commitRes.data;
+        if (Array.isArray(newState.accounts)) setAccounts(newState.accounts);
+        if (Array.isArray(newState.journals)) setJournals(newState.journals);
+        if (Array.isArray(newState.cashEntries)) setCashEntries(newState.cashEntries);
+        const restoredInv = Array.isArray(newState.inventory) ? newState.inventory : (Array.isArray(newState.stock) ? newState.stock : null);
+        if (restoredInv) setInventory(restoredInv);
+        if (Array.isArray(newState.notes)) setNotes(newState.notes);
+        if (Array.isArray(newState.businesses)) setBusinesses(newState.businesses);
+        if (newState.activeBusinessId) setActiveBusinessId(String(newState.activeBusinessId));
+        if (newState.businessName) setBusinessName(newState.businessName);
+        if (newState.ownerName !== undefined) setOwnerName(newState.ownerName);
+        if (newState.ownerPhone !== undefined) setOwnerPhone(newState.ownerPhone);
+        if (newState.businessAddress !== undefined) setBusinessAddress(newState.businessAddress);
+        if (newState.openingBalance !== undefined) setOpeningBalance(Number(newState.openingBalance) || 0);
+        if (newState.walletBalance !== undefined) setWalletBalance(Number(newState.walletBalance) || 0);
+        if (Array.isArray(newState.walletTxns)) setWalletTxns(newState.walletTxns);
+        if (newState.tallyMessageBalance !== undefined) setTallyMessageBalance(Number(newState.tallyMessageBalance) || 50);
+
+        setPinEnabled(false);
+        setAppPin('');
+      }
+
+      if (shouldRestoreMM && commitRes.restoredMoneyManager) {
+        setMoneyManagerState(commitRes.restoredMoneyManager);
+      }
+      if (shouldRestorePrefs && commitRes.restoredPreferences) {
+        if (commitRes.restoredPreferences.theme) setAppTheme(commitRes.restoredPreferences.theme);
+        if (commitRes.restoredPreferences.language) setAppLanguage(commitRes.restoredPreferences.language);
+      }
 
       setModalBackupRestore(false);
       Alert.alert(tStatic("সফল"), tStatic("ডাটা সফলভাবে ব্যাকআপ থেকে পুনরুদ্ধার করা হয়েছে!"));
@@ -3543,10 +3629,26 @@ function TallyKhataApp() {
 
   // --- CASH RECONCILIATION WITH DENOMINATIONS HANDLER ---
   const handleSaveDenominations = async () => {
+    if (!activeBusinessId || typeof activeBusinessId !== 'string' || !activeBusinessId.trim()) {
+      Alert.alert(tStatic("ত্রুটি"), tStatic("সক্রিয় ব্যবসার আইডি পাওয়া যায়নি। ক্যাশবক্স সমন্বয় করা সম্ভব নয়।"));
+      return;
+    }
+    const currentBiz = Array.isArray(businesses) ? businesses.find((b) => String(b.id) === String(activeBusinessId) && !b.isArchived) : null;
+    if (!currentBiz) {
+      Alert.alert(tStatic("ত্রুটি"), tStatic("নির্বাচিত ব্যবসাটি অকার্যকর বা পাওয়া যায়নি।"));
+      return;
+    }
     const totalCounted = countedFromNotes > 0 ? countedFromNotes : (Number(countedCash) || 0);
     const diff = totalCounted - totalCash;
+    if (diff === 0) {
+      setModalReconcileCash(false);
+      resetDenominations();
+      Alert.alert(tStatic("সফল"), tStatic("ক্যাশবক্স পুরোপুরি মিলে গেছে! কোনো গরমিল নেই।"));
+      return;
+    }
     const adjEntry = {
       id: generateUniqueId('adj_'),
+      businessId: String(activeBusinessId),
       category: diff >= 0 ? 'malik_in' : 'cost',
       type: diff >= 0 ? 'in' : 'out',
       amount: Math.abs(diff),
@@ -6062,18 +6164,18 @@ function TallyKhataApp() {
          =================================================================== */}
       <Modal visible={modalAddAccount} animationType="slide" transparent onRequestClose={() => setModalAddAccount(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>{tStatic("নতুন খাতা খুলুন")}</Text>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.text]}>{tStatic("নতুন খাতা খুলুন")}</Text>
               <TouchableOpacity
                 onPress={() => setModalAddAccount(false)}
-                style={styles.modalCloseCircle}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
                 <Image
                 source={require('./assets/icons/ic_close.png')}
-                style={styles.modalCloseIcon}
+                style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
                 resizeMode="contain"
               />
               </TouchableOpacity>
@@ -6095,31 +6197,31 @@ function TallyKhataApp() {
             </View>
 
             <TextInput
-              style={styles.modalSimpleInput}
+              style={[styles.modalSimpleInput, isDark && tStyles.input]}
               placeholder={tStatic("কাস্টমার / সাপ্লায়ারের নাম *")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.textSecondary : COLORS.textSubtle}
               value={accName}
               onChangeText={setAccName}
             />
             <TextInput
-              style={styles.modalSimpleInput}
+              style={[styles.modalSimpleInput, isDark && tStyles.input]}
               placeholder={tStatic("মোবাইল নম্বর (ঐচ্ছিক)")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.textSecondary : COLORS.textSubtle}
               keyboardType="phone-pad"
               value={accPhone}
               onChangeText={setAccPhone}
             />
             <TextInput
-              style={styles.modalSimpleInput}
+              style={[styles.modalSimpleInput, isDark && tStyles.input]}
               placeholder={tStatic("ঠিকানা / এলাকা (ঐচ্ছিক)")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.textSecondary : COLORS.textSubtle}
               value={accAddress}
               onChangeText={setAccAddress}
             />
             <TextInput
-              style={styles.modalSimpleInput}
+              style={[styles.modalSimpleInput, isDark && tStyles.input]}
               placeholder={accType === 1 ? tStatic("পূর্বের বাকি ব্যালেন্স (যদি থাকে)") : tStatic("পূর্বের দেনা ব্যালেন্স (যদি থাকে)")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.textSecondary : COLORS.textSubtle}
               keyboardType="numeric"
               value={accInitialBal}
               onChangeText={setAccInitialBal}
@@ -6145,18 +6247,18 @@ function TallyKhataApp() {
          =================================================================== */}
       <Modal visible={modalAddCash} animationType="slide" transparent onRequestClose={() => setModalAddCash(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>{tStatic("ক্যাশ বাক্সের এন্ট্রি")}</Text>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.text]}>{tStatic("ক্যাশ বাক্সের এন্ট্রি")}</Text>
               <TouchableOpacity
                 onPress={() => setModalAddCash(false)}
-                style={styles.modalCloseCircle}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
                 <Image
                 source={require('./assets/icons/ic_close.png')}
-                style={styles.modalCloseIcon}
+                style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
                 resizeMode="contain"
               />
               </TouchableOpacity>
@@ -6183,18 +6285,18 @@ function TallyKhataApp() {
             </ScrollView>
 
             <TextInput
-              style={styles.modalBigInput}
+              style={[styles.modalBigInput, isDark && tStyles.input]}
               placeholder={tStatic("৳ টাকার পরিমাণ *")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.textSecondary : COLORS.textSubtle}
               keyboardType="numeric"
               autoFocus
               value={cashAmount}
               onChangeText={setCashAmount}
             />
             <TextInput
-              style={styles.modalSimpleInput}
+              style={[styles.modalSimpleInput, isDark && tStyles.input]}
               placeholder={tStatic("বিবরণ (যেমন: পণ্য বিক্রয়, নাস্তা, কারেন্ট বিল)")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.textSecondary : COLORS.textSubtle}
               value={cashDesc}
               onChangeText={setCashDesc}
             />
@@ -6227,7 +6329,7 @@ function TallyKhataApp() {
         onRequestClose={() => setModalReconcileCash(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxHeight: '90%', padding: 16 }]}>
+          <View style={[styles.modalCard, { maxHeight: '90%', padding: 16 }, isDark && tStyles.modalSurface]}>
             <View style={styles.modalHeaderRow}>
               <View>
                 <Text style={styles.modalCardTitle}>{tStatic("ক্যাশবক্স মিলানো (নোট গণনা)")}</Text>
@@ -6348,18 +6450,18 @@ function TallyKhataApp() {
          =================================================================== */}
       <Modal visible={modalBanglaQR} animationType="slide" transparent onRequestClose={() => setModalBanglaQR(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { alignItems: 'center' }]}>
+          <View style={[styles.modalCard, { alignItems: 'center' }, isDark && tStyles.modalSurface]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>{tStatic("বাংলা QR কোড")}</Text>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.text]}>{tStatic("বাংলা QR কোড")}</Text>
               <TouchableOpacity
                 onPress={() => setModalBanglaQR(false)}
-                style={styles.modalCloseCircle}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
                 <Image
                 source={require('./assets/icons/ic_close.png')}
-                style={styles.modalCloseIcon}
+                style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
                 resizeMode="contain"
               />
               </TouchableOpacity>
@@ -6368,7 +6470,7 @@ function TallyKhataApp() {
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.primary, marginTop: 8 }}>
               {businessName}
             </Text>
-            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 16 }}>{tStatic("মার্চেন্ট আইডি: TP-               মার্চেন্ট আইডি: TP-")}{ownerPhone}
+            <Text style={[{ fontSize: 12, color: COLORS.textMuted, marginBottom: 16 }, isDark && tStyles.textSecondary]}>{tStatic("মার্চেন্ট আইডি: TP-               মার্চেন্ট আইডি: TP-")}{ownerPhone}
             </Text>
 
             {/* QR Visual Card */}
@@ -6381,7 +6483,7 @@ function TallyKhataApp() {
               <Text style={styles.qrCenterBadge}>{tStatic("বাংলা QR • ")}{businessName}</Text>
             </View>
 
-            <Text style={{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', marginTop: 12, lineHeight: 18 }}>{tStatic("কাস্টমার তার বিকাশ, নগদ, রকেট বা যেকোনো ব্যাংক অ্যাপ দিয়ে এই কিউআর স্ক্যান করে সরাসরি পেমেন্ট করতে পারবেন।               কাস্টমার তার বিকাশ, নগদ, রকেট বা যেকোনো ব্যাংক অ্যাপ দিয়ে এই কিউআর স্ক্যান করে সরাসরি পেমেন্ট করতে পারবেন।")}</Text>
+            <Text style={[{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', marginTop: 12, lineHeight: 18 }, isDark && tStyles.textSecondary]}>{tStatic("কাস্টমার তার বিকাশ, নগদ, রকেট বা যেকোনো ব্যাংক অ্যাপ দিয়ে এই কিউআর স্ক্যান করে সরাসরি পেমেন্ট করতে পারবেন।               কাস্টমার তার বিকাশ, নগদ, রকেট বা যেকোনো ব্যাংক অ্যাপ দিয়ে এই কিউআর স্ক্যান করে সরাসরি পেমেন্ট করতে পারবেন।")}</Text>
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, width: '100%' }}>
               <TouchableOpacity
@@ -7080,7 +7182,7 @@ function TallyKhataApp() {
          =================================================================== */}
       <Modal visible={modalBackupRestore} animationType="slide" transparent onRequestClose={() => setModalBackupRestore(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxHeight: '92%', padding: 0, overflow: 'hidden' }]}>
+          <View style={[styles.modalCard, { maxHeight: '92%', padding: 0, overflow: 'hidden' }, isDark && tStyles.modalSurface]}>
             {/* Modal Header */}
             <View style={styles.cloudBackupHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -7122,6 +7224,41 @@ function TallyKhataApp() {
             </View>
 
             <ScrollView contentContainerStyle={{ padding: 16 }}>
+              {/* Domain Selection UI for Restore */}
+              <View style={{ marginBottom: 14, backgroundColor: isDark ? currentTheme.cardBgElevated : '#F3F4F6', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: isDark ? currentTheme.cardBorder : '#E5E7EB' }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#374151', marginBottom: 6 }}>
+                  {tStatic("রিস্টোর করার ক্ষেত্র নির্বাচন করুন:")}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                  {[
+                    { key: 'all', label: tStatic("সব ডেটা") },
+                    { key: 'business', label: tStatic("শুধুমাত্র ব্যবসার খাতা") },
+                    { key: 'moneyManager', label: tStatic("ব্যক্তিগত আয়-ব্যয়") },
+                  ].map((dItem) => {
+                    const isSelected = restoreDomain === dItem.key;
+                    return (
+                      <TouchableOpacity
+                        key={dItem.key}
+                        style={{
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          borderRadius: 6,
+                          backgroundColor: isSelected ? (isDark ? '#064E3B' : '#ECFDF5') : (isDark ? currentTheme.cardBg : '#FFFFFF'),
+                          borderWidth: 1.5,
+                          borderColor: isSelected ? '#10B981' : (isDark ? currentTheme.cardBorder : '#D1D5DB'),
+                        }}
+                        onPress={() => setRestoreDomain(dItem.key)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? (isDark ? '#34D399' : '#047857') : (isDark ? currentTheme.textSecondary : '#4B5563') }}>
+                          {isSelected ? '✓ ' : ''}{dItem.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
               {backupActiveTab === 'cloud' ? (
                 <View>
                   {/* Account Connection Status Header */}
@@ -7331,7 +7468,22 @@ function TallyKhataApp() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.backupBtn, { backgroundColor: '#0F8A0F' }]}
-                      onPress={handleImportBackup}
+                      onPress={() => {
+                        const domainLabels = {
+                          all: tStatic("সব ডেটা"),
+                          business: tStatic("শুধুমাত্র ব্যবসার খাতা"),
+                          moneyManager: tStatic("ব্যক্তিগত আয়-ব্যয়"),
+                        };
+                        const domainText = domainLabels[restoreDomain] || tStatic("সব ডেটা");
+                        Alert.alert(
+                          tStatic("অফলাইন ব্যাকআপ রিস্টোর"),
+                          `${tStatic("নির্বাচিত ক্ষেত্র: ")}${domainText}\n${tStatic("আপনি কি নিশ্চিত অফলাইন ব্যাকআপ রিস্টোর করতে চান?")}`,
+                          [
+                            { text: tStatic("বাতিল"), style: 'cancel' },
+                            { text: tStatic("হ্যাঁ, রিস্টোর করুন"), onPress: () => handleImportBackup() },
+                          ]
+                        );
+                      }}
                     >
                       <Text style={styles.backupBtnText}>{tStatic("রিস্টোর")}</Text>
                     </TouchableOpacity>
@@ -7438,31 +7590,32 @@ function TallyKhataApp() {
          =================================================================== */}
       <Modal visible={modalPinSetup} animationType="slide" transparent onRequestClose={() => setModalPinSetup(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>{tStatic("পিন লক সেটিংস")}</Text>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.text]}>{tStatic("পিন লক সেটিংস")}</Text>
               <TouchableOpacity
                 onPress={() => setModalPinSetup(false)}
-                style={styles.modalCloseCircle}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
                 <Image
                 source={require('./assets/icons/ic_close.png')}
-                style={styles.modalCloseIcon}
+                style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
                 resizeMode="contain"
               />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, color: COLORS.textMuted, marginVertical: 8 }}>{tStatic("অ্যাপটি সুরক্ষিত রাখতে ৪ ডিজিটের গোপন পিন কোড সেট করুন:               অ্যাপটি সুরক্ষিত রাখতে ৪ ডিজিটের গোপন পিন কোড সেট করুন:")}</Text>
+            <Text style={[{ fontSize: 13, color: COLORS.textMuted, marginVertical: 8 }, isDark && tStyles.textSecondary]}>{tStatic("অ্যাপটি সুরক্ষিত রাখতে ৪ ডিজিটের গোপন পিন কোড সেট করুন:               অ্যাপটি সুরক্ষিত রাখতে ৪ ডিজিটের গোপন পিন কোড সেট করুন:")}</Text>
 
             <TextInput
-              style={styles.modalBigInput}
+              style={[styles.modalBigInput, isDark && tStyles.input]}
               placeholder={tStatic("৪ ডিজিটের পিন")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.textSecondary : COLORS.textSubtle}
               keyboardType="numeric"
               maxLength={4}
+              secureTextEntry={true}
               value={appPin}
               onChangeText={setAppPin}
             />
@@ -8914,7 +9067,12 @@ function TallyKhataApp() {
                 </View>
 
                 {/* Filter Pills (All / Expense / Income / Transfer) */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 12, paddingRight: 28 }}
+                  style={{ marginBottom: 10 }}
+                >
                   <TouchableOpacity
                     style={[styles.mmFilterChip, tStyles.mmFilterChip, mmTxnFilter === 'all' && [styles.mmFilterChipActive, tStyles.mmFilterChipActive]]}
                     onPress={() => setMmTxnFilter('all')}

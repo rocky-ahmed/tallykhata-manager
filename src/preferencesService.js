@@ -1,3 +1,11 @@
+let _cachedPreferences = null;
+function resetCache() {
+  _cachedPreferences = null;
+}
+function reloadCache(newPrefs = null) {
+  _cachedPreferences = newPrefs;
+}
+
 /**
  * Global App Preferences Service for TallyKhata
  * Manages app-wide Light/Dark/System theme and Bangla/English/System language settings.
@@ -103,4 +111,6 @@ module.exports = {
   resolveEffectiveLanguage,
   getStoredPreferences,
   savePreferences,
+  resetCache,
+  reloadCache,
 };

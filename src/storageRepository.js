@@ -139,8 +139,15 @@ class StorageRepository {
   }
 
   resetStore() {
+    const prevQueue = this.writeQueue;
     this.currentStore = null;
     this.writeQueue = Promise.resolve();
+    if (prevQueue) {
+      return Promise.resolve(prevQueue).catch(() => {}).then(() => {
+        this.currentStore = null;
+      });
+    }
+    return Promise.resolve(true);
   }
 
   getAuthoritativeState() {
@@ -153,7 +160,12 @@ class StorageRepository {
    */
   async loadInitialData() {
     try {
-      const v6DataStr = await this.adapter.getItem(V6_KEY);
+      let v6DataStr = await this.adapter.getItem(V6_KEY);
+      if (!v6DataStr && typeof this.adapter.getItem === 'function') {
+        v6DataStr = (await this.adapter.getItem('@' + V6_KEY)) ||
+                    (await this.adapter.getItem('tallykhata_v6_store')) ||
+                    (await this.adapter.getItem('@tallykhata_v6_store'));
+      }
       if (v6DataStr) {
         const parsed = JSON.parse(v6DataStr);
         if (Array.isArray(parsed.inventory) && !Array.isArray(parsed.stock)) {
@@ -482,6 +494,10 @@ class StorageRepository {
     }
 
     this.activeSafetySnapshot = null;
+    this.notifyRestoreHooks({
+      moneyManager: mmData,
+      preferences: prefsData,
+    });
     return {
       success: true,
       restored: true,
@@ -493,21 +509,49 @@ class StorageRepository {
   }
 
   async getFullBackupState(extraState = {}) {
-    const authoritative = this.getAuthoritativeState();
-    let mmState = extraState && extraState.moneyManager !== undefined ? extraState.moneyManager : null;
-    if (mmState === null && this.adapter && typeof this.adapter.getItem === 'function') {
+    if (this.writeQueue) {
       try {
-        const raw = await this.adapter.getItem(MM_STORAGE_KEY);
-        if (raw) mmState = JSON.parse(raw);
-      } catch (e) {}
+        await Promise.resolve(this.writeQueue).catch(() => {});
+      } catch (_) {}
     }
-    let prefs = extraState && extraState.preferences !== undefined ? extraState.preferences : null;
-    if (prefs === null && this.adapter && typeof this.adapter.getItem === 'function') {
-      try {
-        const raw = await this.adapter.getItem(PREFERENCES_STORAGE_KEY);
-        if (raw) prefs = JSON.parse(raw);
-      } catch (e) {}
+
+    const authoritative = { ...this.getAuthoritativeState() };
+    authoritative.pinEnabled = false;
+    authoritative.appPin = '';
+
+    const domains = (extraState && Array.isArray(extraState.domains) && extraState.domains.length > 0)
+      ? extraState.domains
+      : ['all'];
+    const includeAll = domains.includes('all');
+    const includeMM = includeAll || domains.includes('moneyManager') || domains.includes('money_manager');
+    const includePrefs = includeAll || domains.includes('preferences');
+
+    let mmState = null;
+    if (includeMM) {
+      if (extraState && extraState.moneyManager !== undefined && extraState.moneyManager !== null) {
+        mmState = extraState.moneyManager;
+      } else if (extraState && extraState.money_manager !== undefined && extraState.money_manager !== null) {
+        mmState = extraState.money_manager;
+      } else if (this.adapter && typeof this.adapter.getItem === 'function') {
+        try {
+          const raw = await this.adapter.getItem(MM_STORAGE_KEY);
+          if (raw) mmState = JSON.parse(raw);
+        } catch (e) {}
+      }
     }
+
+    let prefs = null;
+    if (includePrefs) {
+      if (extraState && extraState.preferences !== undefined && extraState.preferences !== null) {
+        prefs = extraState.preferences;
+      } else if (this.adapter && typeof this.adapter.getItem === 'function') {
+        try {
+          const raw = await this.adapter.getItem(PREFERENCES_STORAGE_KEY);
+          if (raw) prefs = JSON.parse(raw);
+        } catch (e) {}
+      }
+    }
+
     return {
       ...authoritative,
       moneyManager: mmState,
@@ -816,12 +860,91 @@ class StorageRepository {
   }
 
   /**
+   * Cascade deletes a business and atomically purges all records matching businessId
+   * across accounts, journals, cashEntries, inventory, stock, notes, walletTxns, and tagadaLogs.
+   * Refuses deletion if it is the sole remaining active business.
+   */
+  async deleteBusinessCascade(bizId) {
+    if (!bizId) return { success: false, error: new Error('Business ID is required') };
+    const targetId = String(bizId);
+
+    return this.mutateStore((prevStore) => {
+      const list = Array.isArray(prevStore.businesses) ? prevStore.businesses : DEFAULT_BUSINESSES;
+      const target = list.find((b) => String(b.id) === targetId);
+      if (!target) {
+        throw new Error('ব্যবসা প্রতিষ্ঠানটি পাওয়া যায়নি: ' + targetId);
+      }
+
+      const activeList = list.filter((b) => !b.isArchived);
+      if (activeList.length <= 1 && !target.isArchived) {
+        throw new Error('কমপক্ষে একটি ব্যবসা সক্রিয় থাকতে হবে। একমাত্র সক্রিয় ব্যবসাটি মুছে ফেলা যাবে না।');
+      }
+
+      // Purge all records matching targetId across collections
+      const accounts = (prevStore.accounts || []).filter((a) => String(a.businessId || '1') !== targetId);
+      const journals = (prevStore.journals || []).filter((j) => String(j.businessId || '1') !== targetId);
+      const cashEntries = (prevStore.cashEntries || []).filter((c) => String(c.businessId || '1') !== targetId);
+      const inventory = (prevStore.inventory || []).filter((i) => String(i.businessId || '1') !== targetId);
+      const stock = (prevStore.stock || []).filter((s) => String(s.businessId || '1') !== targetId);
+      const notes = (prevStore.notes || []).filter((n) => String(n.businessId || '1') !== targetId);
+      const walletTxns = (prevStore.walletTxns || []).filter((w) => String(w.businessId || '1') !== targetId);
+      const tagadaLogs = (prevStore.tagadaLogs || []).filter((t) => String(t.businessId || '1') !== targetId);
+
+      const remainingBusinesses = list.filter((b) => String(b.id) !== targetId);
+
+      let nextActiveId = prevStore.activeBusinessId;
+      if (String(prevStore.activeBusinessId) === targetId) {
+        const firstActive = remainingBusinesses.find((b) => !b.isArchived) || remainingBusinesses[0];
+        nextActiveId = firstActive ? String(firstActive.id) : '1';
+      }
+
+      const updatedBusinesses = remainingBusinesses.map((b) => ({
+        ...b,
+        isSelected: String(b.id) === String(nextActiveId),
+        isActive: !b.isArchived,
+      }));
+
+      const activeBiz = updatedBusinesses.find((b) => String(b.id) === String(nextActiveId));
+
+      return {
+        ...prevStore,
+        businesses: updatedBusinesses,
+        activeBusinessId: nextActiveId,
+        businessName: activeBiz ? activeBiz.name : prevStore.businessName,
+        accounts,
+        journals,
+        cashEntries,
+        inventory,
+        stock,
+        notes,
+        walletTxns,
+        tagadaLogs,
+      };
+    });
+  }
+
+  /**
    * Commits restored backup payload safely into storage.
    * Performs validation, recalculates ledger balances, and writes atomically.
    */
   async commitRestorePayload(backupPayload, options = {}) {
     if (!backupPayload || typeof backupPayload !== 'object') {
       throw new Error('Invalid restore payload: payload must be an object');
+    }
+
+    if (this.writeQueue) {
+      try {
+        await Promise.resolve(this.writeQueue).catch(() => {});
+      } catch (_) {}
+    }
+
+    if (backupPayload.checksum) {
+      const dataToVerify = backupPayload.data || backupPayload;
+      const expectedChecksum = backupPayload.checksum;
+      const computed = this.computeChecksum(dataToVerify);
+      if (computed !== expectedChecksum) {
+        throw new Error('Backup integrity checksum mismatch: data may be corrupted or tampered');
+      }
     }
 
     let manifest = backupPayload.manifest || null;
@@ -846,7 +969,7 @@ class StorageRepository {
       : ['all'];
     const shouldRestoreAll = requestedDomains.includes('all');
     const shouldRestoreBusiness = shouldRestoreAll || requestedDomains.includes('business');
-    const shouldRestoreMM = shouldRestoreAll || requestedDomains.includes('moneyManager');
+    const shouldRestoreMM = shouldRestoreAll || requestedDomains.includes('moneyManager') || requestedDomains.includes('money_manager');
     const shouldRestorePrefs = shouldRestoreAll || requestedDomains.includes('preferences');
 
     // Create safety snapshot before altering live store if not already created
@@ -860,11 +983,14 @@ class StorageRepository {
 
     let restoredMM = null;
     if (shouldRestoreMM) {
-      if (data.moneyManager && typeof data.moneyManager === 'object') {
+      const mmPayload = (data.moneyManager !== undefined && data.moneyManager !== null)
+        ? data.moneyManager
+        : data.money_manager;
+      if (mmPayload && typeof mmPayload === 'object') {
         const defaultMMState = moneyManagerService ? moneyManagerService.getDefaultState() : {};
         const sanitizedMM = moneyManagerService
-          ? moneyManagerService.sanitizeState(data.moneyManager, defaultMMState)
-          : data.moneyManager;
+          ? moneyManagerService.sanitizeState(mmPayload, defaultMMState)
+          : mmPayload;
         if (this.adapter && typeof this.adapter.setItem === 'function') {
           await this.adapter.setItem(MM_STORAGE_KEY, JSON.stringify(sanitizedMM));
         }
@@ -909,9 +1035,13 @@ class StorageRepository {
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
 
+        const finalMergedAccounts = ledgerEngine && typeof ledgerEngine.recalculateAccountRunningBalances === 'function'
+          ? ledgerEngine.recalculateAccountRunningBalances(mergedAccounts, mergedJournals, selectedBizId)
+          : mergedAccounts;
+
         return {
           ...prevStore,
-          accounts: mergedAccounts,
+          accounts: finalMergedAccounts,
           journals: mergedJournals,
           cashEntries: [...keptCash, ...importedCash],
           stock: [...keptStock, ...importedStock],
@@ -941,9 +1071,22 @@ class StorageRepository {
 
       if (Array.isArray(newStore.accounts) && Array.isArray(newStore.journals)) {
         newStore.accounts = newStore.accounts.map(acc => {
-          const accJournals = newStore.journals.filter(j => String(j.accountId) === String(acc.id));
+          const accJournals = newStore.journals.filter(j => String(j.accountId) === String(acc.id) && (!acc.businessId || !j.businessId || String(j.businessId) === String(acc.businessId)));
           if (accJournals.length > 0) {
-            accJournals.sort((a, b) => new Date(a.date + ' ' + (a.time || '00:00')) - new Date(b.date + ' ' + (b.time || '00:00')));
+            accJournals.sort((a, b) => {
+              const dateComp = (a.date || '').localeCompare(b.date || '');
+              if (dateComp !== 0) return dateComp;
+
+              const timeComp = (a.time || '').localeCompare(b.time || '');
+              if (timeComp !== 0) return timeComp;
+
+              const idA = isNaN(Number(a.id)) ? a.id : Number(a.id);
+              const idB = isNaN(Number(b.id)) ? b.id : Number(b.id);
+              if (typeof idA === 'number' && typeof idB === 'number') {
+                return idA - idB;
+              }
+              return String(a.id || '').localeCompare(String(b.id || ''));
+            });
             const opening = Number(acc.openingBalance) || 0;
             let running = opening;
             for (const j of accJournals) {
@@ -998,6 +1141,11 @@ class StorageRepository {
       return newStore;
     });
 
+    this.notifyRestoreHooks({
+      moneyManager: restoredMM,
+      preferences: restoredPrefs,
+    });
+
     return {
       ...mutateResult,
       restoredMoneyManager: restoredMM,
@@ -1005,10 +1153,122 @@ class StorageRepository {
       restoredDomains: {
         business: shouldRestoreBusiness,
         moneyManager: Boolean(restoredMM),
+        money_manager: Boolean(restoredMM),
         preferences: Boolean(restoredPrefs),
       },
     };
   }
+  computeChecksum(dataObj) {
+    if (!dataObj) return '';
+    const str = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj);
+    try {
+      if (typeof require !== 'undefined') {
+        const crypto = require('crypto');
+        if (crypto && crypto.createHash) {
+          return 'sha256_' + crypto.createHash('sha256').update(str, 'utf8').digest('hex');
+        }
+      }
+    } catch (_) {}
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash |= 0;
+    }
+    return 'chk_' + Math.abs(hash).toString(16) + '_' + str.length;
+  }
+
+  notifyRestoreHooks(restoredState = {}) {
+    try {
+      if (moneyManagerService) {
+        if (typeof moneyManagerService.resetCache === 'function') {
+          moneyManagerService.resetCache();
+        }
+        if (typeof moneyManagerService.reloadCache === 'function') {
+          moneyManagerService.reloadCache(restoredState.moneyManager);
+        }
+      }
+    } catch (_) {}
+    try {
+      if (preferencesService) {
+        if (typeof preferencesService.resetCache === 'function') {
+          preferencesService.resetCache();
+        }
+        if (typeof preferencesService.reloadCache === 'function') {
+          preferencesService.reloadCache(restoredState.preferences);
+        }
+      }
+    } catch (_) {}
+  }
+
+  async createStorageBackup(extraState = {}, options = {}) {
+    const fullState = await this.getFullBackupState(extraState);
+    const checksum = this.computeChecksum(fullState);
+
+    const payload = {
+      version: 6,
+      formatVersion: 2,
+      createdAt: new Date().toISOString(),
+      checksum,
+      manifest: {
+        schemaVersion: 6,
+        recordCounts: {
+          accounts: (fullState.accounts || []).length,
+          journals: (fullState.journals || []).length,
+          cashEntries: (fullState.cashEntries || []).length,
+          businesses: (fullState.businesses || []).length,
+          mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
+          mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
+          mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
+          mmGoals: (fullState.moneyManager && Array.isArray(fullState.moneyManager.goals)) ? fullState.moneyManager.goals.length : 0,
+          mmRecurring: (fullState.moneyManager && Array.isArray(fullState.moneyManager.recurring)) ? fullState.moneyManager.recurring.length : 0,
+        },
+        hasMoneyManager: Boolean(fullState.moneyManager),
+      },
+      data: fullState,
+    };
+    return payload;
+  }
+
+  async exportAllData(extraState = {}, options = {}) {
+    return this.createStorageBackup(extraState, options);
+  }
+
+  async restoreStorageBackup(backupPayload, options = {}) {
+    if (!backupPayload || typeof backupPayload !== 'object') {
+      throw new Error('Invalid restore payload: payload must be an object');
+    }
+
+    if (this.writeQueue) {
+      try {
+        await Promise.resolve(this.writeQueue).catch(() => {});
+      } catch (_) {}
+    }
+
+    if (backupPayload.checksum) {
+      const dataToVerify = backupPayload.data || backupPayload;
+      const expectedChecksum = backupPayload.checksum;
+      const computed = this.computeChecksum(dataToVerify);
+      if (computed !== expectedChecksum) {
+        throw new Error('Backup integrity checksum mismatch: data may be corrupted or tampered');
+      }
+    }
+
+    this.currentStore = null;
+    const res = await this.commitRestorePayload(backupPayload, options);
+
+    this.notifyRestoreHooks({
+      moneyManager: res.restoredMoneyManager,
+      preferences: res.restoredPreferences,
+    });
+
+    return res;
+  }
+
+  async importAllData(backupPayload, options = {}) {
+    return this.restoreStorageBackup(backupPayload, options);
+  }
+
 }
 
 // Singleton repository instance for production and test suites

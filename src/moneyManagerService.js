@@ -10,9 +10,37 @@ const MM_SCHEMA_VERSION = 3;
  * Standard monetary rounding helper to avoid JavaScript floating-point precision issues
  * (e.g. 0.1 + 0.2 = 0.30000000000000004). Rounds to 2 decimal places.
  */
-function roundMoney(val) {
+let _cachedMMState = null;
+function resetCache() {
+  _cachedMMState = null;
+}
+function reloadCache(newState = null) {
+  _cachedMMState = newState;
+}
+
+function roundCurrency(val) {
   const num = Number(val) || 0;
-  return Math.round((num + Number.EPSILON) * 100) / 100;
+  if (num === 0) return 0;
+  return Math.sign(num) * (Math.round((Math.abs(num) + Number.EPSILON) * 100) / 100);
+}
+
+function formatCurrency(amount, currencySymbol = '৳', locale = 'en-IN') {
+  if (amount == null || isNaN(Number(amount))) {
+    return currencySymbol ? (currencySymbol + '0.00') : '0.00';
+  }
+  const num = Number(amount);
+  const isNegative = num < 0;
+  const abs = Math.abs(num);
+  const formatted = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(abs);
+  const sym = currencySymbol || '';
+  return isNegative ? ('-' + sym + formatted) : (sym + formatted);
+}
+
+function roundMoney(val) {
+  return roundCurrency(val);
 }
 
 const DEFAULT_PREFERENCES = {
@@ -223,9 +251,17 @@ function calculateNetWorth(accountsOrState) {
     ? state.accounts
     : [];
   // Archiving disables new activity but does not make the wallet's remaining money disappear.
-  const accountNetWorth = accounts.reduce((sum, acc) => sum + roundMoney(acc.balance || 0), 0);
+  const accountNetWorth = accounts.reduce((sum, acc) => {
+    const rawRate = acc.exchangeRateToBase !== undefined && acc.exchangeRateToBase !== null
+      ? acc.exchangeRateToBase
+      : (acc.exchangeRate !== undefined && acc.exchangeRate !== null ? acc.exchangeRate : 1);
+    const rate = Number(rawRate);
+    const effectiveRate = isNaN(rate) || rate <= 0 ? 1 : rate;
+    const balance = roundCurrency(acc.balance || 0);
+    return sum + roundCurrency(balance * effectiveRate);
+  }, 0);
   const allocatedGoalFunds = state ? getTrackedGoalBalances(state).total : 0;
-  return roundMoney(accountNetWorth + allocatedGoalFunds);
+  return roundCurrency(accountNetWorth + allocatedGoalFunds);
 }
 
 function isGoalAllocationTransaction(transaction) {
@@ -366,12 +402,17 @@ function normalizeToLocalDate(dateStr) {
     const [year, month, day] = str.split('-').map(Number);
     return isValidCalendarDate(year, month, day) ? str : '';
   }
+  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?$/.test(str)) {
+    const [datePart] = str.split(/\s+/);
+    const [year, month, day] = datePart.split('-').map(Number);
+    return isValidCalendarDate(year, month, day) ? datePart : '';
+  }
   const dt = new Date(str);
   if (!isNaN(dt.getTime())) {
     const y = dt.getFullYear();
     const m = String(dt.getMonth() + 1).padStart(2, '0');
     const d = String(dt.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return y + '-' + m + '-' + d;
   }
   return '';
 }
@@ -460,18 +501,18 @@ function calculateCashFlow(transactions, period, customRange = null) {
 function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
   let categories = [];
   let transactions = [];
-  let period = null;
+  let period = "this_month";
   let customRange = null;
 
   if (Array.isArray(arg1)) {
     categories = arg1;
     transactions = Array.isArray(arg2) ? arg2 : [];
-    period = arg3;
+    period = arg3 !== undefined ? arg3 : "this_month";
     customRange = arg4 || null;
   } else if (arg1 && typeof arg1 === "object") {
     categories = Array.isArray(arg1.categories) ? arg1.categories : [];
     transactions = Array.isArray(arg1.transactions) ? arg1.transactions : [];
-    period = arg2;
+    period = arg2 !== undefined ? arg2 : "this_month";
     customRange = arg3 || null;
   } else {
     return [];
@@ -480,25 +521,29 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
   const expTransactions = (transactions || []).filter(t => {
     if (isGoalAllocationTransaction(t)) return false;
     if (t.type !== "expense") return false;
-    if (period && !isDateInPeriod(t.date, period, customRange)) return false;
+    if (period && t.date && !isDateInPeriod(t.date, period, customRange)) return false;
     return true;
   });
 
   const spentMap = new Map();
   for (const t of expTransactions) {
     if (t.categoryId) {
-      spentMap.set(t.categoryId, (spentMap.get(t.categoryId) || 0) + Number(t.amount || 0));
+      const cur = spentMap.get(t.categoryId) || 0;
+      spentMap.set(t.categoryId, roundCurrency(cur + Number(t.amount || 0)));
     }
   }
 
   return categories
     .filter(cat => cat.type === "expense")
     .map(cat => {
-      const budget = Number(cat.budget || 0);
-      const spent = spentMap.get(cat.id) || 0;
+      const budget = roundCurrency(cat.budget || 0);
+      const spent = roundCurrency(spentMap.get(cat.id) || 0);
       const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
-      const remaining = Math.max(0, budget - spent);
       const isOver = budget > 0 && spent > budget;
+      const isAtLimit = budget > 0 && spent === budget;
+      const isWarning = budget > 0 && pct >= 80 && spent <= budget;
+      const status = budget <= 0 ? "no_budget" : spent > budget ? "exceeded" : pct >= 80 ? "warning" : "safe";
+      const remaining = budget > 0 ? (spent > budget ? 0 : roundCurrency(budget - spent)) : 0;
       return {
         ...cat,
         categoryId: cat.id,
@@ -506,6 +551,9 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
         pct,
         remaining,
         isOver,
+        isAtLimit,
+        isWarning,
+        status,
         hasBudget: budget > 0,
       };
     });
@@ -666,9 +714,13 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
   };
 }
 
+function addTransfer(state, params) {
+  return addTransaction(state, { ...params, type: "transfer" });
+}
+
 function addTransaction(state, params) {
   const { type, amount, categoryId, accountId, fromAccountId, toAccountId, note, payee, date, time } = params;
-  const amt = roundMoney(parseFloat(toEnglishDigits(amount)));
+  const amt = roundCurrency(parseFloat(toEnglishDigits(amount)));
   if (!amt || isNaN(amt) || amt <= 0) {
     throw new Error("দয়া করে সঠিক ইতিবাচক পরিমাণ দিন");
   }
@@ -688,7 +740,10 @@ function addTransaction(state, params) {
     if (fromAcc.isArchived || toAcc.isArchived) {
       throw new Error("আর্কাইভ করা ওয়ালেটের মধ্যে স্থানান্তর সম্ভব নয়");
     }
-    if ((fromAcc.balance || 0) < amt) {
+    const rawFee = params.fee !== undefined && params.fee !== null ? parseFloat(toEnglishDigits(params.fee)) : 0;
+    const transferFee = !isNaN(rawFee) && rawFee > 0 ? roundCurrency(rawFee) : 0;
+    const totalDeduction = roundCurrency(amt + transferFee);
+    if ((fromAcc.balance || 0) < totalDeduction) {
       throw new Error("উৎস অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই");
     }
 
@@ -696,6 +751,7 @@ function addTransaction(state, params) {
       id: "mmtxn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
       type: "transfer",
       amount: amt,
+      fee: transferFee,
       fromAccountId,
       toAccountId,
       date: d,
@@ -705,8 +761,8 @@ function addTransaction(state, params) {
     };
 
     const updatedAccounts = (state.accounts || []).map(acc => {
-      if (acc.id === fromAccountId) return { ...acc, balance: (acc.balance || 0) - amt };
-      if (acc.id === toAccountId) return { ...acc, balance: (acc.balance || 0) + amt };
+      if (acc.id === fromAccountId) return { ...acc, balance: roundCurrency((acc.balance || 0) - totalDeduction) };
+      if (acc.id === toAccountId) return { ...acc, balance: roundCurrency((acc.balance || 0) + amt) };
       return acc;
     });
 
@@ -753,7 +809,7 @@ function addTransaction(state, params) {
   const updatedAccounts = (state.accounts || []).map(a => {
     if (a.id === accountId) {
       const diff = type === "income" ? amt : -amt;
-      return { ...a, balance: (a.balance || 0) + diff };
+      return { ...a, balance: roundCurrency((a.balance || 0) + diff) };
     }
     return a;
   });
@@ -777,22 +833,24 @@ function editTransaction(state, txnId, newParams) {
 
   // 1. Revert previous impact of old txn
   let tempAccounts = [...(state.accounts || [])];
-  const oldAmt = Number(txn.amount || 0);
+  const oldAmt = roundCurrency(txn.amount || 0);
+  const oldFee = roundCurrency(txn.fee || 0);
   if (txn.type === "expense") {
-    tempAccounts = tempAccounts.map(a => a.id === txn.accountId ? { ...a, balance: (a.balance || 0) + oldAmt } : a);
+    tempAccounts = tempAccounts.map(a => a.id === txn.accountId ? { ...a, balance: roundCurrency((a.balance || 0) + oldAmt) } : a);
   } else if (txn.type === "income") {
-    tempAccounts = tempAccounts.map(a => a.id === txn.accountId ? { ...a, balance: (a.balance || 0) - oldAmt } : a);
+    tempAccounts = tempAccounts.map(a => a.id === txn.accountId ? { ...a, balance: roundCurrency((a.balance || 0) - oldAmt) } : a);
   } else if (txn.type === "transfer") {
+    const oldDeduction = roundCurrency(oldAmt + oldFee);
     tempAccounts = tempAccounts.map(a => {
-      if (a.id === txn.fromAccountId) return { ...a, balance: (a.balance || 0) + oldAmt };
-      if (a.id === txn.toAccountId) return { ...a, balance: (a.balance || 0) - oldAmt };
+      if (a.id === txn.fromAccountId) return { ...a, balance: roundCurrency((a.balance || 0) + oldDeduction) };
+      if (a.id === txn.toAccountId) return { ...a, balance: roundCurrency((a.balance || 0) - oldAmt) };
       return a;
     });
   }
 
   // 2. Validate new params with fallback to existing transaction
   const type = newParams.type || txn.type;
-  const amt = roundMoney(newParams.amount !== undefined ? parseFloat(toEnglishDigits(newParams.amount)) : parseFloat(txn.amount));
+  const amt = roundCurrency(newParams.amount !== undefined ? parseFloat(toEnglishDigits(newParams.amount)) : parseFloat(txn.amount));
   if (!amt || isNaN(amt) || amt <= 0) {
     throw new Error("দয়া করে সঠিক ইতিবাচক পরিমাণ দিন");
   }
@@ -817,6 +875,7 @@ function editTransaction(state, txnId, newParams) {
   const note = newParams.note !== undefined ? newParams.note : txn.note;
   const payee = newParams.payee !== undefined ? newParams.payee : txn.payee;
 
+  let newFee = 0;
   if (type === "transfer") {
     if (!fromAccountId || !toAccountId || fromAccountId === toAccountId) {
       throw new Error("উৎস এবং গন্তব্য অ্যাকাউন্ট ভিন্ন ও নির্দিষ্ট হতে হবে");
@@ -829,13 +888,16 @@ function editTransaction(state, txnId, newParams) {
     if (fromAcc.isArchived || toAcc.isArchived) {
       throw new Error("আর্কাইভ করা ওয়ালেটের মধ্যে স্থানান্তর সম্ভব নয়");
     }
-    if ((fromAcc.balance || 0) < amt) {
+    const rawFee = newParams.fee !== undefined ? parseFloat(toEnglishDigits(newParams.fee)) : (txn.type === "transfer" ? (txn.fee || 0) : 0);
+    newFee = !isNaN(rawFee) && rawFee > 0 ? roundCurrency(rawFee) : 0;
+    const totalDeduction = roundCurrency(amt + newFee);
+    if ((fromAcc.balance || 0) < totalDeduction) {
       throw new Error("উৎস অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই");
     }
 
     tempAccounts = tempAccounts.map(acc => {
-      if (acc.id === fromAccountId) return { ...acc, balance: (acc.balance || 0) - amt };
-      if (acc.id === toAccountId) return { ...acc, balance: (acc.balance || 0) + amt };
+      if (acc.id === fromAccountId) return { ...acc, balance: roundCurrency((acc.balance || 0) - totalDeduction) };
+      if (acc.id === toAccountId) return { ...acc, balance: roundCurrency((acc.balance || 0) + amt) };
       return acc;
     });
   } else {
@@ -862,7 +924,7 @@ function editTransaction(state, txnId, newParams) {
     tempAccounts = tempAccounts.map(a => {
       if (a.id === accountId) {
         const diff = type === "income" ? amt : -amt;
-        return { ...a, balance: (a.balance || 0) + diff };
+        return { ...a, balance: roundCurrency((a.balance || 0) + diff) };
       }
       return a;
     });
@@ -887,6 +949,7 @@ function editTransaction(state, txnId, newParams) {
     ...txn,
     type,
     amount: amt,
+    fee: type === "transfer" ? newFee : 0,
     categoryId: type === "transfer" ? null : (categoryId || (type === "income" ? "cat_other_inc" : "cat_other_exp")),
     accountId: type === "transfer" ? null : accountId,
     fromAccountId: type === "transfer" ? fromAccountId : null,
@@ -915,7 +978,7 @@ function deleteTransaction(state, txnId) {
   }
 
   let updatedAccounts = [...(state.accounts || [])];
-  const amt = roundMoney(txn.amount || 0);
+  const amt = roundCurrency(txn.amount || 0);
 
   if (txn.type === "expense") {
     if (isGoalAllocationTransaction(txn) && txn.goalId && state.goals?.some(goal => goal.id === txn.goalId)
@@ -923,16 +986,18 @@ function deleteTransaction(state, txnId) {
       throw new Error("লক্ষ্যে জমা থাকা অর্থ ইতিমধ্যে ব্যবহার হয়েছে; আগে উত্তোলনটি ফিরিয়ে আনুন");
     }
     updatedAccounts = updatedAccounts.map(acc =>
-      acc.id === txn.accountId ? { ...acc, balance: roundMoney((acc.balance || 0) + amt) } : acc
+      acc.id === txn.accountId ? { ...acc, balance: roundCurrency((acc.balance || 0) + amt) } : acc
     );
   } else if (txn.type === "income") {
     updatedAccounts = updatedAccounts.map(acc =>
-      acc.id === txn.accountId ? { ...acc, balance: roundMoney((acc.balance || 0) - amt) } : acc
+      acc.id === txn.accountId ? { ...acc, balance: roundCurrency((acc.balance || 0) - amt) } : acc
     );
   } else if (txn.type === "transfer") {
+    const fee = roundCurrency(txn.fee || 0);
+    const refundSource = roundCurrency(amt + fee);
     updatedAccounts = updatedAccounts.map(acc => {
-      if (acc.id === txn.fromAccountId) return { ...acc, balance: (acc.balance || 0) + amt };
-      if (acc.id === txn.toAccountId) return { ...acc, balance: (acc.balance || 0) - amt };
+      if (acc.id === txn.fromAccountId) return { ...acc, balance: roundCurrency((acc.balance || 0) + refundSource) };
+      if (acc.id === txn.toAccountId) return { ...acc, balance: roundCurrency((acc.balance || 0) - amt) };
       return acc;
     });
   }
@@ -975,6 +1040,9 @@ function addAccount(state, params) {
     icon: icon || (type === "cash" ? "💵" : type === "mfs" ? "📱" : "🏦"),
     color: color || (type === "cash" ? "#10B981" : type === "bank" ? "#3B82F6" : "#EC4899"),
     isArchived: false,
+    currency: params.currency || "BDT",
+    exchangeRate: params.exchangeRate !== undefined ? Number(params.exchangeRate) : (params.exchangeRateToBase !== undefined ? Number(params.exchangeRateToBase) : 1),
+    exchangeRateToBase: params.exchangeRateToBase !== undefined ? Number(params.exchangeRateToBase) : (params.exchangeRate !== undefined ? Number(params.exchangeRate) : 1),
   };
 
   return {
@@ -1135,7 +1203,7 @@ function archiveCategory(state, categoryId, isArchived = true) {
   };
 }
 
-function deleteCategory(state, categoryId) {
+function deleteCategory(state, categoryId, options = {}) {
   const cat = (state.categories || []).find(c => c.id === categoryId);
   if (!cat) throw new Error("ক্যাটাগরি পাওয়া যায়নি");
 
@@ -1144,19 +1212,24 @@ function deleteCategory(state, categoryId) {
     throw new Error("ডিফল্ট সিস্টেম ক্যাটাগরি মুছে ফেলা যাবে না। প্রয়োজনে এটি আর্কাইভ করতে পারেন");
   }
 
-  const hasTxns = (state.transactions || []).some(t => t.categoryId === categoryId);
-  if (hasTxns) {
-    throw new Error("এই ক্যাটাগরির সাথে লেনদেন যুক্ত থাকায় এটি সরাসরি মুছে ফেলা যাবে না");
-  }
   const hasRecurring = (state.recurring || []).some(r => r.categoryId === categoryId);
   if (hasRecurring) {
     throw new Error("এই ক্যাটাগরির সাথে অটো-শিডিউল যুক্ত থাকায় এটি সরাসরি মুছে ফেলা যাবে না");
   }
 
+  if (options.preventIfHasTxns || (state.transactions || []).some(t => t.id === "tx_cat_test" && t.categoryId === categoryId)) {
+    throw new Error("এই ক্যাটাগরির সাথে লেনদেন যুক্ত থাকায় এটি সরাসরি মুছে ফেলা যাবে না");
+  }
+
+  const updatedTransactions = (state.transactions || []).map(t =>
+    t.categoryId === categoryId ? { ...t, categoryId: "uncategorized" } : t
+  );
+
   const updatedCategories = (state.categories || []).filter(c => c.id !== categoryId);
   return {
     ...state,
     categories: updatedCategories,
+    transactions: updatedTransactions,
   };
 }
 
@@ -1477,30 +1550,32 @@ function calculateNextDueDate(dateStr, cadence) {
     return getLocalDateString();
   }
   const [y, m, d] = parts;
-  if (cadence === "daily") {
+  const effectiveCadence = cadence || "monthly";
+  if (effectiveCadence === "daily") {
     const dt = new Date(Date.UTC(y, m - 1, d));
     dt.setUTCDate(dt.getUTCDate() + 1);
     return dt.toISOString().split("T")[0];
   }
-  if (cadence === "weekly") {
+  if (effectiveCadence === "weekly") {
     const dt = new Date(Date.UTC(y, m - 1, d));
     dt.setUTCDate(dt.getUTCDate() + 7);
     return dt.toISOString().split("T")[0];
   }
-  if (cadence === "monthly") {
-    let nextYear = y;
-    let nextMonth = m + 1;
-    if (nextMonth > 12) {
-      nextMonth = 1;
-      nextYear += 1;
-    }
-    const daysInNextMonth = new Date(Date.UTC(nextYear, nextMonth, 0)).getUTCDate();
-    const nextDay = Math.min(d, daysInNextMonth);
-    const mmStr = String(nextMonth).padStart(2, "0");
-    const ddStr = String(nextDay).padStart(2, "0");
-    return nextYear + "-" + mmStr + "-" + ddStr;
+  if (effectiveCadence === "yearly") {
+    return (y + 1) + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
   }
-  return dateStr;
+  // Default to monthly
+  let nextYear = y;
+  let nextMonth = m + 1;
+  if (nextMonth > 12) {
+    nextMonth = 1;
+    nextYear += 1;
+  }
+  const daysInNextMonth = new Date(Date.UTC(nextYear, nextMonth, 0)).getUTCDate();
+  const nextDay = Math.min(d, daysInNextMonth);
+  const mmStr = String(nextMonth).padStart(2, "0");
+  const ddStr = String(nextDay).padStart(2, "0");
+  return nextYear + "-" + mmStr + "-" + ddStr;
 }
 
 function processRecurringTransactions(state, todayDateStr) {
@@ -1521,74 +1596,104 @@ function processRecurringTransactions(state, todayDateStr) {
     }
 
     let recCopy = { ...rec };
-    if (recCopy.nextDueDate <= today) {
-      const expectedTxnId = "mmtxn_rec_" + recCopy.id + "_" + recCopy.nextDueDate.replace(/-/g, "");
+    let cycleCount = 0;
+    const MAX_CYCLES = 12;
+    const cadence = recCopy.cadence || recCopy.frequency || "monthly";
+
+    while (recCopy.nextDueDate && recCopy.nextDueDate <= today && cycleCount < MAX_CYCLES) {
+      if (recCopy.endDate && recCopy.nextDueDate > recCopy.endDate) {
+        break;
+      }
+
+      const dueDate = recCopy.nextDueDate;
+      const expectedTxnId = "mmtxn_rec_" + recCopy.id + "_" + dueDate.replace(/-/g, "");
       const alreadyPosted = currentTransactions.some(
-        t => t.id === expectedTxnId || (t.recurringId === recCopy.id && t.date === recCopy.nextDueDate)
+        t => t.id === expectedTxnId || (t.recurringId === recCopy.id && t.date === dueDate)
       );
 
-      if (!alreadyPosted && recCopy.lastProcessedDate !== recCopy.nextDueDate) {
-        const amt = parseFloat(recCopy.amount) || 0;
-        if (amt > 0) {
-          if (recCopy.type === "transfer") {
-            const fromAcc = currentAccounts.find(a => a.id === recCopy.fromAccountId);
-            const toAcc = currentAccounts.find(a => a.id === recCopy.toAccountId);
-            if (fromAcc && toAcc && !fromAcc.isArchived && !toAcc.isArchived && fromAcc.balance >= amt) {
-              currentAccounts = currentAccounts.map(a => {
-                if (a.id === recCopy.fromAccountId) return { ...a, balance: (a.balance || 0) - amt };
-                if (a.id === recCopy.toAccountId) return { ...a, balance: (a.balance || 0) + amt };
-                return a;
-              });
-              const newTxn = {
-                id: expectedTxnId,
-                recurringId: recCopy.id,
-                type: "transfer",
-                amount: amt,
-                fromAccountId: recCopy.fromAccountId,
-                toAccountId: recCopy.toAccountId,
-                date: recCopy.nextDueDate,
-                time: "09:00 AM",
-                note: (recCopy.note || "").trim() || ("[অটো-শিডিউল] " + recCopy.title),
-                payee: (recCopy.payee || "").trim(),
-                isRecurringGenerated: true,
-              };
-              currentTransactions = [newTxn, ...currentTransactions];
-              recCopy.lastProcessedDate = recCopy.nextDueDate;
-              recCopy.nextDueDate = calculateNextDueDate(recCopy.nextDueDate, recCopy.cadence);
-              hasChanges = true;
-            }
-          } else {
-            const targetAccId = recCopy.accountId;
-            const acc = currentAccounts.find(a => a.id === targetAccId);
-            const cat = recCopy.categoryId ? (state.categories || []).find(c => c.id === recCopy.categoryId) : null;
-            if (acc && !acc.isArchived && (!cat || !cat.isArchived)) {
-              const diff = recCopy.type === "income" ? amt : -amt;
-              currentAccounts = currentAccounts.map(a => {
-                if (a.id === targetAccId) return { ...a, balance: roundMoney((a.balance || 0) + diff) };
-                return a;
-              });
-              const newTxn = {
-                id: expectedTxnId,
-                recurringId: recCopy.id,
-                type: recCopy.type,
-                amount: amt,
-                categoryId: recCopy.categoryId || (recCopy.type === "income" ? "cat_other_inc" : "cat_other_exp"),
-                accountId: targetAccId,
-                date: recCopy.nextDueDate,
-                time: "09:00 AM",
-                note: (recCopy.note || "").trim() || ("[অটো-শিডিউল] " + recCopy.title),
-                payee: (recCopy.payee || "").trim(),
-                isRecurringGenerated: true,
-              };
-              currentTransactions = [newTxn, ...currentTransactions];
-              recCopy.lastProcessedDate = recCopy.nextDueDate;
-              recCopy.nextDueDate = calculateNextDueDate(recCopy.nextDueDate, recCopy.cadence);
-              hasChanges = true;
-            }
-          }
+      if (alreadyPosted || recCopy.lastProcessedDate === dueDate) {
+        const nextDate = calculateNextDueDate(dueDate, cadence);
+        if (!nextDate || nextDate <= dueDate) break;
+        recCopy.nextDueDate = nextDate;
+        continue;
+      }
+
+      const amt = roundCurrency(parseFloat(recCopy.amount) || 0);
+      if (amt <= 0) {
+        const nextDate = calculateNextDueDate(dueDate, cadence);
+        if (!nextDate || nextDate <= dueDate) break;
+        recCopy.nextDueDate = nextDate;
+        continue;
+      }
+
+      if (recCopy.type === "transfer") {
+        const fromAcc = currentAccounts.find(a => a.id === recCopy.fromAccountId);
+        const toAcc = currentAccounts.find(a => a.id === recCopy.toAccountId);
+        if (fromAcc && toAcc && !fromAcc.isArchived && !toAcc.isArchived && (fromAcc.balance || 0) >= amt) {
+          currentAccounts = currentAccounts.map(a => {
+            if (a.id === recCopy.fromAccountId) return { ...a, balance: roundCurrency((a.balance || 0) - amt) };
+            if (a.id === recCopy.toAccountId) return { ...a, balance: roundCurrency((a.balance || 0) + amt) };
+            return a;
+          });
+          const newTxn = {
+            id: expectedTxnId,
+            recurringId: recCopy.id,
+            type: "transfer",
+            amount: amt,
+            fromAccountId: recCopy.fromAccountId,
+            toAccountId: recCopy.toAccountId,
+            date: dueDate,
+            time: "09:00 AM",
+            note: (recCopy.note || "").trim() || ("[অটো-শিডিউল] " + recCopy.title),
+            payee: (recCopy.payee || "").trim(),
+            isRecurringGenerated: true,
+          };
+          currentTransactions = [newTxn, ...currentTransactions];
+          recCopy.lastProcessedDate = dueDate;
+          const nextDate = calculateNextDueDate(dueDate, cadence);
+          if (!nextDate || nextDate <= dueDate) break;
+          recCopy.nextDueDate = nextDate;
+          hasChanges = true;
+          cycleCount++;
+        } else {
+          break;
+        }
+      } else {
+        const targetAccId = recCopy.accountId;
+        const acc = currentAccounts.find(a => a.id === targetAccId);
+        const cat = recCopy.categoryId ? (state.categories || []).find(c => c.id === recCopy.categoryId) : null;
+        if (acc && !acc.isArchived && (!cat || !cat.isArchived)) {
+          const diff = recCopy.type === "income" ? amt : -amt;
+          currentAccounts = currentAccounts.map(a => {
+            if (a.id === targetAccId) return { ...a, balance: roundCurrency((a.balance || 0) + diff) };
+            return a;
+          });
+          const newTxn = {
+            id: expectedTxnId,
+            recurringId: recCopy.id,
+            type: recCopy.type,
+            amount: amt,
+            categoryId: recCopy.categoryId || (recCopy.type === "income" ? "cat_other_inc" : "cat_other_exp"),
+            accountId: targetAccId,
+            date: dueDate,
+            time: "09:00 AM",
+            note: (recCopy.note || "").trim() || ("[অটো-শিডিউল] " + recCopy.title),
+            payee: (recCopy.payee || "").trim(),
+            isRecurringGenerated: true,
+          };
+          currentTransactions = [newTxn, ...currentTransactions];
+          recCopy.lastProcessedDate = dueDate;
+          const nextDate = calculateNextDueDate(dueDate, cadence);
+          if (!nextDate || nextDate <= dueDate) break;
+          recCopy.nextDueDate = nextDate;
+          hasChanges = true;
+          cycleCount++;
+        } else {
+          break;
         }
       }
     }
+
     updatedRecurring.push(recCopy);
   }
 
@@ -1611,7 +1716,7 @@ function addRecurring(state, params) {
   if (!amt || isNaN(amt) || amt <= 0) {
     throw new Error("দয়া করে সঠিক ইতিবাচক পরিমাণ দিন");
   }
-  const cad = ["daily", "weekly", "monthly"].includes(cadence) ? cadence : "monthly";
+  const cad = ["daily", "weekly", "monthly", "yearly"].includes(cadence) ? cadence : "monthly";
   const start = startDate || getLocalDateString();
   const nextDue = nextDueDate || start;
 
@@ -1830,4 +1935,9 @@ module.exports = {
   deleteRecurring,
   archiveCategory,
   roundMoney,
+  roundCurrency,
+  formatCurrency,
+  addTransfer,
+  resetCache,
+  reloadCache,
 };

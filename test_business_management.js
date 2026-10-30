@@ -6,6 +6,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const { StorageRepository, createDefaultState } = require("./src/storageRepository");
+const ledgerEngine = require("./src/ledgerEngine");
 const { buildBackupPayload, validateBackupIntegrity } = require("./src/googleDriveBackupService");
 
 console.log("================================================================");
@@ -31,6 +32,7 @@ async function runTest(name, fn) {
 function createMockAdapter(initialData = null) {
   const store = new Map();
   if (initialData) {
+    store.set(ledgerEngine.V6_KEY, JSON.stringify(initialData));
     store.set("tallykhata_v6_store", JSON.stringify(initialData));
   }
   return {
@@ -39,6 +41,55 @@ function createMockAdapter(initialData = null) {
     removeItem: async (key) => { store.delete(key); },
     clear: async () => { store.clear(); },
     _map: store,
+  };
+}
+
+
+/**
+ * Executes cashbox reconciliation against a storage repository instance.
+ * Ensures active business ID isolation and prevents fallback to business 1.
+ */
+async function executeCashboxReconciliation({ repo, activeBusinessId, countedCash, recordedCash, date, time }) {
+  if (!activeBusinessId || typeof activeBusinessId !== "string" || !activeBusinessId.trim()) {
+    throw new Error("সক্রিয় ব্যবসা আইডি ব্যতীত ক্যাশ সমন্বয় সম্ভব নয়। ডিফল্ট ব্যবসায় রিডাইরেক্ট নিষিদ্ধ।");
+  }
+
+  const counted = parseFloat(countedCash);
+  if (isNaN(counted) || counted < 0) {
+    throw new Error("ড্রয়ারের আসল ক্যাশ টাকার পরিমাণ লিখুন");
+  }
+
+  const totalCash = Number(recordedCash) || 0;
+  const diff = counted - totalCash;
+
+  if (diff === 0) {
+    return { success: true, diff: 0, adjEntry: null };
+  }
+
+  const adjEntry = {
+    id: "adj_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+    businessId: String(activeBusinessId).trim(),
+    category: diff > 0 ? "malik_in" : "cost",
+    type: diff > 0 ? "in" : "out",
+    amount: Math.abs(diff),
+    desc: diff > 0 ? "ক্যাশ সমন্বয় (উদ্বৃত্ত জমা)" : "ক্যাশ সমন্বয় (ঘাটতি সমন্বয়)",
+    date: date || new Date().toISOString().split("T")[0],
+    time: time || "12:00 PM",
+  };
+
+  const saveRes = await repo.mutateCollection("cashEntries", (latestCash) => {
+    return [adjEntry, ...(latestCash || [])];
+  });
+
+  if (!saveRes || !saveRes.success) {
+    throw new Error("ক্যাশবক্স সমন্বয় সংরক্ষণ করা যায়নি।");
+  }
+
+  return {
+    success: true,
+    diff,
+    adjEntry,
+    updatedCashEntries: saveRes.collection,
   };
 }
 
@@ -341,6 +392,294 @@ async function runAllTests() {
     const menuSnippetMatch = appSource.match(/accessibilityLabel=\{tStatic\("ব্যবসা পরিচালনা"\)\}[\s\S]*?onPress=\{\(\)\s*=>\s*setModalBusinessPicker\(true\)\}/) ||
                              appSource.match(/onPress=\{\(\)\s*=>\s*setModalBusinessPicker\(true\)\}[\s\S]*?accessibilityLabel=\{tStatic\("ব্যবসা পরিচালনা"\)\}/);
     assert.ok(menuSnippetMatch, "Menu entry must trigger setModalBusinessPicker(true)");
+  });
+
+
+  // TEST 15: Cashbox reconciliation in Business 2 stamps adjEntry with businessId '2'
+  await runTest("Multi-business cashbox reconciliation stamps adjEntry with active businessId '2'", async () => {
+    const repo = new StorageRepository(createMockAdapter());
+    await repo.loadInitialData();
+
+    await repo.selectBusiness("2");
+    assert.strictEqual(repo.getActiveBusinessId(), "2");
+
+    // Seed initial cash for Business 2 (5000 in) and Business 1 (8000 in)
+    await repo.mutateCollection("cashEntries", (prev) => [
+      ...prev,
+      { id: "c_biz1_init", businessId: "1", amount: 8000, type: "in", category: "sale" },
+      { id: "c_biz2_init", businessId: "2", amount: 5000, type: "in", category: "sale" },
+    ]);
+
+    // Counted cash is 6500 (surplus of 1500 in Business 2)
+    const reconRes = await executeCashboxReconciliation({
+      repo,
+      activeBusinessId: repo.getActiveBusinessId(),
+      countedCash: 6500,
+      recordedCash: 5000,
+    });
+
+    assert.strictEqual(reconRes.success, true);
+    assert.strictEqual(reconRes.diff, 1500);
+    assert.ok(reconRes.adjEntry);
+    assert.strictEqual(reconRes.adjEntry.businessId, "2", "Adjustment entry must be explicitly stamped with businessId '2'");
+    assert.strictEqual(reconRes.adjEntry.type, "in");
+    assert.strictEqual(reconRes.adjEntry.category, "malik_in");
+    assert.strictEqual(reconRes.adjEntry.amount, 1500);
+
+    // Verify stored state in repo
+    const state = repo.getAuthoritativeState();
+    const biz2Cash = repo.filterByBusiness(state.cashEntries, "2");
+    const biz1Cash = repo.filterByBusiness(state.cashEntries, "1");
+
+    assert.ok(biz2Cash.some((c) => c.id === reconRes.adjEntry.id && c.businessId === "2"));
+    assert.strictEqual(biz1Cash.some((c) => c.id === reconRes.adjEntry.id), false, "Business 1 must not contain Business 2 adjustment entry");
+  });
+
+  // TEST 16: Business 1 cash totals and entries remain completely unaffected by adjustments in Business 2
+  await runTest("Business 1 cash totals and transactions remain completely unaffected by adjustments in Business 2", async () => {
+    const repo = new StorageRepository(createMockAdapter());
+    await repo.loadInitialData();
+
+    // Setup initial records
+    await repo.mutateCollection("cashEntries", (prev) => [
+      ...prev,
+      { id: "b1_sale_1", businessId: "1", amount: 10000, type: "in", category: "sale" },
+      { id: "b1_cost_1", businessId: "1", amount: 2500, type: "out", category: "cost" },
+      { id: "b2_sale_1", businessId: "2", amount: 4000, type: "in", category: "sale" },
+    ]);
+
+    const stateBefore = repo.getAuthoritativeState();
+    const b1CashBefore = repo.filterByBusiness(stateBefore.cashEntries, "1");
+    const b1TotalBefore = b1CashBefore.reduce((acc, c) => c.type === "in" ? acc + c.amount : acc - c.amount, 0);
+    assert.ok(b1TotalBefore > 0);
+    assert.ok(b1CashBefore.length >= 2);
+
+    // Select Business 2 and execute reconciliation with shortage (-1000)
+    await repo.selectBusiness("2");
+    const reconRes = await executeCashboxReconciliation({
+      repo,
+      activeBusinessId: "2",
+      countedCash: 3000,
+      recordedCash: 4000,
+    });
+
+    assert.strictEqual(reconRes.success, true);
+    assert.strictEqual(reconRes.diff, -1000);
+    assert.strictEqual(reconRes.adjEntry.type, "out");
+    assert.strictEqual(reconRes.adjEntry.category, "cost");
+
+    // Inspect state after reconciliation
+    const stateAfter = repo.getAuthoritativeState();
+    const b1CashAfter = repo.filterByBusiness(stateAfter.cashEntries, "1");
+    const b1TotalAfter = b1CashAfter.reduce((acc, c) => c.type === "in" ? acc + c.amount : acc - c.amount, 0);
+
+    // Assert Business 1 is completely untouched
+    assert.strictEqual(b1CashAfter.length, b1CashBefore.length, "Business 1 entries count must remain identical");
+    assert.strictEqual(b1TotalAfter, b1TotalBefore, "Business 1 total cash must remain identical to before reconciliation");
+    assert.deepStrictEqual(b1CashAfter.map((c) => c.id), b1CashBefore.map((c) => c.id));
+
+    // Assert Business 2 reflects adjustment
+    const b2CashAfter = repo.filterByBusiness(stateAfter.cashEntries, "2");
+    const b2TotalAfter = b2CashAfter.reduce((acc, c) => c.type === "in" ? acc + c.amount : acc - c.amount, 0);
+    assert.strictEqual(b2TotalAfter, 3000, "Business 2 total cash must equal counted amount 3000");
+  });
+
+  // TEST 17: Reconciliation rejected if activeBusinessId is missing or falsy and does not fall back to Business 1
+  await runTest("Reconciliation is rejected when activeBusinessId is missing or falsy without falling back to Business 1", async () => {
+    const repo = new StorageRepository(createMockAdapter());
+    await repo.loadInitialData();
+
+    await repo.mutateCollection("cashEntries", (prev) => [
+      ...prev,
+      { id: "b1_preserved", businessId: "1", amount: 5000, type: "in", category: "sale" },
+    ]);
+
+    const stateBefore = repo.getAuthoritativeState();
+    const initialB1Entries = repo.filterByBusiness(stateBefore.cashEntries, "1");
+    const initialCount = initialB1Entries.length;
+    assert.ok(initialCount >= 1);
+
+    // Attempt reconciliation with null, undefined, empty string, and whitespace
+    const invalidBizIds = [null, undefined, "", "   "];
+    for (const invalidId of invalidBizIds) {
+      let threw = false;
+      try {
+        await executeCashboxReconciliation({
+          repo,
+          activeBusinessId: invalidId,
+          countedCash: 7000,
+          recordedCash: 5000,
+        });
+      } catch (err) {
+        threw = true;
+        assert.ok(err.message.includes("সক্রিয় ব্যবসা আইডি ব্যতীত") || err.message.includes("নিষিদ্ধ"));
+      }
+      assert.strictEqual(threw, true, "Reconciliation must throw when activeBusinessId is " + invalidId);
+    }
+
+    // Verify Business 1 cash entries were NEVER mutated or contaminated by fallback
+    const stateAfter = repo.getAuthoritativeState();
+    const b1EntriesAfter = repo.filterByBusiness(stateAfter.cashEntries, "1");
+    assert.strictEqual(b1EntriesAfter.length, initialCount);
+    const preserved = b1EntriesAfter.find(c => c.id === "b1_preserved");
+    assert.ok(preserved);
+    assert.strictEqual(preserved.amount, 5000);
+    assert.strictEqual(stateAfter.cashEntries.some((c) => c.id.startsWith("adj_")), false);
+  });
+
+
+  await runTest("Cross-business accountId collision isolation in ledgerEngine", async () => {
+    const accBiz1 = { id: "cust_shared_99", businessId: "1", type: 1, openingBalance: 1000 };
+    const accBiz2 = { id: "cust_shared_99", businessId: "2", type: 1, openingBalance: 500 };
+
+    const journals = [
+      { id: "j1", accountId: "cust_shared_99", businessId: "1", amount: 200, type: "given", date: "2026-10-31" },
+      { id: "j2", accountId: "cust_shared_99", businessId: "2", amount: 300, type: "given", date: "2026-10-31" },
+    ];
+
+    const recalc1 = ledgerEngine.recalculateAccountRunningBalances(accBiz1, journals);
+    const recalc2 = ledgerEngine.recalculateAccountRunningBalances(accBiz2, journals);
+
+    // Business 1 should only see j1 (1000 + 200 = 1200), ignoring j2 from Business 2
+    assert.strictEqual(recalc1.updatedAccount.balance, 1200);
+    assert.strictEqual(recalc1.accountJournals.length, 1);
+    assert.strictEqual(recalc1.accountJournals[0].id, "j1");
+
+    // Business 2 should only see j2 (500 + 300 = 800), ignoring j1 from Business 1
+    assert.strictEqual(recalc2.updatedAccount.balance, 800);
+    assert.strictEqual(recalc2.accountJournals.length, 1);
+    assert.strictEqual(recalc2.accountJournals[0].id, "j2");
+
+    // Test establishAccountOpeningBalance isolation
+    const accStored1 = { id: "cust_shared_99", businessId: "1", type: 1, balance: 1200 };
+    const opening1 = ledgerEngine.establishAccountOpeningBalance(accStored1, journals);
+    assert.strictEqual(opening1, 1000);
+
+    const accStored2 = { id: "cust_shared_99", businessId: "2", type: 1, balance: 800 };
+    const opening2 = ledgerEngine.establishAccountOpeningBalance(accStored2, journals);
+    assert.strictEqual(opening2, 500);
+  });
+
+  await runTest("indexJournalsByAccount and paisa math in calculateAggregateMetrics & deriveCashBoxSummary", async () => {
+    const allJournals = [
+      { id: "j1", accountId: "acc_1", businessId: "biz_A", amount: 100 },
+      { id: "j2", accountId: "acc_1", businessId: "biz_A", amount: 200 },
+      { id: "j3", accountId: "acc_1", businessId: "biz_B", amount: 300 },
+    ];
+
+    const indexed = ledgerEngine.indexJournalsByAccount(allJournals);
+    assert.ok(indexed.has("biz_A:acc_1"));
+    assert.ok(indexed.has("biz_B:acc_1"));
+    assert.strictEqual(indexed.get("biz_A:acc_1").length, 2);
+    assert.strictEqual(indexed.get("biz_B:acc_1").length, 1);
+
+    // Cashbox summary with integer paisa precision
+    const cashEntries = [
+      { id: "c1", businessId: "biz_A", type: "in", amount: 100.10 },
+      { id: "c2", businessId: "biz_A", type: "in", amount: 200.20 },
+      { id: "c3", businessId: "biz_A", type: "out", amount: 50.05 },
+      { id: "c4", businessId: "biz_B", type: "in", amount: 999 },
+    ];
+
+    const cbSummaryA = ledgerEngine.deriveCashBoxSummary(cashEntries, "biz_A");
+    assert.strictEqual(cbSummaryA.cashIn, 300.30);
+    assert.strictEqual(cbSummaryA.cashOut, 50.05);
+    assert.strictEqual(cbSummaryA.balance, 250.25);
+
+    // Aggregate metrics
+    const accounts = [
+      { id: "a1", businessId: "biz_A", type: 1, balance: 1500.50 }, // customer
+      { id: "a2", businessId: "biz_A", type: 2, balance: 500.25 },  // supplier
+      { id: "a3", businessId: "biz_B", type: 1, balance: 10000 },
+    ];
+    const metricsA = ledgerEngine.calculateAggregateMetrics(accounts, allJournals, "biz_A");
+    assert.strictEqual(metricsA.totalReceivable, 1500.50);
+    assert.strictEqual(metricsA.totalPayable, 500.25);
+    assert.strictEqual(metricsA.netBalance, 1000.25);
+    assert.strictEqual(metricsA.customerCount, 1);
+    assert.strictEqual(metricsA.supplierCount, 1);
+  });
+
+  await runTest("deleteBusinessCascade purges multi-business records and updates active business", async () => {
+    const initialData = {
+      businesses: [
+        { id: "1", name: "Main Shop", isSelected: true, isArchived: false },
+        { id: "2", name: "Branch 2", isSelected: false, isArchived: false },
+      ],
+      activeBusinessId: "2",
+      accounts: [
+        { id: "a1", businessId: "1", name: "Cust 1", balance: 100 },
+        { id: "a2", businessId: "2", name: "Cust 2", balance: 200 },
+      ],
+      journals: [
+        { id: "j1", businessId: "1", accountId: "a1", amount: 100 },
+        { id: "j2", businessId: "2", accountId: "a2", amount: 200 },
+      ],
+      cashEntries: [
+        { id: "c1", businessId: "1", amount: 50 },
+        { id: "c2", businessId: "2", amount: 75 },
+      ],
+      notes: [
+        { id: "n1", businessId: "1", title: "Note 1" },
+        { id: "n2", businessId: "2", title: "Note 2" },
+      ],
+      stock: [
+        { id: "s1", businessId: "1", name: "Item 1" },
+        { id: "s2", businessId: "2", name: "Item 2" },
+      ],
+      inventory: [
+        { id: "s1", businessId: "1", name: "Item 1" },
+        { id: "s2", businessId: "2", name: "Item 2" },
+      ],
+      walletTxns: [
+        { id: "w1", businessId: "1", amount: 10 },
+        { id: "w2", businessId: "2", amount: 20 },
+      ],
+      tagadaLogs: [
+        { id: "t1", businessId: "1", msg: "Hi" },
+        { id: "t2", businessId: "2", msg: "Hello" },
+      ],
+    };
+
+    const repo = new StorageRepository(createMockAdapter(initialData));
+    await repo.loadInitialData();
+
+    // Cascade delete business 2
+    const delRes = await repo.deleteBusinessCascade("2");
+    assert.strictEqual(delRes.success, true);
+
+    const afterState = repo.getAuthoritativeState();
+    assert.strictEqual(afterState.businesses.length, 1);
+    assert.strictEqual(afterState.businesses[0].id, "1");
+    assert.strictEqual(afterState.activeBusinessId, "1");
+
+    // All records for business 2 must be purged
+    assert.strictEqual(afterState.accounts.some(a => String(a.businessId) === "2"), false);
+    assert.strictEqual(afterState.journals.some(j => String(j.businessId) === "2"), false);
+    assert.strictEqual(afterState.cashEntries.some(c => String(c.businessId) === "2"), false);
+    assert.strictEqual(afterState.notes.some(n => String(n.businessId) === "2"), false);
+    assert.strictEqual(afterState.stock.some(s => String(s.businessId) === "2"), false);
+    assert.strictEqual(afterState.inventory.some(i => String(i.businessId) === "2"), false);
+    assert.strictEqual(afterState.walletTxns.some(w => String(w.businessId) === "2"), false);
+    assert.strictEqual(afterState.tagadaLogs.some(t => String(t.businessId) === "2"), false);
+
+    // Business 1 records must remain intact
+    assert.strictEqual(afterState.accounts.length, 1);
+    assert.strictEqual(afterState.accounts[0].id, "a1");
+
+    // Guard: cannot cascade delete the last active business
+    let threw = false;
+    try {
+      const failDel = await repo.deleteBusinessCascade("1");
+      if (failDel && failDel.success === false) {
+        threw = true;
+        assert.ok(failDel.error && failDel.error.message.includes("কমপক্ষে একটি ব্যবসা"));
+      }
+    } catch (e) {
+      threw = true;
+      assert.ok(e.message.includes("কমপক্ষে একটি ব্যবসা"));
+    }
+    assert.strictEqual(threw, true);
   });
 
   console.log("\n================================================================");

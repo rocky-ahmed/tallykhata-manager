@@ -361,6 +361,249 @@ async function runAsyncTest(name, fn) {
     assert(fullState.preferences && fullState.preferences.theme === 'dark');
   });
 
+  // Test 10: Failed-restore rollback on commit error restores safety snapshot without corruption
+  await runAsyncTest('Failed-restore rollback: safety snapshot reverts all stores if restore commit encounters failure', async () => {
+    const adapter = createMockAdapter();
+    const repo = new StorageRepository(adapter);
+    await repo.loadInitialData();
+
+    // 1. Establish pristine pre-restore baseline across all 3 domains
+    repo.currentStore.businessName = 'Pristine Safe Enterprise';
+    repo.currentStore.accounts = [{ id: 'acc_pre_safe', name: 'Safe Business Client', balance: 7500, type: 1 }];
+    repo.currentStore.journals = [{ id: 'j_pre_safe', accountId: 'acc_pre_safe', amount: 7500, type: 'given', date: '2026-10-30' }];
+    await adapter.setItem('@tallykhata_v6_store', JSON.stringify(repo.currentStore));
+
+    const originalMM = {
+      accounts: [{ id: 'mm_pre_safe', name: 'Safe Wallet Account', balance: 18500, isArchived: false }],
+      transactions: [{ id: 'tx_safe_1', amount: 250, type: 'expense', accountId: 'mm_pre_safe' }],
+      categories: [{ id: 'cat_food', name: 'Food', type: 'expense' }],
+      goals: [],
+      recurring: [],
+      preferences: { currencySymbol: '৳' }
+    };
+    await adapter.setItem('@tallykhata_personal_money_manager_v2', JSON.stringify(originalMM));
+
+    const originalPrefs = { theme: 'dark', language: 'bn', vibrationEnabled: true };
+    await adapter.setItem('@tallykhata_app_preferences_v1', JSON.stringify(originalPrefs));
+
+    // 2. Create authoritative safety snapshot with extra domain state
+    const snapResult = await repo.createLocalSafetySnapshot(null, {
+      moneyManager: originalMM,
+      preferences: originalPrefs,
+    });
+    assert.strictEqual(snapResult.success, true);
+    assert.ok(snapResult.snapshotId);
+
+    // 3. Simulate failure during restore commit (e.g. storage adapter throws or transaction fails mid-stream)
+    repo.currentStore.businessName = 'Corrupted Incomplete Restore';
+    repo.currentStore.accounts = [];
+    await adapter.setItem('@tallykhata_personal_money_manager_v2', JSON.stringify({ accounts: [] }));
+    await adapter.setItem('@tallykhata_app_preferences_v1', JSON.stringify({ theme: 'light' }));
+
+    // 4. Trigger rollbackToSafetySnapshot using recorded snapshotId
+    const rollbackResult = await repo.rollbackToSafetySnapshot(snapResult.snapshotId);
+    assert.strictEqual(rollbackResult.success, true);
+    assert.strictEqual(rollbackResult.restored, true);
+
+    // 5. Verify all 3 stores are strictly restored to pristine baseline with zero corruption
+    const bizState = repo.getAuthoritativeState();
+    assert.strictEqual(bizState.businessName, 'Pristine Safe Enterprise');
+    assert.strictEqual(bizState.accounts.length, 1);
+    assert.strictEqual(bizState.accounts[0].name, 'Safe Business Client');
+    assert.strictEqual(bizState.accounts[0].balance, 7500);
+
+    const revertedMM = JSON.parse(await adapter.getItem('@tallykhata_personal_money_manager_v2'));
+    assert.strictEqual(revertedMM.accounts.length, 1);
+    assert.strictEqual(revertedMM.accounts[0].name, 'Safe Wallet Account');
+    assert.strictEqual(revertedMM.accounts[0].balance, 18500);
+
+    const revertedPrefs = JSON.parse(await adapter.getItem('@tallykhata_app_preferences_v1'));
+    assert.strictEqual(revertedPrefs.theme, 'dark');
+    assert.strictEqual(revertedPrefs.language, 'bn');
+    assert.strictEqual(revertedPrefs.vibrationEnabled, true);
+  });
+
+  // Test 11: Domain-selective restore matrix comprehensively isolates and restores selected domains
+  await runAsyncTest('Domain-selective restore matrix isolates and preserves untargeted domains and legacy backups', async () => {
+    const adapter = createMockAdapter();
+    const repo = new StorageRepository(adapter);
+    await repo.loadInitialData();
+
+    // Setup local persistent state
+    const localBizOriginal = 'Local Base Store';
+    repo.currentStore.businessName = localBizOriginal;
+    repo.currentStore.accounts = [{ id: 'b_local_1', name: 'Local Cust', balance: 1000, type: 1 }];
+    await adapter.setItem('@tallykhata_v6_store', JSON.stringify(repo.currentStore));
+
+    const localMMOriginal = {
+      accounts: [{ id: 'mm_local_1', name: 'Local Personal Wallet', balance: 5555, isArchived: false }],
+      transactions: [],
+      categories: [],
+      goals: [],
+      recurring: [],
+      preferences: { currencySymbol: '৳' }
+    };
+    await adapter.setItem('@tallykhata_personal_money_manager_v2', JSON.stringify(localMMOriginal));
+
+    // A. Selective restore: business-only (domains: ['business'])
+    const backupPayload = buildBackupPayload({
+      ...createDefaultState(),
+      businessName: 'Incoming Restored Biz',
+      accounts: [{ id: 'b_inc_1', name: 'Incoming Cust', balance: 9000, type: 1 }],
+      moneyManager: {
+        accounts: [{ id: 'mm_inc_1', name: 'Incoming MM Wallet', balance: 99999, isArchived: false }]
+      }
+    }, { sub: 'usr_matrix' });
+
+    const resBizOnly = await repo.commitRestorePayload(backupPayload, { domains: ['business'] });
+    assert.strictEqual(resBizOnly.success, true);
+    assert.strictEqual(resBizOnly.restoredDomains.business, true);
+    assert.strictEqual(resBizOnly.restoredDomains.moneyManager, false);
+    assert.strictEqual(repo.getAuthoritativeState().businessName, 'Incoming Restored Biz');
+    // MM remains untouched
+    const mmAfterBizOnly = JSON.parse(await adapter.getItem('@tallykhata_personal_money_manager_v2'));
+    assert.strictEqual(mmAfterBizOnly.accounts[0].name, 'Local Personal Wallet');
+    assert.strictEqual(mmAfterBizOnly.accounts[0].balance, 5555);
+
+    // B. Selective restore: personal-only (domains: ['moneyManager'])
+    const resMMOnly = await repo.commitRestorePayload(backupPayload, { domains: ['moneyManager'] });
+    assert.strictEqual(resMMOnly.success, true);
+    assert.strictEqual(resMMOnly.restoredDomains.business, false);
+    assert.strictEqual(resMMOnly.restoredDomains.moneyManager, true);
+    // Business remains untouched from previous step
+    assert.strictEqual(repo.getAuthoritativeState().businessName, 'Incoming Restored Biz');
+    // MM is now updated
+    const mmAfterMMOnly = JSON.parse(await adapter.getItem('@tallykhata_personal_money_manager_v2'));
+    assert.strictEqual(mmAfterMMOnly.accounts[0].name, 'Incoming MM Wallet');
+    assert.strictEqual(mmAfterMMOnly.accounts[0].balance, 99999);
+
+    // C. Full restore (domains: ['all'])
+    const fullBackup = buildBackupPayload({
+      ...createDefaultState(),
+      businessName: 'Complete All Biz',
+      accounts: [{ id: 'b_all_1', name: 'All Cust', balance: 4000, type: 1 }],
+      moneyManager: {
+        accounts: [{ id: 'mm_all_1', name: 'All MM Wallet', balance: 77777, isArchived: false }]
+      }
+    }, { sub: 'usr_all' });
+    const resAll = await repo.commitRestorePayload(fullBackup, { domains: ['all'] });
+    assert.strictEqual(resAll.success, true);
+    assert.strictEqual(resAll.restoredDomains.business, true);
+    assert.strictEqual(resAll.restoredDomains.moneyManager, true);
+    assert.strictEqual(repo.getAuthoritativeState().businessName, 'Complete All Biz');
+    const mmAfterAll = JSON.parse(await adapter.getItem('@tallykhata_personal_money_manager_v2'));
+    assert.strictEqual(mmAfterAll.accounts[0].name, 'All MM Wallet');
+
+    // D. Legacy backup without data.moneyManager never wipes existing MM
+    const legacyBackup = {
+      version: 5,
+      accounts: [{ id: 'b_leg_1', name: 'Legacy Cust', balance: 300, type: 1 }],
+      journals: [],
+      cashEntries: [],
+      businessName: 'Legacy Shop Never Wipes MM'
+    };
+    const resLegacy = await repo.commitRestorePayload(legacyBackup, { domains: ['all'] });
+    assert.strictEqual(resLegacy.success, true);
+    assert.strictEqual(resLegacy.restoredMoneyManager, null);
+    assert.strictEqual(repo.getAuthoritativeState().businessName, 'Legacy Shop Never Wipes MM');
+    // Crucially, MM data remains 'All MM Wallet' and is NOT wiped
+    const mmAfterLegacy = JSON.parse(await adapter.getItem('@tallykhata_personal_money_manager_v2'));
+    assert.strictEqual(mmAfterLegacy.accounts[0].name, 'All MM Wallet');
+    assert.strictEqual(mmAfterLegacy.accounts[0].balance, 77777);
+  });
+
+  // Test 12: Deterministic journal date sorting handles identical dates, varying times, missing times, and tie-breaking by ID
+  runTest('Deterministic journal date sorting: identical dates, varying times, missing times, and tie-breaking by ID', () => {
+    const { recalculateAccountRunningBalances } = require('./src/ledgerEngine');
+
+    const customer = { id: 'cust_det_1', name: 'Customer Test', type: 1, openingBalance: 1000 };
+
+    const journals = [
+      { id: '105', accountId: 'cust_det_1', type: 'given', amount: 50, date: '2026-10-31', time: '14:30' },
+      { id: '102', accountId: 'cust_det_1', type: 'given', amount: 100, date: '2026-10-31', time: '09:00' },
+      { id: '101', accountId: 'cust_det_1', type: 'given', amount: 500, date: '2026-10-30', time: '18:00' },
+      { id: '104', accountId: 'cust_det_1', type: 'received', amount: 200, date: '2026-10-31', time: '14:30' },
+      { id: '103', accountId: 'cust_det_1', type: 'given', amount: 150, date: '2026-10-31', time: '00:00' },
+      { id: '100', accountId: 'cust_det_1', type: 'given', amount: 250, date: '2026-10-31', time: null },
+    ];
+
+    const result = recalculateAccountRunningBalances(customer, journals);
+    assert.ok(result && result.accountJournals);
+
+    // accountJournals is returned newest-first for UI; reversed gives chronological (oldest-first)
+    const chronological = [...result.accountJournals].reverse();
+    assert.strictEqual(chronological[0].id, '101', 'Oldest date 2026-10-30 must be first');
+    assert.strictEqual(chronological[0].runningBalance, 1500); // 1000 + 500
+
+    // Between 104 and 105 (both on 2026-10-31 14:30):
+    const idx104 = chronological.findIndex(j => j.id === '104');
+    const idx105 = chronological.findIndex(j => j.id === '105');
+    assert.ok(idx104 < idx105, 'Tie-breaking on same date & time must sort numeric ID 104 before 105');
+
+    assert.strictEqual(result.finalBalance, chronological[chronological.length - 1].runningBalance);
+    assert.strictEqual(result.updatedAccount.balance, result.finalBalance);
+  });
+
+  // Test 13: Deterministic journal sorting avoids new Date() NaN pitfalls and matches lexicographical ordering
+  runTest('Deterministic journal sorting avoids new Date() NaN pitfalls and matches lexicographical ordering', () => {
+    const invalidDateStr2 = '2026-10-31 InvalidTime';
+    const d2 = new Date(invalidDateStr2);
+
+    assert.ok(isNaN(d2.getTime()), 'new Date with non-standard format returns NaN');
+
+    const safeComparator = (a, b) => {
+      const dateComp = (a.date || '').localeCompare(b.date || '');
+      if (dateComp !== 0) return dateComp;
+
+      if (a.time && b.time) {
+        const timeComp = a.time.localeCompare(b.time);
+        if (timeComp !== 0) return timeComp;
+      }
+
+      const idA = isNaN(Number(a.id)) ? a.id : Number(a.id);
+      const idB = isNaN(Number(b.id)) ? b.id : Number(b.id);
+      if (typeof idA === 'number' && typeof idB === 'number') {
+        return idA - idB;
+      }
+      return String(a.id).localeCompare(String(b.id));
+    };
+
+    const testItems = [
+      { id: '1', date: '2026-10-31', time: 'InvalidTime' },
+      { id: '2', date: '2026-10-31', time: '12:00' },
+      { id: '3', date: '2026-10-30', time: '09:00' },
+    ];
+
+    const sortedItems = [...testItems].sort(safeComparator);
+    assert.strictEqual(sortedItems[0].id, '3', '2026-10-30 is definitively sorted before 2026-10-31');
+
+    const permutations = [
+      [
+        { id: '1', date: '2026-10-30', time: '10:00' },
+        { id: '2', date: '2026-10-31', time: '08:00' },
+        { id: '3', date: '2026-10-31', time: '12:00' },
+        { id: '4', date: '2026-10-31', time: '12:00' },
+      ],
+      [
+        { id: '4', date: '2026-10-31', time: '12:00' },
+        { id: '1', date: '2026-10-30', time: '10:00' },
+        { id: '3', date: '2026-10-31', time: '12:00' },
+        { id: '2', date: '2026-10-31', time: '08:00' },
+      ],
+      [
+        { id: '3', date: '2026-10-31', time: '12:00' },
+        { id: '2', date: '2026-10-31', time: '08:00' },
+        { id: '4', date: '2026-10-31', time: '12:00' },
+        { id: '1', date: '2026-10-30', time: '10:00' },
+      ]
+    ];
+
+    const results = permutations.map(p => p.sort(safeComparator).map(x => x.id).join(','));
+    assert.strictEqual(results[0], results[1], 'Sort must be deterministic regardless of input permutation');
+    assert.strictEqual(results[1], results[2], 'Sort must be deterministic regardless of input permutation');
+    assert.strictEqual(results[0], '1,2,3,4', 'Result must be in exact ascending order 1,2,3,4');
+  });
+
   console.log(`\n================================================================`);
   console.log(`FULL BACKUP SUITE SUMMARY: ${passed} / ${total} TESTS PASSED (100%)`);
   console.log(`================================================================\n`);

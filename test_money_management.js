@@ -1678,6 +1678,302 @@ runTest("mmService.roundMoney eliminates floating-point drift across multi-step 
   assert.strictEqual(String(netWorth).includes("99999999"), false, "Net worth must not contain floating point repeating decimals");
 });
 
+
+// TEST 65: Multi-cycle recurring transaction catch-up generates missed transactions up to 12-cycle ceiling
+runTest("mmService.processRecurringTransactions multi-cycle catch-up handles 3, 5, and 12-cycle ceiling", () => {
+  const baseState = mmService.getDefaultState("2026-10-31");
+  const initialCashBal = baseState.accounts.find(a => a.id === "acc_cash").balance;
+
+  // Case A: 3 cycles behind (2026-08-01, 2026-09-01, 2026-10-01) with monthly cadence
+  let state3 = {
+    ...baseState,
+    recurring: [{
+      id: "rec_rent_3",
+      title: "Monthly Rent 3",
+      type: "expense",
+      amount: 1000,
+      accountId: "acc_cash",
+      categoryId: "cat_food",
+      cadence: "monthly",
+      nextDueDate: "2026-08-01",
+      isActive: true,
+    }]
+  };
+  const res3 = mmService.processRecurringTransactions(state3, "2026-10-01");
+  const txns3 = res3.transactions.filter(t => t.recurringId === "rec_rent_3");
+  assert.strictEqual(txns3.length, 3, "Exactly 3 transactions must be generated for 3 missed cycles");
+  assert.deepStrictEqual(txns3.map(t => t.date), ["2026-10-01", "2026-09-01", "2026-08-01"]);
+  assert.strictEqual(res3.recurring[0].nextDueDate, "2026-11-01");
+  assert.strictEqual(res3.recurring[0].lastProcessedDate, "2026-10-01");
+  assert.strictEqual(res3.accounts.find(a => a.id === "acc_cash").balance, initialCashBal - 3000);
+
+  // Case B: 5 cycles behind (2026-06-01 to 2026-10-01)
+  let state5 = {
+    ...baseState,
+    recurring: [{
+      id: "rec_util_5",
+      title: "Utilities 5",
+      type: "expense",
+      amount: 500,
+      accountId: "acc_cash",
+      categoryId: "cat_bills",
+      cadence: "monthly",
+      nextDueDate: "2026-06-01",
+      isActive: true,
+    }]
+  };
+  const res5 = mmService.processRecurringTransactions(state5, "2026-10-01");
+  const txns5 = res5.transactions.filter(t => t.recurringId === "rec_util_5");
+  assert.strictEqual(txns5.length, 5, "Exactly 5 transactions must be generated for 5 missed cycles");
+  assert.strictEqual(res5.recurring[0].nextDueDate, "2026-11-01");
+  assert.strictEqual(res5.recurring[0].lastProcessedDate, "2026-10-01");
+
+  // Case C: 15 cycles behind (2025-07-01 to 2026-10-01) - capped at 12-cycle ceiling
+  let state15 = {
+    ...baseState,
+    recurring: [{
+      id: "rec_cap_15",
+      title: "Subscription 15",
+      type: "expense",
+      amount: 200,
+      accountId: "acc_cash",
+      categoryId: "cat_entertainment",
+      cadence: "monthly",
+      nextDueDate: "2025-07-01",
+      isActive: true,
+    }]
+  };
+  const res15 = mmService.processRecurringTransactions(state15, "2026-10-01");
+  const txns15 = res15.transactions.filter(t => t.recurringId === "rec_cap_15");
+  assert.strictEqual(txns15.length, 12, "Must cap at 12 cycles ceiling to prevent runaway processing");
+});
+
+// TEST 66: Idempotency of processRecurringTransactions
+runTest("mmService.processRecurringTransactions is strictly idempotent across repeat runs", () => {
+  const baseState = mmService.getDefaultState("2026-10-31");
+  const stateWithRec = {
+    ...baseState,
+    recurring: [{
+      id: "rec_idemp_1",
+      title: "Internet Bill",
+      type: "expense",
+      amount: 1200,
+      accountId: "acc_cash",
+      categoryId: "cat_bills",
+      cadence: "monthly",
+      nextDueDate: "2026-09-01",
+      isActive: true,
+    }]
+  };
+
+  // First run: processes 2 cycles (Sep 1, Oct 1)
+  const firstPass = mmService.processRecurringTransactions(stateWithRec, "2026-10-01");
+  const txnCount1 = firstPass.transactions.length;
+  const cashBal1 = firstPass.accounts.find(a => a.id === "acc_cash").balance;
+  const netWorth1 = mmService.calculateNetWorth(firstPass);
+  const recTxns1 = firstPass.transactions.filter(t => t.recurringId === "rec_idemp_1");
+  assert.strictEqual(recTxns1.length, 2);
+
+  // Second run on the same date: must be completely idempotent
+  const secondPass = mmService.processRecurringTransactions(firstPass, "2026-10-01");
+  assert.strictEqual(secondPass.transactions.length, txnCount1, "Transaction count must not change on second run");
+  assert.strictEqual(secondPass.accounts.find(a => a.id === "acc_cash").balance, cashBal1, "Cash balance must not change on second run");
+  assert.strictEqual(mmService.calculateNetWorth(secondPass), netWorth1, "Net worth must remain unchanged");
+  assert.deepStrictEqual(secondPass.recurring, firstPass.recurring, "Recurring schedule metadata must remain unchanged");
+
+  // Third run: still strictly idempotent
+  const thirdPass = mmService.processRecurringTransactions(secondPass, "2026-10-01");
+  assert.strictEqual(thirdPass.transactions.length, txnCount1);
+  assert.strictEqual(thirdPass.accounts.find(a => a.id === "acc_cash").balance, cashBal1);
+});
+
+// TEST 67: Paused recurring rules (isActive: false) are ignored
+runTest("mmService.processRecurringTransactions ignores paused recurring rules (isActive: false)", () => {
+  const baseState = mmService.getDefaultState("2026-10-31");
+  const initCashBal = baseState.accounts.find(a => a.id === "acc_cash").balance;
+
+  const state = {
+    ...baseState,
+    recurring: [
+      {
+        id: "rec_active",
+        title: "Active Rule",
+        type: "expense",
+        amount: 800,
+        accountId: "acc_cash",
+        categoryId: "cat_food",
+        cadence: "monthly",
+        nextDueDate: "2026-08-01",
+        isActive: true,
+      },
+      {
+        id: "rec_paused",
+        title: "Paused Gym Membership",
+        type: "expense",
+        amount: 2500,
+        accountId: "acc_cash",
+        categoryId: "cat_health",
+        cadence: "monthly",
+        nextDueDate: "2026-06-01",
+        isActive: false,
+      }
+    ]
+  };
+
+  const result = mmService.processRecurringTransactions(state, "2026-10-01");
+
+  // Active rule produced 3 transactions
+  const activeTxns = result.transactions.filter(t => t.recurringId === "rec_active");
+  assert.strictEqual(activeTxns.length, 3);
+
+  // Paused rule produced ZERO transactions
+  const pausedTxns = result.transactions.filter(t => t.recurringId === "rec_paused");
+  assert.strictEqual(pausedTxns.length, 0, "Paused rule must produce 0 transactions");
+
+  // Paused rule nextDueDate remains untouched
+  const pausedRec = result.recurring.find(r => r.id === "rec_paused");
+  assert.strictEqual(pausedRec.nextDueDate, "2026-06-01");
+  assert.strictEqual(pausedRec.lastProcessedDate, undefined);
+
+  // Balances only deducted for active rule (3 * 800 = 2400)
+  assert.strictEqual(result.accounts.find(a => a.id === "acc_cash").balance, initCashBal - 2400);
+});
+
+// TEST 68: Recurring transfers update account balances atomically and preserve total Net Worth
+runTest("mmService.processRecurringTransactions updates recurring transfers atomically and preserves Net Worth", () => {
+  const baseState = mmService.getDefaultState("2026-10-31");
+  const initialNetWorth = mmService.calculateNetWorth(baseState);
+  const bankBefore = baseState.accounts.find(a => a.id === "acc_bank").balance;
+  const cashBefore = baseState.accounts.find(a => a.id === "acc_cash").balance;
+
+  const state = {
+    ...baseState,
+    recurring: [{
+      id: "rec_transfer_xfer",
+      title: "Monthly Pocket Money Transfer",
+      type: "transfer",
+      amount: 1500,
+      fromAccountId: "acc_bank",
+      toAccountId: "acc_cash",
+      cadence: "monthly",
+      nextDueDate: "2026-08-01",
+      isActive: true,
+    }]
+  };
+
+  // Process 3 cycles (Aug 1, Sep 1, Oct 1) -> Total transfer = 4500
+  const result = mmService.processRecurringTransactions(state, "2026-10-01");
+  const transferTxns = result.transactions.filter(t => t.recurringId === "rec_transfer_xfer");
+  assert.strictEqual(transferTxns.length, 3, "Must generate 3 transfer transactions");
+
+  for (const txn of transferTxns) {
+    assert.strictEqual(txn.type, "transfer");
+    assert.strictEqual(txn.fromAccountId, "acc_bank");
+    assert.strictEqual(txn.toAccountId, "acc_cash");
+    assert.strictEqual(txn.amount, 1500);
+  }
+
+  const bankAfter = result.accounts.find(a => a.id === "acc_bank").balance;
+  const cashAfter = result.accounts.find(a => a.id === "acc_cash").balance;
+
+  assert.strictEqual(bankBefore - bankAfter, 4500, "Bank must be debited by exactly 4500");
+  assert.strictEqual(cashAfter - cashBefore, 4500, "Cash must be credited by exactly 4500");
+
+  const finalNetWorth = mmService.calculateNetWorth(result);
+  assert.strictEqual(finalNetWorth, initialNetWorth, "Total net worth must be 100% preserved across transfers");
+});
+
+// TEST 69: Security test: PIN masking enforcement in PIN inputs and masked lock screen dots
+runTest("PIN input enforces secureTextEntry={true} and lock screen renders masked dots without plaintext leakage", () => {
+  const currentAppSource = fs.readFileSync("App.js", "utf8");
+
+  // 1. PIN TextInput enforces secureTextEntry={true}
+  assert.ok(
+    currentAppSource.includes("secureTextEntry={true}"),
+    "PIN TextInput must explicitly set secureTextEntry={true} to prevent shoulder-surfing"
+  );
+
+  // 2. PIN TextInput restricts to numeric and 4 digits
+  assert.ok(
+    currentAppSource.includes('maxLength={4}'),
+    "PIN TextInput must restrict maximum length to 4 digits"
+  );
+  assert.ok(
+    currentAppSource.includes('keyboardType="numeric"'),
+    "PIN TextInput must use numeric keyboardType"
+  );
+
+  // 3. Lock screen renders masked indicator dots (pinDotsRow, pinDot, pinDotFilled)
+  assert.ok(
+    currentAppSource.includes("styles.pinDotsRow"),
+    "Lock screen must render styles.pinDotsRow container for masked indicator dots"
+  );
+  assert.ok(
+    currentAppSource.includes("styles.pinDotFilled"),
+    "Lock screen must render styles.pinDotFilled to visually reflect entered digits without displaying characters"
+  );
+
+  // 4. Verify pinLockContainer does NOT render raw pinInput digits in Text components
+  const lockScreenSection = currentAppSource.slice(
+    currentAppSource.indexOf('// VIEW: PIN SECURITY LOCK SCREEN'),
+    currentAppSource.indexOf('// VIEW: MAIN APPLICATION SHELL')
+  );
+  assert.ok(lockScreenSection.includes("pinInput.length > idx"), "Dots must only check input length");
+  assert.strictEqual(
+    lockScreenSection.includes("<Text>{pinInput}</Text>") || lockScreenSection.includes("{pinInput}"),
+    false,
+    "Lock screen must never output raw pinInput characters into Text nodes"
+  );
+});
+
+// TEST 70: Security test: AppState background and inactive transitions enforce automatic relocking
+runTest("AppState background/inactive transition securely relocks application when PIN is enabled", () => {
+  const currentAppSource = fs.readFileSync("App.js", "utf8");
+
+  // 1. Verify AppState listener is registered
+  assert.ok(
+    currentAppSource.includes("AppState.addEventListener('change'"),
+    "App must register AppState change listener"
+  );
+
+  // 2. Verify background and inactive transitions trigger relock guard
+  assert.ok(
+    currentAppSource.includes("nextState === 'background' || nextState === 'inactive'"),
+    "AppState handler must intercept both background and inactive transitions"
+  );
+  assert.ok(
+    currentAppSource.includes("pinEnabledRef.current"),
+    "AppState handler must check active pinEnabledRef"
+  );
+  assert.ok(
+    currentAppSource.includes("setIsLocked(true)"),
+    "AppState handler must call setIsLocked(true) on background transition"
+  );
+
+  // 3. Behavioral verification of AppState transition logic
+  function simulateAppStateTransition(currentState, nextState, pinEnabled) {
+    let isLocked = currentState.isLocked;
+    if (nextState === 'background' || nextState === 'inactive') {
+      if (pinEnabled) {
+        isLocked = true;
+      }
+    }
+    return { isLocked };
+  }
+
+  // App unlocked with PIN enabled -> goes to background -> must lock
+  const lockedOnBackground = simulateAppStateTransition({ isLocked: false }, 'background', true);
+  assert.strictEqual(lockedOnBackground.isLocked, true, "Application must lock when backgrounded with PIN enabled");
+
+  // App unlocked with PIN enabled -> goes to inactive -> must lock
+  const lockedOnInactive = simulateAppStateTransition({ isLocked: false }, 'inactive', true);
+  assert.strictEqual(lockedOnInactive.isLocked, true, "Application must lock when transitioning to inactive with PIN enabled");
+
+  // App unlocked with PIN disabled -> goes to background -> stays unlocked
+  const unlockedWhenDisabled = simulateAppStateTransition({ isLocked: false }, 'background', false);
+  assert.strictEqual(unlockedWhenDisabled.isLocked, false, "Application must not lock if PIN protection is disabled");
+});
+
 console.log(`\nSUMMARY: ${passed}/${total} tests passed.`);
 if (passed === total) {
   console.log("ALL MONEY MANAGER TESTS PASSED SUCCESSFULLY!\n");

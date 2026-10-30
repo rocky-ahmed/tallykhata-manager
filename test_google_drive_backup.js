@@ -255,7 +255,7 @@ async function runAllTests() {
   console.log('================================================================\n');
 
   let passed = 0;
-  let total = 33;
+  let total = 38;
 
   const mockDrive = createMockDriveFetch();
   const driveService = new GoogleDriveBackupService({ fetch: mockDrive.fetch });
@@ -1865,6 +1865,368 @@ console.log('[PASS] TEST 6: Reject restoration from a different Google Account')
     assert.deepStrictEqual(rawResultNoParents.spaces, ['appDataFolder']);
 
     console.log('[PASS] TEST 33: GoogleDriveBackupService.prototype.getFileMetadata requests correct endpoint and fields');
+    passed++;
+  }
+
+  // 34. Cloud backup creation and upload verification with complete Money Manager data
+  {
+    const mockDrive = createMockDriveFetch();
+    const driveService = new GoogleDriveBackupService({ fetch: mockDrive.fetch });
+    const adapter = createMockAdapter();
+    const repo = new StorageRepository(adapter);
+    await repo.loadInitialData();
+
+    await repo.persistData({
+      businessName: 'Personal & Enterprise Shop',
+      ownerName: 'Multi-Domain Owner',
+      accounts: [
+        { id: 'acc_biz_1', name: 'Biz Customer', balance: 5000, type: 1, businessId: '1' },
+      ],
+      journals: [
+        { id: 'jrn_biz_1', accountId: 'acc_biz_1', amount: 5000, type: 'give', date: '2026-10-31', businessId: '1' },
+      ],
+      cashEntries: [],
+    });
+
+    const mmInitialState = {
+      version: 3,
+      overallMonthlyBudget: 45000,
+      accounts: [
+        { id: 'acc_cash', name: 'নগদ ক্যাশ', type: 'cash', balance: 12000, icon: '💵', color: '#10B981', isArchived: false },
+        { id: 'acc_bank', name: 'ব্যাংক হিসাব', type: 'bank', balance: 55000, icon: '🏦', color: '#3B82F6', isArchived: false },
+        { id: 'acc_bkash', name: 'বিকাশ ওয়ালেট', type: 'mfs', balance: 8500, icon: '📱', color: '#EC4899', isArchived: false },
+        { id: 'acc_nagad', name: 'নগদ ওয়ালেট', type: 'mfs', balance: 4500, icon: '📱', color: '#F97316', isArchived: false },
+      ],
+      categories: [
+        { id: 'cat_food', name: 'খাবার ও বাজার', type: 'expense', icon: '🍲', color: '#EF4444', budget: 15000, isArchived: false },
+        { id: 'cat_salary', name: 'বেতন', type: 'income', icon: '💰', color: '#10B981', budget: 0, isArchived: false },
+      ],
+      goals: [
+        { id: 'goal_1', title: 'নতুন ল্যাপটপ', targetAmount: 80000, savedAmount: 25000, targetDate: '2026-12-31', icon: '💻', color: '#6366F1' },
+      ],
+      recurring: [
+        { id: 'rec_1', title: 'ইন্টারনেট বিল', type: 'expense', amount: 1000, categoryId: 'cat_utility', accountId: 'acc_bkash', cadence: 'monthly', startDate: '2026-10-01', nextDueDate: '2026-11-01', isActive: true },
+      ],
+      transactions: [
+        { id: 'mm_tx_1', type: 'expense', amount: 1500, categoryId: 'cat_food', accountId: 'acc_cash', date: '2026-10-25', time: '12:30 PM', note: 'বাজার' },
+        { id: 'mm_tx_2', type: 'income', amount: 40000, categoryId: 'cat_salary', accountId: 'acc_bank', date: '2026-10-01', time: '10:00 AM', note: 'অক্টোবর বেতন' },
+        { id: 'mm_tx_3', type: 'transfer', amount: 5000, fee: 25, fromAccountId: 'acc_bank', toAccountId: 'acc_bkash', date: '2026-10-26', time: '03:15 PM', note: 'বিকাশ রিচার্জ' },
+      ],
+      preferences: { defaultPeriod: 'this_month', currencySymbol: '৳' },
+    };
+
+    await adapter.setItem('@tallykhata_personal_money_manager_v2', JSON.stringify(mmInitialState));
+
+    const googleUser = { sub: 'google_sub_user_a', email: 'usera@gmail.com', name: 'User A' };
+    const ui = createMockUiState();
+
+    const backupResult = await orchestrateCloudBackup({
+      storageRepository: repo,
+      driveService,
+      getAccessToken: async () => 'token_user_a',
+      googleUser,
+      existingFileId: null,
+      onStatusChange: ui.onStatusChange,
+      onMetaUpdated: () => {},
+      alertFn: ui.alertFn,
+    });
+
+    assert.strictEqual(backupResult.success, true);
+    assert.ok(backupResult.fileId);
+    assert.strictEqual(backupResult.manifest.hasMoneyManager, true);
+    assert(backupResult.manifest.dataDomains.includes('moneyManager'));
+    assert.strictEqual(backupResult.manifest.recordCounts.mmAccounts, 4);
+    assert.strictEqual(backupResult.manifest.recordCounts.mmTransactions, 3);
+    assert.strictEqual(backupResult.manifest.recordCounts.mmCategories, 2);
+    assert.strictEqual(backupResult.manifest.recordCounts.mmGoals, 1);
+    assert.strictEqual(backupResult.manifest.recordCounts.mmRecurring, 1);
+    assert.ok(backupResult.manifest.moneyManagerSummary);
+    assert.strictEqual(backupResult.manifest.moneyManagerSummary.accountsCount, 4);
+    assert.strictEqual(backupResult.manifest.moneyManagerSummary.txnsCount, 3);
+
+    console.log('[PASS] TEST 34: Cloud backup creation and upload verification with complete Money Manager data');
+    passed++;
+  }
+
+  // 35. End-to-end Cloud Restore of Money Manager data from Google Drive download
+  {
+    const mockDrive = createMockDriveFetch();
+    const driveService = new GoogleDriveBackupService({ fetch: mockDrive.fetch });
+    const sourceAdapter = createMockAdapter();
+    const sourceRepo = new StorageRepository(sourceAdapter);
+    await sourceRepo.loadInitialData();
+
+    await sourceRepo.persistData({
+      businessName: 'Cloud MM Source Shop',
+      accounts: [{ id: 'biz_acc_1', name: 'Biz Acc', balance: 3000, type: 1 }],
+      journals: [{ id: 'biz_jrn_1', accountId: 'biz_acc_1', amount: 3000, type: 'give', date: '2026-10-31' }],
+    });
+
+    const sourceMM = {
+      version: 3,
+      overallMonthlyBudget: 35000,
+      accounts: [
+        { id: 'acc_cash', name: 'ক্যাশ', type: 'cash', balance: 15000, icon: '💵', color: '#10B981', isArchived: false },
+        { id: 'acc_bkash', name: 'বিকাশ', type: 'mfs', balance: 6000, icon: '📱', color: '#EC4899', isArchived: false },
+      ],
+      categories: [
+        { id: 'cat_food', name: 'খাবার', type: 'expense', icon: '🍲', color: '#EF4444', budget: 10000, isArchived: false },
+      ],
+      goals: [{ id: 'goal_phone', title: 'মোবাইল ফোন', targetAmount: 30000, savedAmount: 12000, icon: '📱' }],
+      recurring: [],
+      transactions: [
+        { id: 'tx_mm_1', type: 'expense', amount: 800, categoryId: 'cat_food', accountId: 'acc_cash', date: '2026-10-28', time: '01:00 PM' },
+      ],
+      preferences: { defaultPeriod: 'this_month' },
+    };
+
+    const googleUser = { sub: 'google_sub_user_a', email: 'usera@gmail.com', name: 'User A' };
+    const uploadRes = await orchestrateCloudBackup({
+      storageRepository: sourceRepo,
+      driveService,
+      getAccessToken: async () => 'token_user_a',
+      googleUser,
+      extraData: { moneyManager: sourceMM },
+      existingFileId: null,
+    });
+    assert.strictEqual(uploadRes.success, true);
+
+    // Target clean install
+    const targetAdapter = createMockAdapter();
+    const targetRepo = new StorageRepository(targetAdapter);
+    await targetRepo.loadInitialData();
+
+    let restoredMMInCallback = null;
+    const restoreRes = await orchestrateCloudRestore({
+      storageRepository: targetRepo,
+      driveService,
+      getAccessToken: async () => 'token_user_a',
+      fileId: uploadRes.fileId,
+      userSub: googleUser.sub,
+      domains: ['all'],
+      onMoneyManagerRestored: (mm) => { restoredMMInCallback = mm; },
+    });
+
+    assert.strictEqual(restoreRes.success, true);
+    assert.ok(restoredMMInCallback);
+    assert.strictEqual(restoredMMInCallback.accounts.length, 2);
+    assert.strictEqual(restoredMMInCallback.transactions.length, 1);
+    assert.strictEqual(restoredMMInCallback.goals.length, 1);
+
+    const savedRaw = await targetAdapter.getItem('@tallykhata_personal_money_manager_v2');
+    assert.ok(savedRaw);
+    const savedMM = JSON.parse(savedRaw);
+    assert.strictEqual(savedMM.accounts[0].name, 'ক্যাশ');
+    assert.strictEqual(savedMM.transactions[0].amount, 800);
+
+    console.log('[PASS] TEST 35: End-to-end Cloud Restore of Money Manager data from Google Drive');
+    passed++;
+  }
+
+  // 36. Cloud Domain-Selective Restore (Personal-Only and Business-Only isolation)
+  {
+    const mockDrive = createMockDriveFetch();
+    const driveService = new GoogleDriveBackupService({ fetch: mockDrive.fetch });
+    const backupAdapter = createMockAdapter();
+    const backupRepo = new StorageRepository(backupAdapter);
+    await backupRepo.loadInitialData();
+
+    await backupRepo.persistData({
+      businessName: 'Cloud Remote Business',
+      accounts: [{ id: 'b_acc_remote', name: 'Remote Customer', balance: 9000, type: 1 }],
+      journals: [{ id: 'b_jrn_remote', accountId: 'b_acc_remote', amount: 9000, type: 'give', date: '2026-10-31' }],
+    });
+
+    const cloudMM = {
+      version: 3,
+      accounts: [{ id: 'acc_cloud', name: 'ক্লাউড ওয়ালেট', balance: 25000, type: 'bank', isArchived: false }],
+      transactions: [{ id: 'tx_cloud_1', type: 'income', amount: 25000, accountId: 'acc_cloud', date: '2026-10-30' }],
+      categories: [],
+      goals: [],
+      recurring: [],
+    };
+
+    const googleUser = { sub: 'google_sub_user_a', email: 'usera@gmail.com' };
+    const uploadRes = await orchestrateCloudBackup({
+      storageRepository: backupRepo,
+      driveService,
+      getAccessToken: async () => 'token_user_a',
+      googleUser,
+      extraData: { moneyManager: cloudMM },
+    });
+    assert.strictEqual(uploadRes.success, true);
+
+    // Case A: Personal-Only Restore ('moneyManager')
+    // Local device has local business data and PIN enabled
+    const localAdapterA = createMockAdapter();
+    const localRepoA = new StorageRepository(localAdapterA);
+    await localRepoA.loadInitialData();
+    await localRepoA.persistData({
+      businessName: 'Local Untouched Business',
+      pinEnabled: true,
+      appPin: '4321',
+      accounts: [{ id: 'local_acc_1', name: 'Local Customer', balance: 1500, type: 1 }],
+      journals: [{ id: 'local_jrn_1', accountId: 'local_acc_1', amount: 1500, type: 'give', date: '2026-10-31' }],
+    });
+
+    let mmRestoredA = null;
+    const restoreA = await orchestrateCloudRestore({
+      storageRepository: localRepoA,
+      driveService,
+      getAccessToken: async () => 'token_user_a',
+      fileId: uploadRes.fileId,
+      userSub: googleUser.sub,
+      domains: ['moneyManager'],
+      onMoneyManagerRestored: (mm) => { mmRestoredA = mm; },
+    });
+    assert.strictEqual(restoreA.success, true);
+    assert.ok(mmRestoredA);
+    assert.strictEqual(mmRestoredA.accounts[0].name, 'ক্লাউড ওয়ালেট');
+
+    // Local business store MUST be 100% UNTOUCHED
+    const localStateA = localRepoA.getAuthoritativeState();
+    assert.strictEqual(localStateA.businessName, 'Local Untouched Business');
+    assert.strictEqual(localStateA.accounts.length, 1);
+    assert.strictEqual(localStateA.accounts[0].name, 'Local Customer');
+    // Security: Business PIN must NOT be cleared when restoring personal finance only!
+    assert.strictEqual(localStateA.pinEnabled, true);
+    assert.strictEqual(localStateA.appPin, '4321');
+
+    // Case B: Business-Only Restore ('business')
+    const localAdapterB = createMockAdapter();
+    const localRepoB = new StorageRepository(localAdapterB);
+    await localRepoB.loadInitialData();
+    const preExistingMM = {
+      version: 3,
+      accounts: [{ id: 'acc_local_mm', name: 'আমার লোকাল ওয়ালেট', balance: 7777, type: 'cash', isArchived: false }],
+      transactions: [],
+      categories: [],
+      goals: [],
+      recurring: [],
+    };
+    await localAdapterB.setItem('@tallykhata_personal_money_manager_v2', JSON.stringify(preExistingMM));
+
+    const restoreB = await orchestrateCloudRestore({
+      storageRepository: localRepoB,
+      driveService,
+      getAccessToken: async () => 'token_user_a',
+      fileId: uploadRes.fileId,
+      userSub: googleUser.sub,
+      domains: ['business'],
+    });
+    assert.strictEqual(restoreB.success, true);
+
+    // Business restored from cloud
+    const localStateB = localRepoB.getAuthoritativeState();
+    assert.strictEqual(localStateB.businessName, 'Cloud Remote Business');
+    assert.strictEqual(localStateB.accounts[0].name, 'Remote Customer');
+
+    // Personal Money Manager MUST remain 100% UNTOUCHED
+    const finalRawMMB = await localAdapterB.getItem('@tallykhata_personal_money_manager_v2');
+    const finalMMB = JSON.parse(finalRawMMB);
+    assert.strictEqual(finalMMB.accounts[0].name, 'আমার লোকাল ওয়ালেট');
+    assert.strictEqual(finalMMB.accounts[0].balance, 7777);
+
+    console.log('[PASS] TEST 36: Cloud Domain-Selective Restore (Personal-Only and Business-Only isolation)');
+    passed++;
+  }
+
+  // 37. Safety snapshot rollback on commit failure preserves Money Manager without snapshot ID mismatch
+  {
+    const testAdapter = createMockAdapter();
+    const testRepo = new StorageRepository(testAdapter);
+    await testRepo.loadInitialData();
+
+    await testRepo.persistData({
+      businessName: 'Original Pre-Restore Biz',
+      walletBalance: 4000,
+      accounts: [{ id: 'acc_pre', name: 'Pre Customer', balance: 4000, type: 1 }],
+    });
+
+    const preMM = {
+      version: 3,
+      accounts: [{ id: 'acc_pre_mm', name: 'Pre MM Wallet', balance: 12345, type: 'cash', isArchived: false }],
+      transactions: [],
+      categories: [],
+      goals: [],
+      recurring: [],
+    };
+    await testAdapter.setItem('@tallykhata_personal_money_manager_v2', JSON.stringify(preMM));
+
+    const mockDriveServiceFail = {
+      findBackupFile: async () => ({ id: 'file_fail', name: BACKUP_FILENAME }),
+      downloadBackup: async () => ({
+        success: true,
+        manifest: { backupVersion: 1, backupOwner: { sub: 'google_sub' }, checksum: 'sha256_mock' },
+        data: {
+          businessName: 'Corrupted Name',
+          accounts: 'not_an_array_invalid',
+          moneyManager: { accounts: [{ id: 'bad', name: 'Bad' }] },
+        },
+      }),
+    };
+
+    let rollbackMMReceived = null;
+    const restoreResult = await orchestrateCloudRestore({
+      storageRepository: testRepo,
+      driveService: mockDriveServiceFail,
+      getAccessToken: async () => 'mock_token',
+      fileId: 'file_fail',
+      userSub: 'google_sub',
+      extraState: { moneyManager: preMM },
+      onRollback: (safeState, safeMM) => { rollbackMMReceived = safeMM; },
+    });
+
+    assert.strictEqual(restoreResult.success, false);
+    assert.strictEqual(restoreResult.rollbackAttempted, true);
+    assert.strictEqual(restoreResult.rollbackSucceeded, true, 'Rollback must succeed without snapshot ID mismatch');
+    assert.strictEqual(restoreResult.rollbackError, null);
+
+    // Verify local business store was restored
+    const afterRollbackState = testRepo.getAuthoritativeState();
+    assert.strictEqual(afterRollbackState.businessName, 'Original Pre-Restore Biz');
+    assert.strictEqual(afterRollbackState.walletBalance, 4000);
+
+    // Verify local Money Manager store was restored
+    const afterRollbackRawMM = await testAdapter.getItem('@tallykhata_personal_money_manager_v2');
+    const afterRollbackMM = JSON.parse(afterRollbackRawMM);
+    assert.strictEqual(afterRollbackMM.accounts[0].name, 'Pre MM Wallet');
+    assert.strictEqual(afterRollbackMM.accounts[0].balance, 12345);
+
+    console.log('[PASS] TEST 37: Safety snapshot rollback on commit failure preserves Money Manager without snapshot ID mismatch');
+    passed++;
+  }
+
+  // 38. Automatic 404 Recovery on Existing Backup PATCH (stale/deleted file in Drive)
+  {
+    const mockDrive = createMockDriveFetch();
+    const driveService = new GoogleDriveBackupService({ fetch: mockDrive.fetch });
+    const adapter = createMockAdapter();
+    const repo = new StorageRepository(adapter);
+    await repo.loadInitialData();
+
+    await repo.persistData({
+      businessName: 'Auto Recovery Business',
+      accounts: [{ id: 'acc_1', name: 'Cust 1', balance: 2000, type: 1 }],
+      journals: [{ id: 'jrn_1', accountId: 'acc_1', amount: 2000, type: 'give', date: '2026-10-31' }],
+    });
+
+    const googleUser = { sub: 'google_sub_user_a', email: 'usera@gmail.com' };
+
+    // Pass a non-existent existingFileId ('file_deleted_by_user_999')
+    const backupRes = await orchestrateCloudBackup({
+      storageRepository: repo,
+      driveService,
+      getAccessToken: async () => 'token_user_a',
+      googleUser,
+      existingFileId: 'file_deleted_by_user_999',
+    });
+
+    assert.strictEqual(backupRes.success, true);
+    assert.ok(backupRes.fileId);
+    assert.notStrictEqual(backupRes.fileId, 'file_deleted_by_user_999', 'Must create a fresh new file ID on 404 fallback');
+
+    console.log('[PASS] TEST 38: Automatic 404 Recovery on Existing Backup PATCH');
     passed++;
   }
 
