@@ -765,6 +765,20 @@ function TallyKhataApp() {
   const t = (k, params) => i18nService.t(k, effectiveLanguage, params);
   const tStyles = useMemo(() => themeService.getThemedStyles(currentTheme, isDark), [currentTheme, isDark]);
   const formatAppNumber = (n) => (effectiveLanguage === "en" ? String(n !== undefined && n !== null ? Number(n).toLocaleString("en-IN") : "0") : toBengaliNumber(n));
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr) return '';
+    if (effectiveLanguage !== 'bn') return dateStr;
+    const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(dateStr).replace(/[0-9]/g, d => bnDigits[Number(d)]);
+  };
+  const getMmPeriodLabel = () => {
+    if (mmPeriod === 'this_month') return t("mm_period_this_month");
+    if (mmPeriod === 'last_month') return t("mm_period_last_month");
+    if (mmPeriod === 'custom' && mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate) {
+      return `${formatDisplayDate(mmCustomRange.startDate)} - ${formatDisplayDate(mmCustomRange.endDate)}`;
+    }
+    return t("mm_period_all_time");
+  };
 
   const themeContextValue = useMemo(() => ({
     theme: currentTheme,
@@ -8637,7 +8651,7 @@ function TallyKhataApp() {
               const pExpense = periodTxns.filter(t => t.type === 'expense').reduce((acc, t) => acc + (t.amount || 0), 0);
               const pSavings = pIncome - pExpense;
               const savingsRate = pIncome > 0 ? Math.round((pSavings / pIncome) * 100) : 0;
-              const periodLabel = mmPeriod === 'this_month' ? t("mm_period_this_month") : mmPeriod === 'last_month' ? t("mm_period_last_month") : mmPeriod === 'custom' && mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate ? `${mmCustomRange.startDate} - ${mmCustomRange.endDate}` : t("mm_period_all_time");
+              const periodLabel = getMmPeriodLabel();
 
               return (
                 <View style={[styles.mmTotalCard, tStyles.mmTotalCard]}>
@@ -9077,7 +9091,7 @@ function TallyKhataApp() {
 
                       <View style={styles.mmOverallBudgetStats}>
                         <View>
-                          <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>ব্যয় হয়েছে ({mmPeriod === 'this_month' ? t('mm_period_this_month') : mmPeriod === 'last_month' ? t('mm_period_last_month') : mmPeriod === 'custom' && mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate ? `${mmCustomRange.startDate} - ${mmCustomRange.endDate}` : t('mm_period_all_time')})</Text>
+                          <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>ব্যয় হয়েছে ({getMmPeriodLabel()})</Text>
                           <Text style={[styles.mmOverallBudgetSpent, tStyles.mmOverallBudgetSpent, isOver && { color: '#EF4444' }]}>
                             ৳ {totalSpent.toLocaleString('en-US')}
                           </Text>
@@ -9302,7 +9316,7 @@ function TallyKhataApp() {
                                 )}
                               </View>
                               <Text style={[styles.mmCatBudgetAmounts, { color: '#10B981' }]}>
-                                মোট প্রাপ্তি ({mmPeriod === 'this_month' ? t('mm_period_this_month') : mmPeriod === 'last_month' ? t('mm_period_last_month') : mmPeriod === 'custom' && mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate ? `${mmCustomRange.startDate} - ${mmCustomRange.endDate}` : t('mm_period_all_time')}): +{mmCurrency} {earned.toLocaleString('en-US')}
+                                মোট প্রাপ্তি ({getMmPeriodLabel()}): +{mmCurrency} {earned.toLocaleString('en-US')}
                               </Text>
                             </View>
                             <TouchableOpacity
@@ -9447,7 +9461,7 @@ function TallyKhataApp() {
                 {(() => {
                   const periodMetrics = moneyManagerService.calculatePeriodMetrics(moneyManagerState, mmPeriod, mmCustomRange);
                   const distribution = moneyManagerService.calculateCategoryDistribution(moneyManagerState, mmPeriod, mmCustomRange);
-                  const periodLabel = mmPeriod === 'this_month' ? t('mm_period_this_month') : mmPeriod === 'last_month' ? t('mm_period_last_month') : mmPeriod === 'custom' && mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate ? `${mmCustomRange.startDate} - ${mmCustomRange.endDate}` : t('mm_period_all_time');
+                  const periodLabel = getMmPeriodLabel();
 
                   return (
                     <View>
@@ -10848,9 +10862,23 @@ function TallyKhataApp() {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               {/* Quick Presets */}
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel, { marginTop: 6 }]}>কুইক অপশন (Quick Options)</Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>
+              <View style={{ flexDirection: 'row', gap: 6, marginVertical: 8 }}>
                 <TouchableOpacity
-                  style={[styles.mmPrefPill, { flex: 1, paddingHorizontal: 4 }]}
+                  style={[styles.mmPrefPill, { flex: 1, paddingHorizontal: 2 }]}
+                  onPress={() => {
+                    const today = getTodayDate();
+                    setMmRangeStartInput(today);
+                    setMmRangeEndInput(today);
+                    setMmRangeError('');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="আজকের দিন"
+                >
+                  <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText, { fontSize: 11 }]}>{t("mm_quick_today")}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.mmPrefPill, { flex: 1, paddingHorizontal: 2 }]}
                   onPress={() => {
                     const end = new Date();
                     const start = new Date();
@@ -10862,7 +10890,7 @@ function TallyKhataApp() {
                   accessibilityRole="button"
                   accessibilityLabel="গত ৭ দিন"
                 >
-                  <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText]}>{t("mm_quick_last_7_days")}</Text>
+                  <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText, { fontSize: 11 }]}>{t("mm_quick_last_7_days")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -10964,6 +10992,8 @@ function TallyKhataApp() {
                     if (!res.valid) {
                       if (res.error === 'end_before_start') {
                         setMmRangeError(t("mm_invalid_date_range"));
+                      } else if (res.error === 'invalid_calendar_date') {
+                        setMmRangeError(t("mm_invalid_calendar_date"));
                       } else {
                         setMmRangeError(t("mm_invalid_date_format"));
                       }

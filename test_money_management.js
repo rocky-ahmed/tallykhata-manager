@@ -1328,7 +1328,7 @@ runTest("themeService provides comprehensive themed style tokens for Money Manag
   assert(appSource.includes('tStyles.mmFilterChip'), 'App.js missing tStyles.mmFilterChip');
 });
 
-// TEST 53: validateCustomDateRange validates valid formats and enforces chronological order
+// TEST 53: validateCustomDateRange validates valid formats, calendar dates, leap-years, and enforces chronological order
 runTest("validateCustomDateRange validates valid formats and enforces chronological order", () => {
   const v1 = mmService.validateCustomDateRange("2026-10-01", "2026-10-25");
   assert.strictEqual(v1.valid, true);
@@ -1338,6 +1338,12 @@ runTest("validateCustomDateRange validates valid formats and enforces chronologi
   // Same-day range is valid
   const vSame = mmService.validateCustomDateRange("2026-10-15", "2026-10-15");
   assert.strictEqual(vSame.valid, true);
+
+  // Bengali numerals support
+  const vBn = mmService.validateCustomDateRange("২০২৬-১০-০১", "২০২৬-১০-২৫");
+  assert.strictEqual(vBn.valid, true);
+  assert.strictEqual(vBn.startDate, "2026-10-01");
+  assert.strictEqual(vBn.endDate, "2026-10-25");
 
   // Missing dates
   const vMissing = mmService.validateCustomDateRange("", "2026-10-25");
@@ -1354,6 +1360,18 @@ runTest("validateCustomDateRange validates valid formats and enforces chronologi
   assert.strictEqual(vMonth.valid, false);
   assert.strictEqual(vMonth.error, "invalid_format");
 
+  // Impossible calendar dates
+  const vApril31 = mmService.validateCustomDateRange("2026-04-01", "2026-04-31");
+  assert.strictEqual(vApril31.valid, false);
+  assert.strictEqual(vApril31.error, "invalid_calendar_date");
+
+  // Leap-year validation: 2024 is leap, 2026 is non-leap
+  const vLeap = mmService.validateCustomDateRange("2024-02-01", "2024-02-29");
+  assert.strictEqual(vLeap.valid, true);
+  const vNonLeap = mmService.validateCustomDateRange("2026-02-01", "2026-02-29");
+  assert.strictEqual(vNonLeap.valid, false);
+  assert.strictEqual(vNonLeap.error, "invalid_calendar_date");
+
   // End before start
   const vOrder = mmService.validateCustomDateRange("2026-10-25", "2026-10-01");
   assert.strictEqual(vOrder.valid, false);
@@ -1364,18 +1382,35 @@ runTest("validateCustomDateRange validates valid formats and enforces chronologi
 runTest("isDateInPeriod and filterAndSortTransactions handle custom date ranges inclusively", () => {
   const range = { startDate: "2026-10-10", endDate: "2026-10-20" };
 
-  // Inclusive boundaries
+  // Inclusive boundaries (date-only)
   assert.strictEqual(mmService.isDateInPeriod("2026-10-10", "custom", range), true, "Start boundary inclusive");
   assert.strictEqual(mmService.isDateInPeriod("2026-10-20", "custom", range), true, "End boundary inclusive");
   assert.strictEqual(mmService.isDateInPeriod("2026-10-15", "custom", range), true, "Mid-range inclusive");
   assert.strictEqual(mmService.isDateInPeriod("2026-10-09", "custom", range), false, "Pre-start excluded");
   assert.strictEqual(mmService.isDateInPeriod("2026-10-21", "custom", range), false, "Post-end excluded");
 
-  // Same-day range
+  // Inclusive boundaries (timestamps with time, end-of-day, and timezone offsets)
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-10T00:00:00.000Z", "custom", range), true, "Start timestamp inclusive");
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-15T12:00:00", "custom", range), true, "Midday timestamp inclusive");
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-20T23:59:59.999+06:00", "custom", range), true, "End-of-day timestamp inclusive");
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-20 23:59:59", "custom", range), true, "End-of-day space format inclusive");
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-21T00:00:01", "custom", range), false, "Next-day start excluded");
+
+  // Same-day range with beginning, middle, and end of day
   const sameDay = { startDate: "2026-10-15", endDate: "2026-10-15" };
   assert.strictEqual(mmService.isDateInPeriod("2026-10-15", "custom", sameDay), true);
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-15T00:00:00", "custom", sameDay), true);
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-15T12:30:00", "custom", sameDay), true);
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-15 23:59:59", "custom", sameDay), true);
   assert.strictEqual(mmService.isDateInPeriod("2026-10-14", "custom", sameDay), false);
   assert.strictEqual(mmService.isDateInPeriod("2026-10-16", "custom", sameDay), false);
+
+  // Month and Year boundary range
+  const crossYear = { startDate: "2025-12-25", endDate: "2026-01-05" };
+  assert.strictEqual(mmService.isDateInPeriod("2025-12-31", "custom", crossYear), true);
+  assert.strictEqual(mmService.isDateInPeriod("2026-01-01", "custom", crossYear), true);
+  assert.strictEqual(mmService.isDateInPeriod("2025-12-24", "custom", crossYear), false);
+  assert.strictEqual(mmService.isDateInPeriod("2026-01-06", "custom", crossYear), false);
 
   const txns = [
     { id: "t1", type: "expense", amount: 500, date: "2026-10-05" },

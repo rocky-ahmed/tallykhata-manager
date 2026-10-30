@@ -214,13 +214,45 @@ function calculateNetWorth(accountsOrState) {
     .reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
 }
 
+function toEnglishDigits(str) {
+  if (!str) return '';
+  const bnToEn = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
+  return String(str).replace(/[০-৯]/g, d => bnToEn[d] || d);
+}
+
+function isValidCalendarDate(year, month, day) {
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return false;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return dt.getUTCFullYear() === year && (dt.getUTCMonth() + 1) === month && dt.getUTCDate() === day;
+}
+
+function normalizeToLocalDate(dateStr) {
+  if (!dateStr) return '';
+  const str = toEnglishDigits(String(dateStr)).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+  const dt = new Date(str);
+  if (!isNaN(dt.getTime())) {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10);
+  }
+  return str;
+}
+
 function validateCustomDateRange(startDate, endDate) {
   if (!startDate || !endDate) {
     return { valid: false, error: 'missing_dates' };
   }
+  const sStr = toEnglishDigits(String(startDate)).trim();
+  const eStr = toEnglishDigits(String(endDate)).trim();
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-  const sStr = String(startDate).trim();
-  const eStr = String(endDate).trim();
   if (!dateRegex.test(sStr) || !dateRegex.test(eStr)) {
     return { valid: false, error: 'invalid_format' };
   }
@@ -232,6 +264,9 @@ function validateCustomDateRange(startDate, endDate) {
   if (eParts[1] < 1 || eParts[1] > 12 || eParts[2] < 1 || eParts[2] > 31) {
     return { valid: false, error: 'invalid_format' };
   }
+  if (!isValidCalendarDate(sParts[0], sParts[1], sParts[2]) || !isValidCalendarDate(eParts[0], eParts[1], eParts[2])) {
+    return { valid: false, error: 'invalid_calendar_date' };
+  }
   if (sStr > eStr) {
     return { valid: false, error: 'end_before_start' };
   }
@@ -240,13 +275,13 @@ function validateCustomDateRange(startDate, endDate) {
 
 function isDateInPeriod(dateStr, period, customRange = null) {
   if (!dateStr || period === "all_time") return true;
+  const normalizedDate = normalizeToLocalDate(dateStr);
   if (period === "custom") {
     if (!customRange || !customRange.startDate || !customRange.endDate) return true;
-    const d = String(dateStr).trim().slice(0, 10);
-    return d >= customRange.startDate && d <= customRange.endDate;
+    return normalizedDate >= customRange.startDate && normalizedDate <= customRange.endDate;
   }
   const now = new Date();
-  const parts = String(dateStr).split("-").map(Number);
+  const parts = normalizedDate.split("-").map(Number);
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return true;
   const y = parts[0];
   const m = parts[1]; // 1-12
@@ -1548,6 +1583,9 @@ module.exports = {
   calculateCategoryBudgets,
   calculateCategoryDistribution,
   calculatePeriodMetrics,
+  toEnglishDigits,
+  isValidCalendarDate,
+  normalizeToLocalDate,
   validateCustomDateRange,
   isDateInPeriod,
   filterAndSortTransactions,
