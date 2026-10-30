@@ -227,6 +227,16 @@ function isValidCalendarDate(year, month, day) {
   return dt.getUTCFullYear() === year && (dt.getUTCMonth() + 1) === month && dt.getUTCDate() === day;
 }
 
+function shiftDateStr(dateStr, days = 0) {
+  const norm = normalizeToLocalDate(dateStr) || new Date().toISOString().split('T')[0];
+  const parts = norm.split('-').map(Number);
+  const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + Number(days || 0)));
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function normalizeToLocalDate(dateStr) {
   if (!dateStr) return '';
   const str = toEnglishDigits(String(dateStr)).trim();
@@ -1586,6 +1596,7 @@ module.exports = {
   toEnglishDigits,
   isValidCalendarDate,
   normalizeToLocalDate,
+  shiftDateStr,
   validateCustomDateRange,
   isDateInPeriod,
   filterAndSortTransactions,

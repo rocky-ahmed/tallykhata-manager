@@ -1480,6 +1480,17 @@ runTest("App.js wires modalMMCustomDateRange, custom period pill, and date input
   assert(currentAppSource.includes("mmRangeEndInput"), "App.js missing end date input state");
   assert(currentAppSource.includes("mmRangeError"), "App.js missing date range error state");
   assert(currentAppSource.includes("validateCustomDateRange"), "App.js missing validateCustomDateRange invocation");
+  assert(currentAppSource.includes("shiftDateStr"), "App.js missing shiftDateStr integration");
+  assert(currentAppSource.includes("mm_step_prev_day"), "App.js missing step prev day button");
+  assert(currentAppSource.includes("mm_step_next_day"), "App.js missing step next day button");
+  assert(currentAppSource.includes("mm_step_today"), "App.js missing step today button");
+
+  // Verify shiftDateStr logic across leap year and boundaries
+  assert.strictEqual(mmService.shiftDateStr("2026-10-15", -1), "2026-10-14");
+  assert.strictEqual(mmService.shiftDateStr("2026-10-15", 1), "2026-10-16");
+  assert.strictEqual(mmService.shiftDateStr("2024-02-28", 1), "2024-02-29");
+  assert.strictEqual(mmService.shiftDateStr("2026-02-28", 1), "2026-03-01");
+  assert.strictEqual(mmService.shiftDateStr("2025-12-31", 1), "2026-01-01");
 });
 
 console.log(`\nSUMMARY: ${passed}/${total} tests passed.`);

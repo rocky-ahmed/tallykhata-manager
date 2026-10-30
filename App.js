@@ -10927,7 +10927,44 @@ function TallyKhataApp() {
               </View>
 
               {/* Start Date Input */}
-              <Text style={[styles.mmInputLabel, tStyles.mmInputLabel, { marginTop: 12 }]}>{t("mm_start_date")}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                <Text style={[styles.mmInputLabel, tStyles.mmInputLabel, { marginTop: 0 }]}>{t("mm_start_date")}</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <TouchableOpacity
+                    style={[styles.mmPrefPill, { paddingHorizontal: 6, paddingVertical: 2 }]}
+                    onPress={() => {
+                      setMmRangeStartInput(prev => moneyManagerService.shiftDateStr(prev, -1));
+                      setMmRangeError('');
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="শুরুর তারিখ ১ দিন কমান"
+                  >
+                    <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText, { fontSize: 11 }]}>{t("mm_step_prev_day")}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmPrefPill, { paddingHorizontal: 6, paddingVertical: 2 }]}
+                    onPress={() => {
+                      setMmRangeStartInput(prev => moneyManagerService.shiftDateStr(prev, 1));
+                      setMmRangeError('');
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="শুরুর তারিখ ১ দিন বাড়ান"
+                  >
+                    <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText, { fontSize: 11 }]}>{t("mm_step_next_day")}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmPrefPill, { paddingHorizontal: 6, paddingVertical: 2 }]}
+                    onPress={() => {
+                      setMmRangeStartInput(getTodayDate());
+                      setMmRangeError('');
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="শুরুর তারিখ আজকের দিন করুন"
+                  >
+                    <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText, { fontSize: 11 }]}>{t("mm_step_today")}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
               <TextInput
                 style={[styles.mmInput, tStyles.mmInput]}
                 value={mmRangeStartInput}
@@ -10941,7 +10978,44 @@ function TallyKhataApp() {
               />
 
               {/* End Date Input */}
-              <Text style={[styles.mmInputLabel, tStyles.mmInputLabel, { marginTop: 12 }]}>{t("mm_end_date")}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                <Text style={[styles.mmInputLabel, tStyles.mmInputLabel, { marginTop: 0 }]}>{t("mm_end_date")}</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <TouchableOpacity
+                    style={[styles.mmPrefPill, { paddingHorizontal: 6, paddingVertical: 2 }]}
+                    onPress={() => {
+                      setMmRangeEndInput(prev => moneyManagerService.shiftDateStr(prev, -1));
+                      setMmRangeError('');
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="শেষের তারিখ ১ দিন কমান"
+                  >
+                    <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText, { fontSize: 11 }]}>{t("mm_step_prev_day")}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmPrefPill, { paddingHorizontal: 6, paddingVertical: 2 }]}
+                    onPress={() => {
+                      setMmRangeEndInput(prev => moneyManagerService.shiftDateStr(prev, 1));
+                      setMmRangeError('');
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="শেষের তারিখ ১ দিন বাড়ান"
+                  >
+                    <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText, { fontSize: 11 }]}>{t("mm_step_next_day")}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mmPrefPill, { paddingHorizontal: 6, paddingVertical: 2 }]}
+                    onPress={() => {
+                      setMmRangeEndInput(getTodayDate());
+                      setMmRangeError('');
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="শেষের তারিখ আজকের দিন করুন"
+                  >
+                    <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText, { fontSize: 11 }]}>{t("mm_step_today")}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
               <TextInput
                 style={[styles.mmInput, tStyles.mmInput]}
                 value={mmRangeEndInput}
