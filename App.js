@@ -18,6 +18,8 @@ import {
   LogBox,
   Platform,
   BackHandler,
+  Appearance,
+  AppState,
 } from 'react-native';
 
 LogBox.ignoreAllLogs(true);
@@ -708,28 +710,74 @@ function TallyKhataApp() {
   const [modalMoneyOut, setModalMoneyOut] = useState(false);
 
   // ===================================================================
-  // GLOBAL APP PREFERENCES (থিম ও ভাষা)
-  const [appTheme, setAppTheme] = useState('light'); // 'light' | 'dark'
-  const [appLanguage, setAppLanguage] = useState('bn'); // 'bn' | 'en'
+    // GLOBAL APP PREFERENCES (থিম ও ভাষা)
+  const [appTheme, setAppTheme] = useState('light'); // 'light' | 'dark' | 'system'
+  const [appLanguage, setAppLanguage] = useState('bn'); // 'bn' | 'en' | 'system'
+  const [systemColorScheme, setSystemColorScheme] = useState(() => {
+    try {
+      return (typeof Appearance !== 'undefined' && Appearance.getColorScheme && Appearance.getColorScheme()) || 'light';
+    } catch (e) {
+      return 'light';
+    }
+  });
+  const [systemLocale, setSystemLocale] = useState(() => {
+    try {
+      return (typeof Intl !== 'undefined' && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().locale : 'bn';
+    } catch (e) {
+      return 'bn';
+    }
+  });
+
   const [modalThemePicker, setModalThemePicker] = useState(false);
   const [modalLanguagePicker, setModalLanguagePicker] = useState(false);
 
-  const isDark = appTheme === 'dark';
-  const currentTheme = themeService.getThemeTokens(appTheme);
-  const t = (k, params) => i18nService.t(k, appLanguage, params);
+  useEffect(() => {
+    const sub = (typeof Appearance !== 'undefined' && Appearance.addChangeListener)
+      ? Appearance.addChangeListener(({ colorScheme }) => {
+          setSystemColorScheme(colorScheme || 'light');
+        })
+      : null;
+    const appStateSub = (typeof AppState !== 'undefined' && AppState.addEventListener)
+      ? AppState.addEventListener('change', (nextState) => {
+          if (nextState === 'active') {
+            try {
+              if (typeof Appearance !== 'undefined' && Appearance.getColorScheme) {
+                setSystemColorScheme(Appearance.getColorScheme() || 'light');
+              }
+              if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+                setSystemLocale(Intl.DateTimeFormat().resolvedOptions().locale || 'bn');
+              }
+            } catch (e) {}
+          }
+        })
+      : null;
+    return () => {
+      if (sub && typeof sub.remove === 'function') sub.remove();
+      if (appStateSub && typeof appStateSub.remove === 'function') appStateSub.remove();
+    };
+  }, []);
+
+  const effectiveTheme = preferencesService.resolveEffectiveTheme(appTheme, systemColorScheme);
+  const isDark = effectiveTheme === 'dark';
+  const currentTheme = themeService.getThemeTokens(effectiveTheme);
+
+  const effectiveLanguage = preferencesService.resolveEffectiveLanguage(appLanguage, systemLocale);
+  const t = (k, params) => i18nService.t(k, effectiveLanguage, params);
   const tStyles = useMemo(() => themeService.getThemedStyles(currentTheme, isDark), [currentTheme, isDark]);
-  const formatAppNumber = (n) => (appLanguage === "en" ? String(n !== undefined && n !== null ? Number(n).toLocaleString("en-IN") : "0") : toBengaliNumber(n));
+  const formatAppNumber = (n) => (effectiveLanguage === "en" ? String(n !== undefined && n !== null ? Number(n).toLocaleString("en-IN") : "0") : toBengaliNumber(n));
 
   const themeContextValue = useMemo(() => ({
     theme: currentTheme,
     mode: appTheme,
+    effectiveMode: effectiveTheme,
     language: appLanguage,
+    effectiveLanguage,
     t,
     tStyles,
-  }), [appTheme, appLanguage, currentTheme, tStyles]);
+  }), [appTheme, effectiveTheme, appLanguage, effectiveLanguage, currentTheme, tStyles]);
 
   const handleToggleTheme = async (newTheme) => {
-    const target = newTheme || (appTheme === 'dark' ? 'light' : 'dark');
+    const target = newTheme || (effectiveTheme === 'dark' ? 'light' : 'dark');
     setAppTheme(target);
     try {
       await preferencesService.savePreferences(AsyncStorage, { theme: target, language: appLanguage });
@@ -756,7 +804,12 @@ function TallyKhataApp() {
   const [modalMMTransfer, setModalMMTransfer] = useState(false);
   const [mmActiveSubTab, setMmActiveSubTab] = useState("transactions"); // "transactions" | "accounts" | "budgets" | "goals" | "analytics"
   const [mmTxnFilter, setMmTxnFilter] = useState("all"); // "all" | "expense" | "income" | "transfer"
-  const [mmPeriod, setMmPeriod] = useState("this_month"); // "this_month" | "last_month" | "all_time"
+  const [mmPeriod, setMmPeriod] = useState("this_month"); // "this_month" | "last_month" | "all_time" | "custom"
+  const [mmCustomRange, setMmCustomRange] = useState(null); // { startDate: 'YYYY-MM-DD', endDate: 'YYYY-MM-DD' }
+  const [modalMMCustomDateRange, setModalMMCustomDateRange] = useState(false);
+  const [mmRangeStartInput, setMmRangeStartInput] = useState('');
+  const [mmRangeEndInput, setMmRangeEndInput] = useState('');
+  const [mmRangeError, setMmRangeError] = useState('');
   const [mmSortOrder, setMmSortOrder] = useState("newest"); // "newest" | "oldest" | "amount_high" | "amount_low"
   const [mmSearchQuery, setMmSearchQuery] = useState("");
 
@@ -881,6 +934,9 @@ function TallyKhataApp() {
           if (sanitized.preferences && sanitized.preferences.defaultPeriod) {
             setMmPeriod(sanitized.preferences.defaultPeriod);
           }
+          if (sanitized.preferences && sanitized.preferences.customRange) {
+            setMmCustomRange(sanitized.preferences.customRange);
+          }
           if (sanitized.preferences && sanitized.preferences.sortOrder) {
             setMmSortOrder(sanitized.preferences.sortOrder);
           }
@@ -895,8 +951,9 @@ function TallyKhataApp() {
   }, []);
 
   useEffect(() => {
-    if (!modalMoneyManager && !modalMMAddTxn && !modalMMEditTxn && !modalMMAddAccount && !modalMMSetBudget && !modalMMTransfer && !modalMMAddCategory && !modalMMOverallBudget && !modalMMAddGoal && !modalMMDepositGoal && !modalMMPreferences && !modalMMRecurring && !modalMMAddRecurring && !modalMMEditCategory) return;
+    if (!modalMoneyManager && !modalMMAddTxn && !modalMMEditTxn && !modalMMAddAccount && !modalMMSetBudget && !modalMMTransfer && !modalMMAddCategory && !modalMMOverallBudget && !modalMMAddGoal && !modalMMDepositGoal && !modalMMPreferences && !modalMMRecurring && !modalMMAddRecurring && !modalMMEditCategory && !modalMMCustomDateRange) return;
     const backAction = () => {
+      if (modalMMCustomDateRange) { setModalMMCustomDateRange(false); return true; }
       if (modalMMPreferences) { setModalMMPreferences(false); return true; }
       if (modalMMAddRecurring) { setModalMMAddRecurring(false); return true; }
       if (modalMMRecurring) { setModalMMRecurring(false); return true; }
@@ -915,7 +972,7 @@ function TallyKhataApp() {
     };
     const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
     return () => backHandler.remove();
-  }, [modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory]);
+  }, [modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange]);
 
   const handleSaveMMTxn = async () => {
     try {
@@ -4878,7 +4935,7 @@ function TallyKhataApp() {
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_appearance')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>
-                    {appTheme === 'dark' ? t('theme_dark') : t('theme_light')} • {t('menu_appearance_sub')}
+                    {appTheme === 'system' ? `${t('theme_system')} (${isDark ? t('theme_dark') : t('theme_light')})` : appTheme === 'dark' ? t('theme_dark') : t('theme_light')} • {t('menu_appearance_sub')}
                   </Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -4895,7 +4952,7 @@ function TallyKhataApp() {
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_language')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>
-                    {appLanguage === 'bn' ? 'বাংলা' : 'English'} • {t('menu_language_sub')}
+                    {appLanguage === 'system' ? `${t('lang_system')} (${effectiveLanguage === 'en' ? 'English' : 'বাংলা'})` : appLanguage === 'bn' ? 'বাংলা' : 'English'} • {t('menu_language_sub')}
                   </Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -5203,6 +5260,38 @@ function TallyKhataApp() {
                   <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
                 )}
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.themeOptionCard,
+                  appTheme === 'system' && styles.themeOptionCardActive,
+                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
+                  appTheme === 'system' && { borderColor: isDark ? currentTheme.primary : COLORS.primary }
+                ]}
+                onPress={() => {
+                  handleToggleTheme('system');
+                  setModalThemePicker(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]}>
+                  <Text style={{ fontSize: 20 }}>📱</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    {t('theme_system')}
+                  </Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
+                    {t('theme_system_sub')}
+                  </Text>
+                </View>
+                {appTheme === 'system' ? (
+                  <View style={[styles.themeCheckCircle, { backgroundColor: isDark ? currentTheme.primary : COLORS.primary }]}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -5301,6 +5390,38 @@ function TallyKhataApp() {
                   </Text>
                 </View>
                 {appLanguage === 'en' ? (
+                  <View style={[styles.themeCheckCircle, { backgroundColor: isDark ? currentTheme.primary : COLORS.primary }]}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.themeOptionCard,
+                  appLanguage === 'system' && styles.themeOptionCardActive,
+                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
+                  appLanguage === 'system' && { borderColor: isDark ? currentTheme.primary : COLORS.primary }
+                ]}
+                onPress={() => {
+                  handleSelectLanguage('system');
+                  setModalLanguagePicker(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]}>
+                  <Text style={{ fontSize: 20 }}>📱</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    {t('lang_system')}
+                  </Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
+                    {t('lang_system_sub')}
+                  </Text>
+                </View>
+                {appLanguage === 'system' ? (
                   <View style={[styles.themeCheckCircle, { backgroundColor: isDark ? currentTheme.primary : COLORS.primary }]}>
                     <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
                   </View>
@@ -8484,18 +8605,39 @@ function TallyKhataApp() {
                 ⏱️ {t("mm_period_all_time")}
               </Text>
             </TouchableOpacity>
-          </View>
 
+            <TouchableOpacity
+              style={[styles.mmPeriodPill, tStyles.mmPeriodPill, mmPeriod === 'custom' && (isDark ? styles.mmPeriodPillActive : tStyles.mmPeriodPillActive)]}
+              onPress={() => {
+                if (mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate) {
+                  setMmRangeStartInput(mmCustomRange.startDate);
+                  setMmRangeEndInput(mmCustomRange.endDate);
+                } else {
+                  const today = new Date().toISOString().split('T')[0];
+                  setMmRangeStartInput(today);
+                  setMmRangeEndInput(today);
+                }
+                setMmRangeError('');
+                setModalMMCustomDateRange(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="নির্দিষ্ট সময়সীমা নির্বাচন"
+            >
+              <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'custom' && tStyles.mmPeriodPillTextActive]}>
+                📊 {t("mm_period_custom")}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <ScrollView style={{ flex: 1, paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {/* Top Net Worth & Period Flow Card */}
             {moneyManagerState.preferences?.showNetWorthCard !== false && (() => {
               const totalNetWorth = (moneyManagerState.accounts || []).filter(a => !a.isArchived).reduce((acc, a) => acc + (a.balance || 0), 0);
-              const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod });
+              const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod, customRange: mmCustomRange });
               const pIncome = periodTxns.filter(t => t.type === 'income').reduce((acc, t) => acc + (t.amount || 0), 0);
               const pExpense = periodTxns.filter(t => t.type === 'expense').reduce((acc, t) => acc + (t.amount || 0), 0);
               const pSavings = pIncome - pExpense;
               const savingsRate = pIncome > 0 ? Math.round((pSavings / pIncome) * 100) : 0;
-              const periodLabel = mmPeriod === 'this_month' ? 'এই মাস' : mmPeriod === 'last_month' ? 'গত মাস' : 'সব সময়';
+              const periodLabel = mmPeriod === 'this_month' ? t("mm_period_this_month") : mmPeriod === 'last_month' ? t("mm_period_last_month") : mmPeriod === 'custom' && mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate ? `${mmCustomRange.startDate} - ${mmCustomRange.endDate}` : t("mm_period_all_time");
 
               return (
                 <View style={[styles.mmTotalCard, tStyles.mmTotalCard]}>
@@ -8689,6 +8831,7 @@ function TallyKhataApp() {
                   const filteredTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, {
                     filterType: mmTxnFilter,
                     period: mmPeriod,
+                    customRange: mmCustomRange,
                     searchQuery: mmSearchQuery,
                     sortOrder: mmSortOrder,
                   });
@@ -8915,7 +9058,7 @@ function TallyKhataApp() {
                 {/* Overall Monthly Budget Ceiling Card */}
                 {(() => {
                   const overallLimit = moneyManagerState.overallMonthlyBudget || 40000;
-                  const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod });
+                  const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod, customRange: mmCustomRange });
                   const totalSpent = periodTxns.filter((t) => t.type === 'expense').reduce((acc, t) => acc + (t.amount || 0), 0);
                   const remaining = overallLimit - totalSpent;
                   const pct = overallLimit > 0 ? Math.min(100, Math.round((totalSpent / overallLimit) * 100)) : 0;
@@ -8934,7 +9077,7 @@ function TallyKhataApp() {
 
                       <View style={styles.mmOverallBudgetStats}>
                         <View>
-                          <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>ব্যয় হয়েছে ({mmPeriod === 'this_month' ? 'এই মাস' : mmPeriod === 'last_month' ? 'গত মাস' : 'সব সময়'})</Text>
+                          <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>ব্যয় হয়েছে ({mmPeriod === 'this_month' ? t('mm_period_this_month') : mmPeriod === 'last_month' ? t('mm_period_last_month') : mmPeriod === 'custom' && mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate ? `${mmCustomRange.startDate} - ${mmCustomRange.endDate}` : t('mm_period_all_time')})</Text>
                           <Text style={[styles.mmOverallBudgetSpent, tStyles.mmOverallBudgetSpent, isOver && { color: '#EF4444' }]}>
                             ৳ {totalSpent.toLocaleString('en-US')}
                           </Text>
@@ -9038,7 +9181,7 @@ function TallyKhataApp() {
 
                 {mmCatSectionTab === 'expense' ? (
                   (() => {
-                    const categoryBudgets = moneyManagerService.calculateCategoryBudgets(moneyManagerState, mmPeriod);
+                    const categoryBudgets = moneyManagerService.calculateCategoryBudgets(moneyManagerState, mmPeriod, mmCustomRange);
                     const expenseCats = (moneyManagerState.categories || []).filter((c) => c.type === 'expense' && (mmShowArchivedCats || !c.isArchived));
 
                     if (expenseCats.length === 0) {
@@ -9128,7 +9271,7 @@ function TallyKhataApp() {
                 ) : (
                   (() => {
                     const incomeCats = (moneyManagerState.categories || []).filter((c) => c.type === 'income' && (mmShowArchivedCats || !c.isArchived));
-                    const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod });
+                    const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod, customRange: mmCustomRange });
 
                     if (incomeCats.length === 0) {
                       return (
@@ -9159,7 +9302,7 @@ function TallyKhataApp() {
                                 )}
                               </View>
                               <Text style={[styles.mmCatBudgetAmounts, { color: '#10B981' }]}>
-                                মোট প্রাপ্তি ({mmPeriod === 'this_month' ? 'এই মাস' : mmPeriod === 'last_month' ? 'গত মাস' : 'সব সময়'}): +{mmCurrency} {earned.toLocaleString('en-US')}
+                                মোট প্রাপ্তি ({mmPeriod === 'this_month' ? t('mm_period_this_month') : mmPeriod === 'last_month' ? t('mm_period_last_month') : mmPeriod === 'custom' && mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate ? `${mmCustomRange.startDate} - ${mmCustomRange.endDate}` : t('mm_period_all_time')}): +{mmCurrency} {earned.toLocaleString('en-US')}
                               </Text>
                             </View>
                             <TouchableOpacity
@@ -9302,9 +9445,9 @@ function TallyKhataApp() {
             {mmActiveSubTab === 'analytics' && (
               <View style={{ marginTop: 14 }}>
                 {(() => {
-                  const periodMetrics = moneyManagerService.calculatePeriodMetrics(moneyManagerState, mmPeriod);
-                  const distribution = moneyManagerService.calculateCategoryDistribution(moneyManagerState, mmPeriod);
-                  const periodLabel = mmPeriod === 'this_month' ? 'এই মাস' : mmPeriod === 'last_month' ? 'গত মাস' : 'সব সময়';
+                  const periodMetrics = moneyManagerService.calculatePeriodMetrics(moneyManagerState, mmPeriod, mmCustomRange);
+                  const distribution = moneyManagerService.calculateCategoryDistribution(moneyManagerState, mmPeriod, mmCustomRange);
+                  const periodLabel = mmPeriod === 'this_month' ? t('mm_period_this_month') : mmPeriod === 'last_month' ? t('mm_period_last_month') : mmPeriod === 'custom' && mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate ? `${mmCustomRange.startDate} - ${mmCustomRange.endDate}` : t('mm_period_all_time');
 
                   return (
                     <View>
@@ -10168,6 +10311,7 @@ function TallyKhataApp() {
                   { id: 'this_month', label: 'এই মাস' },
                   { id: 'last_month', label: 'গত মাস' },
                   { id: 'all_time', label: 'সব সময়' },
+                  { id: 'custom', label: t('mm_period_custom') },
                 ].map((p) => {
                   const sel = mmPrefDefaultPeriod === p.id;
                   return (
@@ -10678,6 +10822,177 @@ function TallyKhataApp() {
       </Modal>
 
 
+
+
+      {/* 14. MODAL: CUSTOM DATE RANGE SELECTOR */}
+      <Modal
+        visible={modalMMCustomDateRange}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMCustomDateRange(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
+            <View style={styles.mmModalHeader}>
+              <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t("mm_custom_range_title")}</Text>
+              <TouchableOpacity
+                style={[styles.mmModalCloseBtn, isDark && { backgroundColor: currentTheme.cardBorder }]}
+                onPress={() => setModalMMCustomDateRange(false)}
+                accessibilityRole="button"
+                accessibilityLabel="বন্ধ করুন"
+              >
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Quick Presets */}
+              <Text style={[styles.mmInputLabel, tStyles.mmInputLabel, { marginTop: 6 }]}>কুইক অপশন (Quick Options)</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>
+                <TouchableOpacity
+                  style={[styles.mmPrefPill, { flex: 1, paddingHorizontal: 4 }]}
+                  onPress={() => {
+                    const end = new Date();
+                    const start = new Date();
+                    start.setDate(end.getDate() - 7);
+                    setMmRangeStartInput(start.toISOString().split('T')[0]);
+                    setMmRangeEndInput(end.toISOString().split('T')[0]);
+                    setMmRangeError('');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="গত ৭ দিন"
+                >
+                  <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText]}>{t("mm_quick_last_7_days")}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.mmPrefPill, { flex: 1, paddingHorizontal: 4 }]}
+                  onPress={() => {
+                    const end = new Date();
+                    const start = new Date();
+                    start.setDate(end.getDate() - 30);
+                    setMmRangeStartInput(start.toISOString().split('T')[0]);
+                    setMmRangeEndInput(end.toISOString().split('T')[0]);
+                    setMmRangeError('');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="গত ৩০ দিন"
+                >
+                  <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText]}>{t("mm_quick_last_30_days")}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.mmPrefPill, { flex: 1, paddingHorizontal: 4 }]}
+                  onPress={() => {
+                    const now = new Date();
+                    const start = `${now.getFullYear()}-01-01`;
+                    const end = now.toISOString().split('T')[0];
+                    setMmRangeStartInput(start);
+                    setMmRangeEndInput(end);
+                    setMmRangeError('');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="চলতি বছর"
+                >
+                  <Text style={[styles.mmPrefPillText, tStyles.mmPeriodPillText]}>{t("mm_quick_this_year")}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Start Date Input */}
+              <Text style={[styles.mmInputLabel, tStyles.mmInputLabel, { marginTop: 12 }]}>{t("mm_start_date")}</Text>
+              <TextInput
+                style={[styles.mmInput, tStyles.mmInput]}
+                value={mmRangeStartInput}
+                onChangeText={(val) => {
+                  setMmRangeStartInput(val);
+                  setMmRangeError('');
+                }}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={currentTheme.textMuted}
+                maxLength={10}
+              />
+
+              {/* End Date Input */}
+              <Text style={[styles.mmInputLabel, tStyles.mmInputLabel, { marginTop: 12 }]}>{t("mm_end_date")}</Text>
+              <TextInput
+                style={[styles.mmInput, tStyles.mmInput]}
+                value={mmRangeEndInput}
+                onChangeText={(val) => {
+                  setMmRangeEndInput(val);
+                  setMmRangeError('');
+                }}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={currentTheme.textMuted}
+                maxLength={10}
+              />
+
+              {/* Error message */}
+              {!!mmRangeError && (
+                <View style={{ marginTop: 10, padding: 10, backgroundColor: isDark ? '#7F1D1D33' : '#FEE2E2', borderRadius: 8, borderWidth: 1, borderColor: '#EF4444' }}>
+                  <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '600' }}>⚠️ {mmRangeError}</Text>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={{ marginTop: 20, flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.mmResetBtn, { flex: 1 }]}
+                  onPress={() => {
+                    setMmCustomRange(null);
+                    setMmPeriod('this_month');
+                    setMmRangeError('');
+                    setModalMMCustomDateRange(false);
+                    try {
+                      const updatedState = moneyManagerService.updatePreferences(moneyManagerState, {
+                        defaultPeriod: 'this_month',
+                        customRange: null,
+                      });
+                      setMoneyManagerState(updatedState);
+                      moneyManagerService.saveState(AsyncStorage, updatedState);
+                    } catch (e) {}
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="ক্লিয়ার করুন"
+                >
+                  <Text style={styles.mmResetBtnText}>{t("mm_clear_range")}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.mmSubmitBtn, { flex: 2, marginTop: 0 }]}
+                  onPress={() => {
+                    const res = moneyManagerService.validateCustomDateRange(mmRangeStartInput, mmRangeEndInput);
+                    if (!res.valid) {
+                      if (res.error === 'end_before_start') {
+                        setMmRangeError(t("mm_invalid_date_range"));
+                      } else {
+                        setMmRangeError(t("mm_invalid_date_format"));
+                      }
+                      return;
+                    }
+                    const newRange = { startDate: res.startDate, endDate: res.endDate };
+                    setMmCustomRange(newRange);
+                    setMmPeriod('custom');
+                    setMmRangeError('');
+                    setModalMMCustomDateRange(false);
+                    try {
+                      const updatedState = moneyManagerService.updatePreferences(moneyManagerState, {
+                        defaultPeriod: 'custom',
+                        customRange: newRange,
+                      });
+                      setMoneyManagerState(updatedState);
+                      moneyManagerService.saveState(AsyncStorage, updatedState);
+                    } catch (e) {}
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="প্রয়োগ করুন"
+                >
+                  <Text style={styles.mmSubmitBtnText}>{t("mm_apply_range")}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
     </ThemeContext.Provider>

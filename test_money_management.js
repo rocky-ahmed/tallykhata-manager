@@ -1328,6 +1328,125 @@ runTest("themeService provides comprehensive themed style tokens for Money Manag
   assert(appSource.includes('tStyles.mmFilterChip'), 'App.js missing tStyles.mmFilterChip');
 });
 
+// TEST 53: validateCustomDateRange validates valid formats and enforces chronological order
+runTest("validateCustomDateRange validates valid formats and enforces chronological order", () => {
+  const v1 = mmService.validateCustomDateRange("2026-10-01", "2026-10-25");
+  assert.strictEqual(v1.valid, true);
+  assert.strictEqual(v1.startDate, "2026-10-01");
+  assert.strictEqual(v1.endDate, "2026-10-25");
+
+  // Same-day range is valid
+  const vSame = mmService.validateCustomDateRange("2026-10-15", "2026-10-15");
+  assert.strictEqual(vSame.valid, true);
+
+  // Missing dates
+  const vMissing = mmService.validateCustomDateRange("", "2026-10-25");
+  assert.strictEqual(vMissing.valid, false);
+  assert.strictEqual(vMissing.error, "missing_dates");
+
+  // Invalid format
+  const vFormat = mmService.validateCustomDateRange("10-01-2026", "2026-10-25");
+  assert.strictEqual(vFormat.valid, false);
+  assert.strictEqual(vFormat.error, "invalid_format");
+
+  // Out of range month/day
+  const vMonth = mmService.validateCustomDateRange("2026-13-01", "2026-10-25");
+  assert.strictEqual(vMonth.valid, false);
+  assert.strictEqual(vMonth.error, "invalid_format");
+
+  // End before start
+  const vOrder = mmService.validateCustomDateRange("2026-10-25", "2026-10-01");
+  assert.strictEqual(vOrder.valid, false);
+  assert.strictEqual(vOrder.error, "end_before_start");
+});
+
+// TEST 54: isDateInPeriod and filterAndSortTransactions accurately filter custom date ranges
+runTest("isDateInPeriod and filterAndSortTransactions handle custom date ranges inclusively", () => {
+  const range = { startDate: "2026-10-10", endDate: "2026-10-20" };
+
+  // Inclusive boundaries
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-10", "custom", range), true, "Start boundary inclusive");
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-20", "custom", range), true, "End boundary inclusive");
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-15", "custom", range), true, "Mid-range inclusive");
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-09", "custom", range), false, "Pre-start excluded");
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-21", "custom", range), false, "Post-end excluded");
+
+  // Same-day range
+  const sameDay = { startDate: "2026-10-15", endDate: "2026-10-15" };
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-15", "custom", sameDay), true);
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-14", "custom", sameDay), false);
+  assert.strictEqual(mmService.isDateInPeriod("2026-10-16", "custom", sameDay), false);
+
+  const txns = [
+    { id: "t1", type: "expense", amount: 500, date: "2026-10-05" },
+    { id: "t2", type: "expense", amount: 1000, date: "2026-10-12" },
+    { id: "t3", type: "income", amount: 4000, date: "2026-10-18" },
+    { id: "t4", type: "expense", amount: 800, date: "2026-10-25" },
+  ];
+
+  const filtered = mmService.filterAndSortTransactions(txns, {
+    period: "custom",
+    customRange: range,
+  });
+  assert.strictEqual(filtered.length, 2);
+  assert.strictEqual(filtered.map(t => t.id).sort().join(","), "t2,t3");
+});
+
+// TEST 55: calculateCashFlow, calculatePeriodMetrics, and calculateCategoryBudgets under custom range
+runTest("analytics, cashflow, and budgets support custom range without mutating monthly budget targets", () => {
+  const state = {
+    ...mmService.getDefaultState(),
+    overallMonthlyBudget: 25000,
+    categories: [
+      { id: "cat_food", name: "খাবার", type: "expense", budget: 6000, isArchived: false },
+      { id: "cat_bills", name: "বিল", type: "expense", budget: 4000, isArchived: false },
+    ],
+    transactions: [
+      { id: "t1", type: "income", amount: 15000, date: "2026-09-15" },
+      { id: "t2", type: "income", amount: 20000, date: "2026-10-05" },
+      { id: "t3", type: "expense", categoryId: "cat_food", amount: 3000, date: "2026-10-12" },
+      { id: "t4", type: "expense", categoryId: "cat_bills", amount: 1500, date: "2026-10-15" },
+      { id: "t5", type: "transfer", amount: 5000, date: "2026-10-16" },
+      { id: "t6", type: "expense", categoryId: "cat_food", amount: 4000, date: "2026-11-01" },
+    ],
+  };
+
+  const customRange = { startDate: "2026-10-01", endDate: "2026-10-31" };
+
+  // Cash flow
+  const cf = mmService.calculateCashFlow(state.transactions, "custom", customRange);
+  assert.strictEqual(cf.totalIncome, 20000);
+  assert.strictEqual(cf.totalExpense, 4500);
+  assert.strictEqual(cf.totalTransfer, 5000);
+  assert.strictEqual(cf.netSavings, 15500);
+
+  // Period metrics
+  const pm = mmService.calculatePeriodMetrics(state, "custom", customRange);
+  assert.strictEqual(pm.period, "custom");
+  assert.strictEqual(pm.totalIncome, 20000);
+  assert.strictEqual(pm.totalExpense, 4500);
+  assert.strictEqual(pm.overallBudget, 25000, "Monthly budget target limit must not be mutated");
+
+  // Category budgets
+  const cb = mmService.calculateCategoryBudgets(state, "custom", customRange);
+  const foodBudget = cb.find(c => c.id === "cat_food");
+  assert.strictEqual(foodBudget.spent, 3000);
+  assert.strictEqual(foodBudget.remaining, 3000);
+  assert.strictEqual(foodBudget.budget, 6000, "Category monthly budget limit must not be mutated");
+});
+
+// TEST 56: App.js wires modalMMCustomDateRange, period pills, and inputs
+runTest("App.js wires modalMMCustomDateRange, custom period pill, and date inputs", () => {
+  const currentAppSource = fs.readFileSync('App.js', 'utf8');
+  assert(currentAppSource.includes("modalMMCustomDateRange"), "App.js missing modalMMCustomDateRange state");
+  assert(currentAppSource.includes("setModalMMCustomDateRange"), "App.js missing setModalMMCustomDateRange setter");
+  assert(currentAppSource.includes("mmPeriod === 'custom'"), "App.js missing custom period pill");
+  assert(currentAppSource.includes("mmRangeStartInput"), "App.js missing start date input state");
+  assert(currentAppSource.includes("mmRangeEndInput"), "App.js missing end date input state");
+  assert(currentAppSource.includes("mmRangeError"), "App.js missing date range error state");
+  assert(currentAppSource.includes("validateCustomDateRange"), "App.js missing validateCustomDateRange invocation");
+});
+
 console.log(`\nSUMMARY: ${passed}/${total} tests passed.`);
 if (passed === total) {
   console.log("ALL MONEY MANAGER TESTS PASSED SUCCESSFULLY!\n");

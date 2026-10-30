@@ -1,6 +1,6 @@
 /**
  * Global App Preferences Service for TallyKhata
- * Manages app-wide Light/Dark theme and Bangla/English language settings.
+ * Manages app-wide Light/Dark/System theme and Bangla/English/System language settings.
  */
 
 const PREFERENCES_STORAGE_KEY = '@tallykhata_app_preferences_v1';
@@ -8,11 +8,13 @@ const PREFERENCES_STORAGE_KEY = '@tallykhata_app_preferences_v1';
 const THEMES = {
   LIGHT: 'light',
   DARK: 'dark',
+  SYSTEM: 'system',
 };
 
 const LANGUAGES = {
   BN: 'bn',
   EN: 'en',
+  SYSTEM: 'system',
 };
 
 const DEFAULT_PREFERENCES = {
@@ -24,13 +26,47 @@ function sanitizePreferences(raw) {
   if (!raw || typeof raw !== 'object') {
     return { ...DEFAULT_PREFERENCES };
   }
-  const theme = raw.theme === THEMES.DARK ? THEMES.DARK : THEMES.LIGHT;
-  const language = raw.language === LANGUAGES.EN ? LANGUAGES.EN : LANGUAGES.BN;
+  let theme = THEMES.LIGHT;
+  if (raw.theme === THEMES.DARK) {
+    theme = THEMES.DARK;
+  } else if (raw.theme === THEMES.SYSTEM) {
+    theme = THEMES.SYSTEM;
+  } else {
+    theme = THEMES.LIGHT;
+  }
+
+  let language = LANGUAGES.BN;
+  if (raw.language === LANGUAGES.EN) {
+    language = LANGUAGES.EN;
+  } else if (raw.language === LANGUAGES.SYSTEM) {
+    language = LANGUAGES.SYSTEM;
+  } else {
+    language = LANGUAGES.BN;
+  }
+
   return {
     theme,
     language,
     updatedAt: raw.updatedAt || new Date().toISOString(),
   };
+}
+
+function resolveEffectiveTheme(themePreference, systemColorScheme) {
+  if (themePreference === THEMES.DARK) return 'dark';
+  if (themePreference === THEMES.LIGHT) return 'light';
+  // SYSTEM mode
+  if (systemColorScheme === 'dark') return 'dark';
+  return 'light'; // default fallback for system mode
+}
+
+function resolveEffectiveLanguage(languagePreference, systemLocale) {
+  if (languagePreference === LANGUAGES.EN) return 'en';
+  if (languagePreference === LANGUAGES.BN) return 'bn';
+  // SYSTEM mode
+  const loc = (systemLocale || '').toLowerCase().trim();
+  if (loc.startsWith('en')) return 'en';
+  if (loc.startsWith('bn')) return 'bn';
+  return 'bn'; // stable default fallback for unsupported system locales
 }
 
 async function getStoredPreferences(adapter) {
@@ -62,6 +98,8 @@ module.exports = {
   LANGUAGES,
   DEFAULT_PREFERENCES,
   sanitizePreferences,
+  resolveEffectiveTheme,
+  resolveEffectiveLanguage,
   getStoredPreferences,
   savePreferences,
 };

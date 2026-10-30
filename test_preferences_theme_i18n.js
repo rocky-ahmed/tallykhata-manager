@@ -253,6 +253,52 @@ async function runAsyncTest(name, fn) {
     assert(appSource.includes("borderTopColor: '#FFFFFF'") && appSource.includes("borderBottomColor: '#FECACA'"), 'tabActivePill must provide 3D bevel lighting');
   });
 
+
+  // Test 13: System theme resolution
+  runTest('resolveEffectiveTheme correctly derives effective appearance from system color scheme', () => {
+    assert.strictEqual(preferencesService.resolveEffectiveTheme('system', 'dark'), 'dark');
+    assert.strictEqual(preferencesService.resolveEffectiveTheme('system', 'light'), 'light');
+    assert.strictEqual(preferencesService.resolveEffectiveTheme('system', null), 'light'); // fallback
+    assert.strictEqual(preferencesService.resolveEffectiveTheme('dark', 'light'), 'dark'); // explicit override
+    assert.strictEqual(preferencesService.resolveEffectiveTheme('light', 'dark'), 'light'); // explicit override
+  });
+
+  // Test 14: System language resolution
+  runTest('resolveEffectiveLanguage correctly derives language from system locale with stable fallback', () => {
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage('system', 'en-US'), 'en');
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage('system', 'en-GB'), 'en');
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage('system', 'bn-BD'), 'bn');
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage('system', 'bn-IN'), 'bn');
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage('system', 'fr-FR'), 'bn'); // fallback for unsupported
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage('system', null), 'bn'); // fallback
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage('en', 'bn-BD'), 'en'); // explicit override
+    assert.strictEqual(preferencesService.resolveEffectiveLanguage('bn', 'en-US'), 'bn'); // explicit override
+  });
+
+  // Test 15: Storing and sanitizing system mode preferences
+  await runAsyncTest('preferencesService sanitizes and persists system mode preferences', async () => {
+    const sanitized = preferencesService.sanitizePreferences({ theme: 'system', language: 'system' });
+    assert.strictEqual(sanitized.theme, 'system');
+    assert.strictEqual(sanitized.language, 'system');
+
+    const adapter = createMockAdapter();
+    await preferencesService.savePreferences(adapter, { theme: 'system', language: 'system' });
+    const stored = await preferencesService.getStoredPreferences(adapter);
+    assert.strictEqual(stored.theme, 'system');
+    assert.strictEqual(stored.language, 'system');
+  });
+
+  // Test 16: App.js wires System theme and language options in picker modals
+  runTest('App.js wires System theme and language options in modal pickers and Menu tab', () => {
+    const appSource = fs.readFileSync('App.js', 'utf8');
+    assert(appSource.includes("handleToggleTheme('system')"), 'App.js missing handleToggleTheme system option');
+    assert(appSource.includes("handleSelectLanguage('system')"), 'App.js missing handleSelectLanguage system option');
+    assert(appSource.includes("resolveEffectiveTheme"), 'App.js missing resolveEffectiveTheme');
+    assert(appSource.includes("resolveEffectiveLanguage"), 'App.js missing resolveEffectiveLanguage');
+    assert(appSource.includes("theme_system"), 'App.js missing theme_system translation key');
+    assert(appSource.includes("lang_system"), 'App.js missing lang_system translation key');
+  });
+
   console.log(`\n================================================================`);
   console.log(`PREFERENCES, THEME & LOCALIZATION SUMMARY: ${passed} / ${total} TESTS PASSED`);
   console.log(`================================================================\n`);

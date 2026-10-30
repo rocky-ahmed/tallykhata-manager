@@ -12,6 +12,7 @@ const DEFAULT_PREFERENCES = {
   showNetWorthCard: true,
   showSavingsRateCard: true,
   showTipsCard: true,
+  customRange: null,
 };
 
 const DEFAULT_ACCOUNTS = [
@@ -171,9 +172,10 @@ function sanitizeState(parsed, defaultState) {
       }))
     : (def.recurring || []);
 
-  const validPeriods = ["this_month", "last_month", "all_time"];
+  const validPeriods = ["this_month", "last_month", "all_time", "custom"];
   const validSortOrders = ["newest", "oldest", "amount_high", "amount_low"];
   const rawPrefs = parsed.preferences && typeof parsed.preferences === "object" ? parsed.preferences : {};
+  const customRange = rawPrefs.customRange && typeof rawPrefs.customRange === "object" ? { startDate: typeof rawPrefs.customRange.startDate === "string" ? rawPrefs.customRange.startDate.trim() : "", endDate: typeof rawPrefs.customRange.endDate === "string" ? rawPrefs.customRange.endDate.trim() : "" } : null;
   const preferences = {
     ...DEFAULT_PREFERENCES,
     ...rawPrefs,
@@ -212,8 +214,37 @@ function calculateNetWorth(accountsOrState) {
     .reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
 }
 
-function isDateInPeriod(dateStr, period) {
+function validateCustomDateRange(startDate, endDate) {
+  if (!startDate || !endDate) {
+    return { valid: false, error: 'missing_dates' };
+  }
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  const sStr = String(startDate).trim();
+  const eStr = String(endDate).trim();
+  if (!dateRegex.test(sStr) || !dateRegex.test(eStr)) {
+    return { valid: false, error: 'invalid_format' };
+  }
+  const sParts = sStr.split('-').map(Number);
+  const eParts = eStr.split('-').map(Number);
+  if (sParts[1] < 1 || sParts[1] > 12 || sParts[2] < 1 || sParts[2] > 31) {
+    return { valid: false, error: 'invalid_format' };
+  }
+  if (eParts[1] < 1 || eParts[1] > 12 || eParts[2] < 1 || eParts[2] > 31) {
+    return { valid: false, error: 'invalid_format' };
+  }
+  if (sStr > eStr) {
+    return { valid: false, error: 'end_before_start' };
+  }
+  return { valid: true, startDate: sStr, endDate: eStr };
+}
+
+function isDateInPeriod(dateStr, period, customRange = null) {
   if (!dateStr || period === "all_time") return true;
+  if (period === "custom") {
+    if (!customRange || !customRange.startDate || !customRange.endDate) return true;
+    const d = String(dateStr).trim().slice(0, 10);
+    return d >= customRange.startDate && d <= customRange.endDate;
+  }
   const now = new Date();
   const parts = String(dateStr).split("-").map(Number);
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return true;
@@ -234,7 +265,7 @@ function isDateInPeriod(dateStr, period) {
   return true;
 }
 
-function calculateCashFlow(transactions, period) {
+function calculateCashFlow(transactions, period, customRange = null) {
   if (!Array.isArray(transactions)) {
     return { totalIncome: 0, totalExpense: 0, totalTransfer: 0, netSavings: 0, savingsRate: 0 };
   }
@@ -243,7 +274,7 @@ function calculateCashFlow(transactions, period) {
   let totalTransfer = 0;
 
   for (const t of transactions) {
-    if (period && !isDateInPeriod(t.date, period)) continue;
+    if (period && !isDateInPeriod(t.date, period, customRange)) continue;
     const amt = Number(t.amount || 0);
     if (t.type === "income") totalIncome += amt;
     else if (t.type === "expense") totalExpense += amt;
@@ -256,26 +287,29 @@ function calculateCashFlow(transactions, period) {
   return { totalIncome, totalExpense, totalTransfer, netSavings, savingsRate };
 }
 
-function calculateCategoryBudgets(arg1, arg2, arg3) {
+function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
   let categories = [];
   let transactions = [];
   let period = null;
+  let customRange = null;
 
   if (Array.isArray(arg1)) {
     categories = arg1;
     transactions = Array.isArray(arg2) ? arg2 : [];
     period = arg3;
+    customRange = arg4 || null;
   } else if (arg1 && typeof arg1 === "object") {
     categories = Array.isArray(arg1.categories) ? arg1.categories : [];
     transactions = Array.isArray(arg1.transactions) ? arg1.transactions : [];
     period = arg2;
+    customRange = arg3 || null;
   } else {
     return [];
   }
 
   const expTransactions = (transactions || []).filter(t => {
     if (t.type !== "expense") return false;
-    if (period && !isDateInPeriod(t.date, period)) return false;
+    if (period && !isDateInPeriod(t.date, period, customRange)) return false;
     return true;
   });
 
@@ -306,22 +340,25 @@ function calculateCategoryBudgets(arg1, arg2, arg3) {
     });
 }
 
-function calculateCategoryDistribution(arg1, arg2, arg3) {
+function calculateCategoryDistribution(arg1, arg2, arg3, arg4) {
   let categories = [];
   let transactions = [];
   let period = null;
+  let customRange = null;
 
   if (Array.isArray(arg1)) {
     categories = arg1;
     transactions = Array.isArray(arg2) ? arg2 : [];
     period = arg3;
+    customRange = arg4 || null;
   } else if (arg1 && typeof arg1 === "object") {
     categories = Array.isArray(arg1.categories) ? arg1.categories : [];
     transactions = Array.isArray(arg1.transactions) ? arg1.transactions : [];
     period = arg2;
+    customRange = arg3 || null;
   }
 
-  const budgets = calculateCategoryBudgets(categories, transactions, period);
+  const budgets = calculateCategoryBudgets(categories, transactions, period, customRange);
   const totalExpense = budgets.reduce((sum, b) => sum + b.spent, 0);
 
   const distributionList = budgets
@@ -352,7 +389,7 @@ function filterAndSortTransactions(txnsOrState, filterParams = {}) {
     : txnsOrState && Array.isArray(txnsOrState.transactions)
     ? txnsOrState.transactions
     : [];
-  const { filterType, accountId, categoryId, searchQuery, period, sortOrder } = filterParams;
+  const { filterType, accountId, categoryId, searchQuery, period, sortOrder, customRange } = filterParams;
 
   let result = transactions.filter(t => {
     if (filterType && filterType !== "all" && t.type !== filterType) {
@@ -368,7 +405,7 @@ function filterAndSortTransactions(txnsOrState, filterParams = {}) {
     if (categoryId && categoryId !== "all" && t.categoryId !== categoryId) {
       return false;
     }
-    if (period && !isDateInPeriod(t.date, period)) {
+    if (period && !isDateInPeriod(t.date, period, customRange)) {
       return false;
     }
     if (searchQuery && searchQuery.trim()) {
@@ -411,8 +448,8 @@ function filterTransactions(transactions, filterParams) {
   return filterAndSortTransactions(transactions, filterParams);
 }
 
-function calculatePeriodMetrics(state, period = "this_month") {
-  const txns = filterAndSortTransactions(state.transactions || [], { period });
+function calculatePeriodMetrics(state, period = "this_month", customRange = null) {
+  const txns = filterAndSortTransactions(state.transactions || [], { period, customRange });
   const totalIncome = txns.filter(t => t.type === "income").reduce((sum, t) => sum + (t.amount || 0), 0);
   const totalExpense = txns.filter(t => t.type === "expense").reduce((sum, t) => sum + (t.amount || 0), 0);
   const netSavings = totalIncome - totalExpense;
@@ -1166,7 +1203,7 @@ function deleteGoal(state, goalId, refundToAccountId = null) {
 }
 
 function updatePreferences(state, newPrefs) {
-  const validPeriods = ["this_month", "last_month", "all_time"];
+  const validPeriods = ["this_month", "last_month", "all_time", "custom"];
   const validSortOrders = ["newest", "oldest", "amount_high", "amount_low"];
   const raw = {
     ...(state.preferences || DEFAULT_PREFERENCES),
@@ -1511,6 +1548,7 @@ module.exports = {
   calculateCategoryBudgets,
   calculateCategoryDistribution,
   calculatePeriodMetrics,
+  validateCustomDateRange,
   isDateInPeriod,
   filterAndSortTransactions,
   filterTransactions,
