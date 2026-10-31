@@ -1062,6 +1062,7 @@ function TallyKhataApp() {
       });
       await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(updatedState));
       setMoneyManagerState(updatedState);
+      setMmCustomization({});
       setMmCustomRange(null);
       setMmPeriod('this_month');
       setMmPrefDefaultPeriod('this_month');
@@ -1183,6 +1184,8 @@ function TallyKhataApp() {
   const [mmPrefShowNetWorth, setMmPrefShowNetWorth] = useState(true);
   const [mmPrefShowSavingsRate, setMmPrefShowSavingsRate] = useState(true);
   const [mmPrefShowTips, setMmPrefShowTips] = useState(true);
+  const [mmActiveCustomSection, setMmActiveCustomSection] = useState('dashboard');
+  const [mmCustomization, setMmCustomization] = useState(() => (moneyManagerState?.preferences?.customization || {}));
 
   // Category Edit / Archive States
   const [modalMMEditCategory, setModalMMEditCategory] = useState(false);
@@ -1666,6 +1669,7 @@ function TallyKhataApp() {
         showNetWorthCard: mmPrefShowNetWorth,
         showSavingsRateCard: mmPrefShowSavingsRate,
         showTipsCard: mmPrefShowTips,
+        customization: mmCustomization,
       });
       setMoneyManagerState(updatedState);
       setMmPeriod(mmPrefDefaultPeriod);
@@ -4248,7 +4252,7 @@ function TallyKhataApp() {
                 onPress={() => handleMakeCall(selectedAccount.phone)}
                 activeOpacity={0.7}
               >
-                <AppIcon source={require("./assets/icons/ic_call.png")} variant="success" shape="circle" size={16} containerSize={32} />
+                <AppIcon source={require("./assets/icons/ic_call.png")} variant="success" shape="rounded" size={20} containerSize={38} />
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity
@@ -4256,14 +4260,14 @@ function TallyKhataApp() {
               onPress={handleOpenEditAccount}
               activeOpacity={0.7}
             >
-              <AppIcon source={require("./assets/icons/ic_edit.png")} variant="neutral" shape="circle" size={16} containerSize={32} />
+              <AppIcon source={require("./assets/icons/ic_edit.png")} variant="neutral" shape="rounded" size={20} containerSize={38} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={handleDeleteAccount}
               activeOpacity={0.7}
             >
-              <AppIcon source={require("./assets/icons/ic_delete.png")} variant="danger" shape="circle" size={16} containerSize={32} />
+              <AppIcon source={require("./assets/icons/ic_delete.png")} variant="danger" shape="rounded" size={20} containerSize={38} />
             </TouchableOpacity>
           </View>
         </View>
@@ -4288,7 +4292,7 @@ function TallyKhataApp() {
             <Text style={[styles.profileDueLabel, { color: isCustomer ? COLORS.primary : COLORS.green }]}>
               {isCustomer ? tStatic("মোট পাবো (বাকি)") : tStatic("মোট দেবো (দেনা)")}
             </Text>
-            <Text style={[styles.profileDueAmount, { color: isCustomer ? COLORS.primary : COLORS.green }]}>{tStatic("৳                ৳ ")}{formatMoney(selectedAccount.balance)}
+            <Text style={[styles.profileDueAmount, { color: isCustomer ? COLORS.primary : COLORS.green }]}>{tStatic("৳ ")}{formatMoney(selectedAccount.balance)}
             </Text>
           </View>
         </View>
@@ -4301,7 +4305,7 @@ function TallyKhataApp() {
               onPress={() => setModalTagada(true)}
               activeOpacity={0.7}
             >
-              <AppIcon source={require('./assets/icons/ic_sms.png')} variant="primary" shape="circle" size={20} containerSize={42} style={{ marginBottom: 6 }} tintColor={null} />
+              <AppIcon source={require('./assets/icons/ic_sms.png')} variant="primary" shape="rounded" size={24} containerSize={48} style={{ marginBottom: 6 }} tintColor={null} />
               <Text style={styles.quickActionLabel}>{t('tagada_send_sms')}</Text>
             </TouchableOpacity>
           ) : null}
@@ -4311,7 +4315,7 @@ function TallyKhataApp() {
               onPress={() => handleMakeCall(selectedAccount.phone)}
               activeOpacity={0.7}
             >
-              <AppIcon source={require('./assets/icons/ic_call.png')} variant="success" shape="circle" size={20} containerSize={42} style={{ marginBottom: 6 }} />
+              <AppIcon source={require('./assets/icons/ic_call.png')} variant="success" shape="rounded" size={24} containerSize={48} style={{ marginBottom: 6 }} />
               <Text style={styles.quickActionLabel}>{t('ledger_call')}</Text>
             </TouchableOpacity>
           ) : null}
@@ -4331,7 +4335,7 @@ function TallyKhataApp() {
             }}
             activeOpacity={0.7}
           >
-            <AppIcon source={require('./assets/icons/ic_pdf.png')} variant="purple" shape="circle" size={20} containerSize={42} style={{ marginBottom: 6 }} />
+            <AppIcon source={require('./assets/icons/ic_pdf.png')} variant="purple" shape="rounded" size={24} containerSize={48} style={{ marginBottom: 6 }} />
             <Text style={styles.quickActionLabel}>{t('ledger_share_statement')}</Text>
           </TouchableOpacity>
         </View>
@@ -4853,7 +4857,7 @@ function TallyKhataApp() {
               {/* Upper Box: আজকের বেচা & বর্তমান ক্যাশ */}
               <View style={styles.cashTopDashboardUpper}>
                 <View style={styles.cashTopCol}>
-                  <Text style={[styles.cashTopAmount, isDark && tStyles.textPrimary]}>{tStatic("৳                      ৳ ")}{hideCashAmounts ? '***' : formatMoney(todaySales || todayCashIn)}
+                  <Text style={[styles.cashTopAmount, isDark && tStyles.textPrimary]}>{tStatic("৳ ")}{hideCashAmounts ? '***' : formatMoney(todaySales || todayCashIn)}
                   </Text>
                   <Text style={[styles.cashTopLabel, isDark && tStyles.textSecondary]}>{t("cb_today_sale")}</Text>
                 </View>
@@ -4861,7 +4865,7 @@ function TallyKhataApp() {
                 <View style={[styles.cashTopDivider, isDark && tStyles.divider]} />
 
                 <View style={styles.cashTopCol}>
-                  <Text style={[styles.cashTopAmount, { color: isDark ? currentTheme.textPrimary : '#09101D' }]}>{tStatic("৳                      ৳ ")}{hideCashAmounts ? '***' : formatMoney(totalCash)}
+                  <Text style={[styles.cashTopAmount, { color: isDark ? currentTheme.textPrimary : '#09101D' }]}>{tStatic("৳ ")}{hideCashAmounts ? '***' : formatMoney(totalCash)}
                   </Text>
                   <Text style={[styles.cashTopLabel, isDark && tStyles.textSecondary]}>{t("cb_current_cash")}</Text>
                 </View>
@@ -4871,7 +4875,7 @@ function TallyKhataApp() {
               <View style={[styles.cashTopDashboardLower, isDark && { backgroundColor: currentTheme.cardBgElevated }]}>
                 <View style={styles.cashSubCol}>
                   <Text style={[styles.cashSubLabel, isDark && tStyles.textSecondary]}>{t("cb_today_got")}</Text>
-                  <Text style={[styles.cashSubAmount, { color: isDark ? currentTheme.success : '#0F8A0F' }]}>{tStatic("+ ৳                      + ৳ ")}{hideCashAmounts ? '***' : formatMoney(todayCashIn)}
+                  <Text style={[styles.cashSubAmount, { color: isDark ? currentTheme.success : '#0F8A0F' }]}>{tStatic("+ ৳ ")}{hideCashAmounts ? '***' : formatMoney(todayCashIn)}
                   </Text>
                 </View>
 
@@ -4879,7 +4883,7 @@ function TallyKhataApp() {
 
                 <View style={styles.cashSubCol}>
                   <Text style={[styles.cashSubLabel, isDark && tStyles.textSecondary]}>{t("cb_today_gave")}</Text>
-                  <Text style={[styles.cashSubAmount, { color: isDark ? currentTheme.danger : '#C4161C' }]}>{tStatic("- ৳                      - ৳ ")}{hideCashAmounts ? '***' : formatMoney(todayCashOut)}
+                  <Text style={[styles.cashSubAmount, { color: isDark ? currentTheme.danger : '#C4161C' }]}>{tStatic("- ৳ ")}{hideCashAmounts ? '***' : formatMoney(todayCashOut)}
                   </Text>
                 </View>
               </View>
@@ -9300,6 +9304,7 @@ function TallyKhataApp() {
                     setMmPrefShowNetWorth(prefs.showNetWorthCard !== false);
                     setMmPrefShowSavingsRate(prefs.showSavingsRateCard !== false);
                     setMmPrefShowTips(prefs.showTipsCard !== false);
+                    setMmCustomization(prefs.customization || {});
                     setModalMMPreferences(true);
                   }}
                   accessibilityRole="button"
@@ -12279,6 +12284,227 @@ function TallyKhataApp() {
                 })}
               </View>
 
+
+              {/* --- SECTION-SPECIFIC CUSTOMIZATION ENGINE --- */}
+              <View style={{ marginTop: 12, marginBottom: 8, padding: 14, borderRadius: 16, backgroundColor: isDark ? currentTheme.cardBgElevated : '#F8FAFC', borderWidth: 1, borderColor: isDark ? currentTheme.cardBorder : '#E2E8F0' }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 4 }}>
+                  🎨 {t('mm_customization_engine')}
+                </Text>
+                <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 12 }}>
+                  {t('mm_select_section')}
+                </Text>
+
+                {/* Section Selector Pills */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                  {[
+                    { id: 'dashboard', label: t('mm_sec_dashboard'), icon: '📊' },
+                    { id: 'transactions', label: t('mm_sec_transactions'), icon: '📝' },
+                    { id: 'wallets', label: t('mm_sec_wallets'), icon: '💳' },
+                    { id: 'budgets', label: t('mm_sec_budgets'), icon: '🎯' },
+                    { id: 'goals', label: t('mm_sec_goals'), icon: '🏆' },
+                    { id: 'analytics', label: t('mm_sec_analytics'), icon: '📈' },
+                  ].map((sec) => {
+                    const isSecSel = mmActiveCustomSection === sec.id;
+                    return (
+                      <TouchableOpacity
+                        key={sec.id}
+                        onPress={() => setMmActiveCustomSection(sec.id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 20,
+                          backgroundColor: isSecSel ? (isDark ? currentTheme.primary : '#B81414') : (isDark ? currentTheme.cardBg : '#FFFFFF'),
+                          borderWidth: 1,
+                          borderColor: isSecSel ? (isDark ? currentTheme.primary : '#B81414') : (isDark ? currentTheme.cardBorder : '#CBD5E1'),
+                          marginRight: 8,
+                          elevation: isSecSel ? 2 : 0,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, marginRight: 5 }}>{sec.icon}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: isSecSel ? '700' : '500', color: isSecSel ? '#FFFFFF' : (isDark ? currentTheme.textPrimary : '#1E293B') }}>
+                          {sec.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Theme Presets */}
+                <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 8 }}>
+                  {t('mm_theme_presets')}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                  {[
+                    { id: 'emerald', name: 'এমারেল্ড', color: '#10B981', dark: '#064E3B' },
+                    { id: 'sapphire', name: 'স্যাফায়ার', color: '#2563EB', dark: '#1E3A8A' },
+                    { id: 'obsidian', name: 'ওবসিডিয়ান', color: '#334155', dark: '#0F172A' },
+                    { id: 'rose', name: 'রোজ গোল্ড', color: '#EC4899', dark: '#831843' },
+                    { id: 'amber', name: 'অ্যাম্বার', color: '#F59E0B', dark: '#78350F' },
+                    { id: 'amethyst', name: 'অ্যামিথিস্ট', color: '#8B5CF6', dark: '#4C1D95' },
+                  ].map((preset) => {
+                    const currentSecTheme = (mmCustomization[mmActiveCustomSection] && mmCustomization[mmActiveCustomSection].preset) || 'default';
+                    const isPresetSel = currentSecTheme === preset.id;
+                    return (
+                      <TouchableOpacity
+                        key={preset.id}
+                        onPress={() => {
+                          setMmCustomization({
+                            ...mmCustomization,
+                            [mmActiveCustomSection]: {
+                              ...(mmCustomization[mmActiveCustomSection] || {}),
+                              preset: preset.id,
+                              accent: preset.color,
+                            },
+                          });
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 14,
+                          backgroundColor: isDark ? currentTheme.cardBg : '#FFFFFF',
+                          borderWidth: isPresetSel ? 2 : 1,
+                          borderColor: isPresetSel ? preset.color : (isDark ? currentTheme.cardBorder : '#E2E8F0'),
+                          elevation: isPresetSel ? 2 : 0,
+                        }}
+                      >
+                        <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: preset.color, marginRight: 6 }} />
+                        <Text style={{ fontSize: 11, fontWeight: isPresetSel ? '700' : '500', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                          {preset.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Background Tint & Opacity */}
+                <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 8 }}>
+                  {t('mm_bg_tint')}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                  {['0.1', '0.2', '0.3', '0.4'].map((tintVal) => {
+                    const currentSecTint = (mmCustomization[mmActiveCustomSection] && mmCustomization[mmActiveCustomSection].tint) || '0.1';
+                    const isTintSel = currentSecTint === tintVal;
+                    return (
+                      <TouchableOpacity
+                        key={tintVal}
+                        onPress={() => {
+                          setMmCustomization({
+                            ...mmCustomization,
+                            [mmActiveCustomSection]: {
+                              ...(mmCustomization[mmActiveCustomSection] || {}),
+                              tint: tintVal,
+                            },
+                          });
+                        }}
+                        style={{
+                          flex: 1,
+                          alignItems: 'center',
+                          paddingVertical: 6,
+                          borderRadius: 10,
+                          backgroundColor: isTintSel ? (isDark ? currentTheme.primary : '#B81414') : (isDark ? currentTheme.cardBg : '#FFFFFF'),
+                          borderWidth: 1,
+                          borderColor: isTintSel ? (isDark ? currentTheme.primary : '#B81414') : (isDark ? currentTheme.cardBorder : '#E2E8F0'),
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: isTintSel ? '#FFFFFF' : (isDark ? currentTheme.textPrimary : '#1E293B') }}>
+                          {Math.round(parseFloat(tintVal) * 100)}%
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Typography & Text Scale */}
+                <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 8 }}>
+                  {t('mm_text_scale')}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                  {[
+                    { id: '1.0', label: t('mm_scale_normal') },
+                    { id: '1.1', label: t('mm_scale_medium') },
+                    { id: '1.2', label: t('mm_scale_large') },
+                  ].map((scaleOpt) => {
+                    const currentSecScale = (mmCustomization[mmActiveCustomSection] && mmCustomization[mmActiveCustomSection].textScale) || '1.0';
+                    const isScaleSel = currentSecScale === scaleOpt.id;
+                    return (
+                      <TouchableOpacity
+                        key={scaleOpt.id}
+                        onPress={() => {
+                          setMmCustomization({
+                            ...mmCustomization,
+                            [mmActiveCustomSection]: {
+                              ...(mmCustomization[mmActiveCustomSection] || {}),
+                              textScale: scaleOpt.id,
+                            },
+                          });
+                        }}
+                        style={{
+                          flex: 1,
+                          alignItems: 'center',
+                          paddingVertical: 6,
+                          paddingHorizontal: 4,
+                          borderRadius: 10,
+                          backgroundColor: isScaleSel ? (isDark ? currentTheme.primary : '#B81414') : (isDark ? currentTheme.cardBg : '#FFFFFF'),
+                          borderWidth: 1,
+                          borderColor: isScaleSel ? (isDark ? currentTheme.primary : '#B81414') : (isDark ? currentTheme.cardBorder : '#E2E8F0'),
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: isScaleSel ? '#FFFFFF' : (isDark ? currentTheme.textPrimary : '#1E293B') }}>
+                          {scaleOpt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Live Preview Card */}
+                <View style={{ padding: 12, borderRadius: 14, backgroundColor: isDark ? currentTheme.cardBg : '#FFFFFF', borderWidth: 1, borderColor: isDark ? currentTheme.cardBorder : '#E2E8F0', marginTop: 4 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 6 }}>
+                    👁️ {t('mm_live_preview')} ({mmActiveCustomSection})
+                  </Text>
+                  <View style={{
+                    padding: 12,
+                    borderRadius: 12,
+                    backgroundColor: (mmCustomization[mmActiveCustomSection]?.accent ? mmCustomization[mmActiveCustomSection].accent + '1A' : (isDark ? currentTheme.primaryLight : '#FEF2F2')),
+                    borderWidth: 1,
+                    borderColor: mmCustomization[mmActiveCustomSection]?.accent || (isDark ? currentTheme.primary : '#B81414'),
+                  }}>
+                    <Text style={{
+                      fontSize: 14 * parseFloat(mmCustomization[mmActiveCustomSection]?.textScale || '1.0'),
+                      fontWeight: '700',
+                      color: mmCustomization[mmActiveCustomSection]?.accent || (isDark ? currentTheme.primary : '#B81414'),
+                      marginBottom: 2,
+                    }}>
+                      ৳ ১,৫০,০০০.০০
+                    </Text>
+                    <Text style={{
+                      fontSize: 11 * parseFloat(mmCustomization[mmActiveCustomSection]?.textScale || '1.0'),
+                      color: isDark ? currentTheme.textSecondary : '#64748B',
+                    }}>
+                      {mmActiveCustomSection.toUpperCase()} • প্রিমিয়াম ৩ডি কাস্টমাইজড লুক
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const updated = { ...mmCustomization };
+                        delete updated[mmActiveCustomSection];
+                        setMmCustomization(updated);
+                      }}
+                      style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: isDark ? currentTheme.cardBgElevated : '#F1F5F9' }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: '600', color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                        ↩ {t('mm_reset_section')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
               {/* Card Visibility Toggles */}
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>{t('mm_dashboard_visibility')}</Text>
               <TouchableOpacity
@@ -13416,10 +13642,19 @@ const styles = StyleSheet.create({
   customerAvatarCircle: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    borderTopWidth: 1.5,
+    borderTopColor: 'rgba(255, 255, 255, 0.45)',
+    borderBottomWidth: 2.5,
+    borderBottomColor: 'rgba(0, 0, 0, 0.15)',
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
   },
   customerAvatarText: {
     fontSize: 15,
