@@ -589,6 +589,42 @@ function getThemedStyles(theme, isDark) {
     },
     bottomSheetTitle: { color: t.textPrimary },
     bottomSheetSub: { color: t.textSecondary },
+    bizPickerItem: {
+      backgroundColor: dark ? t.cardBgElevated : '#F9FAFB',
+      borderColor: dark ? t.cardBorder : '#E5E7EB',
+      borderBottomColor: dark ? t.outline : '#E2E8F0',
+    },
+    bizPickerItemActive: {
+      backgroundColor: dark ? '#2A1215' : '#FFF5F5',
+      borderColor: t.primary,
+      borderBottomColor: dark ? '#7F0C0C' : '#B81414',
+    },
+    bizPickerAvatar: {
+      backgroundColor: dark ? t.surfaceVariant : '#FEE2E2',
+      borderBottomColor: dark ? t.outline : '#FECACA',
+    },
+    bizPickerName: { color: t.textPrimary },
+    bizPickerSub: { color: t.textSecondary },
+    bizSectionTitle: { color: t.textSecondary },
+    bizArchivedCard: {
+      backgroundColor: dark ? t.cardBgElevated : '#F9FAFB',
+      borderColor: dark ? t.cardBorder : '#E5E7EB',
+      borderBottomColor: dark ? t.outline : '#E2E8F0',
+    },
+    bizArchiveBtn: {
+      backgroundColor: dark ? t.surfaceVariant : '#F3F4F6',
+      borderColor: dark ? t.cardBorder : '#E5E7EB',
+      borderBottomColor: dark ? t.outline : '#D1D5DB',
+    },
+    bizArchiveBtnText: { color: t.textSecondary },
+    activeBizBadge: {
+      backgroundColor: dark ? '#064E3B' : '#DCFCE7',
+      borderColor: dark ? '#065F46' : '#BBF7D0',
+      borderBottomColor: dark ? '#047857' : '#86EFAC',
+    },
+    activeBizBadgeText: {
+      color: dark ? '#6EE7B7' : '#047857',
+    },
   };
 }
 

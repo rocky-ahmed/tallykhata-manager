@@ -1515,6 +1515,7 @@ const APP_STATIC_TEXT_EN = {
   'অ্যাপটি সুরক্ষিত রাখতে ৪ ডিজিটের গোপন পিন কোড সেট করুন:': 'Set a 4-digit PIN to protect the app:',
   'ব্যবসা প্রতিষ্ঠান পরিবর্তন': 'Switch business',
   'সক্রিয় প্রতিষ্ঠানসমূহ': 'Active businesses',
+  'বর্তমানে সক্রিয়': 'Currently Active',
   'আর্কাইভ': 'Archived',
   'আর্কাইভকৃত প্রতিষ্ঠান': 'Archived businesses',
   '(আর্কাইভ)': '(Archived)',

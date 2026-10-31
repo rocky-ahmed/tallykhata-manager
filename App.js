@@ -33,6 +33,7 @@ import * as preferencesService from './src/preferencesService';
 import * as themeService from './src/themeService';
 import * as i18nService from './src/i18nService';
 import * as iconMetricsService from './src/iconMetrics';
+import { STANDARD_TOUCH_HIT_SLOP } from './src/iconMetrics';
 import * as typographyTokens from './src/typographyTokens';
 import { Card3D, Button3D, SquircleBadge } from './src/components';
 
@@ -162,9 +163,13 @@ const toBengaliDecimal = (amount) => {
   return isNeg ? '-' + res : res;
 };
 
-const getAvatarInfo = (name, index) => {
-  const colors = ['#DCFCE7', '#FEF08A', '#DBEAFE', '#FFE4E6', '#DCFCE7', '#FEF08A', '#DBEAFE', '#FFE4E6'];
-  const textColors = ['#0F8A0F', '#B8860B', '#1A68D1', '#B81414', '#0F8A0F', '#B8860B', '#1A68D1', '#B81414'];
+const getAvatarInfo = (name, index, isDark = false) => {
+  const lightColors = ['#DCFCE7', '#FEF08A', '#DBEAFE', '#FFE4E6', '#DCFCE7', '#FEF08A', '#DBEAFE', '#FFE4E6'];
+  const lightTextColors = ['#0F8A0F', '#B8860B', '#1A68D1', '#B81414', '#0F8A0F', '#B8860B', '#1A68D1', '#B81414'];
+  const darkColors = ['#064E3B', '#713F12', '#1E3A8A', '#7F1D1D', '#064E3B', '#713F12', '#1E3A8A', '#7F1D1D'];
+  const darkTextColors = ['#6EE7B7', '#FDE047', '#93C5FD', '#FCA5A5', '#6EE7B7', '#FDE047', '#93C5FD', '#FCA5A5'];
+  const colors = isDark ? darkColors : lightColors;
+  const textColors = isDark ? darkTextColors : lightTextColors;
   const bg = colors[index % colors.length];
   const color = textColors[index % textColors.length];
   let text = 'ক';
@@ -4811,16 +4816,17 @@ function TallyKhataApp() {
                       onChangeText={setSearchQuery}
                     />
                     {searchQuery ? (
-                      <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+                      <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }} hitSlop={STANDARD_TOUCH_HIT_SLOP}>
                         <Image
                           source={require('./assets/icons/ic_close.png')}
-                          style={{ width: 14, height: 14, tintColor: '#6B7280' }}
+                          style={{ width: 14, height: 14, tintColor: isDark ? currentTheme.textSecondary : '#6B7280' }}
                           resizeMode="contain"
                         />
                       </TouchableOpacity>
                     ) : null}
                     <TouchableOpacity
                       style={{ padding: 6, marginLeft: 4 }}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
                       onPress={() => {
                         const nextF = accountFilter === 'all' ? 'due' : accountFilter === 'due' ? 'highest' : 'all';
                         setAccountFilter(nextF);
@@ -4828,17 +4834,18 @@ function TallyKhataApp() {
                     >
                       <Image
                         source={require('./assets/icons/ic_filter.png')}
-                        style={{ width: 22, height: 22, tintColor: accountFilter !== 'all' ? '#B81414' : '#374151' }}
+                        style={{ width: 22, height: 22, tintColor: accountFilter !== 'all' ? (isDark ? currentTheme.danger : '#B81414') : (isDark ? currentTheme.textSecondary : '#374151') }}
                         resizeMode="contain"
                       />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={{ padding: 6, marginLeft: 4 }}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
                       onPress={() => setModalFullReport(true)}
                     >
                       <Image
                         source={require('./assets/icons/ic_download.png')}
-                        style={{ width: 22, height: 22, tintColor: '#374151' }}
+                        style={{ width: 22, height: 22, tintColor: isDark ? currentTheme.textSecondary : '#374151' }}
                         resizeMode="contain"
                       />
                     </TouchableOpacity>
@@ -4875,7 +4882,7 @@ function TallyKhataApp() {
                 </View>
               }
               renderItem={({ item, index }) => {
-                const avatar = getAvatarInfo(item.name, index);
+                const avatar = getAvatarInfo(item.name, index, isDark);
                 return (
                   <TouchableOpacity
                     style={[styles.customerListCard, isDark && tStyles.customerListCard]}
@@ -4885,12 +4892,12 @@ function TallyKhataApp() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <View style={[styles.customerAvatarCircle, { backgroundColor: avatar.bg }]}>
+                    <View style={[styles.customerAvatarCircle, { backgroundColor: avatar.bg }, isDark && { borderTopColor: 'rgba(255, 255, 255, 0.15)', borderBottomColor: 'rgba(0, 0, 0, 0.3)' }]}>
                       <Text style={[styles.customerAvatarText, { color: avatar.color }]}>{avatar.text}</Text>
                     </View>
                     <View style={{ flex: 1, justifyContent: 'center' }}>
                       <Text style={[styles.customerCardName, isDark && tStyles.textPrimary]} numberOfLines={1}>{item.name}</Text>
-                      <Text style={[styles.customerCardTime, isDark && tStyles.textSecondary]}>{item.timeAgo || tStatic("৩ মাস")}</Text>
+                      <Text style={[styles.customerCardTime, isDark && tStyles.textSecondary]}>{item.phone ? (item.phone + ' • ') : ''}{item.timeAgo || tStatic("৩ মাস")}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', justifyContent: 'center', marginRight: 4 }}>
                       <Text style={[styles.customerCardAmount, { color: item.balance > 0 ? (isDark ? currentTheme.danger : '#B81414') : item.balance < 0 ? (isDark ? currentTheme.success : '#059669') : (isDark ? currentTheme.textPrimary : '#111827') }]}>
@@ -8328,40 +8335,44 @@ function TallyKhataApp() {
         onRequestClose={() => setModalBusinessPicker(false)}
       >
         <View style={styles.bottomSheetOverlay}>
-          <View style={styles.bottomSheetCard}>
+          <View style={[styles.bottomSheetCard, isDark && tStyles.modalSurface]}>
             <View style={styles.bottomSheetHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>{tStatic("ব্যবসা প্রতিষ্ঠান পরিবর্তন")}</Text>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.bottomSheetTitle]}>{tStatic("ব্যবসা প্রতিষ্ঠান পরিবর্তন")}</Text>
               <TouchableOpacity
                 onPress={() => setModalBusinessPicker(false)}
-                style={styles.modalCloseCircle}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
                 activeOpacity={0.7}
               >
                 <Image
-                source={require('./assets/icons/ic_close.png')}
-                style={styles.modalCloseIcon}
-                resizeMode="contain"
-              />
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={{ maxHeight: 380, marginVertical: 8 }}>
-              <Text style={styles.bizSectionTitle}>{tStatic("সক্রিয় প্রতিষ্ঠানসমূহ")}</Text>
+              <Text style={[styles.bizSectionTitle, isDark && tStyles.bizSectionTitle]}>{tStatic("সক্রিয় প্রতিষ্ঠানসমূহ")}</Text>
               {(businesses || []).filter((b) => !b.isArchived).map((biz) => {
                 const isSelected = String(biz.id) === String(activeBusinessId) || biz.isSelected || biz.name === businessName;
                 const activeCount = (businesses || []).filter((b) => !b.isArchived).length;
                 return (
                   <View
                     key={biz.id}
-                    style={[styles.bizPickerItem, isSelected && styles.bizPickerItemActive]}
+                    style={[
+                      styles.bizPickerItem,
+                      isDark && tStyles.bizPickerItem,
+                      isSelected && [styles.bizPickerItemActive, isDark && tStyles.bizPickerItemActive],
+                    ]}
                   >
                     <TouchableOpacity
                       style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
                       onPress={() => handleSelectBusiness(biz)}
                       activeOpacity={0.7}
                     >
-                      <View style={styles.bizPickerAvatar}>
+                      <View style={[styles.bizPickerAvatar, isDark && tStyles.bizPickerAvatar]}>
                         <Image
                           source={require('./assets/ic_tally_khata_logo_reg.png')}
                           style={{ width: 28, height: 28 }}
@@ -8369,22 +8380,31 @@ function TallyKhataApp() {
                         />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.bizPickerName}>{biz.name}</Text>
-                        <Text style={styles.bizPickerSub}>{biz.owner || tStatic("স্বত্বাধিকারী")} • {biz.phone || '01700000000'}</Text>
-                        {biz.address ? <Text style={[styles.bizPickerSub, { fontSize: 11 }]}>{biz.address}</Text> : null}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Text style={[styles.bizPickerName, isDark && tStyles.bizPickerName]}>{biz.name}</Text>
+                          {isSelected ? (
+                            <View style={[styles.activeBizBadge, isDark && tStyles.activeBizBadge]}>
+                              <Text style={[styles.activeBizBadgeText, isDark && tStyles.activeBizBadgeText]}>
+                                {tStatic("বর্তমানে সক্রিয়")}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text style={[styles.bizPickerSub, isDark && tStyles.bizPickerSub]}>{biz.owner || tStatic("স্বত্বাধিকারী")} • {biz.phone || '01700000000'}</Text>
+                        {biz.address ? <Text style={[styles.bizPickerSub, isDark && tStyles.bizPickerSub, { fontSize: 11 }]}>{biz.address}</Text> : null}
                       </View>
-                      <View style={[styles.bizPickerRadio, isSelected && styles.bizPickerRadioActive]}>
-                        {isSelected ? <View style={styles.bizPickerRadioInner} /> : null}
+                      <View style={[styles.bizPickerRadio, isSelected && (isDark ? { borderColor: currentTheme.primary } : styles.bizPickerRadioActive)]}>
+                        {isSelected ? <View style={[styles.bizPickerRadioInner, isDark && { backgroundColor: currentTheme.primary }]} /> : null}
                       </View>
                     </TouchableOpacity>
 
                     {activeCount > 1 ? (
                       <TouchableOpacity
-                        style={styles.bizArchiveBtn}
+                        style={[styles.bizArchiveBtn, isDark && tStyles.bizArchiveBtn]}
                         onPress={() => handleArchiveBusiness(biz)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        hitSlop={STANDARD_TOUCH_HIT_SLOP}
                       >
-                        <Text style={styles.bizArchiveBtnText}>{tStatic("আর্কাইভ")}</Text>
+                        <Text style={[styles.bizArchiveBtnText, isDark && tStyles.bizArchiveBtnText]}>{tStatic("আর্কাইভ")}</Text>
                       </TouchableOpacity>
                     ) : null}
                   </View>
@@ -8393,12 +8413,12 @@ function TallyKhataApp() {
 
               {(businesses || []).some((b) => Boolean(b.isArchived)) ? (
                 <>
-                  <Text style={[styles.bizSectionTitle, { marginTop: 16 }]}>{tStatic("আর্কাইভকৃত প্রতিষ্ঠান")}</Text>
+                  <Text style={[styles.bizSectionTitle, isDark && tStyles.bizSectionTitle, { marginTop: 16 }]}>{tStatic("আর্কাইভকৃত প্রতিষ্ঠান")}</Text>
                   {(businesses || []).filter((b) => Boolean(b.isArchived)).map((biz) => (
-                    <View key={biz.id} style={styles.bizArchivedCard}>
+                    <View key={biz.id} style={[styles.bizArchivedCard, isDark && tStyles.bizArchivedCard]}>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.bizPickerName, { color: '#6B7280' }]}>{biz.name}{tStatic(" (আর্কাইভ)")}</Text>
-                        <Text style={styles.bizPickerSub}>{biz.owner || tStatic("স্বত্বাধিকারী")} • {biz.phone || ''}</Text>
+                        <Text style={[styles.bizPickerName, isDark ? { color: currentTheme.textMuted } : { color: '#6B7280' }]}>{biz.name}{tStatic(" (আর্কাইভ)")}</Text>
+                        <Text style={[styles.bizPickerSub, isDark && tStyles.bizPickerSub]}>{biz.owner || tStatic("স্বত্বাধিকারী")} • {biz.phone || ''}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         <TouchableOpacity
@@ -8420,23 +8440,22 @@ function TallyKhataApp() {
               ) : null}
             </ScrollView>
 
-            <TouchableOpacity
-              style={styles.bizAddBtn}
+            <Button3D
+              title={tStatic("নতুন ব্যবসা প্রতিষ্ঠান যোগ করুন")}
+              variant="primary"
+              size="lg"
+              isDark={isDark}
               onPress={() => {
                 setModalBusinessPicker(false);
                 setModalAddBusiness(true);
               }}
-            >
-              <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', marginRight: 8 }}>
-                <Text style={{ fontSize: 16, color: '#FFFFFF', fontWeight: 'bold', marginTop: -2 }}>+</Text>
-              </View>
-              <Text style={styles.bizAddBtnText}>{tStatic("নতুন ব্যবসা প্রতিষ্ঠান যোগ করুন")}</Text>
-            </TouchableOpacity>
+              style={{ marginTop: 8 }}
+            />
           </View>
         </View>
       </Modal>
 
-      {/* 2. ADD BUSINESS */}
+            {/* 2. ADD BUSINESS */}
       <Modal
         visible={modalAddBusiness}
         animationType="slide"
@@ -8444,80 +8463,84 @@ function TallyKhataApp() {
         onRequestClose={() => setModalAddBusiness(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { padding: 18 }]}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { padding: 18 }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>{tStatic("নতুন ব্যবসা প্রতিষ্ঠান")}</Text>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.modalCardTitle]}>{tStatic("নতুন ব্যবসা প্রতিষ্ঠান")}</Text>
               <TouchableOpacity
                 onPress={() => setModalAddBusiness(false)}
-                style={styles.modalCloseCircle}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
                 activeOpacity={0.7}
               >
                 <Image
-                source={require('./assets/icons/ic_close.png')}
-                style={styles.modalCloseIcon}
-                resizeMode="contain"
-              />
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>{tStatic("ব্যবসার নাম *")}</Text>
+            <Text style={[styles.inputLabel, isDark && tStyles.textSecondary]}>{tStatic("ব্যবসার নাম *")}</Text>
             <TextInput
-              style={styles.modalSimpleInput}
+              style={[styles.modalSimpleInput, isDark && tStyles.input]}
               placeholder={tStatic("যেমন: মেসার্স ভাই ভাই ট্রেডার্স")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.inputPlaceholder : COLORS.textSubtle}
               value={newBizName}
               onChangeText={setNewBizName}
             />
 
-            <Text style={styles.inputLabel}>{tStatic("স্বত্বাধিকারীর নাম")}</Text>
+            <Text style={[styles.inputLabel, isDark && tStyles.textSecondary]}>{tStatic("স্বত্বাধিকারীর নাম")}</Text>
             <TextInput
-              style={styles.modalSimpleInput}
+              style={[styles.modalSimpleInput, isDark && tStyles.input]}
               placeholder={tStatic("স্বত্বাধিকারীর নাম")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.inputPlaceholder : COLORS.textSubtle}
               value={newBizOwner}
               onChangeText={setNewBizOwner}
             />
 
-            <Text style={styles.inputLabel}>{tStatic("মোবাইল নম্বর")}</Text>
+            <Text style={[styles.inputLabel, isDark && tStyles.textSecondary]}>{tStatic("মোবাইল নম্বর")}</Text>
             <TextInput
-              style={styles.modalSimpleInput}
+              style={[styles.modalSimpleInput, isDark && tStyles.input]}
               placeholder={tStatic("০১৭১১...")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.inputPlaceholder : COLORS.textSubtle}
               keyboardType="phone-pad"
               value={newBizPhone}
               onChangeText={setNewBizPhone}
             />
 
-            <Text style={styles.inputLabel}>{tStatic("ব্যবসার ঠিকানা")}</Text>
+            <Text style={[styles.inputLabel, isDark && tStyles.textSecondary]}>{tStatic("ব্যবসার ঠিকানা")}</Text>
             <TextInput
-              style={styles.modalSimpleInput}
+              style={[styles.modalSimpleInput, isDark && tStyles.input]}
               placeholder={tStatic("দোকান/বাজারের ঠিকানা")}
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={isDark ? currentTheme.inputPlaceholder : COLORS.textSubtle}
               value={newBizAddress}
               onChangeText={setNewBizAddress}
             />
 
             <View style={[styles.modalBtnRow, { marginTop: 14 }]}>
-              <TouchableOpacity
-                style={styles.modalBtnCancel}
+              <Button3D
+                title={tStatic("বাতিল")}
+                variant="secondary"
+                size="md"
+                isDark={isDark}
                 onPress={() => setModalAddBusiness(false)}
-              >
-                <Text style={styles.modalBtnCancelText}>{tStatic("বাতিল")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
+                style={{ flex: 1, marginRight: 8 }}
+              />
+              <Button3D
+                title={tStatic("তৈরি করুন")}
+                variant="primary"
+                size="md"
+                isDark={isDark}
                 onPress={handleCreateBusiness}
-              >
-                <Text style={styles.modalBtnSubmitText}>{tStatic("সংরক্ষণ করুন")}</Text>
-              </TouchableOpacity>
+                style={{ flex: 1.5 }}
+              />
             </View>
           </View>
         </View>
       </Modal>
 
 
-      {/* 3. BECHA KENA REPORT */}
+{/* 3. BECHA KENA REPORT */}
       <Modal
         visible={modalBechaKena}
         animationType="slide"
@@ -16306,21 +16329,45 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
+    borderBottomWidth: 3,
+    borderBottomColor: '#E2E8F0',
     backgroundColor: '#F9FAFB',
     marginBottom: 10,
   },
   bizPickerItemActive: {
-    borderColor: '#D32F2F',
+    borderColor: '#B81414',
+    borderBottomWidth: 3,
+    borderBottomColor: '#7F0C0C',
     backgroundColor: '#FFF5F5',
   },
   bizPickerAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: 14,
     backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderBottomWidth: 2,
+    borderBottomColor: '#FECACA',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+  },
+  activeBizBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderBottomWidth: 2,
+    borderBottomColor: '#86EFAC',
+    marginLeft: 6,
+  },
+  activeBizBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#047857',
   },
   bizPickerName: {
     fontSize: 15,
@@ -16381,6 +16428,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    borderBottomWidth: 2,
+    borderBottomColor: '#D1D5DB',
     marginLeft: 8,
   },
   bizArchiveBtnText: {
@@ -16397,6 +16446,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    borderBottomWidth: 2,
+    borderBottomColor: '#E2E8F0',
     marginBottom: 8,
   },
   bizRestoreBtn: {
@@ -16404,6 +16455,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 6,
     backgroundColor: '#DEF7EC',
+    borderWidth: 1,
+    borderColor: '#BCF0DA',
+    borderBottomWidth: 2,
+    borderBottomColor: '#84E1BC',
   },
   bizRestoreBtnText: {
     fontSize: 11,
@@ -16415,6 +16470,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 6,
     backgroundColor: '#FDE8E8',
+    borderWidth: 1,
+    borderColor: '#FBD5D5',
+    borderBottomWidth: 2,
+    borderBottomColor: '#F8B4B4',
   },
   bizDeleteBtnText: {
     fontSize: 11,
