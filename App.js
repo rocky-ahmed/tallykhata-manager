@@ -32,6 +32,8 @@ import * as moneyManagerService from './src/moneyManagerService';
 import * as preferencesService from './src/preferencesService';
 import * as themeService from './src/themeService';
 import * as i18nService from './src/i18nService';
+import * as iconMetricsService from './src/iconMetrics';
+import * as typographyTokens from './src/typographyTokens';
 
 export const ThemeContext = React.createContext({
   theme: themeService.LIGHT_THEME,
@@ -379,17 +381,32 @@ const AppIcon = ({
   imageStyle,
   accessibilityLabel,
   themeMode,
+  iconKey,
+  opticalScale,
+  translateY,
 }) => {
   const ctx = React.useContext(ThemeContext);
   const resolvedMode = themeMode || (ctx && ctx.mode) || 'light';
   const theme = themeService.getIconTheme(variant, resolvedMode);
   const resolvedTint = tintColor !== undefined ? tintColor : theme.tint;
 
+  const metrics = iconMetricsService.getIconMetrics(iconKey || (typeof source === 'string' ? source : ''));
+  const effectiveScale = opticalScale !== undefined ? opticalScale : metrics.opticalScale;
+  const effectiveTranslateY = translateY !== undefined ? translateY : metrics.translateY;
+  const effectiveWidth = Math.round(size * effectiveScale);
+  const effectiveHeight = Math.round(size * effectiveScale);
+  const transformStyle = effectiveTranslateY ? [{ translateY: effectiveTranslateY }] : undefined;
+
   if (shape === 'none') {
     return (
       <Image
         source={source}
-        style={[{ width: size, height: size }, resolvedTint ? { tintColor: resolvedTint } : {}, imageStyle]}
+        style={[
+          { width: effectiveWidth, height: effectiveHeight },
+          transformStyle ? { transform: transformStyle } : {},
+          resolvedTint ? { tintColor: resolvedTint } : {},
+          imageStyle,
+        ]}
         resizeMode="contain"
         accessibilityLabel={accessibilityLabel}
       />
@@ -444,7 +461,12 @@ const AppIcon = ({
       />
       <Image
         source={source}
-        style={[{ width: size, height: size }, resolvedTint ? { tintColor: resolvedTint } : {}, imageStyle]}
+        style={[
+          { width: effectiveWidth, height: effectiveHeight },
+          transformStyle ? { transform: transformStyle } : {},
+          resolvedTint ? { tintColor: resolvedTint } : {},
+          imageStyle,
+        ]}
         resizeMode="contain"
       />
     </View>
@@ -4260,14 +4282,14 @@ function TallyKhataApp() {
               onPress={handleOpenEditAccount}
               activeOpacity={0.7}
             >
-              <AppIcon source={require("./assets/icons/ic_edit.png")} variant="neutral" shape="rounded" size={20} containerSize={38} />
+              <AppIcon source={require("./assets/icons/ic_edit.png")} iconKey='ic_edit' variant="neutral" shape="rounded" size={20} containerSize={38} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={handleDeleteAccount}
               activeOpacity={0.7}
             >
-              <AppIcon source={require("./assets/icons/ic_delete.png")} variant="danger" shape="rounded" size={20} containerSize={38} />
+              <AppIcon source={require("./assets/icons/ic_delete.png")} iconKey='ic_delete' variant="danger" shape="rounded" size={20} containerSize={38} />
             </TouchableOpacity>
           </View>
         </View>
@@ -4531,7 +4553,7 @@ function TallyKhataApp() {
                         accessibilityLabel={tStatic("ব্যবসা প্রতিষ্ঠান")}
                       >
                         <AppIcon
-                          source={require('./assets/icons/grid_multi_biz.png')}
+                          source={require('./assets/icons/grid_multi_biz.png')} iconKey='grid_multi_biz'
                           variant="primary"
                           shape="rounded"
                           size={28}
@@ -4550,7 +4572,7 @@ function TallyKhataApp() {
                         accessibilityLabel={tStatic("স্টক হিসাব")}
                       >
                         <AppIcon
-                          source={require('./assets/icons/grid_stock.png')}
+                          source={require('./assets/icons/grid_stock.png')} iconKey='grid_stock'
                           variant="warning"
                           shape="rounded"
                           size={28}
@@ -4569,7 +4591,7 @@ function TallyKhataApp() {
                         accessibilityLabel={tStatic("ব্যবসার নোট")}
                       >
                         <AppIcon
-                          source={require('./assets/icons/grid_note.png')}
+                          source={require('./assets/icons/grid_note.png')} iconKey='grid_note'
                           variant="info"
                           shape="rounded"
                           size={28}
@@ -4588,7 +4610,7 @@ function TallyKhataApp() {
                         accessibilityLabel={tStatic("গ্রুপ তাগাদা")}
                       >
                         <AppIcon
-                          source={require('./assets/icons/grid_bulk_tagada.png')}
+                          source={require('./assets/icons/grid_bulk_tagada.png')} iconKey='grid_bulk_tagada'
                           variant="danger"
                           shape="rounded"
                           size={28}
@@ -4610,7 +4632,7 @@ function TallyKhataApp() {
                         accessibilityLabel={tStatic("মানি ম্যানেজার")}
                       >
                         <AppIcon
-                          source={require('./assets/icons/grid_money_manager.png')}
+                          source={require('./assets/icons/grid_money_manager.png')} iconKey='grid_money_manager'
                           variant="secondary"
                           shape="rounded"
                           size={28}
@@ -4629,7 +4651,7 @@ function TallyKhataApp() {
                         accessibilityLabel={tStatic("ডাটা ব্যাকআপ")}
                       >
                         <AppIcon
-                          source={require('./assets/icons/grid_backup.png')}
+                          source={require('./assets/icons/grid_backup.png')} iconKey='grid_backup'
                           variant="success"
                           shape="rounded"
                           size={28}
@@ -4648,7 +4670,7 @@ function TallyKhataApp() {
                         accessibilityLabel={tStatic("টালি-মেসেজ")}
                       >
                         <AppIcon
-                          source={require('./assets/icons/grid_tally_msg.png')}
+                          source={require('./assets/icons/grid_tally_msg.png')} iconKey='grid_tally_msg'
                           variant="purple"
                           shape="rounded"
                           size={28}
@@ -4667,7 +4689,7 @@ function TallyKhataApp() {
                         accessibilityLabel={tStatic("ক্যাশবক্স")}
                       >
                         <AppIcon
-                          source={require('./assets/icons/grid_cashbox.png')}
+                          source={require('./assets/icons/grid_cashbox.png')} iconKey='grid_cashbox'
                           variant="teal"
                           shape="rounded"
                           size={28}
