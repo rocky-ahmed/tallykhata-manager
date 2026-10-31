@@ -5051,24 +5051,28 @@ function TallyKhataApp() {
 
             {/* Cash Entry Big Buttons (+ ক্যাশ বেচা, - দোকান খরচ) */}
             <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 12, marginTop: 12 }}>
-              <TouchableOpacity
-                style={[styles.cashActionBigBtn, { backgroundColor: '#0F8A0F' }]}
+              <Button3D
+                title={tStatic("+ ক্যাশ বেচা")}
+                variant="success"
+                size="lg"
+                isDark={isDark}
                 onPress={() => {
                   setCashCategory('sale');
                   setModalAddCash(true);
                 }}
-              >
-                <Text style={styles.cashActionBigBtnText}>{tStatic("+ ক্যাশ বেচা")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.cashActionBigBtn, { backgroundColor: '#B81414' }]}
+                style={{ flex: 1 }}
+              />
+              <Button3D
+                title={tStatic("- দোকান খরচ")}
+                variant="destructive"
+                size="lg"
+                isDark={isDark}
                 onPress={() => {
                   setCashCategory('cost');
                   setModalAddCash(true);
                 }}
-              >
-                <Text style={styles.cashActionBigBtnText}>{tStatic("- দোকান খরচ")}</Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
             </View>
 
             {/* Cash Categories Breakdown List (layout_cashbook_accounts.xml) */}
@@ -6903,18 +6907,22 @@ function TallyKhataApp() {
             />
 
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalAddCash(false)}>
-                <Text style={styles.modalBtnCancelText}>{tStatic("বাতিল")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalBtnSubmit,
-                  { backgroundColor: cashCategory === 'sale' || cashCategory === 'malik_in' ? COLORS.green : COLORS.primary },
-                ]}
+              <Button3D
+                title={tStatic("বাতিল")}
+                variant="secondary"
+                size="md"
+                isDark={isDark}
+                onPress={() => setModalAddCash(false)}
+                style={{ flex: 1, marginRight: 8 }}
+              />
+              <Button3D
+                title={tStatic("সংরক্ষণ করুন")}
+                variant={cashCategory === 'sale' || cashCategory === 'malik_in' ? "success" : "destructive"}
+                size="md"
+                isDark={isDark}
                 onPress={handleSaveCashEntry}
-              >
-                <Text style={styles.modalBtnSubmitText}>{tStatic("সংরক্ষণ করুন")}</Text>
-              </TouchableOpacity>
+                style={{ flex: 1.5 }}
+              />
             </View>
           </View>
         </View>
@@ -7029,18 +7037,22 @@ function TallyKhataApp() {
             </ScrollView>
 
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity
-                style={styles.modalBtnCancel}
+              <Button3D
+                title={tStatic("বাতিল")}
+                variant="secondary"
+                size="md"
+                isDark={isDark}
                 onPress={() => setModalReconcileCash(false)}
-              >
-                <Text style={styles.modalBtnCancelText}>{tStatic("বাতিল")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
+                style={{ flex: 1, marginRight: 8 }}
+              />
+              <Button3D
+                title={tStatic("সমন্বয় সংরক্ষণ")}
+                variant="primary"
+                size="md"
+                isDark={isDark}
                 onPress={handleSaveDenominations}
-              >
-                <Text style={styles.modalBtnSubmitText}>{tStatic("সমন্বয় সংরক্ষণ")}</Text>
-              </TouchableOpacity>
+                style={{ flex: 1.5 }}
+              />
             </View>
           </View>
         </View>
@@ -7087,22 +7099,26 @@ function TallyKhataApp() {
             <Text style={[{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', marginTop: 12, lineHeight: 18 }, isDark && tStyles.textSecondary]}>{tStatic("কাস্টমার তার বিকাশ, নগদ, রকেট বা যেকোনো ব্যাংক অ্যাপ দিয়ে এই কিউআর স্ক্যান করে সরাসরি পেমেন্ট করতে পারবেন।               কাস্টমার তার বিকাশ, নগদ, রকেট বা যেকোনো ব্যাংক অ্যাপ দিয়ে এই কিউআর স্ক্যান করে সরাসরি পেমেন্ট করতে পারবেন।")}</Text>
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, width: '100%' }}>
-              <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.blue, flex: 1 }]}
+              <Button3D
+                title={tStatic("শেয়ার কিউআর")}
+                variant="info"
+                size="md"
+                isDark={isDark}
                 onPress={() => {
                   Share.share({
                     message: `=== ${businessName}${tStatic(" (বাংলা QR) ===\nমার্চেন্ট আইডি: TP-")}${ownerPhone}${tStatic("\nবিকাশ/নগদ/রকেট বা ব্যাংক দিয়ে পেমেন্ট করুন।")}`,
                   });
                 }}
-              >
-                <Text style={styles.modalBtnSubmitText}>{tStatic("শেয়ার কিউআর")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtnCancel, { flex: 1 }]}
+                style={{ flex: 1, marginRight: 8 }}
+              />
+              <Button3D
+                title={tStatic("বন্ধ করুন")}
+                variant="secondary"
+                size="md"
+                isDark={isDark}
                 onPress={() => setModalBanglaQR(false)}
-              >
-                <Text style={styles.modalBtnCancelText}>{tStatic("বন্ধ করুন")}</Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
             </View>
           </View>
         </View>
@@ -7113,18 +7129,18 @@ function TallyKhataApp() {
          =================================================================== */}
       <Modal visible={modalAddMoney} animationType="slide" transparent onRequestClose={() => setModalAddMoney(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>{tStatic("ওয়ালেটে অ্যাড মানি")}</Text>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>{tStatic("ওয়ালেটে অ্যাড মানি")}</Text>
               <TouchableOpacity
                 onPress={() => setModalAddMoney(false)}
-                style={styles.modalCloseCircle}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
                 <Image
                 source={require('./assets/icons/ic_close.png')}
-                style={styles.modalCloseIcon}
+                style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
                 resizeMode="contain"
               />
               </TouchableOpacity>
@@ -7146,8 +7162,9 @@ function TallyKhataApp() {
             </View>
 
             <TextInput
-              style={styles.modalBigInput}
+              style={[styles.modalBigInput, isDark && tStyles.input]}
               placeholder={tStatic("৳ টাকার পরিমাণ")}
+              placeholderTextColor={isDark ? currentTheme.textSecondary : COLORS.textSubtle}
               keyboardType="numeric"
               autoFocus
               value={addMoneyAmount}
@@ -7155,15 +7172,22 @@ function TallyKhataApp() {
             />
 
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalAddMoney(false)}>
-                <Text style={styles.modalBtnCancelText}>{tStatic("বাতিল")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.green }]}
+              <Button3D
+                title={tStatic("বাতিল")}
+                variant="secondary"
+                size="md"
+                isDark={isDark}
+                onPress={() => setModalAddMoney(false)}
+                style={{ flex: 1, marginRight: 8 }}
+              />
+              <Button3D
+                title={tStatic("অ্যাড মানি করুন")}
+                variant="success"
+                size="md"
+                isDark={isDark}
                 onPress={handleAddMoney}
-              >
-                <Text style={styles.modalBtnSubmitText}>{tStatic("অ্যাড মানি করুন")}</Text>
-              </TouchableOpacity>
+                style={{ flex: 1.5 }}
+              />
             </View>
           </View>
         </View>
@@ -9098,18 +9122,18 @@ function TallyKhataApp() {
         onRequestClose={() => setModalMoneyOut(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { padding: 18 }]}>
+          <View style={[styles.modalCard, { padding: 18 }, isDark && tStyles.modalSurface]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>{tStatic("টাকা উত্তোলন / ট্রান্সফার")}</Text>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>{tStatic("টাকা উত্তোলন / ট্রান্সফার")}</Text>
               <TouchableOpacity
                 onPress={() => setModalMoneyOut(false)}
-                style={styles.modalCloseCircle}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
               >
                 <Image
                 source={require('./assets/icons/ic_close.png')}
-                style={styles.modalCloseIcon}
+                style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
                 resizeMode="contain"
               />
               </TouchableOpacity>
@@ -9167,18 +9191,22 @@ function TallyKhataApp() {
             />
 
             <View style={[styles.modalBtnRow, { marginTop: 14 }]}>
-              <TouchableOpacity
-                style={styles.modalBtnCancel}
+              <Button3D
+                title={tStatic("বাতিল")}
+                variant="secondary"
+                size="md"
+                isDark={isDark}
                 onPress={() => setModalMoneyOut(false)}
-              >
-                <Text style={styles.modalBtnCancelText}>{tStatic("বাতিল")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
+                style={{ flex: 1, marginRight: 8 }}
+              />
+              <Button3D
+                title={tStatic("ট্রান্সফার নিশ্চিত করুন")}
+                variant="primary"
+                size="md"
+                isDark={isDark}
                 onPress={handleMoneyOut}
-              >
-                <Text style={styles.modalBtnSubmitText}>{tStatic("ট্রান্সফার নিশ্চিত করুন")}</Text>
-              </TouchableOpacity>
+                style={{ flex: 1.5 }}
+              />
             </View>
           </View>
         </View>
@@ -9270,7 +9298,7 @@ function TallyKhataApp() {
         animationType="slide"
         onRequestClose={() => setModalTxnLimit(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
+        <SafeAreaView style={[{ flex: 1, backgroundColor: '#F8F9FA' }, isDark && tStyles.screenBg]}>
           {/* Toolbar matching activity_transaction_limit.xml */}
           <View style={styles.txnLimitHeader}>
             <TouchableOpacity
