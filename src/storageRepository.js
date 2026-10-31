@@ -403,16 +403,29 @@ class StorageRepository {
    * Scoped to an explicit snapshotId so rollbacks never apply stale snapshots from earlier sessions.
    */
   async createLocalSafetySnapshot(customSnapshotId = null, extraState = {}) {
+    if (this.writeQueue) {
+      try {
+        await Promise.resolve(this.writeQueue).catch(() => {});
+      } catch (_) {}
+    }
+
     const currentState = this.getAuthoritativeState();
     if (currentState) {
       const snapshotId = customSnapshotId || ('snap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
 
-      let mmState = extraState && extraState.moneyManager !== undefined ? extraState.moneyManager : null;
-      if (mmState === null && this.adapter && typeof this.adapter.getItem === 'function') {
+      let mmState = null;
+      if (this.adapter && typeof this.adapter.getItem === 'function') {
         try {
           const rawMM = await this.adapter.getItem(MM_STORAGE_KEY);
           if (rawMM) mmState = JSON.parse(rawMM);
         } catch (e) {}
+      }
+      if (mmState === null && extraState) {
+        if (extraState.moneyManager !== undefined && extraState.moneyManager !== null) {
+          mmState = extraState.moneyManager;
+        } else if (extraState.money_manager !== undefined && extraState.money_manager !== null) {
+          mmState = extraState.money_manager;
+        }
       }
 
       let prefs = extraState && extraState.preferences !== undefined ? extraState.preferences : null;
@@ -986,7 +999,12 @@ class StorageRepository {
       const mmPayload = (data.moneyManager !== undefined && data.moneyManager !== null)
         ? data.moneyManager
         : data.money_manager;
-      if (mmPayload && typeof mmPayload === 'object') {
+      const hasValidAccounts = mmPayload &&
+        typeof mmPayload === 'object' &&
+        Array.isArray(mmPayload.accounts) &&
+        mmPayload.accounts.length > 0;
+
+      if (hasValidAccounts) {
         const defaultMMState = moneyManagerService ? moneyManagerService.getDefaultState() : {};
         const sanitizedMM = moneyManagerService
           ? moneyManagerService.sanitizeState(mmPayload, defaultMMState)
@@ -996,7 +1014,7 @@ class StorageRepository {
         }
         restoredMM = sanitizedMM;
       }
-      // If data.moneyManager is not present, DO NOT touch or overwrite existing MM state (legacy safety)
+      // If data.moneyManager is not present, empty {}, or lacks valid accounts, DO NOT touch or overwrite existing MM state (legacy safety)
     }
 
     let restoredPrefs = null;

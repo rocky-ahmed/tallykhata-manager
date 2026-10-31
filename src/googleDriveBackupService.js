@@ -567,6 +567,7 @@ class GoogleDriveBackupService {
     const delimiter = '\r\n--' + boundary + '\r\n';
     const closeDelimiter = '\r\n--' + boundary + '--';
 
+    const recordCounts = (backupPayload && backupPayload.manifest && backupPayload.manifest.recordCounts) || {};
     const metadata = {
       name: BACKUP_FILENAME,
       description: 'TallyKhata Cloud Backup (' + backupPayload.manifest.businessSummary.businessName + ')',
@@ -575,9 +576,11 @@ class GoogleDriveBackupService {
         ownerSub: backupPayload.manifest.backupOwner.sub,
         schemaVersion: String(backupPayload.manifest.schemaVersion),
         createdAt: backupPayload.manifest.createdAt,
-        totalAccounts: String(backupPayload.manifest.recordCounts.accounts),
-        totalJournals: String(backupPayload.manifest.recordCounts.journals || 0),
+        totalAccounts: String(recordCounts.accounts || 0),
+        totalJournals: String(recordCounts.journals || 0),
         hasMoneyManager: String(Boolean(backupPayload.manifest.hasMoneyManager)),
+        mmAccounts: String(recordCounts.mmAccounts || 0),
+        mmTransactions: String(recordCounts.mmTransactions || 0),
       },
     };
 
@@ -1254,13 +1257,20 @@ async function orchestrateCloudBackup({
     }
 
     if (typeof alertFn === 'function') {
-      alertFn(
-        'ব্যাকআপ সফল!',
+      const recordCounts = (payload && payload.manifest && payload.manifest.recordCounts) || {};
+      let alertMsg =
         'আপনার সম্পূর্ণ খাতার ব্যাকআপ সফলভাবে গুগল ড্রাইভে সংরক্ষিত ও যাচাইকৃত হয়েছে。\n\n' +
-        'মোট হিসাব: ' + toBengaliNumber(payload.manifest.recordCounts.accounts) + ' টি\n' +
-        'মোট লেনদেন: ' + toBengaliNumber(payload.manifest.recordCounts.journals) + ' টি\n' +
-        'ক্যাশবক্স এন্ট্রি: ' + toBengaliNumber(payload.manifest.recordCounts.cashEntries) + ' টি'
-      );
+        'মোট হিসাব: ' + toBengaliNumber(recordCounts.accounts || 0) + ' টি\n' +
+        'মোট লেনদেন: ' + toBengaliNumber(recordCounts.journals || 0) + ' টি\n' +
+        'ক্যাশবক্স এন্ট্রি: ' + toBengaliNumber(recordCounts.cashEntries || 0) + ' টি';
+
+      if (payload.manifest && payload.manifest.hasMoneyManager) {
+        alertMsg +=
+          '\nব্যক্তিগত হিসাব: ' + toBengaliNumber(recordCounts.mmAccounts || 0) + ' টি\n' +
+          'ব্যক্তিগত লেনদেন: ' + toBengaliNumber(recordCounts.mmTransactions || 0) + ' টি';
+      }
+
+      alertFn('ব্যাকআপ সফল!', alertMsg);
     }
 
     return {

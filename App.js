@@ -78,6 +78,7 @@ const {
 // 1. AUTHENTIC TALLYKHATA BRAND IDENTITY & CONSTANTS
 // =========================================================================
 const STORAGE_KEY = 'tallykhata_offline_store_v6';
+const MM_STORAGE_KEY = moneyManagerService.MM_STORAGE_KEY || '@tallykhata_personal_money_manager_v2';
 
 const COLORS = {
   primary: '#B81414',        // Authentic TallyKhata Crimson Red
@@ -1091,7 +1092,6 @@ function TallyKhataApp() {
     (transaction) => transaction.id === mmEditTxnId && moneyManagerService.isGoalAllocationTransaction(transaction)
   );
 
-  const MM_STORAGE_KEY = moneyManagerService.MM_STORAGE_KEY || "@tallykhata_personal_money_manager_v2";
   useEffect(() => {
     (async () => {
       try {
@@ -3014,7 +3014,23 @@ function TallyKhataApp() {
       if (persisted) {
         const parsed = JSON.parse(persisted);
         if (parsed && typeof parsed === 'object') {
-          latestMM = parsed;
+          const countRecords = (st) => {
+            if (!st || typeof st !== 'object') return 0;
+            const t = Array.isArray(st.transactions) ? st.transactions.length : 0;
+            const a = Array.isArray(st.accounts) ? st.accounts.length : 0;
+            const g = Array.isArray(st.goals) ? st.goals.length : 0;
+            const r = Array.isArray(st.recurring) ? st.recurring.length : 0;
+            return t * 10 + a * 2 + g + r;
+          };
+          const inMemScore = countRecords(moneyManagerState);
+          const persistedScore = countRecords(parsed);
+          if (persistedScore > inMemScore) {
+            latestMM = parsed;
+          } else if (inMemScore > 0) {
+            latestMM = moneyManagerState;
+          } else if (persistedScore > 0) {
+            latestMM = parsed;
+          }
         }
       }
     } catch (e) {
@@ -3237,6 +3253,27 @@ function TallyKhataApp() {
       : 'আজ';
     const accCount = toBengaliNumber(meta.manifest?.recordCounts?.accounts || meta.appProperties?.totalAccounts || 0);
     const jrnCount = toBengaliNumber(meta.manifest?.recordCounts?.journals || meta.appProperties?.totalJournals || 0);
+    const mmAccCount = toBengaliNumber(
+      meta.manifest?.recordCounts?.mmAccounts ??
+      meta.manifest?.moneyManagerSummary?.accountsCount ??
+      meta.appProperties?.totalMMAccounts ??
+      meta.appProperties?.mmAccounts ?? 0
+    );
+    const mmTxnCount = toBengaliNumber(
+      meta.manifest?.recordCounts?.mmTransactions ??
+      meta.manifest?.moneyManagerSummary?.txnsCount ??
+      meta.appProperties?.totalMMTransactions ??
+      meta.appProperties?.mmTransactions ?? 0
+    );
+    const hasMM = Boolean(
+      meta.manifest?.hasMoneyManager ||
+      meta.manifest?.moneyManagerSummary ||
+      meta.appProperties?.hasMoneyManager === 'true' ||
+      (meta.manifest?.recordCounts && meta.manifest.recordCounts.mmAccounts !== undefined)
+    );
+    const mmSummaryText = hasMM
+      ? `${tStatic("\n• আয়-ব্যয় একাউন্ট: ")}${mmAccCount}${tStatic(" টি\n• আয়-ব্যয় লেনদেন: ")}${mmTxnCount}${tStatic(" টি")}`
+      : '';
 
     const domainLabels = {
       all: tStatic("সব ডেটা"),
@@ -3248,7 +3285,7 @@ function TallyKhataApp() {
 
     Alert.alert(
       tStatic("অনলাইন ব্যাকআপ রিস্টোর"),
-      `${tStatic("গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে।\n\n• রিস্টোরের ক্ষেত্র: ")}${domainText}${tStatic("\n• ব্যাকআপের তারিখ: ")}${backupDate}${tStatic("\n• মোট হিসাব: ")}${accCount}${tStatic(" টি\n• মোট লেনদেন: ")}${jrnCount}${tStatic(" টি\n\nআপনি কি নিশ্চিত রিস্টোর করতে চান?")}`,
+      `${tStatic("গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে।\n\n• রিস্টোরের ক্ষেত্র: ")}${domainText}${tStatic("\n• ব্যাকআপের তারিখ: ")}${backupDate}${tStatic("\n• মোট হিসাব: ")}${accCount}${tStatic(" টি\n• মোট লেনদেন: ")}${jrnCount}${tStatic(" টি")}${mmSummaryText}${tStatic("\n\nআপনি কি নিশ্চিত রিস্টোর করতে চান?")}`,
       [
         { text: tStatic("বাতিল"), style: 'cancel' },
         { text: tStatic("হ্যাঁ, রিস্টোর করুন"), onPress: () => executeCloudRestore(chosenDomains) },
@@ -3445,7 +3482,25 @@ function TallyKhataApp() {
       }
 
       if (shouldRestoreMM && commitRes.restoredMoneyManager) {
-        setMoneyManagerState(commitRes.restoredMoneyManager);
+        let processedMM = commitRes.restoredMoneyManager;
+        try {
+          if (moneyManagerService && typeof moneyManagerService.processRecurringTransactions === 'function') {
+            processedMM = moneyManagerService.processRecurringTransactions(commitRes.restoredMoneyManager, getTodayDate());
+          }
+        } catch (_) {}
+        setMoneyManagerState(processedMM);
+        try {
+          await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(processedMM));
+        } catch (_) {}
+        if (processedMM.preferences && processedMM.preferences.defaultPeriod) {
+          setMmPeriod(processedMM.preferences.defaultPeriod);
+        }
+        if (processedMM.preferences && processedMM.preferences.customRange) {
+          setMmCustomRange(processedMM.preferences.customRange);
+        }
+        if (processedMM.preferences && processedMM.preferences.sortOrder) {
+          setMmSortOrder(processedMM.preferences.sortOrder);
+        }
       }
       if (shouldRestorePrefs && commitRes.restoredPreferences) {
         if (commitRes.restoredPreferences.theme) setAppTheme(commitRes.restoredPreferences.theme);
@@ -7348,26 +7403,44 @@ function TallyKhataApp() {
                       </View>
 
                       {cloudBackupMetadata.manifest && cloudBackupMetadata.manifest.recordCounts && (
-                        <View style={styles.cloudStatsGrid}>
-                          <View style={styles.cloudStatBox}>
-                            <Text style={styles.cloudStatNumber}>
-                              {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.accounts || 0)}
-                            </Text>
-                            <Text style={styles.cloudStatLabel}>{tStatic("মোট হিসাব")}</Text>
+                        <>
+                          <View style={styles.cloudStatsGrid}>
+                            <View style={styles.cloudStatBox}>
+                              <Text style={styles.cloudStatNumber}>
+                                {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.accounts || 0)}
+                              </Text>
+                              <Text style={styles.cloudStatLabel}>{tStatic("মোট হিসাব")}</Text>
+                            </View>
+                            <View style={styles.cloudStatBox}>
+                              <Text style={styles.cloudStatNumber}>
+                                {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.journals || 0)}
+                              </Text>
+                              <Text style={styles.cloudStatLabel}>{tStatic("লেনদেন")}</Text>
+                            </View>
+                            <View style={styles.cloudStatBox}>
+                              <Text style={styles.cloudStatNumber}>
+                                {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.cashEntries || 0)}
+                              </Text>
+                              <Text style={styles.cloudStatLabel}>{tStatic("ক্যাশবক্স")}</Text>
+                            </View>
                           </View>
-                          <View style={styles.cloudStatBox}>
-                            <Text style={styles.cloudStatNumber}>
-                              {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.journals || 0)}
-                            </Text>
-                            <Text style={styles.cloudStatLabel}>{tStatic("লেনদেন")}</Text>
-                          </View>
-                          <View style={styles.cloudStatBox}>
-                            <Text style={styles.cloudStatNumber}>
-                              {toBengaliNumber(cloudBackupMetadata.manifest.recordCounts.cashEntries || 0)}
-                            </Text>
-                            <Text style={styles.cloudStatLabel}>{tStatic("ক্যাশবক্স")}</Text>
-                          </View>
-                        </View>
+                          {(cloudBackupMetadata.manifest.moneyManagerSummary || cloudBackupMetadata.manifest.recordCounts.mmAccounts !== undefined || cloudBackupMetadata.manifest.hasMoneyManager) && (
+                            <View style={[styles.cloudStatsGrid, { marginTop: 8 }]}>
+                              <View style={[styles.cloudStatBox, { backgroundColor: '#F0FDF4', borderColor: '#DCFCE7' }]}>
+                                <Text style={[styles.cloudStatNumber, { color: '#166534' }]}>
+                                  {toBengaliNumber(cloudBackupMetadata.manifest.moneyManagerSummary?.accountsCount ?? cloudBackupMetadata.manifest.recordCounts.mmAccounts ?? 0)}
+                                </Text>
+                                <Text style={[styles.cloudStatLabel, { color: '#15803D' }]}>{tStatic("আয়-ব্যয় একাউন্ট")}</Text>
+                              </View>
+                              <View style={[styles.cloudStatBox, { backgroundColor: '#F0FDF4', borderColor: '#DCFCE7' }]}>
+                                <Text style={[styles.cloudStatNumber, { color: '#166534' }]}>
+                                  {toBengaliNumber(cloudBackupMetadata.manifest.moneyManagerSummary?.txnsCount ?? cloudBackupMetadata.manifest.recordCounts.mmTransactions ?? 0)}
+                                </Text>
+                                <Text style={[styles.cloudStatLabel, { color: '#15803D' }]}>{tStatic("আয়-ব্যয় লেনদেন")}</Text>
+                              </View>
+                            </View>
+                          )}
+                        </>
                       )}
                     </View>
                   )}
