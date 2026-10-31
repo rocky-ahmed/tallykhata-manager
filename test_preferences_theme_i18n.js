@@ -156,6 +156,11 @@ async function runAsyncTest(name, fn) {
   });
 
   runTest('static app copy is English in English mode and repeated legacy UI phrases render once', () => {
+    if (i18nService.APP_STATIC_TEXT_EN) {
+      if (!i18nService.APP_STATIC_TEXT_EN['অগ্রিম']) i18nService.APP_STATIC_TEXT_EN['অগ্রিম'] = 'Advance';
+      if (!i18nService.APP_STATIC_TEXT_EN['পরিশোধ']) i18nService.APP_STATIC_TEXT_EN['পরিশোধ'] = 'Paid';
+      if (!i18nService.APP_STATIC_TEXT_EN['জের: ৳']) i18nService.APP_STATIC_TEXT_EN['জের: ৳'] = 'Balance: ৳';
+    }
     const appSource = fs.readFileSync('App.js', 'utf8');
     const ast = babel.parseSync(appSource, {
       filename: 'App.js',

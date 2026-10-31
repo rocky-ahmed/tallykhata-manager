@@ -367,7 +367,7 @@ async function runAsyncTest(name, fn) {
         type: i % 3 === 0 ? "income" : "expense",
         amount: 250 + (i % 500),
         categoryId: `cat_${(i % 5) + 1}`,
-        date: "2026-10-15",
+        date: mmService.getLocalDateString ? mmService.getLocalDateString() : "2026-11-01",
         time: "10:00 AM",
       });
     }

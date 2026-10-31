@@ -1,0 +1,11 @@
+const fs = require('fs');
+const lines = fs.readFileSync('App.js', 'utf8').split('\n');
+const editAccIdx = lines.findIndex(l => l.includes('<Modal visible={modalEditAccount}'));
+console.log('modalEditAccount starts at line:', editAccIdx + 1);
+const addAccIdx = lines.findIndex(l => l.includes('<Modal visible={modalAddAccount}'));
+console.log('modalAddAccount starts at line:', addAccIdx + 1);
+const cashIdx = lines.findIndex(l => l.includes('<Modal visible={modalAddCash}'));
+console.log('modalAddCash starts at line:', cashIdx + 1);
+console.log(lines.slice(editAccIdx, editAccIdx + 12).join('\n'));
+console.log('---');
+console.log(lines.slice(addAccIdx, addAccIdx + 15).join('\n'));

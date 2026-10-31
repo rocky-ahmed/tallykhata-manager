@@ -504,7 +504,7 @@ runTest("mmService savings goals allow adding, contributing (with balance debit)
 
 // TEST 27: filterAndSortTransactions multi-criteria testing
 runTest("mmService.filterAndSortTransactions filters by period, type, query, and sorts correctly", () => {
-  const dToday = new Date().toISOString().split("T")[0];
+  const dToday = mmService.getLocalDateString ? mmService.getLocalDateString() : mmService.normalizeToLocalDate(new Date());
   const state = {
     transactions: [
       { id: "t1", type: "expense", amount: 500, date: dToday, note: "Lunch with team", payee: "Cafe", categoryId: "cat_food" },
