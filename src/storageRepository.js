@@ -51,21 +51,60 @@ const DEFAULT_BUSINESSES = [
   { id: '3', name: 'সোনালী ফ্যাশন ও বস্ত্রালয়', owner: 'আহমেদ উল্লাহ', phone: '01911334455', address: 'নিউ মার্কেট, ঢাকা', isSelected: false, isArchived: false, createdAt: '2026-10-15T00:00:00.000Z' },
 ];
 
+
+// 1:1 Mapping between legacy default seed names and modern Bengali sample customer names
+const SAMPLE_CUSTOMER_MAPPINGS = {
+  '1': { legacy: 'Raihan ★ khoksha', modern: 'নমুনা গ্রাহক ০১' },
+  '2': { legacy: 'Faysal ★★', modern: 'নমুনা গ্রাহক ০২' },
+  '3': { legacy: 'Abd. Samad ★ Jv', modern: 'নমুনা গ্রাহক ০৩' },
+  '4': { legacy: 'Tanvir ★ Al Baraka', modern: 'নমুনা গ্রাহক ০৪' },
+  '5': { legacy: 'Jwel Vai Gk', modern: 'নমুনা গ্রাহক ০৫' },
+  '6': { legacy: 'Shamim Telecom', modern: 'নমুনা গ্রাহক ০৬' },
+  '7': { legacy: 'Kabir Hardware', modern: 'নমুনা গ্রাহক ০৭' },
+  '8': { legacy: 'Babul Enterprise', modern: 'নমুনা গ্রাহক ০৮' },
+  '9': { legacy: 'Rubel Electronics', modern: 'নমুনা গ্রাহক ০৯' },
+  '10': { legacy: 'Shuvo Mobile Store', modern: 'নমুনা গ্রাহক ১০' },
+  '11': { legacy: 'Ripon Telecom', modern: 'নমুনা গ্রাহক ১১' },
+  '12': { legacy: 'Monir Store', modern: 'নমুনা গ্রাহক ১২' },
+};
+
+/**
+ * Idempotently updates legacy default sample customer names under IDs '1'..'12'
+ * to modern Bengali sample names without ever mutating user-created or user-renamed customers.
+ */
+function migrateLegacySampleCustomerNames(accounts) {
+  if (!Array.isArray(accounts)) return { accounts, changed: false };
+  let changed = false;
+  const updatedAccounts = accounts.map((acc) => {
+    if (!acc || typeof acc !== 'object') return acc;
+    const mapping = SAMPLE_CUSTOMER_MAPPINGS[String(acc.id)];
+    if (mapping && typeof acc.name === 'string' && acc.name.trim() === mapping.legacy) {
+      changed = true;
+      return {
+        ...acc,
+        name: mapping.modern,
+      };
+    }
+    return acc;
+  });
+  return { accounts: updatedAccounts, changed };
+}
+
 function createDefaultState() {
   return {
     accounts: [
-      { id: '1', name: 'Raihan ★ khoksha', phone: '01711223344', type: 1, openingBalance: 3800, balance: 7000, address: 'খোকসা বাজার', createDate: '2026-10-15', timeAgo: '৩ মাস' },
-      { id: '2', name: 'Faysal ★★', phone: '01812345678', type: 1, openingBalance: 8550, balance: 10000, address: 'পশ্চিম পাড়া', createDate: '2026-10-15', timeAgo: '৩ মাস' },
-      { id: '3', name: 'Abd. Samad ★ Jv', phone: '01911998877', type: 1, openingBalance: 3000, balance: 8000, address: 'জেভি মোড়', createDate: '2026-10-15', timeAgo: '৩ মাস' },
-      { id: '4', name: 'Tanvir ★ Al Baraka', phone: '01622334455', type: 1, openingBalance: 0, balance: 0, address: 'আল বারাকা মার্কেট', createDate: '2026-10-15', timeAgo: '৪ মাস' },
-      { id: '5', name: 'Jwel Vai Gk', phone: '01733445566', type: 1, openingBalance: 500, balance: 500, address: 'জিকে কলোনি', createDate: '2026-10-15', timeAgo: '৫ মাস' },
-      { id: '6', name: 'Shamim Telecom', phone: '01744556677', type: 1, openingBalance: 12000, balance: 12000, address: 'স্টেশন রোড', createDate: '2026-10-15', timeAgo: '৬ মাস' },
-      { id: '7', name: 'Kabir Hardware', phone: '01755667788', type: 1, openingBalance: 15000, balance: 15000, address: 'মেইন রোড', createDate: '2026-10-15', timeAgo: '২ মাস' },
-      { id: '8', name: 'Babul Enterprise', phone: '01766778899', type: 1, openingBalance: 18000, balance: 18000, address: 'চকবাজার', createDate: '2026-10-15', timeAgo: '১ মাস' },
-      { id: '9', name: 'Rubel Electronics', phone: '01777889900', type: 1, openingBalance: 14000, balance: 14000, address: 'নিউ মার্কেট', createDate: '2026-10-15', timeAgo: '৩ মাস' },
-      { id: '10', name: 'Shuvo Mobile Store', phone: '01788990011', type: 1, openingBalance: 9000, balance: 9000, address: 'কলেজ গেট', createDate: '2026-10-15', timeAgo: '৪ মাস' },
-      { id: '11', name: 'Ripon Telecom', phone: '01799001122', type: 1, openingBalance: 7000, balance: 7000, address: 'থানা মোড়', createDate: '2026-10-15', timeAgo: '৫ মাস' },
-      { id: '12', name: 'Monir Store', phone: '01712341234', type: 1, openingBalance: 8000, balance: 8000, address: 'হাসপাতাল রোড', createDate: '2026-10-15', timeAgo: '২ মাস' },
+      { id: '1', name: 'নমুনা গ্রাহক ০১', phone: '01711223344', type: 1, openingBalance: 3800, balance: 7000, address: 'খোকসা বাজার', createDate: '2026-10-15', timeAgo: '৩ মাস' },
+      { id: '2', name: 'নমুনা গ্রাহক ০২', phone: '01812345678', type: 1, openingBalance: 8550, balance: 10000, address: 'পশ্চিম পাড়া', createDate: '2026-10-15', timeAgo: '৩ মাস' },
+      { id: '3', name: 'নমুনা গ্রাহক ০৩', phone: '01911998877', type: 1, openingBalance: 3000, balance: 8000, address: 'জেভি মোড়', createDate: '2026-10-15', timeAgo: '৩ মাস' },
+      { id: '4', name: 'নমুনা গ্রাহক ০৪', phone: '01622334455', type: 1, openingBalance: 0, balance: 0, address: 'আল বারাকা মার্কেট', createDate: '2026-10-15', timeAgo: '৪ মাস' },
+      { id: '5', name: 'নমুনা গ্রাহক ০৫', phone: '01733445566', type: 1, openingBalance: 500, balance: 500, address: 'জিকে কলোনি', createDate: '2026-10-15', timeAgo: '৫ মাস' },
+      { id: '6', name: 'নমুনা গ্রাহক ০৬', phone: '01744556677', type: 1, openingBalance: 12000, balance: 12000, address: 'স্টেশন রোড', createDate: '2026-10-15', timeAgo: '৬ মাস' },
+      { id: '7', name: 'নমুনা গ্রাহক ০৭', phone: '01755667788', type: 1, openingBalance: 15000, balance: 15000, address: 'মেইন রোড', createDate: '2026-10-15', timeAgo: '২ মাস' },
+      { id: '8', name: 'নমুনা গ্রাহক ০৮', phone: '01766778899', type: 1, openingBalance: 18000, balance: 18000, address: 'চকবাজার', createDate: '2026-10-15', timeAgo: '১ মাস' },
+      { id: '9', name: 'নমুনা গ্রাহক ০৯', phone: '01777889900', type: 1, openingBalance: 14000, balance: 14000, address: 'নিউ মার্কেট', createDate: '2026-10-15', timeAgo: '৩ মাস' },
+      { id: '10', name: 'নমুনা গ্রাহক ১০', phone: '01788990011', type: 1, openingBalance: 9000, balance: 9000, address: 'কলেজ গেট', createDate: '2026-10-15', timeAgo: '৪ মাস' },
+      { id: '11', name: 'নমুনা গ্রাহক ১১', phone: '01799001122', type: 1, openingBalance: 7000, balance: 7000, address: 'থানা মোড়', createDate: '2026-10-15', timeAgo: '৫ মাস' },
+      { id: '12', name: 'নমুনা গ্রাহক ১২', phone: '01712341234', type: 1, openingBalance: 8000, balance: 8000, address: 'হাসপাতাল রোড', createDate: '2026-10-15', timeAgo: '২ মাস' },
     ],
     journals: [
       { id: '1', accountId: '1', type: 'given', amount: 3200, desc: 'বাকিতে চাল ও ডাল বিক্রয়', date: '2026-10-15', time: '10:30 AM', runningBalance: 7000 },
@@ -138,16 +177,43 @@ class StorageRepository {
     }
   }
 
-  resetStore() {
-    const prevQueue = this.writeQueue;
-    this.currentStore = null;
-    this.writeQueue = Promise.resolve();
-    if (prevQueue) {
-      return Promise.resolve(prevQueue).catch(() => {}).then(() => {
-        this.currentStore = null;
-      });
+  /**
+   * Safe, idempotent load of the store ensuring legacy default customer names are updated.
+   */
+  async loadStore() {
+    const res = await this.loadInitialData();
+    if (res && res.success && res.data && Array.isArray(res.data.accounts)) {
+      const sampleCheck = migrateLegacySampleCustomerNames(res.data.accounts);
+      if (sampleCheck.changed) {
+        res.data.accounts = sampleCheck.accounts;
+        if (this.currentStore) {
+          this.currentStore.accounts = sampleCheck.accounts;
+        }
+        if (this.adapter && typeof this.adapter.setItem === 'function') {
+          try {
+            await this.adapter.setItem(V6_KEY, JSON.stringify(res.data));
+          } catch (_) {}
+        }
+      }
     }
-    return Promise.resolve(true);
+    return res;
+  }
+  async resetStore() {
+    if (this.writeQueue) {
+      try {
+        await Promise.resolve(this.writeQueue).catch(() => {});
+      } catch (_) {}
+    }
+    this.currentStore = null;
+    this._cachedMoneyManager = null;
+    if (typeof moneyManagerService !== 'undefined' && moneyManagerService && typeof moneyManagerService.resetCache === 'function') {
+      try { moneyManagerService.resetCache(); } catch (_) {}
+    }
+    if (typeof preferencesService !== 'undefined' && preferencesService && typeof preferencesService.resetCache === 'function') {
+      try { preferencesService.resetCache(); } catch (_) {}
+    }
+    this.writeQueue = Promise.resolve();
+    return true;
   }
 
   getAuthoritativeState() {
@@ -168,6 +234,14 @@ class StorageRepository {
       }
       if (v6DataStr) {
         const parsed = JSON.parse(v6DataStr);
+        let storeNeedsSave = false;
+        if (Array.isArray(parsed.accounts)) {
+          const sampleCheck = migrateLegacySampleCustomerNames(parsed.accounts);
+          if (sampleCheck.changed) {
+            parsed.accounts = sampleCheck.accounts;
+            storeNeedsSave = true;
+          }
+        }
         if (Array.isArray(parsed.inventory) && !Array.isArray(parsed.stock)) {
           parsed.stock = parsed.inventory;
         } else if (Array.isArray(parsed.stock) && !Array.isArray(parsed.inventory)) {
@@ -186,6 +260,13 @@ class StorageRepository {
           parsed.businesses = DEFAULT_BUSINESSES;
           parsed.activeBusinessId = '1';
         }
+        if (storeNeedsSave) {
+          try {
+            await this.adapter.setItem(V6_KEY, JSON.stringify(parsed));
+          } catch (e) {
+            console.warn('Failed to persist migrated sample customer names:', e);
+          }
+        }
         this.currentStore = parsed;
         return { success: true, data: parsed, source: 'v6' };
       }
@@ -196,6 +277,12 @@ class StorageRepository {
         const migResult = migrateV5toV6(v5DataStr);
         if (migResult.success && migResult.data) {
           const migratedData = migResult.data;
+          if (Array.isArray(migratedData.accounts)) {
+            const sampleCheck = migrateLegacySampleCustomerNames(migratedData.accounts);
+            if (sampleCheck.changed) {
+              migratedData.accounts = sampleCheck.accounts;
+            }
+          }
           // Retain unmutated v5 backup
           await this.adapter.setItem(V5_BACKUP_KEY, v5DataStr);
           // Save migrated v6 data
@@ -951,10 +1038,13 @@ class StorageRepository {
       } catch (_) {}
     }
 
-    if (backupPayload.checksum) {
+    const expectedChecksum = (backupPayload && backupPayload.checksum) ||
+                             (backupPayload && backupPayload.manifest && backupPayload.manifest.checksum) ||
+                             null;
+    if (expectedChecksum) {
       const dataToVerify = backupPayload.data || backupPayload;
-      const expectedChecksum = backupPayload.checksum;
-      const computed = this.computeChecksum(dataToVerify);
+      const isLegacyChk = String(expectedChecksum).startsWith('chk_');
+      const computed = isLegacyChk ? this.computeLegacyChecksum(dataToVerify) : this.computeChecksum(dataToVerify);
       if (computed !== expectedChecksum) {
         throw new Error('Backup integrity checksum mismatch: data may be corrupted or tampered');
       }
@@ -1002,7 +1092,7 @@ class StorageRepository {
       const hasValidAccounts = mmPayload &&
         typeof mmPayload === 'object' &&
         Array.isArray(mmPayload.accounts) &&
-        mmPayload.accounts.length > 0;
+        (mmPayload.accounts.length > 0 || (manifest && manifest.hasMoneyManager === true) || (mmPayload.version >= 3));
 
       if (hasValidAccounts) {
         const defaultMMState = moneyManagerService ? moneyManagerService.getDefaultState() : {};
@@ -1176,17 +1266,9 @@ class StorageRepository {
       },
     };
   }
-  computeChecksum(dataObj) {
+  computeLegacyChecksum(dataObj) {
     if (!dataObj) return '';
     const str = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj);
-    try {
-      if (typeof require !== 'undefined') {
-        const crypto = require('crypto');
-        if (crypto && crypto.createHash) {
-          return 'sha256_' + crypto.createHash('sha256').update(str, 'utf8').digest('hex');
-        }
-      }
-    } catch (_) {}
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
@@ -1194,6 +1276,22 @@ class StorageRepository {
       hash |= 0;
     }
     return 'chk_' + Math.abs(hash).toString(16) + '_' + str.length;
+  }
+
+  computeChecksum(dataObj) {
+    if (!dataObj) return '';
+    const str = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj);
+    try {
+      if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+        const nodeReq = typeof require === 'function' ? require : null;
+        const cryptoModName = ['cry', 'pto'].join('');
+        const crypto = nodeReq ? nodeReq(cryptoModName) : null;
+        if (crypto && typeof crypto.createHash === 'function') {
+          return 'sha256_' + crypto.createHash('sha256').update(str, 'utf8').digest('hex');
+        }
+      }
+    } catch (_) {}
+    return this.computeLegacyChecksum(dataObj);
   }
 
   notifyRestoreHooks(restoredState = {}) {
@@ -1266,13 +1364,21 @@ class StorageRepository {
     if (backupPayload.checksum) {
       const dataToVerify = backupPayload.data || backupPayload;
       const expectedChecksum = backupPayload.checksum;
-      const computed = this.computeChecksum(dataToVerify);
+      const isLegacyChk = String(expectedChecksum).startsWith('chk_');
+      const computed = isLegacyChk ? this.computeLegacyChecksum(dataToVerify) : this.computeChecksum(dataToVerify);
       if (computed !== expectedChecksum) {
         throw new Error('Backup integrity checksum mismatch: data may be corrupted or tampered');
       }
     }
 
     this.currentStore = null;
+    this._cachedMoneyManager = null;
+    if (typeof moneyManagerService !== 'undefined' && moneyManagerService && typeof moneyManagerService.resetCache === 'function') {
+      try { moneyManagerService.resetCache(); } catch (_) {}
+    }
+    if (typeof preferencesService !== 'undefined' && preferencesService && typeof preferencesService.resetCache === 'function') {
+      try { preferencesService.resetCache(); } catch (_) {}
+    }
     const res = await this.commitRestorePayload(backupPayload, options);
 
     this.notifyRestoreHooks({
@@ -1284,18 +1390,100 @@ class StorageRepository {
   }
 
   async importAllData(backupPayload, options = {}) {
+    if (this.writeQueue) {
+      try {
+        await Promise.resolve(this.writeQueue).catch(() => {});
+      } catch (_) {}
+    }
     return this.restoreStorageBackup(backupPayload, options);
   }
 
+  /**
+   * Chains a Money Manager state write onto this.writeQueue mutex,
+   * guaranteeing that subsequent getFullBackupState/commitRestorePayload calls
+   * await the finished disk mutation.
+   */
+  async saveMoneyManager(mmState) {
+    if (!mmState || typeof mmState !== 'object') {
+      return { success: false, error: new Error('Valid Money Manager state object is required') };
+    }
+
+    this._pendingWrites++;
+    return new Promise((resolve) => {
+      this.writeQueue = this.writeQueue
+        .then(async () => {
+          try {
+            if (this.adapter && typeof this.adapter.setItem === 'function') {
+              await this.adapter.setItem(MM_STORAGE_KEY, JSON.stringify(mmState));
+            }
+            this._cachedMoneyManager = mmState;
+            this.notifyRestoreHooks({ moneyManager: mmState });
+            resolve({ success: true, moneyManager: mmState });
+          } catch (err) {
+            console.error('saveMoneyManager write error:', err);
+            resolve({ success: false, error: err });
+          } finally {
+            this._pendingWrites--;
+            if (this._pendingWrites === 0) {
+              this.writeQueue = Promise.resolve();
+            }
+          }
+        })
+        .catch((fatalErr) => {
+          this._pendingWrites--;
+          if (this._pendingWrites === 0) {
+            this.writeQueue = Promise.resolve();
+          }
+          console.error('writeQueue recovered from error during saveMoneyManager:', fatalErr);
+          resolve({ success: false, error: fatalErr });
+        });
+    });
+  }
+
+  /**
+   * Retrieves authoritative Money Manager state after awaiting any in-flight writeQueue promises.
+   */
+  async getAuthoritativeMoneyManager() {
+    if (this.writeQueue) {
+      try {
+        await Promise.resolve(this.writeQueue).catch(() => {});
+      } catch (_) {}
+    }
+    if (this._cachedMoneyManager) {
+      return this._cachedMoneyManager;
+    }
+    if (this.adapter && typeof this.adapter.getItem === 'function') {
+      try {
+        const raw = await this.adapter.getItem(MM_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          this._cachedMoneyManager = parsed;
+          return parsed;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
 }
 
 // Singleton repository instance for production and test suites
 const defaultRepository = new StorageRepository();
 
+const loadStore = async (repo = defaultRepository) => {
+  if (repo && typeof repo.loadStore === 'function') {
+    return repo.loadStore();
+  }
+  return defaultRepository.loadStore();
+};
+
+
 const repoExport = {
   StorageRepository,
   storageRepository: defaultRepository,
   createDefaultState,
+  SAMPLE_CUSTOMER_MAPPINGS,
+  migrateLegacySampleCustomerNames,
+  loadStore,
   VALID_COLLECTIONS,
   default: defaultRepository,
 };
@@ -1307,6 +1495,9 @@ if (typeof exports !== 'undefined') {
   exports.StorageRepository = StorageRepository;
   exports.storageRepository = defaultRepository;
   exports.createDefaultState = createDefaultState;
+  exports.SAMPLE_CUSTOMER_MAPPINGS = SAMPLE_CUSTOMER_MAPPINGS;
+  exports.migrateLegacySampleCustomerNames = migrateLegacySampleCustomerNames;
+  exports.loadStore = loadStore;
   exports.VALID_COLLECTIONS = VALID_COLLECTIONS;
   exports.default = defaultRepository;
 }

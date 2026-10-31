@@ -134,12 +134,21 @@ const LIGHT_ICON_THEMES = {
     borderSides: '#F3E8FF',
     tint: '#7C3AED',
   },
+  teal: {
+    bg: '#F0FDFA',
+    borderTop: '#FFFFFF',
+    borderBottom: '#99F6E4',
+    borderSides: '#CCFBF1',
+    tint: '#0D9488',
+    shadowColor: '#0D9488',
+  },
   neutral: {
     bg: '#F8FAFC',
     borderTop: '#FFFFFF',
     borderBottom: '#E2E8F0',
     borderSides: '#EDF2F7',
     tint: '#4B5563',
+    shadowColor: '#64748B',
   },
   secondary: {
     bg: "#EEF2FF",
@@ -207,12 +216,21 @@ const DARK_ICON_THEMES = {
     borderSides: '#4C1D95',
     tint: '#C084FC',
   },
+  teal: {
+    bg: '#042F2E',
+    borderTop: '#115E59',
+    borderBottom: '#021B1A',
+    borderSides: '#0F766E',
+    tint: '#2DD4BF',
+    shadowColor: '#000000',
+  },
   neutral: {
     bg: '#1E293B',
     borderTop: '#334155',
     borderBottom: '#0F172A',
     borderSides: '#293548',
     tint: '#CBD5E1',
+    shadowColor: '#000000',
   },
   white: {
     bg: 'rgba(255, 255, 255, 0.15)',
@@ -449,7 +467,51 @@ function getThemedStyles(theme, isDark) {
     mmProgressBarBg: { backgroundColor: dark ? '#334155' : '#E2E8F0' },
     mmEmptyBox: { backgroundColor: dark ? '#1E293B' : '#FFFFFF', borderColor: dark ? '#334155' : '#E2E8F0' },
     mmEmptyText: { color: dark ? '#94A3B8' : '#64748B' },
-    mmToggleLabel: { color: dark ? '#F8FAFC' : '#0F172A' },
+        mmToggleLabel: { color: dark ? '#F8FAFC' : '#0F172A' },
+    // Theme & Language settings section tokens
+    themeOptionCard: {
+      backgroundColor: dark ? t.cardBgElevated : '#F8FAFC',
+      borderColor: dark ? t.cardBorder : '#E2E8F0',
+    },
+    themeOptionCardActive: {
+      borderColor: dark ? t.primary : '#B81414',
+      backgroundColor: dark ? '#2B1212' : '#FEF2F2',
+    },
+    themeOptionTitle: { color: t.textPrimary },
+    themeOptionSub: { color: t.textSecondary },
+    themePreviewBox: {
+      backgroundColor: t.cardBg,
+      borderColor: t.cardBorder,
+    },
+    themePreviewSectionLabel: { color: t.textSecondary },
+    themePreviewTitle: { color: t.textPrimary },
+    themePreviewSub: { color: t.textSecondary },
+    themePreviewAmount: { color: t.primary },
+    themePreviewAmountLabel: { color: t.textMuted },
+    themeCheckCircle: { backgroundColor: t.primary },
+    themeUncheckCircle: { borderColor: dark ? t.textMuted : '#CBD5E1' },
+    themeModeBadge: {
+      backgroundColor: dark ? t.primaryLight : '#FEE2E2',
+      borderColor: dark ? t.primary : '#FECACA',
+    },
+    themeModeBadgeText: {
+      color: dark ? t.primary : '#B81414',
+    },
+    themeDoneBtn: {
+      backgroundColor: t.primary,
+    },
+    themeDoneBtnText: {
+      color: '#FFFFFF',
+    },
+    bottomSheetCard: {
+      backgroundColor: t.modalSurface,
+      borderColor: t.cardBorder,
+    },
+    bottomSheetHeader: {
+      borderBottomColor: t.divider,
+    },
+    bottomSheetTitle: { color: t.textPrimary },
+    bottomSheetSub: { color: t.textSecondary },
   };
 }
 

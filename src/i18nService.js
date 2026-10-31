@@ -138,7 +138,7 @@ const STRINGS = {
     btn_back: 'ফিরে যান',
 
     // Cashbox
-    cb_title: 'দৈনিক ক্যাশবক্স',
+    cb_title: 'ক্যাশবক্স',
     cb_cash_in_hand: 'হাতে নগদ ক্যাশ',
     cb_today_in: 'আজকের জমা',
     cb_today_out: 'আজকের খরচ',
@@ -202,6 +202,7 @@ const STRINGS = {
     mm_tab_budgets: 'বাজেট',
     mm_tab_goals: 'লক্ষ্য',
     mm_tab_analytics: 'বিশ্লেষণ',
+    mm_tab_transfer: 'ট্রান্সফার',
     mm_net_worth: 'মোট ব্যক্তিগত সম্পদ',
     mm_total_income: 'মোট আয়',
     mm_total_expense: 'মোট ব্যয়',
@@ -265,6 +266,14 @@ const STRINGS = {
     theme_system_sub: 'ডিভাইসের সিস্টেম থিম অনুসরণ করবে',
     lang_system: 'সিস্টেম ভাষা',
     lang_system_sub: 'ফোনের সিস্টেম ভাষা অনুযায়ী পরিবর্তিত হবে',
+    lang_system_full: 'সিস্টেম ভাষা (System Language)',
+    theme_preview_label: 'লাইভ থিম প্রিভিউ',
+    lang_preview_label: 'লাইভ ভাষা প্রিভিউ',
+    theme_preview_card_title: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ',
+    theme_preview_card_sub: 'আজকের মোট হিসাব ও বাকি',
+    theme_preview_button: 'নমুনা অ্যাকশন',
+    theme_preview_active: 'সক্রিয় থিম',
+    btn_done: 'সম্পন্ন',
     mm_add_txn: 'নতুন লেনদেন',
     mm_transfer: 'স্থানান্তর',
     mm_manage_categories: 'ক্যাটাগরি পরিচালনা',
@@ -297,6 +306,9 @@ const STRINGS = {
     mm_account_bank: "ব্যাংক অ্যাকাউন্ট",
     mm_account_mfs: "মোবাইল আর্থিক সেবা",
     mm_account_other: "অন্যান্য অর্থ",
+    mm_account_credit: "ক্রেডিট কার্ড",
+    mm_account_savings: "সঞ্চয়ী হিসাব",
+    mm_transfer_fee_label: "ট্রান্সফার ফি",
     mm_archived: "আর্কাইভকৃত",
     mm_access_transfer: "ফান্ড স্থানান্তর",
     mm_access_activate: "সক্রিয় করুন",
@@ -493,7 +505,7 @@ const STRINGS = {
     mm_access_decrease_end: "শেষের তারিখ ১ দিন কমান",
     mm_access_increase_end: "শেষের তারিখ ১ দিন বাড়ান",
     mm_access_end_today: "শেষের তারিখ আজকের দিন করুন",
-    qa_cashbox: "দৈনিক ক্যাশবক্স",
+    qa_cashbox: "ক্যাশবক্স",
     mm_empty_filtered: "আপনার খোঁজ বা ফিল্টারের সাথে মিলে এমন লেনদেন নেই",
     mm_empty_period: "এই সময়সীমায় কোনো লেনদেন নেই",
     mm_first_txn: "+ প্রথম লেনদেন যোগ করুন",
@@ -736,7 +748,7 @@ const STRINGS = {
     btn_back: 'Back',
 
     // Cashbox
-    cb_title: 'Daily Cashbox',
+    cb_title: 'Cashbox',
     cb_cash_in_hand: 'Cash in Hand',
     cb_today_in: 'Today Cash In',
     cb_today_out: 'Today Cash Out',
@@ -800,6 +812,7 @@ const STRINGS = {
     mm_tab_budgets: 'Budgets',
     mm_tab_goals: 'Goals',
     mm_tab_analytics: 'Analytics',
+    mm_tab_transfer: 'Transfer',
     mm_net_worth: 'Total Net Worth',
     mm_total_income: 'Total Income',
     mm_total_expense: 'Total Expense',
@@ -863,6 +876,14 @@ const STRINGS = {
     theme_system_sub: 'Follow device system appearance',
     lang_system: 'System Language',
     lang_system_sub: 'Follow device system language',
+    lang_system_full: 'সিস্টেম ভাষা (System Language)',
+    theme_preview_label: 'Live Appearance Preview',
+    lang_preview_label: 'Live Language Preview',
+    theme_preview_card_title: 'Bhai Bhai Enterprise',
+    theme_preview_card_sub: "Today's summary & balance",
+    theme_preview_button: 'Sample Action',
+    theme_preview_active: 'Active Theme',
+    btn_done: 'Done',
     mm_add_txn: 'New Transaction',
     mm_transfer: 'Transfer',
     mm_manage_categories: 'Manage Categories',
@@ -895,6 +916,9 @@ const STRINGS = {
     mm_account_bank: "Bank account",
     mm_account_mfs: "Mobile finance (MFS)",
     mm_account_other: "Other funds",
+    mm_account_credit: "Credit card",
+    mm_account_savings: "Savings account",
+    mm_transfer_fee_label: "Transfer fee",
     mm_archived: "Archived",
     mm_access_transfer: "Transfer funds",
     mm_access_activate: "Activate",
@@ -1226,7 +1250,15 @@ const STRINGS = {
 // Original TallyKhata UI copy that predates the keyed translation catalog.
 // This is display-only: it is applied to literal UI text and never to names,
 // notes, payees, or other values loaded from user storage.
+const STATIC_TRANSLATIONS = {
+  "ক্লাউড ভেরিফিকেশন চালাতে প্রথমে আপনার গুগল একাউন্ট যুক্ত করতে হবে।": "To run cloud verification, you must first connect your Google account.",
+  "গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি।": "Google Drive access token not found.",
+  "ভেরিফিকেশন চলছে...": "Verification in progress...",
+  "লাইভ সিনথেটিক ভেরিফিকেশন (Drive E2E)": "Live Synthetic Verification (Drive E2E)",
+  "আসল গুগল ড্রাইভে টেস্ট ফাইল আপলোড, ডাউনলোড ও চেকসাম অডিট যাচাই": "Verify test file upload, download, and checksum audit on real Google Drive",
+};
 const APP_STATIC_TEXT_EN = {
+  ...STATIC_TRANSLATIONS,
   "নির্বাচিত ক্ষেত্র:": "Selected scope:",
   "গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে।\n\n• রিস্টোরের ক্ষেত্র:": "A local safety backup of current data will be created before restoring from Google Drive.\n\n• Restore scope:",
   "গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে। • রিস্টোরের ক্ষেত্র:": "A local safety backup of current data will be created before restoring from Google Drive. • Restore scope:",
@@ -2199,17 +2231,22 @@ function translateMoneyManagerError(message, lang = 'bn') {
 }
 
 function t(key, lang = 'bn', params = {}) {
+  if (key === null || key === undefined) return '';
   const dictionary = STRINGS[lang] || STRINGS.bn;
-  let text = dictionary[key] || STRINGS.bn[key] || key;
+  let text = dictionary[key] ?? STRINGS.bn[key] ?? (typeof key === 'string' ? key : String(key || ''));
+  if (text === null || text === undefined) return '';
   if (params && typeof params === 'object') {
     Object.keys(params).forEach((k) => {
-      text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(params[k]));
+      const val = params[k] !== undefined && params[k] !== null ? String(params[k]) : '';
+      text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), val);
     });
   }
   return text;
 }
 
 module.exports = {
+  STATIC_TRANSLATIONS,
+  APP_STATIC_TEXT_EN,
   STRINGS,
   t,
   translateStaticText,

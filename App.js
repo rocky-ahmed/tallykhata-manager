@@ -397,7 +397,7 @@ const AppIcon = ({
   }
 
   const isCircle = shape === 'circle';
-  const radius = isCircle ? containerSize / 2 : 10;
+  const radius = isCircle ? containerSize / 2 : (shape === 'rounded' ? Math.round(containerSize * 0.28) : 10);
 
   return (
     <View
@@ -409,23 +409,39 @@ const AppIcon = ({
           backgroundColor: theme.bg,
           borderTopWidth: 1.5,
           borderTopColor: theme.borderTop,
-          borderBottomWidth: 2.5,
+          borderBottomWidth: 3,
           borderBottomColor: theme.borderBottom,
           borderLeftWidth: 1,
           borderRightWidth: 1,
           borderColor: theme.borderSides,
           justifyContent: 'center',
           alignItems: 'center',
-          elevation: 2,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.08,
-          shadowRadius: 2,
+          elevation: resolvedMode === 'dark' ? 4 : 3,
+          shadowColor: resolvedMode === 'dark' ? '#000000' : (theme.shadowColor || '#000000'),
+          shadowOffset: { width: 0, height: resolvedMode === 'dark' ? 3 : 2 },
+          shadowOpacity: resolvedMode === 'dark' ? 0.35 : 0.12,
+          shadowRadius: resolvedMode === 'dark' ? 4 : 3.5,
+          overflow: 'hidden',
+          position: 'relative',
         },
         style,
       ]}
       accessibilityLabel={accessibilityLabel}
     >
+      {/* Specular 3D dimensional highlight across the top curved bevel */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: Math.round(containerSize * 0.36),
+          borderTopLeftRadius: radius,
+          borderTopRightRadius: radius,
+          backgroundColor: resolvedMode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.32)',
+        }}
+      />
       <Image
         source={source}
         style={[{ width: size, height: size }, resolvedTint ? { tintColor: resolvedTint } : {}, imageStyle]}
@@ -497,18 +513,18 @@ const SectionHeader = ({ title, count, badge, actionText, onAction, style }) => 
 // 4. SEED DATA & AUTHENTIC TALLYKHATA FAQS
 // =========================================================================
 const INITIAL_ACCOUNTS = [
-  { id: '1', name: 'Raihan ★ khoksha', phone: '01711223344', type: 1, balance: 7000, address: 'খোকসা বাজার', createDate: getTodayDate(), timeAgo: '৩ মাস' },
-  { id: '2', name: 'Faysal ★★', phone: '01812345678', type: 1, balance: 10000, address: 'পশ্চিম পাড়া', createDate: getTodayDate(), timeAgo: '৩ মাস' },
-  { id: '3', name: 'Abd. Samad ★ Jv', phone: '01911998877', type: 1, balance: 8000, address: 'জেভি মোড়', createDate: getTodayDate(), timeAgo: '৩ মাস' },
-  { id: '4', name: 'Tanvir ★ Al Baraka', phone: '01622334455', type: 1, balance: 0, address: 'আল বারাকা মার্কেট', createDate: getTodayDate(), timeAgo: '৪ মাস' },
-  { id: '5', name: 'Jwel Vai Gk', phone: '01733445566', type: 1, balance: 500, address: 'জিকে কলোনি', createDate: getTodayDate(), timeAgo: '৫ মাস' },
-  { id: '6', name: 'Shamim Telecom', phone: '01744556677', type: 1, balance: 12000, address: 'স্টেশন রোড', createDate: getTodayDate(), timeAgo: '৬ মাস' },
-  { id: '7', name: 'Kabir Hardware', phone: '01755667788', type: 1, balance: 15000, address: 'মেইন রোড', createDate: getTodayDate(), timeAgo: '২ মাস' },
-  { id: '8', name: 'Babul Enterprise', phone: '01766778899', type: 1, balance: 18000, address: 'চকবাজার', createDate: getTodayDate(), timeAgo: '১ মাস' },
-  { id: '9', name: 'Rubel Electronics', phone: '01777889900', type: 1, balance: 14000, address: 'নিউ মার্কেট', createDate: getTodayDate(), timeAgo: '৩ মাস' },
-  { id: '10', name: 'Shuvo Mobile Store', phone: '01788990011', type: 1, balance: 9000, address: 'কলেজ গেট', createDate: getTodayDate(), timeAgo: '৪ মাস' },
-  { id: '11', name: 'Ripon Telecom', phone: '01799001122', type: 1, balance: 7000, address: 'থানা মোড়', createDate: getTodayDate(), timeAgo: '৫ মাস' },
-  { id: '12', name: 'Monir Store', phone: '01712341234', type: 1, balance: 8000, address: 'হাসপাতাল রোড', createDate: getTodayDate(), timeAgo: '২ মাস' },
+  { id: '1', name: 'নমুনা গ্রাহক ০১', phone: '01711223344', type: 1, balance: 7000, address: 'খোকসা বাজার', createDate: getTodayDate(), timeAgo: '৩ মাস' },
+  { id: '2', name: 'নমুনা গ্রাহক ০২', phone: '01812345678', type: 1, balance: 10000, address: 'পশ্চিম পাড়া', createDate: getTodayDate(), timeAgo: '৩ মাস' },
+  { id: '3', name: 'নমুনা গ্রাহক ০৩', phone: '01911998877', type: 1, balance: 8000, address: 'জেভি মোড়', createDate: getTodayDate(), timeAgo: '৩ মাস' },
+  { id: '4', name: 'নমুনা গ্রাহক ০৪', phone: '01622334455', type: 1, balance: 0, address: 'আল বারাকা মার্কেট', createDate: getTodayDate(), timeAgo: '৪ মাস' },
+  { id: '5', name: 'নমুনা গ্রাহক ০৫', phone: '01733445566', type: 1, balance: 500, address: 'জিকে কলোনি', createDate: getTodayDate(), timeAgo: '৫ মাস' },
+  { id: '6', name: 'নমুনা গ্রাহক ০৬', phone: '01744556677', type: 1, balance: 12000, address: 'স্টেশন রোড', createDate: getTodayDate(), timeAgo: '৬ মাস' },
+  { id: '7', name: 'নমুনা গ্রাহক ০৭', phone: '01755667788', type: 1, balance: 15000, address: 'মেইন রোড', createDate: getTodayDate(), timeAgo: '২ মাস' },
+  { id: '8', name: 'নমুনা গ্রাহক ০৮', phone: '01766778899', type: 1, balance: 18000, address: 'চকবাজার', createDate: getTodayDate(), timeAgo: '১ মাস' },
+  { id: '9', name: 'নমুনা গ্রাহক ০৯', phone: '01777889900', type: 1, balance: 14000, address: 'নিউ মার্কেট', createDate: getTodayDate(), timeAgo: '৩ মাস' },
+  { id: '10', name: 'নমুনা গ্রাহক ১০', phone: '01788990011', type: 1, balance: 9000, address: 'কলেজ গেট', createDate: getTodayDate(), timeAgo: '৪ মাস' },
+  { id: '11', name: 'নমুনা গ্রাহক ১১', phone: '01799001122', type: 1, balance: 7000, address: 'থানা মোড়', createDate: getTodayDate(), timeAgo: '৫ মাস' },
+  { id: '12', name: 'নমুনা গ্রাহক ১২', phone: '01712341234', type: 1, balance: 8000, address: 'হাসপাতাল রোড', createDate: getTodayDate(), timeAgo: '২ মাস' },
 ];
 
 const INITIAL_JOURNALS = [
@@ -574,6 +590,115 @@ const AUTHENTIC_FAQS = [
     a: 'না, টালিখাতা ১০০% সম্পূর্ণ অফলাইন অ্যাপ। কোনো ইন্টারনেট কানেকশন ছাড়াও সব হিসাব, ক্যালকুলেটর ও রশিদ ব্যবহার করা যায়।'
   }
 ];
+
+
+// ===================================================================
+// 3D DESIGN SYSTEM FOR PERSONAL MONEY MANAGER (Image 3, Image 4, Image 8, Image 12)
+// Tactile, dimensional, high-contrast badges with specular highlight & depth
+// ===================================================================
+const MM_WALLET_ICONS = {
+  cash: { icon: '💵', color: '#10B981', labelKey: 'mm_account_cash' },
+  bank: { icon: '🏦', color: '#3B82F6', labelKey: 'mm_account_bank' },
+  mfs: { icon: '📱', color: '#EC4899', labelKey: 'mm_account_mfs' },
+  credit: { icon: '💳', color: '#F59E0B', labelKey: 'mm_account_credit' },
+  savings: { icon: '💰', color: '#8B5CF6', labelKey: 'mm_account_savings' },
+  other: { icon: '💼', color: '#64748B', labelKey: 'mm_account_other' },
+};
+
+const MM_CATEGORY_ICONS = {
+  cat_food: { icon: '🍲', color: '#EF4444' },
+  cat_transport: { icon: '🚌', color: '#F59E0B' },
+  cat_utility: { icon: '💡', color: '#0EA5E9' },
+  cat_shopping: { icon: '🛍️', color: '#EC4899' },
+  cat_health: { icon: '💊', color: '#10B981' },
+  cat_education: { icon: '📚', color: '#8B5CF6' },
+  cat_entertainment: { icon: '☕', color: '#6366F1' },
+  cat_salary: { icon: '💰', color: '#10B981' },
+  cat_business_profit: { icon: '📈', color: '#059669' },
+  cat_investment: { icon: '🏛️', color: '#2563EB' },
+  cat_rent: { icon: '🏠', color: '#F97316' },
+  cat_other_exp: { icon: '📦', color: '#64748B' },
+  cat_other_inc: { icon: '🎁', color: '#14B8A6' },
+};
+
+function MM3DIcon({
+  icon,
+  color = '#3B82F6',
+  size = 44,
+  iconSize = 22,
+  isDark = false,
+  shape = 'squircle',
+  glow = false,
+  style,
+}) {
+  const borderRadius = shape === 'circle' ? size / 2 : Math.round(size * 0.35);
+  const baseBg = isDark
+    ? (color ? color + '28' : '#1E293B')
+    : (color ? color + '16' : '#F8FAFC');
+
+  const highlightBorder = isDark
+    ? 'rgba(255, 255, 255, 0.24)'
+    : 'rgba(255, 255, 255, 0.95)';
+
+  const shadowBorder = isDark
+    ? 'rgba(0, 0, 0, 0.55)'
+    : (color ? color + '38' : 'rgba(0, 0, 0, 0.12)');
+
+  return (
+    <View
+      style={[
+        {
+          width: size,
+          height: size,
+          borderRadius,
+          backgroundColor: baseBg,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1.5,
+          borderColor: isDark ? (color ? color + '48' : '#334155') : (color ? color + '2C' : '#E2E8F0'),
+          borderTopColor: highlightBorder,
+          borderBottomColor: shadowBorder,
+          borderBottomWidth: 2.5,
+          shadowColor: color || '#000000',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: isDark ? 0.35 : 0.16,
+          shadowRadius: 6,
+          elevation: 4,
+          position: 'relative',
+        },
+        glow && {
+          shadowOpacity: 0.55,
+          shadowRadius: 9,
+          elevation: 6,
+        },
+        style,
+      ]}
+    >
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 2,
+          left: 4,
+          right: 4,
+          height: Math.max(4, Math.round(size * 0.36)),
+          borderRadius: Math.max(3, borderRadius * 0.65),
+          backgroundColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.5)',
+        }}
+      />
+      <Text
+        style={{
+          fontSize: iconSize,
+          includeFontPadding: false,
+          textAlign: 'center',
+        }}
+      >
+        {icon}
+      </Text>
+    </View>
+  );
+}
+
 
 
 function TallyKhataApp() {
@@ -873,6 +998,7 @@ function TallyKhataApp() {
   const [modalMMTransfer, setModalMMTransfer] = useState(false);
   const [mmActiveSubTab, setMmActiveSubTab] = useState("transactions"); // "transactions" | "accounts" | "budgets" | "goals" | "analytics"
   const [mmTxnFilter, setMmTxnFilter] = useState("all"); // "all" | "expense" | "income" | "transfer"
+  const [mmAccountFilter, setMmAccountFilter] = useState("all"); // "all" | accountId
   const [mmPeriod, setMmPeriod] = useState("this_month"); // "this_month" | "last_month" | "all_time" | "custom"
   const [mmCustomRange, setMmCustomRange] = useState(null); // { startDate: 'YYYY-MM-DD', endDate: 'YYYY-MM-DD' }
   const [modalMMCustomDateRange, setModalMMCustomDateRange] = useState(false);
@@ -1949,47 +2075,68 @@ function TallyKhataApp() {
   }, [notes, activeBizId]);
 
   // --- FINANCIAL CALCULATIONS & DOUBLE-ENTRY SYNC (BUSINESS SCOPED) ---
-  let totalCustomerDue = 0;
-  let totalSupplierDue = 0;
-  (businessAccounts || []).forEach((a) => {
-    const bal = Number(a.balance) || 0;
-    if (a.type === 1 && bal > 0) totalCustomerDue += bal;
-    if (a.type === 2 && bal > 0) totalSupplierDue += bal;
-  });
+  const { totalCustomerDue, totalSupplierDue, customerCount, supplierCount } = useMemo(() => {
+    let custDue = 0;
+    let suppDue = 0;
+    let cCount = 0;
+    let sCount = 0;
+    (businessAccounts || []).forEach((a) => {
+      const bal = Number(a.balance) || 0;
+      if (a.type === 1) {
+        cCount++;
+        if (bal > 0) custDue += bal;
+      } else if (a.type === 2) {
+        sCount++;
+        if (bal > 0) suppDue += bal;
+      }
+    });
+    return {
+      totalCustomerDue: custDue,
+      totalSupplierDue: suppDue,
+      customerCount: cCount,
+      supplierCount: sCount,
+    };
+  }, [businessAccounts]);
 
-  let totalCash = Number(openingBalance) || 0;
-  let todayCashIn = 0;
-  let todayCashOut = 0;
-  let todaySales = 0;
-  let todayCosts = 0;
   const todayStr = getTodayDate();
+  const { totalCash, todayCashIn, todayCashOut, todaySales, todayCosts, todayBakiAday, todaySupplierPay } = useMemo(() => {
+    let totCash = Number(openingBalance) || 0;
+    let tIn = 0;
+    let tOut = 0;
+    let tSales = 0;
+    let tCosts = 0;
+    let tBaki = 0;
+    let tSupp = 0;
 
-  (businessCashEntries || []).forEach((c) => {
-    const amt = Number(c.amount) || 0;
-    if (c.type === 'in') {
-      totalCash += amt;
-      if (c.date === todayStr) {
-        todayCashIn += amt;
-        if (c.category === 'sale') todaySales += amt;
+    (businessCashEntries || []).forEach((c) => {
+      const amt = Number(c.amount) || 0;
+      if (c.type === 'in') {
+        totCash += amt;
+        if (c.date === todayStr) {
+          tIn += amt;
+          if (c.category === 'sale') tSales += amt;
+          if (c.category === 'baki_aday') tBaki += amt;
+        }
+      } else {
+        totCash -= amt;
+        if (c.date === todayStr) {
+          tOut += amt;
+          if (c.category === 'cost') tCosts += amt;
+          if (c.category === 'supplier_pay') tSupp += amt;
+        }
       }
-    } else {
-      totalCash -= amt;
-      if (c.date === todayStr) {
-        todayCashOut += amt;
-        if (c.category === 'cost') todayCosts += amt;
-      }
-    }
-  });
+    });
 
-  let todayBakiAday = 0;
-  let todaySupplierPay = 0;
-  (businessCashEntries || []).forEach((c) => {
-    const amt = Number(c.amount) || 0;
-    if (c.date === todayStr) {
-      if (c.category === 'baki_aday') todayBakiAday += amt;
-      if (c.category === 'supplier_pay') todaySupplierPay += amt;
-    }
-  });
+    return {
+      totalCash: totCash,
+      todayCashIn: tIn,
+      todayCashOut: tOut,
+      todaySales: tSales,
+      todayCosts: tCosts,
+      todayBakiAday: tBaki,
+      todaySupplierPay: tSupp,
+    };
+  }, [businessCashEntries, openingBalance, todayStr]);
 
   const countedFromNotes =
     (Number(notes1000) || 0) * 1000 +
@@ -3010,26 +3157,21 @@ function TallyKhataApp() {
   const executeCloudBackup = async () => {
     let latestMM = moneyManagerState;
     try {
+      if (storageRepository.writeQueue) {
+        await Promise.resolve(storageRepository.writeQueue).catch(() => {});
+      }
       const persisted = await AsyncStorage.getItem(MM_STORAGE_KEY);
       if (persisted) {
         const parsed = JSON.parse(persisted);
         if (parsed && typeof parsed === 'object') {
-          const countRecords = (st) => {
-            if (!st || typeof st !== 'object') return 0;
-            const t = Array.isArray(st.transactions) ? st.transactions.length : 0;
-            const a = Array.isArray(st.accounts) ? st.accounts.length : 0;
-            const g = Array.isArray(st.goals) ? st.goals.length : 0;
-            const r = Array.isArray(st.recurring) ? st.recurring.length : 0;
-            return t * 10 + a * 2 + g + r;
-          };
-          const inMemScore = countRecords(moneyManagerState);
-          const persistedScore = countRecords(parsed);
-          if (persistedScore > inMemScore) {
+          const inMemTime = (moneyManagerState && moneyManagerState.updatedAt) ? new Date(moneyManagerState.updatedAt).getTime() : 0;
+          const diskTime = (parsed && parsed.updatedAt) ? new Date(parsed.updatedAt).getTime() : 0;
+          if (diskTime > inMemTime && diskTime > 0) {
             latestMM = parsed;
-          } else if (inMemScore > 0) {
+          } else if (inMemTime >= diskTime && inMemTime > 0) {
             latestMM = moneyManagerState;
-          } else if (persistedScore > 0) {
-            latestMM = parsed;
+          } else {
+            latestMM = moneyManagerState || parsed;
           }
         }
       }
@@ -3090,6 +3232,56 @@ function TallyKhataApp() {
     return executeCloudBackup();
   };
 
+  const handleRunLiveSyntheticVerification = async () => {
+    if (!googleUser || !googleUser.sub) {
+      Alert.alert(
+        tStatic("গুগল একাউন্ট প্রয়োজন"),
+        tStatic("ক্লাউড ভেরিফিকেশন চালাতে প্রথমে আপনার গুগল একাউন্ট যুক্ত করতে হবে।")
+      );
+      return;
+    }
+
+    setCloudBackupStatus('backing_up');
+    try {
+      let token = await getValidGoogleAccessToken(false);
+      if (!token) {
+        token = await getValidGoogleAccessToken(true);
+      }
+      if (!token) {
+        setCloudBackupStatus('idle');
+        Alert.alert(
+          tStatic("অনুমোদন প্রয়োজন"),
+          tStatic("গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি।")
+        );
+        return;
+      }
+
+      console.log('[LIVE_MM_VERIFICATION] Starting runLiveEndToEndSyntheticVerification with active Google account...');
+      const report = await googleDriveBackupService.runLiveEndToEndSyntheticVerification(token, {
+        googleUser,
+        driveService: googleDriveBackupService,
+        keepTestFile: false,
+      });
+
+      console.log('[LIVE_MM_VERIFICATION_REPORT_JSON]' + JSON.stringify(report) + '[/LIVE_MM_VERIFICATION_REPORT_JSON]');
+      setCloudBackupStatus('idle');
+
+      Alert.alert(
+        `লাইভ ভেরিফিকেশন: ${report.phase8_verdict}`,
+        `ফলাফল: ${report.phase8_verdict}\nআপলোড ফাইল আইডি: ${report.phase4_testFileUpload ? report.phase4_testFileUpload.fileId : 'N/A'}\nডাউনলোড ও চেকসাম: ${report.phase5_remoteDownloadAndVerification && report.phase5_remoteDownloadAndVerification.checksumMatch ? 'মিল পাওয়া গেছে' : 'মিলেনি'}\nপ্রডাকশন ব্যাকআপ অক্ষত: ${report.productionBackupProtected ? 'হ্যাঁ' : 'না'}`
+      );
+      return report;
+    } catch (err) {
+      console.error('[LIVE_MM_VERIFICATION_ERROR]', err);
+      setCloudBackupStatus('idle');
+      Alert.alert('ভেরিফিকেশন ব্যর্থ', err.message || String(err));
+    }
+  };
+
+  if (typeof global !== 'undefined') {
+    global.__tallykhataRunLiveVerification = handleRunLiveSyntheticVerification;
+  }
+
   const applyStateToUi = (state, { resetPin = false } = {}) => {
     if (!state) return;
     if (Array.isArray(state.accounts)) setAccounts(state.accounts);
@@ -3138,7 +3330,7 @@ function TallyKhataApp() {
         const isBusinessRestored = !domains || domains.includes('all') || domains.includes('business');
         applyStateToUi(newState, { resetPin: isBusinessRestored });
       },
-      onMoneyManagerRestored: async (newMM) => {
+            onMoneyManagerRestored: async (newMM) => {
         if (newMM) {
           let processed = newMM;
           try {
@@ -3150,6 +3342,15 @@ function TallyKhataApp() {
           try {
             await AsyncStorage.setItem(MM_STORAGE_KEY, JSON.stringify(processed));
           } catch (_) {}
+          if (processed.preferences && processed.preferences.defaultPeriod) {
+            setMmPeriod(processed.preferences.defaultPeriod);
+          }
+          if (processed.preferences && processed.preferences.customRange) {
+            setMmCustomRange(processed.preferences.customRange);
+          }
+          if (processed.preferences && processed.preferences.sortOrder) {
+            setMmSortOrder(processed.preferences.sortOrder);
+          }
         }
       },
       onPreferencesRestored: (newPrefs) => {
@@ -3972,24 +4173,41 @@ function TallyKhataApp() {
   // VIEW A: CUSTOMER / SUPPLIER ACCOUNT LEDGER SCREEN (activity_customer_report_v2.xml)
   // =========================================================================
   const isCustomer = selectedAccount ? selectedAccount.type === 1 : true;
-  const rawJournals = selectedAccount ? (journals || []).filter((j) => j.accountId === selectedAccount.id) : [];
-  const openingBal = Number(selectedAccount?.openingBalance) || 0;
-  const openingEntry = (selectedAccount && openingBal > 0) ? [{
-    id: 'opening_' + selectedAccount.id,
-    isOpening: true,
-    desc: isCustomer ? 'পূর্বের বাকি (শুরুর জের)' : 'পূর্বের দেনা (শুরুর জের)',
-    amount: openingBal,
-    date: selectedAccount.createDate || '২০২৬-১০-১৫',
-    time: '',
-    type: isCustomer ? 'given' : 'received',
-  }] : [];
-  const accountJournals = [...openingEntry, ...rawJournals];
-  const totalGiven = accountJournals
-    .filter((j) => j.type === 'given')
-    .reduce((sum, j) => sum + Number(j.amount || 0), 0);
-  const totalReceived = accountJournals
-    .filter((j) => j.type === 'received')
-    .reduce((sum, j) => sum + Number(j.amount || 0), 0);
+  const { accountJournals, totalGiven, totalReceived } = useMemo(() => {
+    if (!selectedAccount) {
+      return { accountJournals: [], totalGiven: 0, totalReceived: 0 };
+    }
+    const isCust = selectedAccount.type === 1;
+    const targetAccId = String(selectedAccount.id);
+    const rawJournals = [];
+    const allJ = journals || [];
+    for (let i = 0; i < allJ.length; i++) {
+      const j = allJ[i];
+      if (String(j.accountId) === targetAccId) {
+        rawJournals.push(j);
+      }
+    }
+    const openingBal = Number(selectedAccount.openingBalance) || 0;
+    const openingEntry = openingBal > 0 ? [{
+      id: 'opening_' + selectedAccount.id,
+      isOpening: true,
+      desc: isCust ? 'পূর্বের বাকি (শুরুর জের)' : 'পূর্বের দেনা (শুরুর জের)',
+      amount: openingBal,
+      date: selectedAccount.createDate || '২০২৬-১০-১৫',
+      time: '',
+      type: isCust ? 'given' : 'received',
+    }] : [];
+    const list = [...openingEntry, ...rawJournals];
+    let given = 0;
+    let received = 0;
+    for (let i = 0; i < list.length; i++) {
+      const j = list[i];
+      const amt = Number(j.amount || 0);
+      if (j.type === 'given') given += amt;
+      else if (j.type === 'received') received += amt;
+    }
+    return { accountJournals: list, totalGiven: given, totalReceived: received };
+  }, [selectedAccount, journals]);
 
   return (
     <ThemeContext.Provider value={themeContextValue}>
@@ -4133,6 +4351,10 @@ function TallyKhataApp() {
           data={accountJournals}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 110 }}
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
           renderItem={({ item }) => {
             const isGiven = item.type === 'given';
             return (
@@ -4284,6 +4506,10 @@ function TallyKhataApp() {
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingBottom: 95 }}
               showsVerticalScrollIndicator={false}
+              initialNumToRender={15}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              removeClippedSubviews={true}
               ListHeaderComponent={
                 <View style={[{ backgroundColor: '#F5F6F8' }, isDark && tStyles.screenBg]}>
                   {/* --- 8-ITEM AUTHENTIC QUICK ACTIONS GRID --- */}
@@ -4301,8 +4527,8 @@ function TallyKhataApp() {
                           source={require('./assets/icons/grid_multi_biz.png')}
                           variant="primary"
                           shape="rounded"
-                          size={26}
-                          containerSize={46}
+                          size={28}
+                          containerSize={50}
                           tintColor={null}
                           style={styles.quickGrid3DIcon}
                         />
@@ -4320,8 +4546,8 @@ function TallyKhataApp() {
                           source={require('./assets/icons/grid_stock.png')}
                           variant="warning"
                           shape="rounded"
-                          size={26}
-                          containerSize={46}
+                          size={28}
+                          containerSize={50}
                           tintColor={null}
                           style={styles.quickGrid3DIcon}
                         />
@@ -4339,8 +4565,8 @@ function TallyKhataApp() {
                           source={require('./assets/icons/grid_note.png')}
                           variant="info"
                           shape="rounded"
-                          size={26}
-                          containerSize={46}
+                          size={28}
+                          containerSize={50}
                           tintColor={null}
                           style={styles.quickGrid3DIcon}
                         />
@@ -4358,8 +4584,8 @@ function TallyKhataApp() {
                           source={require('./assets/icons/grid_bulk_tagada.png')}
                           variant="danger"
                           shape="rounded"
-                          size={26}
-                          containerSize={46}
+                          size={28}
+                          containerSize={50}
                           tintColor={null}
                           style={styles.quickGrid3DIcon}
                         />
@@ -4380,8 +4606,8 @@ function TallyKhataApp() {
                           source={require('./assets/icons/grid_money_manager.png')}
                           variant="secondary"
                           shape="rounded"
-                          size={26}
-                          containerSize={46}
+                          size={28}
+                          containerSize={50}
                           tintColor={null}
                           style={styles.quickGrid3DIcon}
                         />
@@ -4399,8 +4625,8 @@ function TallyKhataApp() {
                           source={require('./assets/icons/grid_backup.png')}
                           variant="success"
                           shape="rounded"
-                          size={26}
-                          containerSize={46}
+                          size={28}
+                          containerSize={50}
                           tintColor={null}
                           style={styles.quickGrid3DIcon}
                         />
@@ -4418,8 +4644,8 @@ function TallyKhataApp() {
                           source={require('./assets/icons/grid_tally_msg.png')}
                           variant="purple"
                           shape="rounded"
-                          size={26}
-                          containerSize={46}
+                          size={28}
+                          containerSize={50}
                           tintColor={null}
                           style={styles.quickGrid3DIcon}
                         />
@@ -4435,10 +4661,10 @@ function TallyKhataApp() {
                       >
                         <AppIcon
                           source={require('./assets/icons/grid_cashbox.png')}
-                          variant="neutral"
+                          variant="teal"
                           shape="rounded"
-                          size={26}
-                          containerSize={46}
+                          size={28}
+                          containerSize={50}
                           tintColor={null}
                           style={styles.quickGrid3DIcon}
                         />
@@ -4535,7 +4761,7 @@ function TallyKhataApp() {
                       style={[styles.counterTabPill, accountTab === 'customer' && (isDark ? { backgroundColor: currentTheme.cardBg } : styles.counterTabPillActive)]}
                     >
                       <Text style={[styles.counterTabText, isDark && { color: currentTheme.textSecondary }, accountTab === 'customer' && { color: currentTheme.primary, fontWeight: 'bold' }]}>
-                        {t('header_filter_customer')} {formatAppNumber(businessAccounts.filter((a) => a.type === 1).length)}
+                        {t('header_filter_customer')} {formatAppNumber(customerCount)}
                       </Text>
                     </TouchableOpacity>
                     <Text style={[styles.counterStripDivider, isDark && tStyles.textSecondary]}>/</Text>
@@ -4548,7 +4774,7 @@ function TallyKhataApp() {
                       style={[styles.counterTabPill, accountTab === 'supplier' && (isDark ? { backgroundColor: currentTheme.cardBg } : styles.counterTabPillActive)]}
                     >
                       <Text style={[styles.counterTabText, isDark && { color: currentTheme.textSecondary }, accountTab === 'supplier' && { color: currentTheme.primary, fontWeight: 'bold' }]}>
-                        {t('header_filter_supplier')} {formatAppNumber(businessAccounts.filter((a) => a.type === 2).length)}
+                        {t('header_filter_supplier')} {formatAppNumber(supplierCount)}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -5520,8 +5746,8 @@ function TallyKhataApp() {
       {/* ===================================================================
           MODAL: ADD TRANSACTION WITH AUTHENTIC BUILT-IN CALCULATOR KEYPAD
          =================================================================== */}
-      {/* ===================================================================
-          MODAL: THEME SELECTION (Light / Dark Appearance)
+            {/* ===================================================================
+          MODAL: THEME SELECTION (System Default / Light Mode / Dark Mode)
          =================================================================== */}
       <Modal
         visible={modalThemePicker}
@@ -5530,8 +5756,9 @@ function TallyKhataApp() {
         onRequestClose={() => setModalThemePicker(false)}
       >
         <View style={styles.bottomSheetOverlay}>
-          <View style={[styles.bottomSheetCard, isDark && { backgroundColor: currentTheme.modalSurface }]}>
-            <View style={styles.bottomSheetHeader}>
+          <View style={[styles.bottomSheetCard, isDark && { backgroundColor: currentTheme.modalSurface, borderColor: currentTheme.cardBorder }]}>
+            <View style={styles.bottomSheetHandle} />
+            <View style={[styles.bottomSheetHeader, isDark && { borderBottomColor: currentTheme.divider }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.bottomSheetTitle, isDark && { color: currentTheme.textPrimary }]}>
                   {t('menu_appearance')}
@@ -5554,88 +5781,77 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            <View style={{ paddingVertical: 12 }}>
-              <TouchableOpacity
-                style={[
-                  styles.themeOptionCard,
-                  appTheme === 'light' && styles.themeOptionCardActive,
-                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
-                  appTheme === 'light' && isDark && { borderColor: currentTheme.primary }
-                ]}
-                onPress={() => {
-                  handleToggleTheme('light');
-                  setModalThemePicker(false);
-                }}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`${t('theme_light')}. ${t('theme_light_sub')}`}
-              >
-                <View style={[styles.themeOptionIconCircle, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={{ fontSize: 20 }}>☀️</Text>
-                </View>
-                <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
-                    {t('theme_light')}
+            {/* Live Appearance Preview Card */}
+            <View style={{ marginTop: 6, marginBottom: 12 }}>
+              <View style={styles.themePreviewHeaderRow}>
+                <Text style={[styles.themePreviewSectionLabel, isDark && { color: currentTheme.textSecondary }]}>
+                  {t('theme_preview_label')}
+                </Text>
+                <View style={[styles.themeModeBadge, { backgroundColor: isDark ? currentTheme.primaryLight : '#FEE2E2', borderColor: isDark ? currentTheme.primary : '#FECACA' }]}>
+                  <Text style={[styles.themeModeBadgeText, { color: isDark ? currentTheme.primary : '#B81414' }]}>
+                    {appTheme === 'system'
+                      ? '📱 ' + t('theme_system') + ' (' + (effectiveTheme === 'dark' ? '🌙 ' + t('theme_dark') : '☀️ ' + t('theme_light')) + ')'
+                      : (effectiveTheme === 'dark' ? '🌙 ' + t('theme_dark') : '☀️ ' + t('theme_light'))}
                   </Text>
-                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>{t('theme_light_sub')}</Text>
                 </View>
-                {appTheme === 'light' ? (
-                  <View style={[styles.themeCheckCircle, { backgroundColor: COLORS.primary }]}>
-                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
-                  </View>
-                ) : (
-                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
-                )}
-              </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.themeOptionCard,
-                  appTheme === 'dark' && styles.themeOptionCardActive,
-                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
-                  appTheme === 'dark' && { borderColor: isDark ? currentTheme.primary : COLORS.primary }
-                ]}
-                onPress={() => {
-                  handleToggleTheme('dark');
-                  setModalThemePicker(false);
-                }}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`${t('theme_dark')}. ${t('theme_dark_sub')}`}
-              >
-                <View style={[styles.themeOptionIconCircle, { backgroundColor: '#1E293B' }]}>
-                  <Text style={{ fontSize: 20 }}>🌙</Text>
-                </View>
-                <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
-                    {t('theme_dark')}
-                  </Text>
-                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>{t('theme_dark_sub')}</Text>
-                </View>
-                {appTheme === 'dark' ? (
-                  <View style={[styles.themeCheckCircle, { backgroundColor: isDark ? currentTheme.primary : COLORS.primary }]}>
-                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
+              <View style={[styles.themePreviewBox, { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}>
+                {/* Preview Top Row: Shop & Balance */}
+                <View style={styles.themePreviewCardRow}>
+                  <View style={[styles.themePreviewIconCircle, { backgroundColor: isDark ? currentTheme.cardBgElevated : '#F1F5F9', borderColor: isDark ? currentTheme.cardBorder : '#E2E8F0', borderWidth: 1 }]}>
+                    <Text style={{ fontSize: 18 }}>🏪</Text>
                   </View>
-                ) : (
-                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
-                )}
-              </TouchableOpacity>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={[styles.themePreviewTitle, { color: currentTheme.textPrimary }]}>
+                      {t('theme_preview_card_title')}
+                    </Text>
+                    <Text style={[styles.themePreviewSub, { color: currentTheme.textSecondary }]}>
+                      {t('theme_preview_card_sub')}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.themePreviewAmount, { color: currentTheme.primary }]}>৳ {formatMoney(5450)}</Text>
+                    <Text style={[styles.themePreviewAmountLabel, { color: currentTheme.textMuted }]}>{t('ledger_total')}</Text>
+                  </View>
+                </View>
+
+                {/* Preview Bottom Row: Accent Palette & Action Button */}
+                <View style={[styles.themePreviewActionRow, { borderTopColor: currentTheme.divider }]}>
+                  <View style={styles.themePreviewAccents}>
+                    <View style={[styles.themePreviewDot, { backgroundColor: currentTheme.primary }]} />
+                    <View style={[styles.themePreviewDot, { backgroundColor: currentTheme.success }]} />
+                    <View style={[styles.themePreviewDot, { backgroundColor: currentTheme.warning }]} />
+                    <View style={[styles.themePreviewDot, { backgroundColor: currentTheme.info }]} />
+                    <View style={[styles.themePreviewDot, { backgroundColor: currentTheme.purple }]} />
+                  </View>
+                  <View style={[styles.themePreviewSampleBtn, { backgroundColor: currentTheme.primary }]}>
+                    <Text style={styles.themePreviewSampleBtnText}>
+                      ✓ {t('theme_preview_button')}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Theme Options: System Default, Light Mode, Dark Mode */}
+            <View style={{ paddingVertical: 2 }}>
+              {/* Option 1: System Default */}
               <TouchableOpacity
                 style={[
                   styles.themeOptionCard,
                   appTheme === 'system' && styles.themeOptionCardActive,
                   isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
-                  appTheme === 'system' && { borderColor: isDark ? currentTheme.primary : COLORS.primary }
+                  appTheme === 'system' && { borderColor: isDark ? currentTheme.primary : COLORS.primary, backgroundColor: isDark ? '#2B1212' : '#FEF2F2', borderWidth: 2 }
                 ]}
                 onPress={() => {
                   handleToggleTheme('system');
-                  setModalThemePicker(false);
                 }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('theme_system')}. ${t('theme_system_sub')}`}
               >
-                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]}>
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#334155' : '#E2E8F0', borderColor: isDark ? '#475569' : '#CBD5E1', borderWidth: 1 }]}>
                   <Text style={{ fontSize: 20 }}>📱</Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 14 }}>
@@ -5643,7 +5859,9 @@ function TallyKhataApp() {
                     {t('theme_system')}
                   </Text>
                   <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
-                    {t('theme_system_sub')}
+                    {appTheme === 'system'
+                      ? `${t('theme_system_sub')} • ${effectiveTheme === 'dark' ? '🌙 ' + t('theme_dark') : '☀️ ' + t('theme_light')}`
+                      : t('theme_system_sub')}
                   </Text>
                 </View>
                 {appTheme === 'system' ? (
@@ -5654,13 +5872,94 @@ function TallyKhataApp() {
                   <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
                 )}
               </TouchableOpacity>
+
+              {/* Option 2: Light Mode */}
+              <TouchableOpacity
+                style={[
+                  styles.themeOptionCard,
+                  appTheme === 'light' && styles.themeOptionCardActive,
+                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
+                  appTheme === 'light' && { borderColor: isDark ? currentTheme.primary : COLORS.primary, backgroundColor: isDark ? '#2B1212' : '#FEF2F2', borderWidth: 2 }
+                ]}
+                onPress={() => {
+                  handleToggleTheme('light');
+                }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('theme_light')}. ${t('theme_light_sub')}`}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#451A03' : '#FEF3C7', borderColor: isDark ? '#78350F' : '#FDE68A', borderWidth: 1 }]}>
+                  <Text style={{ fontSize: 20 }}>☀️</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    {t('theme_light')}
+                  </Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
+                    {t('theme_light_sub')}
+                  </Text>
+                </View>
+                {appTheme === 'light' ? (
+                  <View style={[styles.themeCheckCircle, { backgroundColor: isDark ? currentTheme.primary : COLORS.primary }]}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
+                )}
+              </TouchableOpacity>
+
+              {/* Option 3: Dark Mode */}
+              <TouchableOpacity
+                style={[
+                  styles.themeOptionCard,
+                  appTheme === 'dark' && styles.themeOptionCardActive,
+                  isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
+                  appTheme === 'dark' && { borderColor: isDark ? currentTheme.primary : COLORS.primary, backgroundColor: isDark ? '#2B1212' : '#FEF2F2', borderWidth: 2 }
+                ]}
+                onPress={() => {
+                  handleToggleTheme('dark');
+                }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('theme_dark')}. ${t('theme_dark_sub')}`}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#1E293B' : '#0F172A', borderColor: isDark ? '#334155' : '#1E293B', borderWidth: 1 }]}>
+                  <Text style={{ fontSize: 20 }}>🌙</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    {t('theme_dark')}
+                  </Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
+                    {t('theme_dark_sub')}
+                  </Text>
+                </View>
+                {appTheme === 'dark' ? (
+                  <View style={[styles.themeCheckCircle, { backgroundColor: isDark ? currentTheme.primary : COLORS.primary }]}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
+                )}
+              </TouchableOpacity>
             </View>
+
+            {/* Done Action Button */}
+            <TouchableOpacity
+              style={[styles.themeDoneBtn, { backgroundColor: currentTheme.primary }]}
+              onPress={() => setModalThemePicker(false)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={t('btn_done')}
+            >
+              <Text style={styles.themeDoneBtnText}>✓ {t('btn_done')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
       {/* ===================================================================
-          MODAL: LANGUAGE SELECTION (Bangla / English)
+          MODAL: LANGUAGE SELECTION (বাংলা / English / সিস্টেম ভাষা)
          =================================================================== */}
       <Modal
         visible={modalLanguagePicker}
@@ -5669,8 +5968,9 @@ function TallyKhataApp() {
         onRequestClose={() => setModalLanguagePicker(false)}
       >
         <View style={styles.bottomSheetOverlay}>
-          <View style={[styles.bottomSheetCard, isDark && { backgroundColor: currentTheme.modalSurface }]}>
-            <View style={styles.bottomSheetHeader}>
+          <View style={[styles.bottomSheetCard, isDark && { backgroundColor: currentTheme.modalSurface, borderColor: currentTheme.cardBorder }]}>
+            <View style={styles.bottomSheetHandle} />
+            <View style={[styles.bottomSheetHeader, isDark && { borderBottomColor: currentTheme.divider }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.bottomSheetTitle, isDark && { color: currentTheme.textPrimary }]}>
                   {t('menu_language')}
@@ -5693,31 +5993,81 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            <View style={{ paddingVertical: 12 }}>
+            {/* Live Language Preview Card */}
+            <View style={{ marginTop: 6, marginBottom: 12 }}>
+              <View style={styles.themePreviewHeaderRow}>
+                <Text style={[styles.themePreviewSectionLabel, isDark && { color: currentTheme.textSecondary }]}>
+                  {t('lang_preview_label')}
+                </Text>
+                <View style={[styles.themeModeBadge, { backgroundColor: isDark ? currentTheme.primaryLight : '#FEE2E2', borderColor: isDark ? currentTheme.primary : '#FECACA' }]}>
+                  <Text style={[styles.themeModeBadgeText, { color: isDark ? currentTheme.primary : '#B81414' }]}>
+                    {effectiveLanguage === 'en' ? '🇬🇧 English' : '🇧🇩 বাংলা'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.themePreviewBox, { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}>
+                {/* Preview Top Row: Shop & Balance */}
+                <View style={styles.themePreviewCardRow}>
+                  <View style={[styles.themePreviewIconCircle, { backgroundColor: isDark ? currentTheme.cardBgElevated : '#F1F5F9', borderColor: isDark ? currentTheme.cardBorder : '#E2E8F0', borderWidth: 1 }]}>
+                    <Text style={{ fontSize: 18 }}>🗣️</Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={[styles.themePreviewTitle, { color: currentTheme.textPrimary }]}>
+                      {t('theme_preview_card_title')}
+                    </Text>
+                    <Text style={[styles.themePreviewSub, { color: currentTheme.textSecondary }]}>
+                      {t('theme_preview_card_sub')}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.themePreviewAmount, { color: currentTheme.primary }]}>৳ {formatMoney(5450)}</Text>
+                    <Text style={[styles.themePreviewAmountLabel, { color: currentTheme.textMuted }]}>{t('ledger_total')}</Text>
+                  </View>
+                </View>
+
+                {/* Preview Bottom Row: Sample Date & Action Button */}
+                <View style={[styles.themePreviewActionRow, { borderTopColor: currentTheme.divider }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, marginRight: 6 }}>📅</Text>
+                    <Text style={[styles.themePreviewSub, { color: currentTheme.textSecondary, fontWeight: '600' }]}>
+                      {t('mm_today')} • {formatDisplayDate(getTodayDate())}
+                    </Text>
+                  </View>
+                  <View style={[styles.themePreviewSampleBtn, { backgroundColor: currentTheme.primary }]}>
+                    <Text style={styles.themePreviewSampleBtnText}>
+                      ✓ {t('theme_preview_button')}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View style={{ paddingVertical: 2 }}>
+              {/* Option 1: বাংলা */}
               <TouchableOpacity
                 style={[
                   styles.themeOptionCard,
                   appLanguage === 'bn' && styles.themeOptionCardActive,
                   isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
-                  appLanguage === 'bn' && isDark && { borderColor: currentTheme.primary }
+                  appLanguage === 'bn' && { borderColor: isDark ? currentTheme.primary : COLORS.primary, backgroundColor: isDark ? '#2B1212' : '#FEF2F2', borderWidth: 2 }
                 ]}
                 onPress={() => {
                   handleSelectLanguage('bn');
-                  setModalLanguagePicker(false);
                 }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('lang_bn')}. ${t('lang_bn_sub')}`}
               >
-                <View style={[styles.themeOptionIconCircle, { backgroundColor: '#F0FDF4' }]}>
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#064E3B' : '#F0FDF4', borderColor: isDark ? '#047857' : '#BBF7D0', borderWidth: 1 }]}>
                   <Text style={{ fontSize: 20 }}>🇧🇩</Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>{t('lang_bn')}</Text>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>বাংলা</Text>
                   <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>{t('lang_bn_sub')}</Text>
                 </View>
                 {appLanguage === 'bn' ? (
-                  <View style={[styles.themeCheckCircle, { backgroundColor: COLORS.primary }]}>
+                  <View style={[styles.themeCheckCircle, { backgroundColor: isDark ? currentTheme.primary : COLORS.primary }]}>
                     <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>✓</Text>
                   </View>
                 ) : (
@@ -5725,22 +6075,22 @@ function TallyKhataApp() {
                 )}
               </TouchableOpacity>
 
+              {/* Option 2: English */}
               <TouchableOpacity
                 style={[
                   styles.themeOptionCard,
                   appLanguage === 'en' && styles.themeOptionCardActive,
                   isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
-                  appLanguage === 'en' && { borderColor: isDark ? currentTheme.primary : COLORS.primary }
+                  appLanguage === 'en' && { borderColor: isDark ? currentTheme.primary : COLORS.primary, backgroundColor: isDark ? '#2B1212' : '#FEF2F2', borderWidth: 2 }
                 ]}
                 onPress={() => {
                   handleSelectLanguage('en');
-                  setModalLanguagePicker(false);
                 }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('lang_en')}. ${t('lang_english_sub')}`}
               >
-                <View style={[styles.themeOptionIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#1E3A8A' : '#EFF6FF', borderColor: isDark ? '#1D4ED8' : '#BAE6FD', borderWidth: 1 }]}>
                   <Text style={{ fontSize: 20 }}>🇬🇧</Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 14 }}>
@@ -5759,30 +6109,33 @@ function TallyKhataApp() {
                   <View style={[styles.themeUncheckCircle, isDark && { borderColor: currentTheme.textMuted }]} />
                 )}
               </TouchableOpacity>
+
+              {/* Option 3: সিস্টেম ভাষা (System Language) */}
               <TouchableOpacity
                 style={[
                   styles.themeOptionCard,
                   appLanguage === 'system' && styles.themeOptionCardActive,
                   isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder },
-                  appLanguage === 'system' && { borderColor: isDark ? currentTheme.primary : COLORS.primary }
+                  appLanguage === 'system' && { borderColor: isDark ? currentTheme.primary : COLORS.primary, backgroundColor: isDark ? '#2B1212' : '#FEF2F2', borderWidth: 2 }
                 ]}
                 onPress={() => {
                   handleSelectLanguage('system');
-                  setModalLanguagePicker(false);
                 }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('lang_system')}. ${t('lang_system_sub')}`}
               >
-                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]}>
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#334155' : '#E2E8F0', borderColor: isDark ? '#475569' : '#CBD5E1', borderWidth: 1 }]}>
                   <Text style={{ fontSize: 20 }}>📱</Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>
-                    {t('lang_system')}
+                    {t('lang_system_full')}
                   </Text>
                   <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
-                    {t('lang_system_sub')}
+                    {appLanguage === 'system'
+                      ? `${t('lang_system_sub')} • ${effectiveLanguage === 'en' ? 'English' : 'বাংলা'}`
+                      : t('lang_system_sub')}
                   </Text>
                 </View>
                 {appLanguage === 'system' ? (
@@ -5794,6 +6147,17 @@ function TallyKhataApp() {
                 )}
               </TouchableOpacity>
             </View>
+
+            {/* Done Action Button */}
+            <TouchableOpacity
+              style={[styles.themeDoneBtn, { backgroundColor: currentTheme.primary }]}
+              onPress={() => setModalLanguagePicker(false)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={t('btn_done')}
+            >
+              <Text style={styles.themeDoneBtnText}>✓ {t('btn_done')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -7310,6 +7674,25 @@ function TallyKhataApp() {
                   <View style={styles.cloudControlsSection}>
                     <SectionHeader title={tStatic("ক্লাউড ব্যাকআপ ও রিস্টোর অপশন")} />
 
+                    {/* CONTROL 0: লাইভ সিনথেটিক ভেরিফিকেশন (Google Drive E2E) */}
+                    <TouchableOpacity
+                      style={[styles.cloudControlCard, { borderColor: '#86EFAC', backgroundColor: '#F0FDF4' }]}
+                      onPress={handleRunLiveSyntheticVerification}
+                      disabled={cloudBackupStatus === 'backing_up'}
+                      activeOpacity={0.75}
+                    >
+                      <AppIcon source={require('./assets/icons/ic_cloud.png')} variant="success" shape="circle" size={22} containerSize={44} style={{ marginRight: 12 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.cloudControlTitle, { color: '#15803D' }]}>
+                          {cloudBackupStatus === 'backing_up' ? tStatic("ভেরিফিকেশন চলছে...") : tStatic("লাইভ সিনথেটিক ভেরিফিকেশন (Drive E2E)")}
+                        </Text>
+                        <Text style={styles.cloudControlSub}>
+                          {tStatic("আসল গুগল ড্রাইভে টেস্ট ফাইল আপলোড, ডাউনলোড ও চেকসাম অডিট যাচাই")}
+                        </Text>
+                      </View>
+                      <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 14, height: 14, tintColor: '#15803D' }} resizeMode="contain" />
+                    </TouchableOpacity>
+
                     {/* CONTROL 1: এখন ব্যাকআপ নিন */}
                     <TouchableOpacity
                       style={[styles.cloudControlCard, { borderColor: '#FECACA' }]}
@@ -7914,32 +8297,49 @@ function TallyKhataApp() {
           </View>
 
           {(() => {
-            const cashBecha = (cashEntries || [])
-              .filter((e) => e.category === 'sale')
-              .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-            const cashKena = (cashEntries || [])
-              .filter((e) => e.category === 'buy')
-              .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-            const bakiBecha = (journals || [])
-              .filter((j) => j.type === 'give')
-              .reduce((sum, j) => sum + (Number(j.amount) || 0), 0);
-            const bakiKena = (journals || [])
-              .filter((j) => j.type === 'got')
-              .reduce((sum, j) => sum + (Number(j.amount) || 0), 0);
+            let cashBecha = 0;
+            let cashKena = 0;
+            const salesList = [];
+            const cEntries = cashEntries || [];
+            for (let i = 0; i < cEntries.length; i++) {
+              const e = cEntries[i];
+              const amt = Number(e.amount) || 0;
+              if (e.category === 'sale') {
+                cashBecha += amt;
+                salesList.push({
+                  id: e.id,
+                  title: e.desc || tStatic("ক্যাশ বেচা"),
+                  amount: e.amount,
+                  date: e.date,
+                  time: e.time,
+                  isSale: true,
+                  tag: tStatic("ক্যাশ"),
+                });
+              } else if (e.category === 'buy') {
+                cashKena += amt;
+                salesList.push({
+                  id: e.id,
+                  title: e.desc || tStatic("ক্যাশ কেনা"),
+                  amount: e.amount,
+                  date: e.date,
+                  time: e.time,
+                  isSale: false,
+                  tag: tStatic("ক্যাশ"),
+                });
+              }
+            }
+
+            let bakiBecha = 0;
+            let bakiKena = 0;
+            const allJ = journals || [];
+            for (let i = 0; i < allJ.length; i++) {
+              const j = allJ[i];
+              const amt = Number(j.amount) || 0;
+              if (j.type === 'give') bakiBecha += amt;
+              else if (j.type === 'got') bakiKena += amt;
+            }
             const totalBecha = cashBecha + bakiBecha;
             const totalKena = cashKena + bakiKena;
-
-            const salesList = (cashEntries || [])
-              .filter((e) => e.category === 'sale' || e.category === 'buy')
-              .map((e) => ({
-                id: e.id,
-                title: e.desc || (e.category === 'sale' ? tStatic("ক্যাশ বেচা") : tStatic("ক্যাশ কেনা")),
-                amount: e.amount,
-                date: e.date,
-                time: e.time,
-                isSale: e.category === 'sale',
-                tag: tStatic("ক্যাশ"),
-              }));
 
             return (
               <ScrollView style={{ flex: 1 }}>
@@ -8949,54 +9349,589 @@ function TallyKhataApp() {
             </TouchableOpacity>
           </View>
           <ScrollView style={{ flex: 1, paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Top Net Worth & Period Flow Card */}
+                        {/* Top Net Worth & Period Flow Card (Image 12, Image 4) */}
             {moneyManagerState.preferences?.showNetWorthCard !== false && (() => {
               const periodMetrics = moneyManagerService.calculatePeriodMetrics(moneyManagerState, mmPeriod, mmCustomRange);
               const totalNetWorth = periodMetrics.netWorth;
-              const periodTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: mmPeriod, customRange: mmCustomRange });
-              const cashflowTxns = periodTxns.filter(transaction => !moneyManagerService.isGoalAllocationTransaction(transaction));
-              const pIncome = cashflowTxns.filter(t => t.type === 'income').reduce((acc, t) => acc + (t.amount || 0), 0);
-              const pExpense = cashflowTxns.filter(t => t.type === 'expense').reduce((acc, t) => acc + (t.amount || 0), 0);
-              const pSavings = pIncome - pExpense;
-              const savingsRate = pIncome > 0 ? Math.round((pSavings / pIncome) * 100) : 0;
+              const pIncome = periodMetrics.income;
+              const pExpense = periodMetrics.expense;
+              const pSavings = periodMetrics.netSavings;
+              const savingsRate = periodMetrics.savingsRate;
               const periodLabel = getMmPeriodLabel();
 
               return (
-                <View style={[styles.mmTotalCard, tStyles.mmTotalCard]}>
+                <View style={[styles.mmTotalCard, tStyles.mmTotalCard, { borderRadius: 24, padding: 18, marginTop: 14, borderWidth: 1.5 }]}>
+                  {/* Balance Card Header */}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={[styles.mmTotalCardLabel, tStyles.mmTotalCardLabel]}>{t("mm_net_worth")}</Text>
-                    <View style={[[styles.mmPeriodBadge, tStyles.mmPeriodBadge], !isDark && { backgroundColor: currentTheme.cardBgElevated }]}>
-                      <Text style={[[styles.mmPeriodBadgeText, tStyles.mmPeriodBadgeText], !isDark && { color: currentTheme.textSecondary }]}>{periodLabel}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 16 }}>💎</Text>
+                      <Text style={[styles.mmTotalCardLabel, tStyles.mmTotalCardLabel, { fontSize: 14, fontWeight: '700', letterSpacing: 0.3 }]}>
+                        {t("mm_net_worth")}
+                      </Text>
                     </View>
-                  </View>
-                  <Text style={[styles.mmTotalCardAmount, tStyles.mmTotalCardAmount]}>{mmCurrency} {formatMMNumber(totalNetWorth)}</Text>
-                  <Text style={[styles.mmTotalCardSub, tStyles.mmTotalCardSub]}>{t('mm_active_wallet_balances')}</Text>
-
-                  <View style={[styles.mmStatRow, !isDark && { borderTopColor: currentTheme.divider }]}>
-                    <View style={styles.mmStatCol}>
-                      <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>{t('mm_income_prefix')}{periodLabel})</Text>
-                      <Text style={[styles.mmStatIncome, tStyles.mmStatIncome]}>+{mmCurrency} {formatMMNumber(pIncome)}</Text>
-                    </View>
-                    <View style={[styles.mmStatDivider, tStyles.mmStatDivider]} />
-                    <View style={styles.mmStatCol}>
-                      <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>{t('mm_expense_prefix')}{periodLabel})</Text>
-                      <Text style={[styles.mmStatExpense, tStyles.mmStatExpense]}>-{mmCurrency} {formatMMNumber(pExpense)}</Text>
-                    </View>
-                    <View style={[styles.mmStatDivider, tStyles.mmStatDivider]} />
-                    <View style={styles.mmStatCol}>
-                      <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>{t('mm_net_savings')}</Text>
-                      <Text style={[[styles.mmStatSavings, tStyles.mmStatSavings], pSavings < 0 && { color: '#EF4444' }]}>
-                        {pSavings >= 0 ? '+' : ''}{mmCurrency} {formatMMNumber(pSavings)}
+                    <View style={[[styles.mmPeriodBadge, tStyles.mmPeriodBadge], !isDark && { backgroundColor: currentTheme.cardBgElevated }, { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }]}>
+                      <Text style={[[styles.mmPeriodBadgeText, tStyles.mmPeriodBadgeText], !isDark && { color: currentTheme.textSecondary }, { fontSize: 11, fontWeight: '700' }]}>
+                        {periodLabel}
                       </Text>
                     </View>
                   </View>
+
+                  {/* Large Balance Display */}
+                  <View style={{ marginVertical: 8 }}>
+                    <Text style={[styles.mmTotalCardAmount, tStyles.mmTotalCardAmount, { fontSize: 32, fontWeight: '900', letterSpacing: -0.5 }]}>
+                      {mmCurrency} {formatMMNumber(totalNetWorth)}
+                    </Text>
+                    <Text style={[styles.mmTotalCardSub, tStyles.mmTotalCardSub, { fontSize: 12, marginTop: 2 }]}>
+                      {t('mm_active_wallet_balances')}
+                    </Text>
+                  </View>
+
+                  {/* Inflows & Outflows Summary Cards / Pills (Image 12) */}
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                    {/* Inflows Card */}
+                    <View style={{
+                      flex: 1,
+                      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
+                      borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : 'rgba(16, 185, 129, 0.25)',
+                      borderWidth: 1.5,
+                      borderRadius: 16,
+                      padding: 12,
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#A7F3D0' : '#047857' }} numberOfLines={1}>
+                          {t('mm_income_prefix')}{periodLabel})
+                        </Text>
+                        <View style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          backgroundColor: isDark ? '#065F46' : '#D1FAE5',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#10B981' }}>↗</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.mmStatIncome, tStyles.mmStatIncome, { fontSize: 16, fontWeight: '800' }]} numberOfLines={1}>
+                        +{mmCurrency} {formatMMNumber(pIncome)}
+                      </Text>
+                    </View>
+
+                    {/* Outflows Card */}
+                    <View style={{
+                      flex: 1,
+                      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
+                      borderColor: isDark ? 'rgba(239, 68, 68, 0.35)' : 'rgba(239, 68, 68, 0.25)',
+                      borderWidth: 1.5,
+                      borderRadius: 16,
+                      padding: 12,
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#FECACA' : '#B91C1C' }} numberOfLines={1}>
+                          {t('mm_expense_prefix')}{periodLabel})
+                        </Text>
+                        <View style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          backgroundColor: isDark ? '#7F1D1D' : '#FEE2E2',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#EF4444' }}>↘</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.mmStatExpense, tStyles.mmStatExpense, { fontSize: 16, fontWeight: '800' }]} numberOfLines={1}>
+                        -{mmCurrency} {formatMMNumber(pExpense)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Net Savings Badge / Pill */}
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 12,
+                    backgroundColor: isDark ? '#1E293B' : (currentTheme.cardBgElevated || '#F1F5F9'),
+                    borderWidth: 1,
+                    borderColor: isDark ? '#334155' : (currentTheme.border || '#E2E8F0'),
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 14 }}>🌱</Text>
+                      <Text style={[styles.mmStatLabel, tStyles.mmStatLabel, { fontSize: 12, fontWeight: '600', marginBottom: 0 }]}>
+                        {t('mm_net_savings')}
+                      </Text>
+                    </View>
+                    <Text style={[[styles.mmStatSavings, tStyles.mmStatSavings], { fontSize: 14, fontWeight: '800' }, pSavings < 0 && { color: '#EF4444' }]}>
+                      {pSavings >= 0 ? '+' : ''}{mmCurrency} {formatMMNumber(pSavings)}
+                    </Text>
+                  </View>
+
+                  {/* Savings Rate (if income > 0) */}
                   {pIncome > 0 && moneyManagerState.preferences?.showSavingsRateCard !== false && (
-                    <View style={[styles.mmSavingsRateRow, tStyles.mmSavingsRateRow]}>
-                      <Text style={[styles.mmSavingsRateText, tStyles.mmSavingsRateText]}>
+                    <View style={[styles.mmSavingsRateRow, tStyles.mmSavingsRateRow, { marginTop: 8, paddingTop: 6 }]}>
+                      <Text style={[styles.mmSavingsRateText, tStyles.mmSavingsRateText, { fontSize: 11 }]}>
                         {t('mm_savings_rate_prefix')} <Text style={{ color: pSavings >= 0 ? '#10B981' : '#EF4444', fontWeight: 'bold' }}>{savingsRate}%</Text> ({pSavings >= 0 ? t('mm_savings_positive') : t('mm_savings_negative')})
                       </Text>
                     </View>
                   )}
+                </View>
+              );
+            })()}
+
+            {/* Quick Actions Bar (Image 7, Image 12) */}
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              gap: 8,
+              marginTop: 14,
+            }}>
+              {/* Add Income */}
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                  borderColor: isDark ? 'rgba(16, 185, 129, 0.4)' : '#A7F3D0',
+                  borderWidth: 1.5,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 8,
+                  paddingHorizontal: 4,
+                  elevation: 2,
+                  shadowColor: '#10B981',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isDark ? 0.3 : 0.12,
+                  shadowRadius: 3,
+                }}
+                onPress={() => {
+                  setMmNewType('income');
+                  setMmNewAmount('');
+                  setMmNewNote('');
+                  setMmNewPayee('');
+                  setModalMMAddTxn(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('mm_type_income')}
+              >
+                <View style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: '#10B981',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 3,
+                }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', lineHeight: 18 }}>+</Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#A7F3D0' : '#065F46' }}>
+                  + {t('mm_type_income')}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Add Expense */}
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
+                  borderColor: isDark ? 'rgba(239, 68, 68, 0.4)' : '#FECACA',
+                  borderWidth: 1.5,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 8,
+                  paddingHorizontal: 4,
+                  elevation: 2,
+                  shadowColor: '#EF4444',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isDark ? 0.3 : 0.12,
+                  shadowRadius: 3,
+                }}
+                onPress={() => {
+                  setMmNewType('expense');
+                  setMmNewAmount('');
+                  setMmNewNote('');
+                  setMmNewPayee('');
+                  setModalMMAddTxn(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('mm_type_expense')}
+              >
+                <View style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: '#EF4444',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 3,
+                }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', lineHeight: 18 }}>−</Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#FECACA' : '#991B1B' }}>
+                  − {t('mm_type_expense')}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Transfer */}
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#F5F3FF',
+                  borderColor: isDark ? 'rgba(139, 92, 246, 0.4)' : '#DDD6FE',
+                  borderWidth: 1.5,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 8,
+                  paddingHorizontal: 4,
+                  elevation: 2,
+                  shadowColor: '#8B5CF6',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isDark ? 0.3 : 0.12,
+                  shadowRadius: 3,
+                }}
+                onPress={() => {
+                  setMmTransferAmt('');
+                  setMmTransferNote('');
+                  const activeAccs = (moneyManagerState.accounts || []).filter(a => !a.isArchived);
+                  if (activeAccs.length > 0) setMmTransferFrom(activeAccs[0].id);
+                  if (activeAccs.length > 1) setMmTransferTo(activeAccs[1].id);
+                  setModalMMTransfer(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('mm_tab_transfer')}
+              >
+                <View style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: '#8B5CF6',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 3,
+                }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>⇄</Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#DDD6FE' : '#5B21B6' }}>
+                  {t('mm_tab_transfer')}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Budgets */}
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+                  borderColor: isDark ? 'rgba(59, 130, 246, 0.4)' : '#BFDBFE',
+                  borderWidth: 1.5,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 8,
+                  paddingHorizontal: 4,
+                  elevation: 2,
+                  shadowColor: '#3B82F6',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isDark ? 0.3 : 0.12,
+                  shadowRadius: 3,
+                }}
+                onPress={() => setMmActiveSubTab('budgets')}
+                accessibilityRole="button"
+                accessibilityLabel={t('mm_tab_budgets')}
+              >
+                <View style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: '#3B82F6',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 3,
+                }}>
+                  <Text style={{ fontSize: 13 }}>🎯</Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#BFDBFE' : '#1D4ED8' }}>
+                  {t('mm_tab_budgets')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Horizontal Accounts / Wallets Carousel (Image 4, Image 8) */}
+            <View style={{ marginTop: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 16 }}>👛</Text>
+                  <Text style={[styles.mmSectionTitle, tStyles.mmSectionTitle, { fontSize: 15, fontWeight: '700' }]}>
+                    {t("mm_wallets_title")}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setMmActiveSubTab('accounts')}
+                  style={{ paddingHorizontal: 6, paddingVertical: 4 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mm_wallets_title')}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#60A5FA' : '#2563EB' }}>
+                    {effectiveLanguage === 'en' ? 'View all' : 'সব দেখুন'} →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 10, paddingRight: 16 }}
+              >
+                {/* "All Wallets" Pill/Card */}
+                <TouchableOpacity
+                  style={{
+                    minWidth: 100,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    borderRadius: 18,
+                    backgroundColor: mmAccountFilter === 'all'
+                      ? (isDark ? '#1E3A8A' : '#EFF6FF')
+                      : (isDark ? '#1E293B' : (currentTheme.cardBgElevated || '#FFFFFF')),
+                    borderWidth: 2,
+                    borderColor: mmAccountFilter === 'all'
+                      ? (isDark ? '#3B82F6' : '#2563EB')
+                      : (isDark ? '#334155' : (currentTheme.border || '#E2E8F0')),
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    elevation: mmAccountFilter === 'all' ? 4 : 2,
+                    shadowColor: mmAccountFilter === 'all' ? '#3B82F6' : '#000000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isDark ? 0.35 : 0.1,
+                    shadowRadius: 4,
+                  }}
+                  onPress={() => setMmAccountFilter('all')}
+                  accessibilityRole="button"
+                  accessibilityLabel="All Accounts"
+                >
+                  <MM3DIcon
+                    icon="💎"
+                    color="#3B82F6"
+                    size={36}
+                    iconSize={18}
+                    isDark={isDark}
+                    glow={mmAccountFilter === 'all'}
+                  />
+                  <Text style={{
+                    marginTop: 6,
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    color: mmAccountFilter === 'all' ? (isDark ? '#93C5FD' : '#1D4ED8') : (isDark ? '#F8FAFC' : '#0F172A'),
+                  }}>
+                    {t('mm_filter_all') || 'সকল ওয়ালেট'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Account Cards */}
+                {(moneyManagerState.accounts || []).filter(a => !a.isArchived).map(acc => {
+                  const isSelected = mmAccountFilter === acc.id;
+                  const accColor = acc.color || (MM_WALLET_ICONS[acc.type]?.color || '#3B82F6');
+                  const accIcon = acc.icon || (MM_WALLET_ICONS[acc.type]?.icon || '💵');
+
+                  return (
+                    <TouchableOpacity
+                      key={acc.id}
+                      style={{
+                        minWidth: 140,
+                        padding: 12,
+                        borderRadius: 18,
+                        backgroundColor: isSelected
+                          ? (isDark ? '#1E293B' : '#F0FDF4')
+                          : (isDark ? '#1E293B' : (currentTheme.cardBgElevated || '#FFFFFF')),
+                        borderWidth: 2,
+                        borderColor: isSelected
+                          ? accColor
+                          : (isDark ? '#334155' : (currentTheme.border || '#E2E8F0')),
+                        elevation: isSelected ? 4 : 2,
+                        shadowColor: isSelected ? accColor : '#000000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: isDark ? 0.35 : 0.1,
+                        shadowRadius: 4,
+                      }}
+                      onPress={() => setMmAccountFilter(isSelected ? 'all' : acc.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={tMMSeed('account', acc.id, acc.name)}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <MM3DIcon
+                          icon={accIcon}
+                          color={accColor}
+                          size={36}
+                          iconSize={18}
+                          isDark={isDark}
+                          glow={isSelected}
+                        />
+                        <View style={{
+                          backgroundColor: isDark ? accColor + '30' : accColor + '18',
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 6,
+                        }}>
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: accColor }}>
+                            {(MM_WALLET_ICONS[acc.type] && t(MM_WALLET_ICONS[acc.type].labelKey)) || acc.type.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '700',
+                          color: isDark ? '#F8FAFC' : '#0F172A',
+                          marginTop: 8,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {tMMSeed('account', acc.id, acc.name)}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '800',
+                          color: isSelected ? accColor : (isDark ? '#E2E8F0' : '#1E293B'),
+                          marginTop: 2,
+                        }}
+                      >
+                        {mmCurrency} {formatMMNumber(acc.balance || 0)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {/* "+ Add Wallet" Card */}
+                <TouchableOpacity
+                  style={{
+                    minWidth: 120,
+                    padding: 12,
+                    borderRadius: 18,
+                    backgroundColor: isDark ? '#1E293B' : (currentTheme.cardBgElevated || '#F8FAFC'),
+                    borderWidth: 1.5,
+                    borderColor: isDark ? '#3B82F6' : '#93C5FD',
+                    borderStyle: 'dashed',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => {
+                    setMmNewAccName('');
+                    setMmNewAccBal('');
+                    setMmNewAccType('bank');
+                    setMmNewAccIcon('🏦');
+                    setModalMMAddAccount(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mm_add_account')}
+                >
+                  <View style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    backgroundColor: isDark ? 'rgba(59, 130, 246, 0.2)' : '#EFF6FF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 4,
+                  }}>
+                    <Text style={{ fontSize: 18, color: '#3B82F6', fontWeight: 'bold' }}>+</Text>
+                  </View>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#60A5FA' : '#2563EB' }}>
+                    + {t('mm_add_account')}
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+
+            {/* Category Spending Breakdown (Image 12, Image 4) */}
+            {(() => {
+              const expenseDist = moneyManagerService.calculateCategoryDistribution(moneyManagerState, 'expense', mmPeriod, mmCustomRange);
+              if (!expenseDist || expenseDist.length === 0) return null;
+              const top4 = expenseDist.slice(0, 4);
+
+              return (
+                <View style={{
+                  marginTop: 16,
+                  backgroundColor: isDark ? '#1E293B' : (currentTheme.cardBgElevated || '#FFFFFF'),
+                  borderRadius: 20,
+                  padding: 16,
+                  borderWidth: 1.5,
+                  borderColor: isDark ? '#334155' : (currentTheme.border || '#E2E8F0'),
+                  elevation: 2,
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isDark ? 0.3 : 0.08,
+                  shadowRadius: 4,
+                }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 16 }}>📊</Text>
+                      <Text style={[styles.mmSectionTitle, tStyles.mmSectionTitle, { fontSize: 14, fontWeight: '700' }]}>
+                        {t('mm_tab_analytics') || 'ব্যয়ের খাত ও বিশ্লেষণ'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setMmActiveSubTab('analytics')}
+                      style={{ paddingHorizontal: 4, paddingVertical: 2 }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#60A5FA' : '#2563EB' }}>
+                        {effectiveLanguage === 'en' ? 'Details' : 'বিস্তারিত'} →
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={{ gap: 10 }}>
+                    {top4.map((item) => {
+                      const cat = (moneyManagerState.categories || []).find(c => c.id === item.categoryId);
+                      const catBudget = cat && cat.budget > 0 ? cat.budget : 0;
+                      const budgetPct = catBudget > 0 ? Math.min(100, Math.round((item.amount / catBudget) * 100)) : null;
+
+                      return (
+                        <View key={item.categoryId}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                              <MM3DIcon
+                                icon={item.icon || '🍲'}
+                                color={item.color || '#EF4444'}
+                                size={32}
+                                iconSize={16}
+                                isDark={isDark}
+                              />
+                              <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F8FAFC' : '#0F172A', flex: 1 }} numberOfLines={1}>
+                                {cat ? tMMSeed('category', cat.id, cat.name) : item.categoryName}
+                              </Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: isDark ? '#F87171' : '#DC2626' }}>
+                                {mmCurrency} {formatMMNumber(item.amount)}
+                              </Text>
+                              <Text style={{ fontSize: 10, color: isDark ? '#94A3B8' : '#64748B' }}>
+                                {item.percentage}% {catBudget > 0 ? ('• ' + t('mm_tab_budgets') + ': ' + budgetPct + '%') : ''}
+                              </Text>
+                            </View>
+                          </View>
+                          {/* Progress indicator */}
+                          <View style={{ height: 5, borderRadius: 3, backgroundColor: isDark ? '#334155' : '#E2E8F0', overflow: 'hidden' }}>
+                            <View style={{
+                              height: '100%',
+                              width: (Math.min(100, item.percentage)) + '%',
+                              backgroundColor: item.color || '#EF4444',
+                              borderRadius: 3,
+                            }} />
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
               );
             })()}
@@ -9153,9 +10088,49 @@ function TallyKhataApp() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Filtered & Sorted Transactions List */}
+                {/* Account Filter Active Banner */}
+                {mmAccountFilter !== 'all' && (() => {
+                  const currentAcc = (moneyManagerState.accounts || []).find(a => a.id === mmAccountFilter);
+                  const accName = currentAcc ? tMMSeed('account', currentAcc.id, currentAcc.name) : mmAccountFilter;
+                  return (
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+                      borderColor: isDark ? 'rgba(59, 130, 246, 0.4)' : '#BFDBFE',
+                      borderWidth: 1.5,
+                      borderRadius: 14,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      marginBottom: 12,
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                        <Text style={{ fontSize: 14 }}>👛</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#93C5FD' : '#1D4ED8', flex: 1 }} numberOfLines={1}>
+                          {t('mm_wallet_or_account')}: {accName}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setMmAccountFilter('all')}
+                        style={{
+                          backgroundColor: isDark ? '#1E3A8A' : '#DBEAFE',
+                          borderRadius: 8,
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#BFDBFE' : '#1E40AF' }}>
+                          ✕ {effectiveLanguage === 'en' ? 'Clear' : 'মুছুন'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })()}
+
+                {/* Date-Grouped Filtered & Sorted Transactions List (8-10 Year Usability Standard) */}
                 {(() => {
-                  const filteredTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, {
+                  let filteredTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, {
                     filterType: mmTxnFilter,
                     period: mmPeriod,
                     customRange: mmCustomRange,
@@ -9163,15 +10138,22 @@ function TallyKhataApp() {
                     sortOrder: mmSortOrder,
                   });
 
+                  if (mmAccountFilter !== 'all') {
+                    filteredTxns = filteredTxns.filter((txn) => (
+                      txn.accountId === mmAccountFilter ||
+                      (txn.type === 'transfer' && (txn.fromAccountId === mmAccountFilter || txn.toAccountId === mmAccountFilter))
+                    ));
+                  }
+
                   if (filteredTxns.length === 0) {
                     return (
                       <View style={[styles.mmEmptyBox, tStyles.mmEmptyBox]}>
                         <Text style={styles.mmEmptyIcon}>📝</Text>
                         <Text style={[styles.mmEmptyText, tStyles.mmEmptyText]}>
-                          {mmSearchQuery ? t('mm_empty_filtered') : t('mm_empty_period')}
+                          {mmSearchQuery || mmAccountFilter !== 'all' ? t('mm_empty_filtered') : t('mm_empty_period')}
                         </Text>
                         <TouchableOpacity
-                            style={[styles.mmEmptyBtn, tStyles.mmEmptyBtn]}
+                          style={[styles.mmEmptyBtn, tStyles.mmEmptyBtn]}
                           onPress={() => {
                             setMmNewType('expense');
                             setMmNewAmount('');
@@ -9186,88 +10168,219 @@ function TallyKhataApp() {
                     );
                   }
 
-                  return filteredTxns.map((txn) => {
-                    const isIncome = txn.type === 'income';
-                    const isExpense = txn.type === 'expense';
-                    const isTransfer = txn.type === 'transfer';
-                    const isGoalAllocation = moneyManagerService.isGoalAllocationTransaction(txn);
-                    const linkedGoal = isGoalAllocation ? (moneyManagerState.goals || []).find((goal) => goal.id === txn.goalId) : null;
+                  const todayStr = moneyManagerService.getLocalDateString();
+                  const yesterdayStr = moneyManagerService.shiftDateStr(todayStr, -1);
 
-                    const cat = (moneyManagerState.categories || []).find((c) => c.id === txn.categoryId);
-                    const acc = (moneyManagerState.accounts || []).find((a) => a.id === txn.accountId);
-                    const fromAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === txn.fromAccountId) : null;
-                    const toAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === txn.toAccountId) : null;
+                  // Group transactions by date
+                  const dateGroups = [];
+                  const groupMap = new Map();
 
-                    const title = isGoalAllocation
-                      ? `${t(txn.goalAction === 'withdrawal' ? 'mm_goal_withdrawal_short' : 'mm_goal_deposit_short')}: ${linkedGoal ? tMMSeed('goal', linkedGoal.id, linkedGoal.title) : txn.payee || t('mm_goal_fallback')}`
-                      : isTransfer
-                      ? `${fromAcc ? tMMSeed('account', fromAcc.id, fromAcc.name) : t('mm_account')} ➔ ${toAcc ? tMMSeed('account', toAcc.id, toAcc.name) : t('mm_account')}`
-                      : cat
-                      ? tMMSeed('category', cat.id, cat.name)
-                      : t('mm_generic_txn');
+                  filteredTxns.map((txn) => {
+                    const d = txn.date || todayStr;
+                    if (!groupMap.has(d)) {
+                      const newGroup = {
+                        date: d,
+                        txns: [],
+                        totalIncome: 0,
+                        totalExpense: 0,
+                      };
+                      groupMap.set(d, newGroup);
+                      dateGroups.push(newGroup);
+                    }
+                    const grp = groupMap.get(d);
+                    grp.txns.push(txn);
+                    if (txn.type === 'income') grp.totalIncome += (txn.amount || 0);
+                    else if (txn.type === 'expense') grp.totalExpense += (txn.amount || 0);
+                  });
 
-                    const icon = isGoalAllocation ? '🎯' : isTransfer ? '🔄' : cat ? cat.icon : '💵';
-                    const color = isGoalAllocation ? '#8B5CF6' : isTransfer ? '#3B82F6' : isIncome ? '#10B981' : '#EF4444';
+                  return dateGroups.map((grp) => {
+                    const headerLabel = grp.date === todayStr
+                      ? ('🌟 ' + (effectiveLanguage === 'en' ? 'Today' : 'আজ'))
+                      : grp.date === yesterdayStr
+                      ? ('🗓️ ' + (effectiveLanguage === 'en' ? 'Yesterday' : 'গতকাল'))
+                      : ('📅 ' + formatDisplayDate(grp.date));
 
                     return (
-                      <View key={txn.id} style={[[styles.mmTxnCard, tStyles.mmTxnCard], tStyles.mmTxnItem]}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <View style={[styles.mmTxnIconBox, { backgroundColor: color + '22', borderColor: color + '55' }]}>
-                            <Text style={styles.mmTxnIcon}>{icon}</Text>
-                          </View>
-                          <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={[styles.mmTxnCat, tStyles.mmTxnTitle]} numberOfLines={1}>
-                              {title}
+                      <View key={grp.date} style={{ marginBottom: 12 }}>
+                        {/* Group Sticky Header */}
+                        <View style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingVertical: 6,
+                          paddingHorizontal: 4,
+                          marginBottom: 8,
+                          borderBottomWidth: 1,
+                          borderBottomColor: isDark ? '#334155' : (currentTheme.divider || '#E2E8F0'),
+                        }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{
+                              fontSize: 13,
+                              fontWeight: '700',
+                              color: isDark ? '#F1F5F9' : '#1E293B',
+                            }}>
+                              {headerLabel}
                             </Text>
-                            {txn.payee ? (
-                              <Text style={[styles.mmTxnPayee, tStyles.mmTxnPayee]} numberOfLines={1}>
-                                🏷️ {tMMSeed('transaction', txn.id, txn.payee, 'payee')}
+                            <View style={{
+                              backgroundColor: isDark ? '#334155' : '#F1F5F9',
+                              borderRadius: 10,
+                              paddingHorizontal: 6,
+                              paddingVertical: 1,
+                            }}>
+                              <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B', fontWeight: '600' }}>
+                                {grp.txns.length}
                               </Text>
-                            ) : null}
-                            {txn.note ? (
-                              <Text style={[[styles.mmTxnNote, tStyles.mmTxnNote], tStyles.mmTxnSub]} numberOfLines={2}>
-                                {tMMSeed('transaction', txn.id, txn.note, 'note')}
-                              </Text>
-                            ) : null}
-                            <Text style={[[styles.mmTxnMeta, tStyles.mmTxnMeta], tStyles.mmTxnSub]}>
-                              {formatDisplayDate(txn.date)}{txn.time && !/^(today|yesterday)$/i.test(String(txn.time).trim()) ? ` • ${txn.time}` : ''}{acc && !isTransfer ? ` • ${tMMSeed('account', acc.id, acc.name)}` : ''}
-                            </Text>
+                            </View>
                           </View>
-                          <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
-                            <Text style={[styles.mmTxnAmount, { color }]}>
-            {isGoalAllocation ? (txn.goalAction === 'withdrawal' ? '↗ ' : '↘ ') : isIncome ? '+' : isExpense ? '-' : ''}{mmCurrency}{' '}
-                              {formatMMNumber((txn.amount || 0))}
-                            </Text>
+
+                          {/* Day Subtotals */}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            {grp.totalIncome > 0 && (
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#34D399' : '#059669' }}>
+                                +{mmCurrency} {formatMMNumber(grp.totalIncome)}
+                              </Text>
+                            )}
+                            {grp.totalExpense > 0 && (
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#F87171' : '#DC2626' }}>
+                                -{mmCurrency} {formatMMNumber(grp.totalExpense)}
+                              </Text>
+                            )}
                           </View>
                         </View>
 
-                        {/* Transaction Actions: Edit & Delete */}
-                        <View style={[styles.mmTxnActionRow, tStyles.mmTxnActionRow]}>
-                          {!isGoalAllocation && (
-                            <TouchableOpacity
-                              style={[styles.mmTxnActionBtn, tStyles.mmTxnActionBtn]}
-                              onPress={() => handleOpenEditMMTxn(txn)}
-                              accessibilityRole="button"
-                              accessibilityLabel={t('mm_access_edit_txn')}
-                            >
-                              <Text style={[styles.mmTxnActionBtnText, tStyles.mmTxnActionBtnText]}>✏️ {t('btn_edit')}</Text>
-                            </TouchableOpacity>
-                          )}
-                          <TouchableOpacity
-                            style={[styles.mmTxnDeleteBtn, tStyles.mmTxnDeleteBtn]}
-                            onPress={() => handleDeleteMMTxn(txn.id)}
-                            accessibilityRole="button"
-                            accessibilityLabel={t('mm_access_delete_txn')}
-                          >
-                            <Text style={[styles.mmTxnDeleteBtnText, tStyles.mmTxnDeleteBtnText]}>🗑️ {t('btn_delete')}</Text>
-                          </TouchableOpacity>
-                        </View>
+                        {/* Transactions in this Date Group */}
+                        {grp.txns.map((txn) => {
+                          const isIncome = txn.type === 'income';
+                          const isExpense = txn.type === 'expense';
+                          const isTransfer = txn.type === 'transfer';
+                          const isGoalAllocation = moneyManagerService.isGoalAllocationTransaction(txn);
+                          const linkedGoal = isGoalAllocation ? (moneyManagerState.goals || []).find((goal) => goal.id === txn.goalId) : null;
+
+                          const cat = (moneyManagerState.categories || []).find((c) => c.id === txn.categoryId);
+                          const acc = (moneyManagerState.accounts || []).find((a) => a.id === txn.accountId);
+                          const fromAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === txn.fromAccountId) : null;
+                          const toAcc = isTransfer ? (moneyManagerState.accounts || []).find((a) => a.id === txn.toAccountId) : null;
+
+                          const title = isGoalAllocation
+                            ? (t(txn.goalAction === 'withdrawal' ? 'mm_goal_withdrawal_short' : 'mm_goal_deposit_short') + ': ' + (linkedGoal ? tMMSeed('goal', linkedGoal.id, linkedGoal.title) : txn.payee || t('mm_goal_fallback')))
+                            : isTransfer
+                            ? ((fromAcc ? tMMSeed('account', fromAcc.id, fromAcc.name) : t('mm_account')) + ' ➔ ' + (toAcc ? tMMSeed('account', toAcc.id, toAcc.name) : t('mm_account')))
+                            : cat
+                            ? tMMSeed('category', cat.id, cat.name)
+                            : t('mm_generic_txn');
+
+                          const icon = isGoalAllocation ? '🎯' : isTransfer ? '⇄' : cat ? cat.icon : '💵';
+                          const color = isGoalAllocation ? '#8B5CF6' : isTransfer ? '#8B5CF6' : isIncome ? '#10B981' : '#EF4444';
+
+                          return (
+                            <View key={txn.id} style={[[styles.mmTxnCard, tStyles.mmTxnCard], tStyles.mmTxnItem, { borderRadius: 18, padding: 14, marginBottom: 8, borderWidth: 1.5 }]}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <MM3DIcon
+                                  icon={icon}
+                                  color={color}
+                                  size={46}
+                                  iconSize={22}
+                                  isDark={isDark}
+                                />
+                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                  <Text style={[styles.mmTxnCat, tStyles.mmTxnTitle, { fontSize: 15, fontWeight: '700' }]} numberOfLines={1}>
+                                    {title}
+                                  </Text>
+                                  {txn.payee ? (
+                                    <Text style={[styles.mmTxnPayee, tStyles.mmTxnPayee, { fontSize: 12, marginTop: 1 }]} numberOfLines={1}>
+                                      🏷️ {tMMSeed('transaction', txn.id, txn.payee, 'payee')}
+                                    </Text>
+                                  ) : null}
+                                  {txn.note ? (
+                                    <Text style={[[styles.mmTxnNote, tStyles.mmTxnNote], tStyles.mmTxnSub, { fontSize: 12, marginTop: 1 }]} numberOfLines={2}>
+                                      {tMMSeed('transaction', txn.id, txn.note, 'note')}
+                                    </Text>
+                                  ) : null}
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                                    {(acc || (fromAcc && toAcc)) && (
+                                      <View style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 3,
+                                        paddingHorizontal: 7,
+                                        paddingVertical: 2,
+                                        borderRadius: 8,
+                                        backgroundColor: isDark ? '#334155' : (currentTheme.cardBgElevated || '#F1F5F9'),
+                                        borderWidth: 1,
+                                        borderColor: isDark ? '#475569' : '#E2E8F0',
+                                      }}>
+                                        <Text style={{ fontSize: 10 }}>👛</Text>
+                                        <Text style={{
+                                          fontSize: 10,
+                                          fontWeight: '700',
+                                          color: isDark ? '#E2E8F0' : '#475569',
+                                        }} numberOfLines={1}>
+                                          {isTransfer
+                                            ? ((fromAcc ? tMMSeed('account', fromAcc.id, fromAcc.name) : '') + ' ➔ ' + (toAcc ? tMMSeed('account', toAcc.id, toAcc.name) : ''))
+                                            : (acc ? tMMSeed('account', acc.id, acc.name) : '')}
+                                        </Text>
+                                      </View>
+                                    )}
+                                    {txn.time && !/^(today|yesterday)$/i.test(String(txn.time).trim()) ? (
+                                      <Text style={[[styles.mmTxnMeta, tStyles.mmTxnMeta], tStyles.mmTxnSub, { fontSize: 11 }]}>
+                                        ⏰ {txn.time} • {formatDisplayDate(txn.date)}
+                                      </Text>
+                                    ) : (
+                                      <Text style={[[styles.mmTxnMeta, tStyles.mmTxnMeta], tStyles.mmTxnSub, { fontSize: 11 }]}>
+                                        📅 {formatDisplayDate(txn.date)}
+                                      </Text>
+                                    )}
+                                  </View>
+                                </View>
+                                <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                                  <Text style={[styles.mmTxnAmount, {
+                                    color: isIncome ? '#10B981' : isExpense ? '#EF4444' : isTransfer ? '#8B5CF6' : color,
+                                    fontSize: 16,
+                                    fontWeight: '800',
+                                  }]}>
+                                    {isGoalAllocation ? (txn.goalAction === 'withdrawal' ? '↗ ' : '↘ ') : isIncome ? '+' : isExpense ? '-' : isTransfer ? '⇄ ' : ''}{mmCurrency}{' '}
+                                    {formatMMNumber((txn.amount || 0))}
+                                  </Text>
+                                  {isTransfer && txn.fee > 0 && (
+                                    <Text style={{ fontSize: 10, color: isDark ? '#94A3B8' : '#64748B', marginTop: 1 }}>
+                                      {t('mm_transfer_fee_label')}: {mmCurrency}{formatMMNumber(txn.fee)}
+                                    </Text>
+                                  )}
+                                </View>
+                              </View>
+
+                              {/* Transaction Actions: Edit & Delete (48dp+ touch target) */}
+                              <View style={[styles.mmTxnActionRow, tStyles.mmTxnActionRow, { marginTop: 10, paddingTop: 8, gap: 10 }]}>
+                                {!isGoalAllocation && (
+                                  <TouchableOpacity
+                                    style={[styles.mmTxnActionBtn, tStyles.mmTxnActionBtn, { minHeight: 44, paddingHorizontal: 16, borderRadius: 12, justifyContent: 'center', alignItems: 'center' }]}
+                                    onPress={() => handleOpenEditMMTxn(txn)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('mm_access_edit_txn')}
+                                  >
+                                    <Text style={[styles.mmTxnActionBtnText, tStyles.mmTxnActionBtnText, { fontSize: 13, fontWeight: '700' }]}>✏️ {t('btn_edit')}</Text>
+                                  </TouchableOpacity>
+                                )}
+                                <TouchableOpacity
+                                  style={[styles.mmTxnDeleteBtn, tStyles.mmTxnDeleteBtn, { minHeight: 44, paddingHorizontal: 16, borderRadius: 12, justifyContent: 'center', alignItems: 'center' }]}
+                                  onPress={() => handleDeleteMMTxn(txn.id)}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={t('mm_access_delete_txn')}
+                                >
+                                  <Text style={[styles.mmTxnDeleteBtnText, tStyles.mmTxnDeleteBtnText, { fontSize: 13, fontWeight: '700' }]}>🗑️ {t('btn_delete')}</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          );
+                        })}
                       </View>
                     );
                   });
                 })()}
               </View>
             )}
+
+
 
             {/* SUB-TAB 2: ACCOUNTS & WALLETS */}
             {mmActiveSubTab === 'accounts' && (
@@ -9302,9 +10415,14 @@ function TallyKhataApp() {
                   return (
                     <View key={acc.id} style={[styles.mmAccountCard, tStyles.mmAccountCard, acc.isArchived && styles.mmAccountCardArchived]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={[styles.mmAccountIconBox, { backgroundColor: (acc.color || '#3B82F6') + '22', borderColor: (acc.color || '#3B82F6') + '55' }]}>
-                          <Text style={styles.mmAccountIcon}>{acc.icon || '💼'}</Text>
-                        </View>
+                        <MM3DIcon
+                          icon={acc.icon || '💼'}
+                          color={acc.color || '#3B82F6'}
+                          size={46}
+                          iconSize={22}
+                          isDark={isDark}
+                          glow={!acc.isArchived}
+                        />
                         <View style={{ flex: 1, marginLeft: 12 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Text style={[styles.mmAccountName, tStyles.mmAccountName]} numberOfLines={1}>
@@ -9540,9 +10658,13 @@ function TallyKhataApp() {
                       return (
                         <View key={cat.id} style={[styles.mmCatBudgetCard, tStyles.mmCatBudgetCard]}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={[styles.mmCatBudgetIconBox, { backgroundColor: (cat.color || '#3B82F6') + '22', borderColor: (cat.color || '#3B82F6') + '55' }]}>
-                              <Text style={{ fontSize: 18 }}>{cat.icon || '🏷️'}</Text>
-                            </View>
+                            <MM3DIcon
+                              icon={cat.icon || '🏷️'}
+                              color={cat.color || '#3B82F6'}
+                              size={42}
+                              iconSize={20}
+                              isDark={isDark}
+                            />
                             <View style={{ flex: 1, marginLeft: 12 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Text style={[styles.mmCatBudgetName, tStyles.mmCatBudgetName]}>{tMMSeed('category', cat.id, cat.name)}</Text>
@@ -9626,9 +10748,13 @@ function TallyKhataApp() {
                       return (
                         <View key={cat.id} style={[styles.mmCatBudgetCard, tStyles.mmCatBudgetCard]}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={[styles.mmCatBudgetIconBox, { backgroundColor: (cat.color || '#10B981') + '22', borderColor: (cat.color || '#10B981') + '55' }]}>
-                              <Text style={{ fontSize: 18 }}>{cat.icon || '💰'}</Text>
-                            </View>
+                            <MM3DIcon
+                              icon={cat.icon || '💰'}
+                              color={cat.color || '#10B981'}
+                              size={42}
+                              iconSize={20}
+                              isDark={isDark}
+                            />
                             <View style={{ flex: 1, marginLeft: 12 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Text style={[styles.mmCatBudgetName, tStyles.mmCatBudgetName]}>{tMMSeed('category', cat.id, cat.name)}</Text>
@@ -9718,9 +10844,14 @@ function TallyKhataApp() {
                     return (
                       <View key={g.id} style={[[styles.mmGoalCard, tStyles.mmGoalCard], tStyles.mmCard]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <View style={[styles.mmGoalIconBox, { backgroundColor: (g.color || '#10B981') + '22', borderColor: (g.color || '#10B981') + '55' }]}>
-                            <Text style={{ fontSize: 22 }}>{g.icon || '🎯'}</Text>
-                          </View>
+                          <MM3DIcon
+                            icon={g.icon || '🎯'}
+                            color={g.color || '#10B981'}
+                            size={48}
+                            iconSize={24}
+                            isDark={isDark}
+                            glow
+                          />
                           <View style={{ flex: 1, marginLeft: 12 }}>
                             <Text style={[styles.mmGoalTitle, tStyles.mmGoalTitle]} numberOfLines={1}>
                               {tMMSeed('goal', g.id, g.title)}
@@ -9859,7 +10990,7 @@ function TallyKhataApp() {
                           distribution.map((item) => (
                             <View key={item.categoryId} style={styles.mmDistributionRow}>
                               <View style={styles.mmDistributionLeft}>
-                                <Text style={styles.mmDistributionIcon}>{item.icon}</Text>
+                                <MM3DIcon icon={item.icon || '🏷️'} color={item.color || '#3B82F6'} size={28} iconSize={15} isDark={isDark} style={{ marginRight: 8 }} />
                                 <Text style={[styles.mmDistributionName, tStyles.mmDistributionName]} numberOfLines={1}>
                                   {tMMSeed('category', item.categoryId, item.categoryName)}
                                 </Text>
@@ -9932,6 +11063,19 @@ function TallyKhataApp() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              <View style={{ alignItems: 'center', marginVertical: 14 }}>
+                <MM3DIcon
+                  icon={mmNewAccIcon}
+                  color={mmNewAccType === 'cash' ? '#10B981' : mmNewAccType === 'bank' ? '#3B82F6' : mmNewAccType === 'mfs' ? '#EC4899' : '#8B5CF6'}
+                  size={58}
+                  iconSize={28}
+                  isDark={isDark}
+                  glow
+                />
+                <Text style={{ marginTop: 8, fontSize: 14, fontWeight: '700', color: isDark ? '#F8FAFC' : '#0F172A' }}>
+                  {mmNewAccName.trim() || t('mm_new_wallet_title')}
+                </Text>
+              </View>
               {/* Type Selector (Expense / Income / Transfer) */}
               <View style={{ flexDirection: 'row', marginBottom: 14 }}>
                 <TouchableOpacity
@@ -11638,6 +12782,130 @@ function TallyKhataApp() {
 // =========================================================================
 const styles = StyleSheet.create({
   // --- THEME & LANGUAGE PICKER STYLES ---
+  bottomSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    marginBottom: 8,
+  },
+  bottomSheetTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  bottomSheetSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 3,
+  },
+  themePreviewHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  themePreviewSectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  themeModeBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  themeModeBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  themePreviewBox: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 8,
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+  },
+  themePreviewCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  themePreviewIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themePreviewTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  themePreviewSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  themePreviewAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  themePreviewAmountLabel: {
+    fontSize: 10,
+    marginTop: 1,
+  },
+  themePreviewActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+  },
+  themePreviewAccents: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  themePreviewDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  themePreviewSampleBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themePreviewSampleBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  themeDoneBtn: {
+    marginTop: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 1,
+  },
+  themeDoneBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   themeOptionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -11779,8 +13047,8 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   quickGridIcon: {
-    width: 42,
-    height: 42,
+    width: 48,
+    height: 48,
   },
   quickGridLabel: {
     fontSize: 12,
@@ -15325,11 +16593,16 @@ const styles = StyleSheet.create({
   /* Top Summary Card */
   mmTotalCard: {
     backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 24,
+    padding: 18,
     marginTop: 14,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#334155',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   mmTotalCardLabel: {
     color: '#94A3B8',
@@ -15580,14 +16853,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 14,
     backgroundColor: '#F1F5F9',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 4,
   },
   mmSubTabBtn: {
     flex: 1,
-    paddingVertical: 9,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 8,
+    justifyContent: 'center',
+    borderRadius: 12,
+    minHeight: 40,
   },
   mmSubTabBtnActive: {
     backgroundColor: '#FFFFFF',
@@ -15677,11 +16952,16 @@ const styles = StyleSheet.create({
   /* Transactions List */
   mmTxnCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   mmTxnIconBox: {
     width: 40,
@@ -15775,11 +17055,16 @@ const styles = StyleSheet.create({
   },
   mmAccountCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 18,
     padding: 14,
     marginBottom: 10,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   mmAccountCardArchived: {
     opacity: 0.6,
@@ -16165,10 +17450,15 @@ const styles = StyleSheet.create({
   },
   mmModalSheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 20,
     maxHeight: '90%',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
   },
   mmModalHeader: {
     flexDirection: 'row',
@@ -16196,14 +17486,15 @@ const styles = StyleSheet.create({
   },
   mmInput: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     color: '#0F172A',
     fontSize: 15,
-    marginBottom: 10,
-    borderWidth: 1,
+    marginBottom: 12,
+    borderWidth: 1.5,
     borderColor: '#CBD5E1',
+    minHeight: 48,
   },
   mmCatChip: {
     flexDirection: 'row',
@@ -16288,11 +17579,18 @@ const styles = StyleSheet.create({
   },
   mmSubmitBtn: {
     backgroundColor: '#059669',
-    borderRadius: 12,
+    borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 10,
+    justifyContent: 'center',
+    marginTop: 12,
     marginBottom: 12,
+    minHeight: 50,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 4,
   },
   mmSubmitBtnText: {
     color: '#FFFFFF',

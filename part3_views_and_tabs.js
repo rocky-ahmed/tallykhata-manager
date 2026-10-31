@@ -358,23 +358,6 @@
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={
                 <View style={{ backgroundColor: '#F8F9FA' }}>
-                  {/* --- 1. PROMO BANNER (মানি ট্রান্সফার চার্জ ফ্রি!*) --- */}
-                  <TouchableOpacity
-                    style={styles.promoBannerCard}
-                    onPress={() => setActiveTab('tallypay')}
-                    activeOpacity={0.85}
-                  >
-                    <Image
-                      source={require('./assets/icons/ic_sqr_value_banner.png')}
-                      style={styles.promoBannerImg}
-                      resizeMode="contain"
-                    />
-                    <View style={styles.promoBannerTextCol}>
-                      <Text style={styles.promoBannerBold}>মানি ট্রান্সফার</Text>
-                      <Text style={styles.promoBannerBold}>চার্জ ফ্রি!*</Text>
-                      <Text style={styles.promoBannerSub}>*শর্ত প্রযোজ্য</Text>
-                    </View>
-                  </TouchableOpacity>
 
                   {/* --- 2. 8-ITEM AUTHENTIC QUICK ACTIONS GRID --- */}
                   <View style={styles.quickGridContainer}>
@@ -1033,45 +1016,6 @@
                   <Image source={require("./assets/ic_bangla_qr.png")} style={{ width: 24, height: 24 }} resizeMode="contain" />
                 </View>
                 <Text style={styles.walletServiceLabel}>কিউআর পেমেন্ট</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Authentic SQR Promo Banner (layoutSqrPromo from fragment_tp_wallet_main.xml) */}
-            <View style={styles.walletPromoCard}>
-              <Image
-                source={require('./assets/ic_qr_support_all_apps.png')}
-                style={{ width: '100%', height: 75, marginBottom: 12 }}
-                resizeMode="contain"
-              />
-              <Text style={styles.walletPromoTitle}>
-                টালিপে QR — ব্যবসায়ীদের জন্য সেরা বাংলা QR
-              </Text>
-              <View style={styles.walletPromoBenefitRow}>
-                <Image
-                  source={require('./assets/icons/ic_check.png')}
-                  style={{ width: 16, height: 16, tintColor: '#0F8A0F', marginRight: 8, marginTop: 2 }}
-                  resizeMode="contain"
-                />
-                <Text style={styles.walletPromoBenefitText}>
-                  টালিপে QR-এ পেমেন্ট নিন নগদ, বিকাশ, রকেট সহ সকল ব্যাংক অ্যাপ থেকে।
-                </Text>
-              </View>
-              <View style={styles.walletPromoBenefitRow}>
-                <Image
-                  source={require('./assets/icons/ic_check.png')}
-                  style={{ width: 16, height: 16, tintColor: '#0F8A0F', marginRight: 8, marginTop: 2 }}
-                  resizeMode="contain"
-                />
-                <Text style={styles.walletPromoBenefitText}>
-                  ইনস্ট্যান্ট পেমেন্ট বা টাকা ট্রান্সফার করুন ব্যাংক বা MFS একাউন্টে।
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.walletPromoCtaBtn}
-                onPress={() => setModalBanglaQR(true)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.walletPromoCtaText}>টালিপে QR নিন</Text>
               </TouchableOpacity>
             </View>
 

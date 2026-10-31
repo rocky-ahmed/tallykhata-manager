@@ -95,8 +95,17 @@ function establishAccountOpeningBalance(account, allJournals = []) {
   let jNetPaisa = 0;
   let hasInvalid = false;
 
+  const targetBizId = account.businessId !== undefined && account.businessId !== null ? String(account.businessId) : null;
+  const isBizMatch = (j) => {
+    const jBizId = j && j.businessId !== undefined && j.businessId !== null ? String(j.businessId) : null;
+    if (targetBizId && jBizId) return targetBizId === jBizId;
+    if (targetBizId && !jBizId) return targetBizId === '1' || targetBizId === 'default';
+    if (!targetBizId && jBizId) return jBizId === '1' || jBizId === 'default';
+    return true;
+  };
+
   for (const j of allJournals) {
-    if (String(j.accountId) === targetAccId && (!account.businessId || !j.businessId || String(j.businessId) === String(account.businessId))) {
+    if (j && String(j.accountId) === targetAccId && isBizMatch(j)) {
       const numAmt = Number(j.amount);
       if (isNaN(numAmt)) {
         hasInvalid = true;
@@ -136,7 +145,161 @@ function establishAccountOpeningBalance(account, allJournals = []) {
  *     given (-) = cash paid / we owe supplier less
  *     balance = openingBalance + sum(received) - sum(given)
  */
-function recalculateAccountRunningBalances(account, allJournals = []) {
+
+function sortJournalsChronologically(journals) {
+  if (!Array.isArray(journals) || journals.length <= 1) return journals;
+  return journals.sort((a, b) => {
+    const dA = a.date || '';
+    const dB = b.date || '';
+    if (dA < dB) return -1;
+    if (dA > dB) return 1;
+
+    const tA = a.time || '';
+    const tB = b.time || '';
+    if (tA < tB) return -1;
+    if (tA > tB) return 1;
+
+    const numA = Number(a.id);
+    const numB = Number(b.id);
+    if (!isNaN(numA) && !isNaN(numB)) {
+      return numA - numB;
+    }
+    const sA = String(a.id || '');
+    const sB = String(b.id || '');
+    return sA < sB ? -1 : (sA > sB ? 1 : 0);
+  });
+}
+
+/**
+ * High-performance batch recalculation of account running balances.
+ * Indexes all journals in O(M) time and recalculates N accounts in O(N + M log M)
+ * instead of naive O(N * M) scans.
+ */
+function recalculateAllAccountBalances(accounts = [], allJournals = [], businessId = null) {
+  if (!Array.isArray(accounts) || accounts.length === 0) {
+    const emptyResult = [];
+    emptyResult.updatedAccounts = [];
+    emptyResult.updatedJournals = allJournals;
+    emptyResult.accounts = [];
+    emptyResult.journals = allJournals;
+    return emptyResult;
+  }
+
+  // 1. Index all journals by accountId in O(M) time
+  const journalMap = new Map();
+  for (let i = 0; i < allJournals.length; i++) {
+    const j = allJournals[i];
+    if (!j || j.accountId === undefined || j.accountId === null) continue;
+    if (businessId && j.businessId && String(j.businessId) !== String(businessId)) {
+      continue;
+    }
+    const accKey = String(j.accountId);
+    let list = journalMap.get(accKey);
+    if (!list) {
+      list = [];
+      journalMap.set(accKey, list);
+    }
+    list.push({ ...j });
+  }
+
+  const updatedJournalsMap = new Map();
+  const updatedAccounts = [];
+
+  // 2. Iterate each account in O(N) time with O(1) journal lookup
+  for (let i = 0; i < accounts.length; i++) {
+    const account = accounts[i];
+    if (!account || !account.id) {
+      updatedAccounts.push(account);
+      continue;
+    }
+
+    if (businessId && account.businessId && String(account.businessId) !== String(businessId)) {
+      updatedAccounts.push(account);
+      continue;
+    }
+
+    const isCustomer = account.type === 1;
+    const targetAccId = String(account.id);
+    const targetBizId = account.businessId !== undefined && account.businessId !== null ? String(account.businessId) : null;
+    const rawTargetJournals = journalMap.get(targetAccId) || [];
+    const targetJournals = rawTargetJournals.filter(j => {
+      const jBizId = j.businessId !== undefined && j.businessId !== null ? String(j.businessId) : null;
+      if (targetBizId && jBizId) return targetBizId === jBizId;
+      if (targetBizId && !jBizId) return targetBizId === '1' || targetBizId === 'default';
+      if (!targetBizId && jBizId) return jBizId === '1' || jBizId === 'default';
+      return true;
+    });
+
+    let openingBal = 0;
+    if (account.openingBalance !== undefined && account.openingBalance !== null) {
+      openingBal = Number(account.openingBalance) || 0;
+    } else if (account.initialBalance !== undefined && account.initialBalance !== null) {
+      openingBal = Number(account.initialBalance) || 0;
+    }
+
+    if (targetJournals.length > 0) {
+      sortJournalsChronologically(targetJournals);
+
+      let runningPaisa = Math.round(openingBal * 100);
+      for (let k = 0; k < targetJournals.length; k++) {
+        const j = targetJournals[k];
+        const numAmt = Number(j.amount) || 0;
+        const amtPaisa = Math.round(numAmt * 100);
+        if (isCustomer) {
+          if (j.type === 'given') runningPaisa += amtPaisa;
+          else if (j.type === 'received') runningPaisa -= amtPaisa;
+        } else {
+          if (j.type === 'received') runningPaisa += amtPaisa;
+          else if (j.type === 'given') runningPaisa -= amtPaisa;
+        }
+        j.runningBalance = runningPaisa / 100;
+        updatedJournalsMap.set(String(j.id), j);
+      }
+
+      const finalBalance = runningPaisa / 100;
+      updatedAccounts.push({
+        ...account,
+        balance: finalBalance,
+        openingBalance: Math.round(openingBal * 100) / 100,
+      });
+    } else {
+      const finalBalance = Math.round(openingBal * 100) / 100;
+      updatedAccounts.push({
+        ...account,
+        balance: finalBalance,
+        openingBalance: finalBalance,
+      });
+    }
+  }
+
+  // 3. Map modified journals back in O(M) time
+  let updatedJournals;
+  if (updatedJournalsMap.size > 0) {
+    updatedJournals = allJournals.map((orig) => {
+      const mod = updatedJournalsMap.get(String(orig.id));
+      return mod || orig;
+    });
+  } else {
+    updatedJournals = allJournals;
+  }
+
+  const result = [...updatedAccounts];
+  result.updatedAccounts = updatedAccounts;
+  result.updatedJournals = updatedJournals;
+  result.accounts = updatedAccounts;
+  result.journals = updatedJournals;
+  return result;
+}
+
+function recalculateAccountRunningBalances(accountOrAccounts, allJournals = [], optionsOrIndex = null) {
+  if (Array.isArray(accountOrAccounts)) {
+    const businessId = (typeof optionsOrIndex === 'string' || typeof optionsOrIndex === 'number')
+      ? optionsOrIndex
+      : (optionsOrIndex && optionsOrIndex.businessId) || null;
+    return recalculateAllAccountBalances(accountOrAccounts, allJournals, businessId);
+  }
+
+  const account = accountOrAccounts;
   if (!account || !account.id) {
     return { updatedAccount: account, updatedJournals: allJournals, accountJournals: [] };
   }
@@ -144,35 +307,34 @@ function recalculateAccountRunningBalances(account, allJournals = []) {
   const isCustomer = account.type === 1;
   const targetAccId = String(account.id);
 
-  // Extract journals belonging to this account and others
-  const targetJournals = [];
-  const otherJournals = [];
+  // If optionsOrIndex is a Map (pre-indexed journals), do O(1) lookup
+  let targetJournals = [];
+  const targetBizId = account.businessId !== undefined && account.businessId !== null ? String(account.businessId) : null;
+  const isBizMatch = (j) => {
+    const jBizId = j && j.businessId !== undefined && j.businessId !== null ? String(j.businessId) : null;
+    if (targetBizId && jBizId) return targetBizId === jBizId;
+    if (targetBizId && !jBizId) return targetBizId === '1' || targetBizId === 'default';
+    if (!targetBizId && jBizId) return jBizId === '1' || jBizId === 'default';
+    return true;
+  };
 
-  for (const j of allJournals) {
-    if (String(j.accountId) === targetAccId && (!account.businessId || !j.businessId || String(j.businessId) === String(account.businessId))) {
-      targetJournals.push({ ...j });
-    } else {
-      otherJournals.push(j);
+  if (optionsOrIndex instanceof Map) {
+    const effectiveBiz = targetBizId || 'default';
+    const list = optionsOrIndex.get(`${effectiveBiz}:${targetAccId}`) || optionsOrIndex.get(targetAccId);
+    if (list) {
+      targetJournals = list.filter(isBizMatch).map(j => ({ ...j }));
+    }
+  } else {
+    for (let i = 0; i < allJournals.length; i++) {
+      const j = allJournals[i];
+      if (j && String(j.accountId) === targetAccId && isBizMatch(j)) {
+        targetJournals.push({ ...j });
+      }
     }
   }
 
   // Sort chronologically ascending (oldest first)
-  targetJournals.sort((a, b) => {
-    const dateComp = (a.date || '').localeCompare(b.date || '');
-    if (dateComp !== 0) return dateComp;
-
-    if (a.time && b.time) {
-      const timeComp = a.time.localeCompare(b.time);
-      if (timeComp !== 0) return timeComp;
-    }
-
-    const idA = isNaN(Number(a.id)) ? a.id : Number(a.id);
-    const idB = isNaN(Number(b.id)) ? b.id : Number(b.id);
-    if (typeof idA === 'number' && typeof idB === 'number') {
-      return idA - idB;
-    }
-    return String(a.id).localeCompare(String(b.id));
-  });
+  sortJournalsChronologically(targetJournals);
 
   // Determine explicit opening balance baseline
   let openingBal = 0;
@@ -184,7 +346,8 @@ function recalculateAccountRunningBalances(account, allJournals = []) {
 
   // Calculate sequential running balance starting from openingBal baseline in integer paisa
   let runningPaisa = Math.round(openingBal * 100);
-  for (const j of targetJournals) {
+  for (let i = 0; i < targetJournals.length; i++) {
+    const j = targetJournals[i];
     const numAmt = Number(j.amount) || 0;
     const amtPaisa = Math.round(numAmt * 100);
     if (isCustomer) {
@@ -207,19 +370,19 @@ function recalculateAccountRunningBalances(account, allJournals = []) {
   // For UI display, account journals are displayed newest first
   const displayAccountJournals = [...targetJournals].reverse();
 
-  // Combine back into allJournals, replacing modified items by ID
-  const targetMap = new Map();
-  for (const tj of targetJournals) {
-    targetMap.set(String(tj.id), tj);
-  }
-
-  const updatedJournals = allJournals.map((orig) => {
-    const strId = String(orig.id);
-    if (targetMap.has(strId)) {
-      return targetMap.get(strId);
+  let updatedJournals;
+  if (targetJournals.length > 0) {
+    const targetMap = new Map();
+    for (let i = 0; i < targetJournals.length; i++) {
+      targetMap.set(String(targetJournals[i].id), targetJournals[i]);
     }
-    return orig;
-  });
+    updatedJournals = allJournals.map((orig) => {
+      const strId = String(orig.id);
+      return targetMap.has(strId) ? targetMap.get(strId) : orig;
+    });
+  } else {
+    updatedJournals = allJournals;
+  }
 
   return {
     updatedAccount,
@@ -444,6 +607,50 @@ function indexJournalsByAccount(allJournals = [], businessId = null) {
   return map;
 }
 
+
+/**
+ * Creates an O(1) account lookup Map by string ID.
+ */
+function createAccountLookupMap(accounts = []) {
+  const map = new Map();
+  for (let i = 0; i < accounts.length; i++) {
+    const a = accounts[i];
+    if (a && a.id !== undefined && a.id !== null) {
+      map.set(String(a.id), a);
+    }
+  }
+  return map;
+}
+
+/**
+ * Fast single-pass customer query with filtering and search.
+ */
+function queryCustomerAccounts(accounts = [], options = {}) {
+  const { type = 1, filter = 'all', searchQuery = '', businessId = null } = options;
+  const q = searchQuery ? searchQuery.toLowerCase().trim() : '';
+
+  const results = [];
+  for (let i = 0; i < accounts.length; i++) {
+    const a = accounts[i];
+    if (!a) continue;
+    if (businessId && a.businessId && String(a.businessId) !== String(businessId)) continue;
+    if (type !== 'all' && a.type !== type) continue;
+    const bal = Number(a.balance) || 0;
+    if (filter === 'due' && bal <= 0) continue;
+    if (q) {
+      const mName = (a.name || '').toLowerCase().includes(q);
+      const mPhone = (a.phone || '').includes(q);
+      if (!mName && !mPhone) continue;
+    }
+    results.push(a);
+  }
+
+  if (filter === 'highest') {
+    results.sort((a, b) => (Number(b.balance) || 0) - (Number(a.balance) || 0));
+  }
+  return results;
+}
+
 const ledgerEngine = {
   generateUniqueId,
   validateTransaction,
@@ -451,6 +658,9 @@ const ledgerEngine = {
   validateStockAdjustment,
   establishAccountOpeningBalance,
   recalculateAccountRunningBalances,
+  recalculateAllAccountBalances,
+  createAccountLookupMap,
+  queryCustomerAccounts,
   syncCashboxForTransaction,
   removeCashEntriesForTransactions,
   migrateV5toV6,

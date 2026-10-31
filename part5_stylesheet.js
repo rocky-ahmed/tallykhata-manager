@@ -77,41 +77,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Yellow Promo Banner
-  promoBannerCard: {
-    backgroundColor: '#FFFED402',
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FEF08A',
-  },
-  promoBannerImg: {
-    width: 66,
-    height: 76,
-  },
-  promoBannerTextCol: {
-    flex: 1,
-    marginLeft: 14,
-  },
-  promoBannerBold: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#000000',
-    lineHeight: 28,
-  },
-  promoBannerSub: {
-    fontSize: 10,
-    color: '#374151',
-    alignSelf: 'flex-end',
-    marginTop: 2,
-  },
-
   // 8-Item Quick Grid
   quickGridContainer: {
     marginHorizontal: 8,

@@ -126,9 +126,15 @@ function createMockDriveFetch() {
     if (url.includes('/drive/v3/files?') && options.method !== 'POST') {
       const token = authHeader.replace('Bearer ', '');
       const userSub = token === 'token_user_a' ? 'google_sub_user_a' : token === 'token_user_b' ? 'google_sub_user_b' : 'other';
+      let targetName = BACKUP_FILENAME;
+      try {
+        const decodedUrl = decodeURIComponent(url);
+        const qMatch = decodedUrl.match(/name\s*=\s*'([^']+)'/);
+        if (qMatch) targetName = qMatch[1];
+      } catch (_) {}
       const userFiles = [];
       for (const [id, f] of files.entries()) {
-        if (f.userSub === userSub && f.metadata.name === BACKUP_FILENAME) {
+        if (f.userSub === userSub && f.metadata.name === targetName) {
           userFiles.push({
             id,
             name: f.metadata.name,
@@ -165,7 +171,7 @@ function createMockDriveFetch() {
     }
 
     // 3.5. Get file metadata
-    if (url.includes('/drive/v3/files/') && !url.includes('alt=media') && !url.includes('/upload/')) {
+    if (url.includes('/drive/v3/files/') && !url.includes('alt=media') && !url.includes('/upload/') && options.method !== 'DELETE') {
       const match = url.match(/\/files\/([^\?]+)/);
       const fileId = match ? decodeURIComponent(match[1]) : null;
       if (files.has(fileId)) {
@@ -237,6 +243,18 @@ function createMockDriveFetch() {
       };
     }
 
+
+    // 6. Delete file (DELETE)
+    if (url.includes('/drive/v3/files/') && options.method === 'DELETE') {
+      const match = url.match(/\/files\/([^\?]+)/);
+      const fileId = match ? decodeURIComponent(match[1]) : null;
+      if (files.has(fileId)) {
+        files.delete(fileId);
+        return { ok: true, status: 204, text: async () => '' };
+      }
+      return { ok: false, status: 404, text: async () => 'File not found' };
+    }
+
     return { ok: false, status: 400, text: async () => 'Unknown route: ' + url };
   };
 
@@ -255,7 +273,7 @@ async function runAllTests() {
   console.log('================================================================\n');
 
   let passed = 0;
-  let total = 38;
+  let total = 44;
 
   const mockDrive = createMockDriveFetch();
   const driveService = new GoogleDriveBackupService({ fetch: mockDrive.fetch });
@@ -2229,6 +2247,313 @@ console.log('[PASS] TEST 6: Reject restoration from a different Google Account')
     console.log('[PASS] TEST 38: Automatic 404 Recovery on Existing Backup PATCH');
     passed++;
   }
+
+  // TEST 39: orchestrateCloudRestore automatic 404 recovery on deleted targetFileId
+  {
+    const mockDrive = createMockDriveFetch();
+    const driveService = new GoogleDriveBackupService({ fetch: mockDrive.fetch });
+    const adapter = createMockAdapter();
+    const repo = new StorageRepository(adapter);
+    await repo.loadInitialData();
+
+    await repo.persistData({
+      businessName: 'Recovery Test Biz',
+      accounts: [{ id: 'acc_1', name: 'Cust 1', balance: 5000, type: 1 }],
+      journals: [{ id: 'jrn_1', accountId: 'acc_1', amount: 5000, type: 'give', date: '2026-10-31' }],
+    });
+
+    const googleUser = { sub: 'google_sub_user_a', email: 'usera@gmail.com' };
+
+    // 1. Create a real backup first
+    const backupRes = await orchestrateCloudBackup({
+      storageRepository: repo,
+      driveService,
+      getAccessToken: async () => 'token_user_a',
+      googleUser,
+    });
+    assert.strictEqual(backupRes.success, true);
+    const validFileId = backupRes.fileId;
+
+    // 2. Clear local storage to simulate new device or wiped data
+    await repo.persistData({
+      businessName: 'Fresh Empty Biz',
+      accounts: [],
+      journals: [],
+    });
+
+    // 3. Trigger orchestrateCloudRestore with a stale/deleted fileId
+    let discoveredMeta = null;
+    const restoreRes = await orchestrateCloudRestore({
+      storageRepository: repo,
+      driveService,
+      getAccessToken: async () => 'token_user_a',
+      fileId: 'stale_deleted_file_id_404',
+      userSub: googleUser.sub,
+      onFileDiscovered: (meta) => { discoveredMeta = meta; },
+    });
+
+    assert.strictEqual(restoreRes.success, true, 'Restore must succeed via 404 recovery');
+    assert.ok(discoveredMeta, 'Must have discovered the actual backup file');
+    assert.strictEqual(discoveredMeta.fileId, validFileId, 'Must recover the valid remote file ID');
+
+    const restoredStore = repo.getAuthoritativeState();
+    assert.strictEqual(restoredStore.businessName, 'Recovery Test Biz');
+    assert.strictEqual(restoredStore.accounts.length, 1);
+    console.log('[PASS] TEST 39: Automatic 404 Recovery in orchestrateCloudRestore');
+    passed++;
+  }
+
+  // TEST 40: saveMoneyManager chains onto writeQueue and getFullBackupState awaits in-flight writes
+  {
+    const adapter = createMockAdapter();
+    const repo = new StorageRepository(adapter);
+    await repo.loadInitialData();
+
+    let writeSlowFinished = false;
+    // Inject a slow writeQueue task
+    repo.writeQueue = repo.writeQueue.then(async () => {
+      await new Promise(r => setTimeout(r, 50));
+      writeSlowFinished = true;
+    });
+
+    const mmState = {
+      version: 3,
+      accounts: [{ id: 'acc_q', name: 'Queue Wallet', balance: 12345 }],
+      transactions: [],
+      categories: [],
+      updatedAt: '2026-10-31T10:00:00.000Z',
+    };
+
+    // saveMoneyManager should enqueue behind writeSlowFinished
+    const savePromise = repo.saveMoneyManager(mmState);
+
+    // getFullBackupState must await savePromise to settle
+    const backupState = await repo.getFullBackupState();
+    assert.strictEqual(writeSlowFinished, true, 'Write queue must have settled before getFullBackupState returns');
+    assert.ok(backupState.moneyManager);
+    assert.strictEqual(backupState.moneyManager.accounts[0].name, 'Queue Wallet');
+
+    const saveRes = await savePromise;
+    assert.strictEqual(saveRes.success, true);
+    console.log('[PASS] TEST 40: saveMoneyManager writeQueue synchronization');
+    passed++;
+  }
+
+  // TEST 41: Checksum verification validates manifest.checksum and rejects tampered data
+  {
+    const adapter = createMockAdapter();
+    const repo = new StorageRepository(adapter);
+    await repo.loadInitialData();
+
+    const testData = {
+      accounts: [{ id: 'a1', name: 'A1', balance: 500 }],
+      journals: [],
+      cashEntries: [],
+    };
+    const validPayload = {
+      manifest: {
+        schemaVersion: 6,
+        backupVersion: 1,
+        checksum: repo.computeChecksum(testData),
+      },
+      data: testData,
+    };
+
+    // 1. Valid checksum must succeed
+    const resValid = await repo.commitRestorePayload(validPayload);
+    assert.strictEqual(resValid.success, true);
+
+    // 2. Tampered payload with modified balance must throw
+    const tamperedPayload = {
+      manifest: {
+        schemaVersion: 6,
+        backupVersion: 1,
+        checksum: validPayload.manifest.checksum,
+      },
+      data: {
+        accounts: [{ id: 'a1', name: 'A1', balance: 999999 }], // tampered!
+        journals: [],
+        cashEntries: [],
+      },
+    };
+
+    await assert.rejects(
+      async () => { await repo.commitRestorePayload(tamperedPayload); },
+      /checksum mismatch/i,
+      'Must reject tampered payload when manifest.checksum does not match'
+    );
+    console.log('[PASS] TEST 41: Checksum validation with manifest.checksum');
+    passed++;
+  }
+
+  // TEST 42: Zero-account modern Money Manager with manifest.hasMoneyManager restores cleanly
+  {
+    const adapter = createMockAdapter();
+    const repo = new StorageRepository(adapter);
+    await repo.loadInitialData();
+
+    // Set pre-existing MM state
+    await adapter.setItem('@tallykhata_personal_money_manager_v2', JSON.stringify({
+      version: 3,
+      accounts: [{ id: 'old_acc', name: 'Old', balance: 50 }],
+      transactions: [],
+      categories: [],
+    }));
+
+    // Modern backup with manifest.hasMoneyManager === true and empty accounts
+    const modernZeroAccounts = {
+      manifest: {
+        schemaVersion: 6,
+        backupVersion: 1,
+        hasMoneyManager: true,
+      },
+      data: {
+        accounts: [{ id: 'b1', name: 'Biz 1', balance: 100 }],
+        moneyManager: {
+          version: 3,
+          accounts: [],
+          transactions: [],
+          categories: [{ id: 'cat_custom', name: 'Custom Cat', type: 'expense' }],
+        },
+      },
+    };
+
+    const res = await repo.commitRestorePayload(modernZeroAccounts, { domains: ['all'] });
+    assert.strictEqual(res.success, true);
+    assert.ok(res.restoredMoneyManager);
+    assert.strictEqual(res.restoredMoneyManager.categories.some(c => c.id === 'cat_custom'), true);
+    console.log('[PASS] TEST 42: Zero-account modern Money Manager restoration');
+    passed++;
+  }
+
+  // TEST 43: verifyUploadedBackupMatches version tolerance (backupVersion vs backupFormatVersion)
+  {
+    const { verifyUploadedBackupMatches } = require('./src/googleDriveBackupService');
+    const uploadedManifest = {
+      schemaVersion: 6,
+      backupVersion: 1,
+      checksum: 'sha256_mock_123',
+      backupOwner: { sub: 'user_1' },
+      recordCounts: { accounts: 5, journals: 10, cashEntries: 2 },
+    };
+
+    const downloadedManifest = {
+      schemaVersion: 6,
+      backupFormatVersion: 1, // named backupFormatVersion instead of backupVersion
+      checksum: 'sha256_mock_123',
+      backupOwner: { sub: 'user_1' },
+      recordCounts: { accounts: 5, journals: 10, cashEntries: 2 },
+    };
+
+    const match = verifyUploadedBackupMatches({
+      uploadedManifest,
+      downloadedManifest,
+      uploadedSub: 'user_1',
+      downloadedSub: 'user_1',
+      verifiedFileId: 'f_1',
+    });
+
+    assert.strictEqual(match.valid, true, 'Must accept matching versions regardless of backupVersion / backupFormatVersion naming');
+    console.log('[PASS] TEST 43: verifyUploadedBackupMatches version tolerance');
+    passed++;
+  }
+
+  // TEST 44: uploadBackup generates compliant RFC 2046 multipart body with compact JSON
+  {
+    let capturedBody = null;
+    const mockDrive = {
+      fetch: async (url, opts) => {
+        capturedBody = opts.body;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'new_file_id', name: 'tallykhata_cloud_backup.json' }),
+        };
+      },
+    };
+
+    const { calculateChecksum } = require('./src/googleDriveBackupService');
+    const driveService = new GoogleDriveBackupService({ fetch: mockDrive.fetch });
+    const testData = { accounts: [] };
+    const checksum = calculateChecksum(testData);
+    const payload = {
+      manifest: {
+        schemaVersion: 6,
+        backupVersion: 1,
+        checksum,
+        createdAt: '2026-10-31T12:00:00.000Z',
+        businessSummary: { businessName: 'Test Shop' },
+        backupOwner: { sub: 'sub_test' },
+        hasMoneyManager: true,
+        recordCounts: { accounts: 2, journals: 5, cashEntries: 1, mmAccounts: 1, mmTransactions: 3 },
+      },
+      data: testData,
+    };
+
+    await driveService.uploadBackup('test_token', payload);
+
+    assert.ok(capturedBody, 'Multipart body must be captured');
+    assert.strictEqual(capturedBody.startsWith('--'), true, 'Body must start with boundary prefix -- without leading newline');
+    assert.ok(capturedBody.includes('Content-Type: application/json; charset=UTF-8'), 'Must specify UTF-8 charset on both parts');
+    assert.ok(!capturedBody.includes('\n  "manifest":'), 'Payload must be compact JSON without pretty-print indentation');
+    console.log('[PASS] TEST 44: Compliant RFC 2046 compact multipart upload');
+    passed++;
+  }
+
+  // TEST 45: Live End-to-End Synthetic Verification (Phase 1-8 Complete Pipeline)
+  {
+    total++;
+    const mockDrive = createMockDriveFetch();
+    const driveService = new GoogleDriveBackupService({ fetch: mockDrive.fetch });
+
+    // Pre-populate an existing production backup to verify it remains 100% untouched
+    const prodPayload = buildBackupPayload(
+      {
+        accounts: [{ id: 'biz_acc_prod', name: 'Real Shop Customer', type: 1, balance: 8000 }],
+        journals: [{ id: 'biz_jrn_prod', accountId: 'biz_acc_prod', amount: 8000, type: 'debit' }],
+        cashEntries: [],
+        businesses: [{ id: '1', name: 'Real Production Shop' }],
+        moneyManager: {
+          accounts: [{ id: 'mm_real_acc', balance: 50000, type: 'bank', currency: 'BDT' }],
+          transactions: [{ id: 'mm_real_txn', amount: 5000, type: 'income' }],
+        },
+      },
+      { sub: 'google_sub_user_a', email: 'usera@gmail.com', name: 'User A Shop' }
+    );
+    await driveService.uploadBackup('token_user_a', prodPayload);
+    const prodBackupBefore = await driveService.findBackupFile('token_user_a');
+    assert.ok(prodBackupBefore, 'Production backup must exist before synthetic test');
+
+    // Run end-to-end synthetic verification
+    const report = await driveService.runLiveEndToEndSyntheticVerification('token_user_a', {
+      googleUser: { sub: 'google_sub_user_a', email: 'usera@gmail.com', name: 'User A Shop' },
+    });
+
+    assert.strictEqual(report.phase8_verdict, 'PASS', 'Synthetic verification verdict must be PASS');
+    assert.strictEqual(report.phase3_authentication.authenticated, true, 'Phase 3 authentication must pass');
+    assert.strictEqual(report.phase4_testFileUpload.success, true, 'Phase 4 test upload must pass');
+    assert.strictEqual(report.phase5_remoteDownloadAndVerification.downloadSuccess, true, 'Phase 5 download must pass');
+    assert.strictEqual(report.phase5_remoteDownloadAndVerification.checksumMatch, true, 'Phase 5 checksum must match');
+    assert.strictEqual(report.phase5_remoteDownloadAndVerification.accountsMatch, true, 'Phase 5 synthetic MM accounts must match');
+    assert.strictEqual(report.phase5_remoteDownloadAndVerification.txnsMatch, true, 'Phase 5 synthetic MM txns must match');
+    assert.strictEqual(report.phase6_isolatedRestore.fullRestoreSuccess, true, 'Phase 6 full restore must pass');
+    assert.strictEqual(report.phase6_isolatedRestore.selectiveBusinessPreservesMM, true, 'Phase 6 selective biz restore must preserve MM');
+    assert.strictEqual(report.phase6_isolatedRestore.selectivePersonalPreservesBiz, true, 'Phase 6 selective personal restore must preserve biz');
+    assert.strictEqual(report.phase6_isolatedRestore.rollbackProtectionVerified, true, 'Phase 6 rollback protection must pass');
+    assert.strictEqual(report.phase7_repeatCycleAndSafety.repeatCycleSuccess, true, 'Phase 7 repeat cycle must pass');
+    assert.strictEqual(report.phase7_repeatCycleAndSafety.hasNewTransaction, true, 'Phase 7 repeat cycle must verify new transaction');
+    assert.strictEqual(report.phase7_repeatCycleAndSafety.productionBackupUntouched, true, 'Phase 7 production backup must be untouched');
+    assert.strictEqual(report.phase7_repeatCycleAndSafety.testFileCleanedUp, true, 'Phase 7 synthetic test file must be cleaned up from Drive');
+
+    // Re-verify production backup after synthetic test
+    const prodBackupAfter = await driveService.findBackupFile('token_user_a');
+    assert.strictEqual(prodBackupAfter.id, prodBackupBefore.id, 'Production file ID must not change');
+    assert.strictEqual(prodBackupAfter.modifiedTime, prodBackupBefore.modifiedTime, 'Production modified time must not change');
+
+    console.log('[PASS] TEST 45: Live End-to-End Synthetic Verification (Phase 1-8 Complete Pipeline with 100% Production Safety)');
+    passed++;
+  }
+
 
   console.log('\n================================================================');
   console.log(`SUMMARY: ${passed} / ${total} TESTS PASSED SUCCESSFULLY (100%)`);

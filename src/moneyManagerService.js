@@ -19,8 +19,9 @@ function reloadCache(newState = null) {
 }
 
 function roundCurrency(val) {
-  const num = Number(val) || 0;
-  if (num === 0) return 0;
+  if (val == null) return 0;
+  const num = Number(val);
+  if (isNaN(num) || num === 0) return 0;
   return Math.sign(num) * (Math.round((Math.abs(num) + Number.EPSILON) * 100) / 100);
 }
 
@@ -153,6 +154,7 @@ function getDefaultState(todayDateStr) {
       { id: "mmtxn_4", type: "transfer", amount: 5000, fromAccountId: "acc_bank", toAccountId: "acc_bkash", date: d, time: "09:00 AM", note: "ব্যাংক হতে বিকাশে ট্রান্সফার", payee: "" },
       { id: "mmtxn_5", type: "expense", amount: 650, categoryId: "cat_transport", accountId: "acc_cash", date: shiftDateStr(d, -1), time: "07:30 PM", note: "সিএনজি ও যাতায়াত ভাড়া", payee: "যাতায়াত" },
     ],
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -238,6 +240,7 @@ function sanitizeState(parsed, defaultState) {
     goals,
     recurring,
     transactions,
+    updatedAt: parsed.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -397,6 +400,12 @@ function getQuickDateRange(preset, todayDateStr = getLocalDateString()) {
 
 function normalizeToLocalDate(dateStr) {
   if (!dateStr) return '';
+  if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
+    const y = dateStr.getFullYear();
+    const m = String(dateStr.getMonth() + 1).padStart(2, '0');
+    const d = String(dateStr.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
   const str = toEnglishDigits(String(dateStr)).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
     const [year, month, day] = str.split('-').map(Number);
@@ -507,12 +516,12 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
   if (Array.isArray(arg1)) {
     categories = arg1;
     transactions = Array.isArray(arg2) ? arg2 : [];
-    period = arg3 !== undefined ? arg3 : "this_month";
+    period = (arg3 !== undefined && arg3 !== null) ? arg3 : "this_month";
     customRange = arg4 || null;
   } else if (arg1 && typeof arg1 === "object") {
     categories = Array.isArray(arg1.categories) ? arg1.categories : [];
     transactions = Array.isArray(arg1.transactions) ? arg1.transactions : [];
-    period = arg2 !== undefined ? arg2 : "this_month";
+    period = (arg2 !== undefined && arg2 !== null) ? arg2 : "this_month";
     customRange = arg3 || null;
   } else {
     return [];
@@ -668,22 +677,89 @@ function filterTransactions(transactions, filterParams) {
   return filterAndSortTransactions(transactions, filterParams);
 }
 
+function getDateFilterPredicate(period, customRange = null) {
+  if (!period || period === "all_time") return () => true;
+
+  if (period === "custom") {
+    if (!customRange || !customRange.startDate || !customRange.endDate) return () => false;
+    const range = validateCustomDateRange(customRange.startDate, customRange.endDate);
+    if (!range.valid) return () => false;
+    const { startDate, endDate } = range;
+    return (dateStr) => {
+      const d = normalizeToLocalDate(dateStr);
+      return d && d >= startDate && d <= endDate;
+    };
+  }
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  if (period === "this_month") {
+    const prefix = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    return (dateStr) => {
+      if (typeof dateStr === 'string' && dateStr.startsWith(prefix)) return true;
+      const d = normalizeToLocalDate(dateStr);
+      if (!d) return false;
+      const parts = d.split('-');
+      return Number(parts[0]) === currentYear && Number(parts[1]) === currentMonth;
+    };
+  }
+
+  if (period === "last_month") {
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const prefix = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    return (dateStr) => {
+      if (typeof dateStr === 'string' && dateStr.startsWith(prefix)) return true;
+      const d = normalizeToLocalDate(dateStr);
+      if (!d) return false;
+      const parts = d.split('-');
+      return Number(parts[0]) === prevYear && Number(parts[1]) === prevMonth;
+    };
+  }
+
+  return (dateStr) => isDateInPeriod(dateStr, period, customRange);
+}
+
 function calculatePeriodMetrics(state, period = "this_month", customRange = null) {
-  const txns = filterAndSortTransactions(state.transactions || [], { period, customRange })
-    .filter(transaction => !isGoalAllocationTransaction(transaction));
-  const totalIncome = txns.filter(t => t.type === "income").reduce((sum, t) => sum + (t.amount || 0), 0);
-  const totalExpense = txns.filter(t => t.type === "expense").reduce((sum, t) => sum + (t.amount || 0), 0);
+  const allTxns = (state && Array.isArray(state.transactions)) ? state.transactions : [];
+  let totalIncome = 0;
+  let totalExpense = 0;
+  const categoryExpenses = {};
+  const inPeriod = getDateFilterPredicate(period, customRange);
+
+  // Single-pass O(N) accumulation without expensive sorting or redundant array iterations
+  for (let i = 0; i < allTxns.length; i++) {
+    const t = allTxns[i];
+    if (!t) continue;
+    if (isGoalAllocationTransaction(t)) continue;
+    if (!inPeriod(t.date)) continue;
+
+    const amt = Number(t.amount || 0);
+    if (t.type === "income") {
+      totalIncome += amt;
+    } else if (t.type === "expense") {
+      totalExpense += amt;
+      if (t.categoryId) {
+        categoryExpenses[t.categoryId] = (categoryExpenses[t.categoryId] || 0) + amt;
+      }
+    }
+  }
+
   const netSavings = totalIncome - totalExpense;
 
-  const categoryExpenses = {};
-  txns.forEach(t => {
-    if (t.type === "expense" && t.categoryId) {
-      categoryExpenses[t.categoryId] = (categoryExpenses[t.categoryId] || 0) + t.amount;
+  // O(1) category lookup map
+  const categoryMap = new Map();
+  if (state && Array.isArray(state.categories)) {
+    for (let i = 0; i < state.categories.length; i++) {
+      const c = state.categories[i];
+      if (c && c.id) categoryMap.set(c.id, c);
     }
-  });
+  }
 
   const categoryBreakdown = Object.keys(categoryExpenses).map(catId => {
-    const cat = (state.categories || []).find(c => c.id === catId) || { name: "অন্যান্য", icon: "📦", color: "#6B7280" };
+    const cat = categoryMap.get(catId) || { name: "অন্যান্য", icon: "📦", color: "#6B7280" };
     const amount = categoryExpenses[catId];
     const percent = totalExpense > 0 ? Math.round((amount / totalExpense) * 100) : 0;
     return { catId, cat, amount, percent };
@@ -770,6 +846,7 @@ function addTransaction(state, params) {
       ...state,
       accounts: updatedAccounts,
       transactions: [newTxn, ...(state.transactions || [])],
+      updatedAt: new Date().toISOString(),
     };
   }
 
@@ -818,6 +895,7 @@ function addTransaction(state, params) {
     ...state,
     accounts: updatedAccounts,
     transactions: [newTxn, ...(state.transactions || [])],
+    updatedAt: new Date().toISOString(),
   };
 }
 
