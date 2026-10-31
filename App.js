@@ -1002,6 +1002,8 @@ function TallyKhataApp() {
   const [mmPeriod, setMmPeriod] = useState("this_month"); // "this_month" | "last_month" | "all_time" | "custom"
   const [mmCustomRange, setMmCustomRange] = useState(null); // { startDate: 'YYYY-MM-DD', endDate: 'YYYY-MM-DD' }
   const [modalMMCustomDateRange, setModalMMCustomDateRange] = useState(false);
+  const [mmHideBalance, setMmHideBalance] = useState(false);
+  const [modalMMMonthPicker, setModalMMMonthPicker] = useState(false);
   const [mmRangeStartInput, setMmRangeStartInput] = useState('');
   const [mmRangeEndInput, setMmRangeEndInput] = useState('');
   const [mmRangeError, setMmRangeError] = useState('');
@@ -1250,8 +1252,9 @@ function TallyKhataApp() {
   }, []);
 
   useEffect(() => {
-    if (!modalMoneyManager && !modalMMAddTxn && !modalMMEditTxn && !modalMMAddAccount && !modalMMSetBudget && !modalMMTransfer && !modalMMAddCategory && !modalMMOverallBudget && !modalMMAddGoal && !modalMMDepositGoal && !modalMMWithdrawGoal && !modalMMPreferences && !modalMMRecurring && !modalMMAddRecurring && !modalMMEditCategory && !modalMMCustomDateRange) return;
+    if (!modalMoneyManager && !modalMMAddTxn && !modalMMEditTxn && !modalMMAddAccount && !modalMMSetBudget && !modalMMTransfer && !modalMMAddCategory && !modalMMOverallBudget && !modalMMAddGoal && !modalMMDepositGoal && !modalMMWithdrawGoal && !modalMMPreferences && !modalMMRecurring && !modalMMAddRecurring && !modalMMEditCategory && !modalMMCustomDateRange && !modalMMMonthPicker) return;
     const backAction = () => {
+      if (modalMMMonthPicker) { setModalMMMonthPicker(false); return true; }
       if (modalMMCustomDateRange) { setModalMMCustomDateRange(false); return true; }
       if (modalMMPreferences) { setModalMMPreferences(false); return true; }
       if (modalMMAddRecurring) { setModalMMAddRecurring(false); return true; }
@@ -1272,7 +1275,7 @@ function TallyKhataApp() {
     };
     const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
     return () => backHandler.remove();
-  }, [modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMWithdrawGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange]);
+  }, [modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMWithdrawGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange, modalMMMonthPicker]);
 
   const showMMError = (error, fallbackKey = 'mm_error_generic', titleKey = 'mm_alert_error') => {
     const message = i18nService.translateMoneyManagerError(error?.message || error, effectiveLanguage);
@@ -9233,123 +9236,152 @@ function TallyKhataApp() {
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? currentTheme.headerBg : '#FFFFFF'} translucent={false} />
         <SafeAreaView style={[{ flex: 1 }, tStyles.mmScreen]}>
           {/* Header */}
-          <View style={[styles.mmHeader, tStyles.mmHeader, { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <TouchableOpacity
-                style={[styles.mmBackBtn, tStyles.mmBackBtn]}
-                onPress={() => setModalMoneyManager(false)}
-                accessibilityRole="button"
-                accessibilityLabel={t('mm_access_back')}
-              >
-                <Text style={[styles.mmBackIcon, tStyles.mmBackIcon]}>←</Text>
-              </TouchableOpacity>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Text style={[styles.mmHeaderTitle, tStyles.mmHeaderTitle, { flexShrink: 1 }]}>{t("mm_title")}</Text>
-                  <View style={[styles.mmBadge, tStyles.mmBadge]}>
-                    <Text style={[styles.mmBadgeText, tStyles.mmBadgeText]}>{t("mm_badge")}</Text>
+          <View style={[styles.mmHeader, tStyles.mmHeader, { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : (currentTheme.divider || '#E2E8F0') }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              {/* Left: Back Button + Title */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                <TouchableOpacity
+                  style={[styles.mmBackBtn, tStyles.mmBackBtn]}
+                  onPress={() => setModalMoneyManager(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mm_access_back')}
+                >
+                  <Text style={[styles.mmBackIcon, tStyles.mmBackIcon]}>←</Text>
+                </TouchableOpacity>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <Text style={[styles.mmHeaderTitle, tStyles.mmHeaderTitle, { flexShrink: 1 }]} numberOfLines={1}>
+                      {t("mm_title")}
+                    </Text>
+                    <View style={[styles.mmBadge, tStyles.mmBadge]}>
+                      <Text style={[styles.mmBadgeText, tStyles.mmBadgeText]}>{t("mm_badge")}</Text>
+                    </View>
                   </View>
+                  <Text style={[styles.mmHeaderSub, tStyles.mmHeaderSub, { fontSize: 11, marginTop: 1 }]} numberOfLines={1}>
+                    {t("mm_sub")}
+                  </Text>
                 </View>
-                <Text style={[styles.mmHeaderSub, tStyles.mmHeaderSub]} numberOfLines={2}>{t("mm_sub")}</Text>
+              </View>
+
+              {/* Right: Quick Month Picker Pill & Settings/Schedule Icons */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {/* Month Picker Sheet Trigger Pill (Image 10 Style) */}
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    paddingHorizontal: 8,
+                    paddingVertical: 6,
+                    borderRadius: 14,
+                    backgroundColor: isDark ? '#1E293B' : (currentTheme.cardBgElevated || '#F1F5F9'),
+                    borderWidth: 1.5,
+                    borderColor: isDark ? '#3B82F6' : '#93C5FD',
+                  }}
+                  onPress={() => setModalMMMonthPicker(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose Month"
+                >
+                  <Text style={{ fontSize: 12 }}>📅</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#93C5FD' : '#1D4ED8', maxWidth: 90 }} numberOfLines={1}>
+                    {getMmPeriodLabel()}
+                  </Text>
+                  <Text style={{ fontSize: 8, color: isDark ? '#93C5FD' : '#1D4ED8' }}>▼</Text>
+                </TouchableOpacity>
+
+                {/* Settings Icon */}
+                <TouchableOpacity
+                  style={[[styles.mmHeaderIconBtn, tStyles.mmHeaderIconBtn], tStyles.mmIconBtn]}
+                  onPress={() => {
+                    const prefs = moneyManagerState.preferences || {};
+                    setMmPrefDefaultPeriod(prefs.defaultPeriod || "this_month");
+                    setMmPrefCurrencySymbol(prefs.currencySymbol || tStatic("৳"));
+                    setMmPrefSortOrder(prefs.sortOrder || "newest");
+                    setMmPrefShowNetWorth(prefs.showNetWorthCard !== false);
+                    setMmPrefShowSavingsRate(prefs.showSavingsRateCard !== false);
+                    setMmPrefShowTips(prefs.showTipsCard !== false);
+                    setModalMMPreferences(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mm_access_settings')}
+                >
+                  <Text style={{ fontSize: 15 }}>⚙️</Text>
+                </TouchableOpacity>
+
+                {/* Recurring Schedule Icon */}
+                <TouchableOpacity
+                  style={[[styles.mmHeaderIconBtn, tStyles.mmHeaderIconBtn], tStyles.mmIconBtn]}
+                  onPress={() => setModalMMRecurring(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mm_schedules_title')}
+                >
+                  <Text style={{ fontSize: 15 }}>⏱️</Text>
+                </TouchableOpacity>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-              <TouchableOpacity
-                style={[[styles.mmHeaderIconBtn, tStyles.mmHeaderIconBtn], tStyles.mmIconBtn]}
-                onPress={() => {
-                  const prefs = moneyManagerState.preferences || {};
-                  setMmPrefDefaultPeriod(prefs.defaultPeriod || "this_month");
-                  setMmPrefCurrencySymbol(prefs.currencySymbol || tStatic("৳"));
-                  setMmPrefSortOrder(prefs.sortOrder || "newest");
-                  setMmPrefShowNetWorth(prefs.showNetWorthCard !== false);
-                  setMmPrefShowSavingsRate(prefs.showSavingsRateCard !== false);
-                  setMmPrefShowTips(prefs.showTipsCard !== false);
-                  setModalMMPreferences(true);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t('mm_access_settings')}
-              >
-                <Text style={{ fontSize: 16 }}>⚙️</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[[styles.mmHeaderIconBtn, tStyles.mmHeaderIconBtn], tStyles.mmIconBtn]}
-                onPress={() => setModalMMRecurring(true)}
-                accessibilityRole="button"
-                accessibilityLabel={t('mm_schedules_title')}
-              >
-                <Text style={{ fontSize: 16 }}>⏱️</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.mmAddHeaderBtn, tStyles.mmAddHeaderBtn, { minHeight: 42, paddingHorizontal: 14 }]}
-                onPress={() => {
-                  setMmNewType('expense');
-                  setMmNewAmount('');
-                  setMmNewNote('');
-                  setMmNewPayee('');
-                  setModalMMAddTxn(true);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t('mm_access_new_txn')}
-              >
-                <Text style={[styles.mmAddHeaderBtnText, tStyles.mmAddHeaderBtnText]}>{t("mm_new_txn")}</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
-          {/* Period Selector Pills Bar */}
-          <View style={[styles.mmPeriodContainer, tStyles.mmPeriodContainer, { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, paddingHorizontal: 12 }]}>
-            <TouchableOpacity
-              style={[styles.mmPeriodPill, tStyles.mmPeriodPill, { flex: 0, width: '48%', marginHorizontal: 0 }, mmPeriod === 'this_month' && [styles.mmPeriodPillActive, tStyles.mmPeriodPillActive]]}
-              onPress={() => handleSelectMMPeriod('this_month')}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('mm_period_this_month')} ${t('mm_period_accessibility_suffix')}`}
+          {/* Period Selector Pills Bar (Horizontal Scrollable) */}
+          <View style={[styles.mmPeriodContainer, tStyles.mmPeriodContainer, { paddingHorizontal: 14, paddingVertical: 8 }]}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingRight: 16 }}
             >
-              <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'this_month' && [styles.mmPeriodPillTextActive, tStyles.mmPeriodPillTextActive]]}>
-                📅 {t("mm_period_this_month")}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.mmPeriodPill, tStyles.mmPeriodPill, { flex: 0, width: '48%', marginHorizontal: 0 }, mmPeriod === 'last_month' && [styles.mmPeriodPillActive, tStyles.mmPeriodPillActive]]}
-              onPress={() => handleSelectMMPeriod('last_month')}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('mm_period_last_month')} ${t('mm_period_accessibility_suffix')}`}
-            >
-              <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'last_month' && [styles.mmPeriodPillTextActive, tStyles.mmPeriodPillTextActive]]}>
-                🗓️ {t("mm_period_last_month")}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.mmPeriodPill, tStyles.mmPeriodPill, { flex: 0, width: '48%', marginHorizontal: 0 }, mmPeriod === 'all_time' && [styles.mmPeriodPillActive, tStyles.mmPeriodPillActive]]}
-              onPress={() => handleSelectMMPeriod('all_time')}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('mm_period_all_time')} ${t('mm_period_accessibility_suffix')}`}
-            >
-              <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'all_time' && [styles.mmPeriodPillTextActive, tStyles.mmPeriodPillTextActive]]}>
-                ⏱️ {t("mm_period_all_time")}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.mmPeriodPill, tStyles.mmPeriodPill, mmPeriod === 'this_month' && [styles.mmPeriodPillActive, tStyles.mmPeriodPillActive]]}
+                onPress={() => handleSelectMMPeriod('this_month')}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('mm_period_this_month')} ${t('mm_period_accessibility_suffix')}`}
+              >
+                <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'this_month' && [styles.mmPeriodPillTextActive, tStyles.mmPeriodPillTextActive]]}>
+                  📅 {t("mm_period_this_month")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.mmPeriodPill, tStyles.mmPeriodPill, mmPeriod === 'last_month' && [styles.mmPeriodPillActive, tStyles.mmPeriodPillActive]]}
+                onPress={() => handleSelectMMPeriod('last_month')}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('mm_period_last_month')} ${t('mm_period_accessibility_suffix')}`}
+              >
+                <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'last_month' && [styles.mmPeriodPillTextActive, tStyles.mmPeriodPillTextActive]]}>
+                  🗓️ {t("mm_period_last_month")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.mmPeriodPill, tStyles.mmPeriodPill, mmPeriod === 'all_time' && [styles.mmPeriodPillActive, tStyles.mmPeriodPillActive]]}
+                onPress={() => handleSelectMMPeriod('all_time')}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('mm_period_all_time')} ${t('mm_period_accessibility_suffix')}`}
+              >
+                <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'all_time' && [styles.mmPeriodPillTextActive, tStyles.mmPeriodPillTextActive]]}>
+                  ⏱️ {t("mm_period_all_time")}
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.mmPeriodPill, tStyles.mmPeriodPill, { flex: 0, width: '48%', marginHorizontal: 0 }, mmPeriod === 'custom' && [styles.mmPeriodPillActive, tStyles.mmPeriodPillActive]]}
-              onPress={() => {
-                if (mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate) {
-                  setMMRangeInputs(mmCustomRange.startDate, mmCustomRange.endDate);
-                } else {
-                  const today = moneyManagerService.getLocalDateString();
-                  setMMRangeInputs(today, today);
-                }
-                setModalMMCustomDateRange(true);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t('mm_custom_range_title')}
-            >
-              <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'custom' && [styles.mmPeriodPillTextActive, tStyles.mmPeriodPillTextActive]]}>
-                📊 {t("mm_period_custom")}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.mmPeriodPill, tStyles.mmPeriodPill, mmPeriod === 'custom' && [styles.mmPeriodPillActive, tStyles.mmPeriodPillActive]]}
+                onPress={() => {
+                  if (mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate) {
+                    setMMRangeInputs(mmCustomRange.startDate, mmCustomRange.endDate);
+                  } else {
+                    const today = moneyManagerService.getLocalDateString();
+                    setMMRangeInputs(today, today);
+                  }
+                  setModalMMCustomDateRange(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('mm_custom_range_title')}
+              >
+                <Text style={[styles.mmPeriodPillText, tStyles.mmPeriodPillText, mmPeriod === 'custom' && [styles.mmPeriodPillTextActive, tStyles.mmPeriodPillTextActive]]}>
+                  📊 {t("mm_period_custom")}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                        {/* Top Net Worth & Period Flow Card (Image 12, Image 4) */}
+
+          <ScrollView style={{ flex: 1, paddingHorizontal: 16 }} contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Top Net Worth & Period Flow Card (Image 12, Image 4) */}
             {moneyManagerState.preferences?.showNetWorthCard !== false && (() => {
               const periodMetrics = moneyManagerService.calculatePeriodMetrics(moneyManagerState, mmPeriod, mmCustomRange);
               const totalNetWorth = periodMetrics.netWorth;
@@ -9360,7 +9392,7 @@ function TallyKhataApp() {
               const periodLabel = getMmPeriodLabel();
 
               return (
-                <View style={[styles.mmTotalCard, tStyles.mmTotalCard, { borderRadius: 24, padding: 18, marginTop: 14, borderWidth: 1.5 }]}>
+                <View style={[styles.mmTotalCard, tStyles.mmTotalCard, { borderRadius: 24, padding: 18, marginTop: 8, borderWidth: 1.5 }]}>
                   {/* Balance Card Header */}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -9368,18 +9400,32 @@ function TallyKhataApp() {
                       <Text style={[styles.mmTotalCardLabel, tStyles.mmTotalCardLabel, { fontSize: 14, fontWeight: '700', letterSpacing: 0.3 }]}>
                         {t("mm_net_worth")}
                       </Text>
+                      {/* Privacy Eye Toggle */}
+                      <TouchableOpacity
+                        onPress={() => setMmHideBalance(prev => !prev)}
+                        style={{ padding: 4 }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Toggle Balance Visibility"
+                      >
+                        <Text style={{ fontSize: 16 }}>{mmHideBalance ? '🙈' : '👁️'}</Text>
+                      </TouchableOpacity>
                     </View>
-                    <View style={[[styles.mmPeriodBadge, tStyles.mmPeriodBadge], !isDark && { backgroundColor: currentTheme.cardBgElevated }, { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }]}>
+                    <TouchableOpacity
+                      onPress={() => setModalMMMonthPicker(true)}
+                      style={[[styles.mmPeriodBadge, tStyles.mmPeriodBadge], !isDark && { backgroundColor: currentTheme.cardBgElevated }, { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Change Period"
+                    >
                       <Text style={[[styles.mmPeriodBadgeText, tStyles.mmPeriodBadgeText], !isDark && { color: currentTheme.textSecondary }, { fontSize: 11, fontWeight: '700' }]}>
-                        {periodLabel}
+                        {periodLabel} ▼
                       </Text>
-                    </View>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Large Balance Display */}
                   <View style={{ marginVertical: 8 }}>
-                    <Text style={[styles.mmTotalCardAmount, tStyles.mmTotalCardAmount, { fontSize: 32, fontWeight: '900', letterSpacing: -0.5 }]}>
-                      {mmCurrency} {formatMMNumber(totalNetWorth)}
+                    <Text style={[styles.mmTotalCardAmount, tStyles.mmTotalCardAmount, { fontSize: 34, fontWeight: '900', letterSpacing: -0.5 }]}>
+                      {mmHideBalance ? '••••••••' : `${mmCurrency} ${formatMMNumber(totalNetWorth)}`}
                     </Text>
                     <Text style={[styles.mmTotalCardSub, tStyles.mmTotalCardSub, { fontSize: 12, marginTop: 2 }]}>
                       {t('mm_active_wallet_balances')}
@@ -9882,6 +9928,8 @@ function TallyKhataApp() {
                     <TouchableOpacity
                       onPress={() => setMmActiveSubTab('analytics')}
                       style={{ paddingHorizontal: 4, paddingVertical: 2 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Analytics Details"
                     >
                       <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#60A5FA' : '#2563EB' }}>
                         {effectiveLanguage === 'en' ? 'Details' : 'বিস্তারিত'} →
@@ -10051,47 +10099,10 @@ function TallyKhataApp() {
                   </TouchableOpacity>
                 </ScrollView>
 
-                {/* Sort Order Chips */}
-                <View style={styles.mmSortRow}>
-                  <Text style={[styles.mmSortLabel, tStyles.mmSortLabel]}>{t('mm_sort_label')}</Text>
-                  <TouchableOpacity
-                    style={[styles.mmSortChip, tStyles.mmSortChip, mmSortOrder === 'newest' && [styles.mmSortChipActive, tStyles.mmSortChipActive]]}
-                    onPress={() => setMmSortOrder('newest')}
-                  >
-                    <Text style={[styles.mmSortChipText, tStyles.mmSortChipText, mmSortOrder === 'newest' && [styles.mmSortChipTextActive, tStyles.mmSortChipTextActive]]}>
-                      {t('mm_sort_newest')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.mmSortChip, tStyles.mmSortChip, mmSortOrder === 'oldest' && [styles.mmSortChipActive, tStyles.mmSortChipActive]]}
-                    onPress={() => setMmSortOrder('oldest')}
-                  >
-                    <Text style={[styles.mmSortChipText, tStyles.mmSortChipText, mmSortOrder === 'oldest' && [styles.mmSortChipTextActive, tStyles.mmSortChipTextActive]]}>
-                      {t('mm_sort_oldest')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.mmSortChip, tStyles.mmSortChip, mmSortOrder === 'amount_high' && [styles.mmSortChipActive, tStyles.mmSortChipActive]]}
-                    onPress={() => setMmSortOrder('amount_high')}
-                  >
-                    <Text style={[styles.mmSortChipText, tStyles.mmSortChipText, mmSortOrder === 'amount_high' && [styles.mmSortChipTextActive, tStyles.mmSortChipTextActive]]}>
-                      {t('mm_sort_high')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.mmSortChip, tStyles.mmSortChip, mmSortOrder === 'amount_low' && [styles.mmSortChipActive, tStyles.mmSortChipActive]]}
-                    onPress={() => setMmSortOrder('amount_low')}
-                  >
-                    <Text style={[styles.mmSortChipText, tStyles.mmSortChipText, mmSortOrder === 'amount_low' && [styles.mmSortChipTextActive, tStyles.mmSortChipTextActive]]}>
-                      {t('mm_sort_low')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Account Filter Active Banner */}
+                {/* Active Account Filter Indicator */}
                 {mmAccountFilter !== 'all' && (() => {
-                  const currentAcc = (moneyManagerState.accounts || []).find(a => a.id === mmAccountFilter);
-                  const accName = currentAcc ? tMMSeed('account', currentAcc.id, currentAcc.name) : mmAccountFilter;
+                  const filteredAcc = (moneyManagerState.accounts || []).find(a => a.id === mmAccountFilter);
+                  const accName = filteredAcc ? tMMSeed('account', filteredAcc.id, filteredAcc.name) : mmAccountFilter;
                   return (
                     <View style={{
                       flexDirection: 'row',
@@ -10274,7 +10285,11 @@ function TallyKhataApp() {
 
                           return (
                             <View key={txn.id} style={[[styles.mmTxnCard, tStyles.mmTxnCard], tStyles.mmTxnItem, { borderRadius: 18, padding: 14, marginBottom: 8, borderWidth: 1.5 }]}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => !isGoalAllocation && handleOpenEditMMTxn(txn)}
+                                style={{ flexDirection: 'row', alignItems: 'center' }}
+                              >
                                 <MM3DIcon
                                   icon={icon}
                                   color={color}
@@ -10314,10 +10329,10 @@ function TallyKhataApp() {
                                           fontSize: 10,
                                           fontWeight: '700',
                                           color: isDark ? '#E2E8F0' : '#475569',
-                                        }} numberOfLines={1}>
+                                        }}>
                                           {isTransfer
-                                            ? ((fromAcc ? tMMSeed('account', fromAcc.id, fromAcc.name) : '') + ' ➔ ' + (toAcc ? tMMSeed('account', toAcc.id, toAcc.name) : ''))
-                                            : (acc ? tMMSeed('account', acc.id, acc.name) : '')}
+                                            ? `${fromAcc ? tMMSeed('account', fromAcc.id, fromAcc.name) : ''} ➔ ${toAcc ? tMMSeed('account', toAcc.id, toAcc.name) : ''}`
+                                            : tMMSeed('account', acc.id, acc.name)}
                                         </Text>
                                       </View>
                                     )}
@@ -10347,7 +10362,7 @@ function TallyKhataApp() {
                                     </Text>
                                   )}
                                 </View>
-                              </View>
+                              </TouchableOpacity>
 
                               {/* Transaction Actions: Edit & Delete (48dp+ touch target) */}
                               <View style={[styles.mmTxnActionRow, tStyles.mmTxnActionRow, { marginTop: 10, paddingTop: 8, gap: 10 }]}>
@@ -10380,11 +10395,39 @@ function TallyKhataApp() {
               </View>
             )}
 
-
-
-            {/* SUB-TAB 2: ACCOUNTS & WALLETS */}
+            {/* SUB-TAB 2: ACCOUNTS & WALLETS (Modern Wallet 1:1 Style — Image 8) */}
             {mmActiveSubTab === 'accounts' && (
               <View style={{ marginTop: 14 }}>
+                {/* Modern Wallet Header Summary (Image 8) */}
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  backgroundColor: isDark ? '#1E293B' : (currentTheme.cardBgElevated || '#F8FAFC'),
+                  padding: 14,
+                  borderRadius: 18,
+                  borderWidth: 1.5,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  marginBottom: 14,
+                }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B', fontWeight: '700' }}>
+                      {effectiveLanguage === 'en' ? 'TOTAL ACTIVE BALANCE' : 'মোট সক্রিয় ওয়ালেট ব্যালেন্স'}
+                    </Text>
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: isDark ? '#F8FAFC' : '#0F172A', marginTop: 2 }}>
+                      {mmCurrency} {formatMMNumber((moneyManagerState.accounts || []).filter(a => !a.isArchived).reduce((sum, a) => sum + (a.balance || 0), 0))}
+                    </Text>
+                  </View>
+                  <View style={{ width: 1, backgroundColor: isDark ? '#334155' : '#E2E8F0', marginHorizontal: 10 }} />
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B', fontWeight: '700' }}>
+                      {effectiveLanguage === 'en' ? 'ARCHIVED' : 'আর্কাইভ ব্যালেন্স'}
+                    </Text>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: isDark ? '#94A3B8' : '#64748B', marginTop: 2 }}>
+                      {mmCurrency} {formatMMNumber((moneyManagerState.accounts || []).filter(a => a.isArchived).reduce((sum, a) => sum + (a.balance || 0), 0))}
+                    </Text>
+                  </View>
+                </View>
+
                 <View style={styles.mmSectionHeader}>
                   <Text style={[styles.mmSectionTitle, tStyles.mmSectionTitle]}>{t("mm_wallets_title")}</Text>
                   <TouchableOpacity
@@ -10402,6 +10445,7 @@ function TallyKhataApp() {
                   </TouchableOpacity>
                 </View>
 
+                {/* Individual Account Cards (Modern Wallet 1:1 Design — Image 8) */}
                 {(moneyManagerState.accounts || []).map((acc) => {
                   const typeLabel =
                     acc.type === 'cash'
@@ -10412,76 +10456,134 @@ function TallyKhataApp() {
                       ? t('mm_account_mfs')
                       : t('mm_account_other');
 
+                  const accColor = acc.color || (MM_WALLET_ICONS[acc.type]?.color || '#3B82F6');
+                  const accIcon = acc.icon || (MM_WALLET_ICONS[acc.type]?.icon || '💵');
+
+                  // Calculate this month's income & expense for this account
+                  const thisMonthTxns = moneyManagerService.filterAndSortTransactions(moneyManagerState, { period: 'this_month' });
+                  const accIncome = thisMonthTxns
+                    .filter(t => t.accountId === acc.id && t.type === 'income')
+                    .reduce((sum, t) => sum + (t.amount || 0), 0);
+                  const accExpense = thisMonthTxns
+                    .filter(t => t.accountId === acc.id && t.type === 'expense' && !moneyManagerService.isGoalAllocationTransaction(t))
+                    .reduce((sum, t) => sum + (t.amount || 0), 0);
+
                   return (
-                    <View key={acc.id} style={[styles.mmAccountCard, tStyles.mmAccountCard, acc.isArchived && styles.mmAccountCardArchived]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <MM3DIcon
-                          icon={acc.icon || '💼'}
-                          color={acc.color || '#3B82F6'}
-                          size={46}
-                          iconSize={22}
-                          isDark={isDark}
-                          glow={!acc.isArchived}
-                        />
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={[styles.mmAccountName, tStyles.mmAccountName]} numberOfLines={1}>
+                    <View
+                      key={acc.id}
+                      style={[
+                        styles.mmAccountCard,
+                        tStyles.mmAccountCard,
+                        acc.isArchived && styles.mmAccountCardArchived,
+                        {
+                          padding: 0,
+                          borderRadius: 20,
+                          overflow: 'hidden',
+                          borderWidth: 1.5,
+                          borderColor: isDark ? '#334155' : '#E2E8F0',
+                          marginBottom: 14,
+                        }
+                      ]}
+                    >
+                      {/* Top Colored Banner (Modern Wallet Image 8) */}
+                      <View style={{
+                        backgroundColor: accColor,
+                        padding: 16,
+                      }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={{ fontSize: 20 }}>{accIcon}</Text>
+                            <Text style={[styles.mmAccountName, { color: '#FFFFFF', fontSize: 17, fontWeight: '800' }]} numberOfLines={1}>
                               {acc.name}
                             </Text>
                             {acc.isArchived && (
-                              <View style={[styles.mmArchivedBadge, tStyles.mmArchivedBadge]}>
-                                <Text style={[styles.mmArchivedBadgeText, tStyles.mmArchivedBadgeText]}>{t('mm_archived')}</Text>
+                              <View style={[styles.mmArchivedBadge, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+                                <Text style={[styles.mmArchivedBadgeText, { color: '#FFFFFF' }]}>{t('mm_archived')}</Text>
                               </View>
                             )}
                           </View>
-                          <Text style={[[styles.mmAccountType, tStyles.mmAccountType], tStyles.mmCardSub]}>{typeLabel}</Text>
+                          <View style={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 8,
+                          }}>
+                            <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>{typeLabel}</Text>
+                          </View>
                         </View>
-                        <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
-                          <Text style={[[styles.mmAccountBalance, tStyles.mmAccountBalance], tStyles.mmCardTitle]}>{mmCurrency} {formatMMNumber((acc.balance || 0))}</Text>
-                        </View>
+                        {/* Large White Balance Display */}
+                        <Text style={[styles.mmAccountBalance, { color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginTop: 10 }]}>
+                          {mmCurrency} {formatMMNumber((acc.balance || 0))}
+                        </Text>
                       </View>
 
-                      {/* Account Action Buttons */}
-                      <View style={[styles.mmAccountActions, tStyles.mmAccountActions]}>
-                        <TouchableOpacity
-                          style={[[styles.mmAccountActionBtn, tStyles.mmAccountActionBtn], acc.isArchived && { opacity: 0.5 }]}
-                          onPress={() => {
-                            if (acc.isArchived) {
-                              Alert.alert(t("mm_alert_warning"), t("mm_archived_wallet_transfer_error"));
-                              return;
-                            }
-                            setMmTransferFrom(acc.id);
-                            const other = (moneyManagerState.accounts || []).find((a) => a.id !== acc.id && !a.isArchived);
-                            if (other) setMmTransferTo(other.id);
-                            setMmTransferAmt('');
-                            setMmTransferNote('');
-                            setModalMMTransfer(true);
-                          }}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('mm_access_transfer')}
-                        >
-                          <Text style={[styles.mmAccountActionText, tStyles.mmAccountActionText]}>{t('mm_transfer_btn')}</Text>
-                        </TouchableOpacity>
+                      {/* Bottom White/Dark Card Body with Month Flow Stats (Image 8) */}
+                      <View style={{
+                        padding: 14,
+                        backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                      }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : '#64748B', letterSpacing: 0.3 }}>
+                              {effectiveLanguage === 'en' ? 'INCOME THIS MONTH' : 'চলতি মাসের মোট আয়'}
+                            </Text>
+                            <Text style={{ fontSize: 14, fontWeight: '800', color: isDark ? '#34D399' : '#059669', marginTop: 2 }}>
+                              +{mmCurrency} {formatMMNumber(accIncome)}
+                            </Text>
+                          </View>
+                          <View style={{ width: 1, height: 26, backgroundColor: isDark ? '#334155' : '#E2E8F0', marginHorizontal: 10 }} />
+                          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : '#64748B', letterSpacing: 0.3 }}>
+                              {effectiveLanguage === 'en' ? 'EXPENSES THIS MONTH' : 'চলতি মাসের মোট ব্যয়'}
+                            </Text>
+                            <Text style={{ fontSize: 14, fontWeight: '800', color: isDark ? '#F87171' : '#DC2626', marginTop: 2 }}>
+                              -{mmCurrency} {formatMMNumber(accExpense)}
+                            </Text>
+                          </View>
+                        </View>
 
-                        <TouchableOpacity
-                          style={[styles.mmAccountArchiveBtn, tStyles.mmAccountArchiveBtn]}
-                          onPress={() => handleArchiveMMAccount(acc.id, !acc.isArchived)}
-                          accessibilityRole="button"
-                          accessibilityLabel={acc.isArchived ? t('mm_access_activate') : t('mm_access_archive')}
-                        >
-                          <Text style={[styles.mmAccountArchiveText, tStyles.mmAccountArchiveText]}>
-                            {acc.isArchived ? t('mm_unarchive_btn') : t('mm_archive_btn')}
-                          </Text>
-                        </TouchableOpacity>
+                        {/* Account Action Buttons */}
+                        <View style={[styles.mmAccountActions, tStyles.mmAccountActions, { marginTop: 12, paddingTop: 10 }]}>
+                          <TouchableOpacity
+                            style={[[styles.mmAccountActionBtn, tStyles.mmAccountActionBtn], acc.isArchived && { opacity: 0.5 }, { minHeight: 40, paddingHorizontal: 12, borderRadius: 10, justifyContent: 'center' }]}
+                            onPress={() => {
+                              if (acc.isArchived) {
+                                Alert.alert(t("mm_alert_warning"), t("mm_archived_wallet_transfer_error"));
+                                return;
+                              }
+                              setMmTransferFrom(acc.id);
+                              const other = (moneyManagerState.accounts || []).find((a) => a.id !== acc.id && !a.isArchived);
+                              if (other) setMmTransferTo(other.id);
+                              setMmTransferAmt('');
+                              setMmTransferNote('');
+                              setModalMMTransfer(true);
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('mm_access_transfer')}
+                          >
+                            <Text style={[styles.mmAccountActionText, tStyles.mmAccountActionText, { fontWeight: '700' }]}>⇄ {t('mm_transfer_btn')}</Text>
+                          </TouchableOpacity>
 
-                        <TouchableOpacity
-                          style={[styles.mmAccountDeleteBtn, tStyles.mmAccountDeleteBtn]}
-                          onPress={() => handleDeleteMMAccount(acc.id)}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('mm_access_delete_account')}
-                        >
-                          <Text style={[styles.mmAccountDeleteText, tStyles.mmAccountDeleteText]}>{t('mm_delete')}</Text>
-                        </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.mmAccountArchiveBtn, tStyles.mmAccountArchiveBtn, { minHeight: 40, paddingHorizontal: 12, borderRadius: 10, justifyContent: 'center' }]}
+                            onPress={() => handleArchiveMMAccount(acc.id, !acc.isArchived)}
+                            accessibilityRole="button"
+                            accessibilityLabel={acc.isArchived ? t('mm_access_activate') : t('mm_access_archive')}
+                          >
+                            <Text style={[styles.mmAccountArchiveText, tStyles.mmAccountArchiveText, { fontWeight: '600' }]}>
+                              {acc.isArchived ? `📦 ${t('mm_unarchive_btn')}` : `📦 ${t('mm_archive_btn')}`}
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.mmAccountDeleteBtn, tStyles.mmAccountDeleteBtn, { minHeight: 40, paddingHorizontal: 12, borderRadius: 10, justifyContent: 'center' }]}
+                            onPress={() => handleDeleteMMAccount(acc.id)}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('mm_access_delete_account')}
+                          >
+                            <Text style={[styles.mmAccountDeleteText, tStyles.mmAccountDeleteText, { fontWeight: '700' }]}>🗑️ {t('mm_delete')}</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
                   );
@@ -10519,9 +10621,9 @@ function TallyKhataApp() {
                   const isOver = totalSpent > overallLimit;
 
                   return (
-                    <View style={[[styles.mmOverallBudgetCard, tStyles.mmOverallBudgetCard], tStyles.mmCard]}>
+                    <View style={[[styles.mmOverallBudgetCard, tStyles.mmOverallBudgetCard], tStyles.mmCard, { borderRadius: 22, padding: 18, borderWidth: 1.5 }]}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={[styles.mmOverallBudgetTitle, tStyles.mmOverallBudgetTitle]}>{t('mm_overall_budget')}</Text>
+                        <Text style={[styles.mmOverallBudgetTitle, tStyles.mmOverallBudgetTitle, { fontSize: 15, fontWeight: '700' }]}>{t('mm_overall_budget')}</Text>
                         <View style={[styles.mmOverallBudgetBadge, tStyles.mmOverallBudgetBadge, isOver && { backgroundColor: '#EF4444' }]}>
                           <Text style={[styles.mmOverallBudgetBadgeText, tStyles.mmOverallBudgetBadgeText, isOver && { color: '#FFFFFF' }]}>
                             {isOver ? t('mm_budget_over') : t('mm_budget_ok')}
@@ -10529,117 +10631,112 @@ function TallyKhataApp() {
                         </View>
                       </View>
 
-                      <View style={styles.mmOverallBudgetStats}>
+                      <View style={[styles.mmOverallBudgetStats, { marginVertical: 12 }]}>
                         <View>
                           <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>{t('mm_spent_prefix')}{t('mm_period_this_month')})</Text>
-                          <Text style={[styles.mmOverallBudgetSpent, tStyles.mmOverallBudgetSpent, isOver && { color: '#EF4444' }]}>
+                          <Text style={[styles.mmOverallBudgetSpent, tStyles.mmOverallBudgetSpent, isOver && { color: '#EF4444' }, { fontSize: 24, fontWeight: '900' }]}>
                             {mmCurrency} {formatMMNumber(totalSpent)}
                           </Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
                           <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>{t('mm_max_limit')}</Text>
-                          <Text style={[styles.mmOverallBudgetLimit, tStyles.mmOverallBudgetLimit]}>{mmCurrency} {formatMMNumber(overallLimit)}</Text>
+                          <Text style={[styles.mmOverallBudgetLimit, tStyles.mmOverallBudgetLimit, { fontSize: 18, fontWeight: '800' }]}>{mmCurrency} {formatMMNumber(overallLimit)}</Text>
                         </View>
                       </View>
 
-                      {/* Progress Bar */}
-                      <View style={[styles.mmProgressBarBg, tStyles.mmProgressBarBg]}>
+                      {/* 3-Color Threshold Progress Bar (<80% Green, 80-100% Amber, >100% Red) */}
+                      <View style={[styles.mmProgressBarBg, tStyles.mmProgressBarBg, { height: 10, borderRadius: 5 }]}>
                         <View
                           style={[
                             styles.mmProgressBarFill,
                             {
                               width: `${pct}%`,
                               backgroundColor: isOver ? '#EF4444' : pct > 80 ? '#F59E0B' : '#10B981',
+                              height: '100%',
+                              borderRadius: 5,
                             },
                           ]}
                         />
                       </View>
 
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                            <Text style={{ color: currentTheme.textMuted, fontSize: 12 }}>{t('mm_budget_used')} {pct}%</Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                        <Text style={{ color: currentTheme.textMuted, fontSize: 12, fontWeight: '600' }}>{t('mm_budget_used')} {pct}%</Text>
                         <Text style={{ color: isOver ? '#EF4444' : '#10B981', fontSize: 12, fontWeight: 'bold' }}>
-                          {isOver ? `${t('mm_over_budget_short')} ${mmCurrency} ${formatMMNumber(Math.abs(remaining))}` : `${t('mm_remaining_short')} ${mmCurrency} ${formatMMNumber(remaining)}`}
+                          {isOver ? `${t('mm_budget_over_by')} ${mmCurrency} ${formatMMNumber(Math.abs(remaining))}` : `${t('mm_budget_remaining')} ${mmCurrency} ${formatMMNumber(remaining)}`}
                         </Text>
                       </View>
 
                       <TouchableOpacity
-                        style={[styles.mmOverallBudgetBtn, tStyles.mmOverallBudgetBtn]}
+                        style={[styles.mmOverallBudgetEditBtn, tStyles.mmOverallBudgetEditBtn, { marginTop: 14, minHeight: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' }]}
                         onPress={() => {
                           setMmOverallBudgetInput(String(overallLimit));
                           setModalMMOverallBudget(true);
                         }}
                         accessibilityRole="button"
-                        accessibilityLabel={t('mm_edit_overall_budget')}
+                        accessibilityLabel={t('mm_change_budget')}
                       >
-                        <Text style={[styles.mmOverallBudgetBtnText, tStyles.mmOverallBudgetBtnText]}>{t('mm_edit_overall_budget')}</Text>
+                        <Text style={[styles.mmOverallBudgetEditBtnText, tStyles.mmOverallBudgetEditBtnText, { fontWeight: '700' }]}>
+                          ✏️ {t('mm_change_budget')}
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   );
                 })()}
 
-                {/* Category Section Header */}
-                <View style={[styles.mmSectionHeader, { marginTop: 16 }]}>
-                  <Text style={[styles.mmSectionTitle, tStyles.mmSectionTitle]}>
-                    {mmCatSectionTab === 'expense' ? t('mm_category_budget_heading') : t('mm_income_category_heading')}
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                {/* Category Budgets Header & Tabs */}
+                <View style={{ marginTop: 18 }}>
+                  <View style={styles.mmSectionHeader}>
+                    <Text style={[styles.mmSectionTitle, tStyles.mmSectionTitle]}>{t('mm_category_budget')}</Text>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity
+                        style={[styles.mmAddSmallBtn, tStyles.mmAddSmallBtn, { backgroundColor: '#475569' }]}
+                        onPress={() => setMmShowArchivedCats(!mmShowArchivedCats)}
+                      >
+                        <Text style={[styles.mmAddSmallBtnText, tStyles.mmAddSmallBtnText]}>
+                          {mmShowArchivedCats ? t('mm_hide_archived') : t('mm_show_archived')}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.mmAddSmallBtn, tStyles.mmAddSmallBtn]}
+                        onPress={() => {
+                          setMmNewCatName('');
+                          setMmNewCatType('expense');
+                          setMmNewCatIcon('🏷️');
+                          setMmNewCatColor('#EF4444');
+                          setModalMMAddCategory(true);
+                        }}
+                      >
+                        <Text style={[styles.mmAddSmallBtnText, tStyles.mmAddSmallBtnText]}>{t('mm_add_category')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={[styles.mmCatTabsRow, tStyles.mmCatTabsRow]}>
                     <TouchableOpacity
-                      style={[styles.mmAddSmallBtn, tStyles.mmAddSmallBtn, { backgroundColor: mmShowArchivedCats ? currentTheme.cardBorder : currentTheme.primary }]}
-                      onPress={() => setMmShowArchivedCats(!mmShowArchivedCats)}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('mm_access_archived_filter')}
+                      style={[styles.mmCatTab, tStyles.mmCatTab, mmCatSectionTab === 'expense' && [styles.mmCatTabActive, tStyles.mmCatTabActive]]}
+                      onPress={() => setMmCatSectionTab('expense')}
                     >
-                      <Text style={[styles.mmAddSmallBtnText, tStyles.mmAddSmallBtnText]}>
-                        {mmShowArchivedCats ? t('mm_hide_archived') : t('mm_show_archived')}
+                      <Text style={[styles.mmCatTabText, tStyles.mmCatTabText, mmCatSectionTab === 'expense' && [styles.mmCatTabTextActive, tStyles.mmCatTabTextActive]]}>
+                        {t('mm_expense_budgets')}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.mmAddSmallBtn, tStyles.mmAddSmallBtn]}
-                      onPress={() => {
-                        setMmNewCatName('');
-                        setMmNewCatBudget('');
-                        setMmNewCatType(mmCatSectionTab);
-                        setModalMMAddCategory(true);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('mm_access_new_category')}
+                      style={[styles.mmCatTab, tStyles.mmCatTab, mmCatSectionTab === 'income' && [styles.mmCatTabActive, tStyles.mmCatTabActive]]}
+                      onPress={() => setMmCatSectionTab('income')}
                     >
-                      <Text style={[styles.mmAddSmallBtnText, tStyles.mmAddSmallBtnText]}>{t('mm_new_cat_btn')}</Text>
+                      <Text style={[styles.mmCatTabText, tStyles.mmCatTabText, mmCatSectionTab === 'income' && [styles.mmCatTabTextActive, tStyles.mmCatTabTextActive]]}>
+                        {t('mm_income_categories')}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Category Type Filter Pills (Expense / Income) */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, marginBottom: 12 }}>
-                  <TouchableOpacity
-                    style={[[styles.mmPrefPill, tStyles.mmPrefPill], mmCatSectionTab === 'expense' && [styles.mmPrefPillActive, tStyles.mmPrefPillActive]]}
-                    onPress={() => setMmCatSectionTab('expense')}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('mm_access_expense_categories')}
-                  >
-                    <Text style={[[styles.mmPrefPillText, tStyles.mmPrefPillText], mmCatSectionTab === 'expense' && [styles.mmPrefPillTextActive, tStyles.mmPrefPillTextActive]]}>
-                      {t('mm_expense_budget')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[[styles.mmPrefPill, tStyles.mmPrefPill], mmCatSectionTab === 'income' && [styles.mmPrefPillActive, tStyles.mmPrefPillActive]]}
-                    onPress={() => setMmCatSectionTab('income')}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('mm_access_income_categories')}
-                  >
-                    <Text style={[[styles.mmPrefPillText, tStyles.mmPrefPillText], mmCatSectionTab === 'income' && [styles.mmPrefPillTextActive, tStyles.mmPrefPillTextActive]]}>
-                      {t('mm_income_category')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
                 {mmCatSectionTab === 'expense' ? (
                   (() => {
-                    // Per-category budget progress is monthly; custom ranges are reserved for transaction analytics.
-                    const categoryBudgets = moneyManagerService.calculateCategoryBudgets(moneyManagerState, 'this_month');
-                    const expenseCats = (moneyManagerState.categories || []).filter((c) => c.type === 'expense' && (mmShowArchivedCats || !c.isArchived));
+                    const budgetItems = moneyManagerService.calculateCategoryBudgets(moneyManagerState, { period: mmPeriod, customRange: mmCustomRange });
+                    const visibleItems = budgetItems.filter(b => mmShowArchivedCats || !b.isArchived);
 
-                    if (expenseCats.length === 0) {
+                    if (visibleItems.length === 0) {
                       return (
                         <View style={{ paddingVertical: 20, alignItems: 'center' }}>
                           <Text style={{ color: currentTheme.textSecondary, fontSize: 13 }}>{t('mm_empty_expense_categories')}</Text>
@@ -10647,53 +10744,51 @@ function TallyKhataApp() {
                       );
                     }
 
-                    return expenseCats.map((cat) => {
-                      const budgetInfo = categoryBudgets.find((b) => b.categoryId === cat.id || b.id === cat.id);
-                      const spent = budgetInfo ? budgetInfo.spent : 0;
-                      const limit = cat.budget || 0;
-                      const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
-                      const remaining = limit - spent;
-                      const isOver = limit > 0 && spent > limit;
+                    return visibleItems.map((b) => {
+                      const isOver = b.isOver;
+                      const pct = b.pct || 0;
+                      const spent = b.spent || 0;
+                      const limit = b.budget || 0;
+                      const remaining = b.remaining;
 
                       return (
-                        <View key={cat.id} style={[styles.mmCatBudgetCard, tStyles.mmCatBudgetCard]}>
+                        <View key={b.categoryId} style={[styles.mmCatBudgetCard, tStyles.mmCatBudgetCard, b.isArchived && { opacity: 0.6 }]}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <MM3DIcon
-                              icon={cat.icon || '🏷️'}
-                              color={cat.color || '#3B82F6'}
+                              icon={b.icon || '🏷️'}
+                              color={b.color || '#EF4444'}
                               size={42}
                               iconSize={20}
                               isDark={isDark}
                             />
                             <View style={{ flex: 1, marginLeft: 12 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={[styles.mmCatBudgetName, tStyles.mmCatBudgetName]}>{tMMSeed('category', cat.id, cat.name)}</Text>
-                                {cat.isArchived && (
+                                <Text style={[styles.mmCatBudgetName, tStyles.mmCatBudgetName]}>{tMMSeed('category', b.categoryId, b.categoryName)}</Text>
+                                {b.isArchived && (
                                   <View style={[styles.mmArchivedBadge, tStyles.mmArchivedBadge]}>
                                     <Text style={[styles.mmArchivedBadgeText, tStyles.mmArchivedBadgeText]}>{t('mm_archived')}</Text>
                                   </View>
                                 )}
                               </View>
                               <Text style={[styles.mmCatBudgetAmounts, tStyles.mmCatBudgetAmounts]}>
-                                {t('mm_spent')} {mmCurrency} {formatMMNumber(spent)} {limit > 0 ? `${t('mm_budget_limit_prefix')}${mmCurrency} ${formatMMNumber(limit)}` : t('mm_no_limit')}
+                                {t('mm_spent_prefix')}{getMmPeriodLabel()}): {mmCurrency} {formatMMNumber(spent)}
+                                {limit > 0 ? ` / ${mmCurrency} ${formatMMNumber(limit)}` : ' • ' + t('mm_no_budget_set')}
                               </Text>
                             </View>
                             <View style={{ flexDirection: 'row', gap: 6 }}>
                               <TouchableOpacity
                                 style={[styles.mmCatBudgetBtn, tStyles.mmCatBudgetBtn]}
-                                onPress={() => {
-                                  setMmBudgetCat(cat.id);
-                                  setMmBudgetLimit(limit > 0 ? String(limit) : '');
-                                  setModalMMSetBudget(true);
-                                }}
+                                onPress={() => handleOpenSetBudget(b.categoryId, b.categoryName, limit)}
                                 accessibilityRole="button"
                                 accessibilityLabel={t('mm_access_set_budget')}
                               >
-                                <Text style={[styles.mmCatBudgetBtnText, tStyles.mmCatBudgetBtnText]}>{t('mm_budget_btn')}</Text>
+                                <Text style={[styles.mmCatBudgetBtnText, tStyles.mmCatBudgetBtnText]}>
+                                  {limit > 0 ? t('mm_budget_change') : t('mm_budget_set')}
+                                </Text>
                               </TouchableOpacity>
                               <TouchableOpacity
-                                style={[styles.mmCatBudgetBtn, tStyles.mmCatBudgetBtn]}
-                                onPress={() => handleOpenEditMMCategory(cat)}
+                                style={[styles.mmCatBudgetBtn, tStyles.mmCatBudgetBtn, { paddingHorizontal: 6 }]}
+                                onPress={() => handleOpenEditMMCategory(b)}
                                 accessibilityRole="button"
                                 accessibilityLabel={t('mm_access_edit_category')}
                               >
@@ -10716,7 +10811,7 @@ function TallyKhataApp() {
                                 />
                               </View>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                          <Text style={{ color: currentTheme.textMuted, fontSize: 11 }}>{t('mm_used')} {pct}%</Text>
+                                <Text style={{ color: currentTheme.textMuted, fontSize: 11 }}>{t('mm_used')} {pct}%</Text>
                                 <Text style={{ color: isOver ? '#EF4444' : '#10B981', fontSize: 11, fontWeight: 'bold' }}>
                                   {isOver ? `${t('mm_over_by_short')} ${mmCurrency} ${formatMMNumber(Math.abs(remaining))}` : `${t('mm_remaining_short')} ${mmCurrency} ${formatMMNumber(remaining)}`}
                                 </Text>
@@ -10769,7 +10864,7 @@ function TallyKhataApp() {
                               </Text>
                             </View>
                             <TouchableOpacity
-                            style={[styles.mmCatBudgetBtn, tStyles.mmCatBudgetBtn]}
+                              style={[styles.mmCatBudgetBtn, tStyles.mmCatBudgetBtn]}
                               onPress={() => handleOpenEditMMCategory(cat)}
                               accessibilityRole="button"
                               accessibilityLabel={t('mm_access_edit_category')}
@@ -10842,7 +10937,7 @@ function TallyKhataApp() {
                     const fundedAmount = moneyManagerService.getGoalFundedAmount(moneyManagerState, g.id);
 
                     return (
-                      <View key={g.id} style={[[styles.mmGoalCard, tStyles.mmGoalCard], tStyles.mmCard]}>
+                      <View key={g.id} style={[[styles.mmGoalCard, tStyles.mmGoalCard], tStyles.mmCard, { borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1.5 }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <MM3DIcon
                             icon={g.icon || '🎯'}
@@ -10853,7 +10948,7 @@ function TallyKhataApp() {
                             glow
                           />
                           <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={[styles.mmGoalTitle, tStyles.mmGoalTitle]} numberOfLines={1}>
+                            <Text style={[styles.mmGoalTitle, tStyles.mmGoalTitle, { fontSize: 16, fontWeight: '700' }]} numberOfLines={1}>
                               {tMMSeed('goal', g.id, g.title)}
                             </Text>
                             {g.targetDate ? <Text style={[styles.mmGoalTargetDate, tStyles.mmGoalTargetDate]}>{t('mm_target_prefix')} {g.targetDate}</Text> : null}
@@ -10861,19 +10956,21 @@ function TallyKhataApp() {
                           </View>
                         </View>
 
-                        <View style={styles.mmGoalProgressRow}>
-                          <Text style={[[styles.mmGoalSaved, tStyles.mmGoalSaved], tStyles.mmCardTitle]}>{t('mm_saved_prefix')} {formatMMNumber(saved)}</Text>
-                          <Text style={[[styles.mmGoalTarget, tStyles.mmGoalTarget], tStyles.mmCardSub]}>{t('mm_target_amount_prefix')} {formatMMNumber(target)}</Text>
+                        <View style={[styles.mmGoalProgressRow, { marginVertical: 8 }]}>
+                          <Text style={[[styles.mmGoalSaved, tStyles.mmGoalSaved], tStyles.mmCardTitle, { fontSize: 15 }]}>{t('mm_saved_prefix')} {formatMMNumber(saved)}</Text>
+                          <Text style={[[styles.mmGoalTarget, tStyles.mmGoalTarget], tStyles.mmCardSub, { fontSize: 13 }]}>{t('mm_target_amount_prefix')} {formatMMNumber(target)}</Text>
                         </View>
 
                         {/* Progress Bar */}
-                        <View style={[styles.mmProgressBarBg, tStyles.mmProgressBarBg]}>
+                        <View style={[styles.mmProgressBarBg, tStyles.mmProgressBarBg, { height: 8, borderRadius: 4 }]}>
                           <View
                             style={[
                               styles.mmProgressBarFill,
                               {
                                 width: `${pct}%`,
                                 backgroundColor: pct >= 100 ? '#10B981' : g.color || '#3B82F6',
+                                height: '100%',
+                                borderRadius: 4,
                               },
                             ]}
                           />
@@ -10883,7 +10980,7 @@ function TallyKhataApp() {
                         </Text>
 
                         {/* Goal Actions */}
-                        <Text style={[styles.mmGoalNote, tStyles.mmGoalNote]}>
+                        <Text style={[styles.mmGoalNote, tStyles.mmGoalNote, { marginTop: 6 }]}>
                           {t('mm_goal_wallet_funded')}: {formatMMCurrency(fundedAmount)}
                         </Text>
                         {saved !== fundedAmount ? (
@@ -10905,9 +11002,9 @@ function TallyKhataApp() {
                           </View>
                         ) : null}
 
-                        <View style={[styles.mmGoalActions, tStyles.mmGoalActions, { flexWrap: 'wrap', gap: 8 }]}>
+                        <View style={[styles.mmGoalActions, tStyles.mmGoalActions, { flexWrap: 'wrap', gap: 8, marginTop: 10 }]}>
                           <TouchableOpacity
-                            style={[styles.mmGoalDepositBtn, tStyles.mmGoalDepositBtn]}
+                            style={[styles.mmGoalDepositBtn, tStyles.mmGoalDepositBtn, { minHeight: 40, paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center' }]}
                             onPress={() => {
                               setMmDepositGoalId(g.id);
                               setMmDepositAmt('');
@@ -10918,25 +11015,25 @@ function TallyKhataApp() {
                             accessibilityRole="button"
                             accessibilityLabel={t('mm_access_deposit')}
                           >
-                            <Text style={[styles.mmGoalDepositBtnText, tStyles.mmGoalDepositBtnText]}>{t('mm_deposit_btn')}</Text>
+                            <Text style={[styles.mmGoalDepositBtnText, tStyles.mmGoalDepositBtnText, { fontWeight: '700' }]}>{t('mm_deposit_btn')}</Text>
                           </TouchableOpacity>
                           {fundedAmount > 0 ? (
                             <TouchableOpacity
-                              style={[styles.mmGoalDepositBtn, tStyles.mmGoalDepositBtn, { backgroundColor: '#2563EB' }]}
+                              style={[styles.mmGoalDepositBtn, tStyles.mmGoalDepositBtn, { backgroundColor: '#2563EB', minHeight: 40, paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center' }]}
                               onPress={() => openMMWithdrawGoal(g.id)}
                               accessibilityRole="button"
-                              accessibilityLabel={t('mm_access_withdraw_goal')}
+                              accessibilityLabel={t('mm_goal_withdraw')}
                             >
-                              <Text style={[styles.mmGoalDepositBtnText, tStyles.mmGoalDepositBtnText]}>{t('mm_goal_withdrawal_short')}</Text>
+                              <Text style={[styles.mmGoalDepositBtnText, tStyles.mmGoalDepositBtnText, { fontWeight: '700' }]}>{t('mm_goal_withdraw')}</Text>
                             </TouchableOpacity>
                           ) : null}
                           <TouchableOpacity
-                            style={[styles.mmGoalDeleteBtn, tStyles.mmGoalDeleteBtn]}
+                            style={[styles.mmGoalDeleteBtn, tStyles.mmGoalDeleteBtn, { minHeight: 40, paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center' }]}
                             onPress={() => handleDeleteMMGoal(g.id)}
                             accessibilityRole="button"
                             accessibilityLabel={t('mm_access_delete_goal')}
                           >
-                            <Text style={[styles.mmGoalDeleteBtnText, tStyles.mmGoalDeleteBtnText]}>{t('mm_delete')}</Text>
+                            <Text style={[styles.mmGoalDeleteBtnText, tStyles.mmGoalDeleteBtnText, { fontWeight: '700' }]}>{t('mm_delete')}</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -10951,15 +11048,15 @@ function TallyKhataApp() {
               <View style={{ marginTop: 14 }}>
                 {(() => {
                   const periodMetrics = moneyManagerService.calculatePeriodMetrics(moneyManagerState, mmPeriod, mmCustomRange);
-                  const distribution = moneyManagerService.calculateCategoryDistribution(moneyManagerState, mmPeriod, mmCustomRange);
+                  const distribution = moneyManagerService.calculateCategoryDistribution(moneyManagerState, 'expense', mmPeriod, mmCustomRange);
                   const periodLabel = getMmPeriodLabel();
 
                   return (
                     <View>
                       {/* Period Overview Card */}
-                      <View style={[styles.mmAnalyticsCard, tStyles.mmAnalyticsCard]}>
+                      <View style={[styles.mmAnalyticsCard, tStyles.mmAnalyticsCard, { borderRadius: 20, padding: 16, borderWidth: 1.5 }]}>
                         <Text style={[[styles.mmAnalyticsTitle, tStyles.mmAnalyticsTitle], tStyles.mmCardTitle]}>{t('mm_cash_flow_title')}{periodLabel})</Text>
-                        <View style={[styles.mmStatRow, tStyles.mmStatRow]}>
+                        <View style={[styles.mmStatRow, tStyles.mmStatRow, { marginTop: 10 }]}>
                           <View style={styles.mmStatCol}>
                             <Text style={[styles.mmStatLabel, tStyles.mmStatLabel]}>{t('mm_total_income')}</Text>
                             <Text style={[styles.mmStatIncome, tStyles.mmStatIncome]}>+{mmCurrency} {formatMMNumber(periodMetrics.income)}</Text>
@@ -10980,7 +11077,7 @@ function TallyKhataApp() {
                       </View>
 
                       {/* Category Expense Distribution Card */}
-                      <View style={[[styles.mmAnalyticsCard, tStyles.mmAnalyticsCard], { marginTop: 14 }]}>
+                      <View style={[[styles.mmAnalyticsCard, tStyles.mmAnalyticsCard], { marginTop: 14, borderRadius: 20, padding: 16, borderWidth: 1.5 }]}>
                         <Text style={[[styles.mmAnalyticsTitle, tStyles.mmAnalyticsTitle], tStyles.mmCardTitle]}>{t('mm_category_distribution_title')}{periodLabel})</Text>
                         {distribution.length === 0 ? (
                           <Text style={{ color: currentTheme.textMuted, fontSize: 13, marginTop: 10, textAlign: 'center' }}>
@@ -10988,7 +11085,7 @@ function TallyKhataApp() {
                           </Text>
                         ) : (
                           distribution.map((item) => (
-                            <View key={item.categoryId} style={styles.mmDistributionRow}>
+                            <View key={item.categoryId} style={[styles.mmDistributionRow, { marginVertical: 6 }]}>
                               <View style={styles.mmDistributionLeft}>
                                 <MM3DIcon icon={item.icon || '🏷️'} color={item.color || '#3B82F6'} size={28} iconSize={15} isDark={isDark} style={{ marginRight: 8 }} />
                                 <Text style={[styles.mmDistributionName, tStyles.mmDistributionName]} numberOfLines={1}>
@@ -11017,24 +11114,24 @@ function TallyKhataApp() {
 
                       {/* Smart Financial Tips Card */}
                       {moneyManagerState.preferences?.showTipsCard !== false && (
-                      <View style={[[styles.mmTipsCard, tStyles.mmTipsCard], { marginTop: 14 }]}>
-                        <Text style={[styles.mmTipsTitle, tStyles.mmTipsTitle]}>{t('mm_tips_title')}</Text>
-                        <View style={styles.mmTipRow}>
-                          <Text style={[styles.mmTipText, tStyles.mmTipText]}>
-                            • <Text style={{ fontWeight: 'bold' }}>{t('mm_tip_503020_label')}</Text> {t('mm_tip_503020')}
-                          </Text>
+                        <View style={[[styles.mmTipsCard, tStyles.mmTipsCard], { marginTop: 14, borderRadius: 20, padding: 16, borderWidth: 1.5 }]}>
+                          <Text style={[styles.mmTipsTitle, tStyles.mmTipsTitle]}>{t('mm_tips_title')}</Text>
+                          <View style={styles.mmTipRow}>
+                            <Text style={[styles.mmTipText, tStyles.mmTipText]}>
+                              • <Text style={{ fontWeight: 'bold' }}>{t('mm_tip_503020_label')}</Text> {t('mm_tip_503020')}
+                            </Text>
+                          </View>
+                          <View style={styles.mmTipRow}>
+                            <Text style={[styles.mmTipText, tStyles.mmTipText]}>
+                              • <Text style={{ fontWeight: 'bold' }}>{t('mm_tip_emergency_label')}</Text> {t('mm_tip_emergency')}
+                            </Text>
+                          </View>
+                          <View style={styles.mmTipRow}>
+                            <Text style={[styles.mmTipText, tStyles.mmTipText]}>
+                              • <Text style={{ fontWeight: 'bold' }}>{t('mm_tip_budget_label')}</Text> {t('mm_tip_budget')}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={styles.mmTipRow}>
-                          <Text style={[styles.mmTipText, tStyles.mmTipText]}>
-                            • <Text style={{ fontWeight: 'bold' }}>{t('mm_tip_emergency_label')}</Text> {t('mm_tip_emergency')}
-                          </Text>
-                        </View>
-                        <View style={styles.mmTipRow}>
-                          <Text style={[styles.mmTipText, tStyles.mmTipText]}>
-                            • <Text style={{ fontWeight: 'bold' }}>{t('mm_tip_budget_label')}</Text> {t('mm_tip_budget')}
-                          </Text>
-                        </View>
-                      </View>
                       )}
                     </View>
                   );
@@ -11046,7 +11143,161 @@ function TallyKhataApp() {
         </SafeAreaView>
       </Modal>
 
-      {/* 1. MODAL: ADD TRANSACTION */}
+      {/* MODAL: CHOOSE MONTH & PERIOD (Image 10 Style) */}
+      <Modal
+        visible={modalMMMonthPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalMMMonthPicker(false)}
+      >
+        <View style={styles.mmModalOverlay}>
+          <View style={[styles.mmModalSheet, tStyles.mmModalSheet, { maxHeight: '85%' }]}>
+            <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
+              <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>
+                {effectiveLanguage === 'en' ? 'Choose Month & Period' : 'মাস ও সময়কাল নির্বাচন'}
+              </Text>
+              <TouchableOpacity
+                style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]}
+                onPress={() => setModalMMMonthPicker(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24, gap: 16 }}>
+              {/* Quick Period Pills (Image 10) */}
+              <View>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#94A3B8' : '#64748B', marginBottom: 10 }}>
+                  {effectiveLanguage === 'en' ? 'Quick Periods' : 'দ্রুত সময়সীমা'}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 20,
+                      backgroundColor: mmPeriod === 'this_month' ? '#8B5CF6' : (isDark ? '#334155' : '#F1F5F9'),
+                      borderWidth: 1,
+                      borderColor: mmPeriod === 'this_month' ? '#7C3AED' : (isDark ? '#475569' : '#E2E8F0'),
+                    }}
+                    onPress={() => {
+                      handleSelectMMPeriod('this_month');
+                      setModalMMMonthPicker(false);
+                    }}
+                  >
+                    <Text style={{ color: mmPeriod === 'this_month' ? '#FFFFFF' : (isDark ? '#F1F5F9' : '#1E293B'), fontWeight: '700', fontSize: 13 }}>
+                      📅 {t("mm_period_this_month")}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 20,
+                      backgroundColor: mmPeriod === 'last_month' ? '#8B5CF6' : (isDark ? '#334155' : '#F1F5F9'),
+                      borderWidth: 1,
+                      borderColor: mmPeriod === 'last_month' ? '#7C3AED' : (isDark ? '#475569' : '#E2E8F0'),
+                    }}
+                    onPress={() => {
+                      handleSelectMMPeriod('last_month');
+                      setModalMMMonthPicker(false);
+                    }}
+                  >
+                    <Text style={{ color: mmPeriod === 'last_month' ? '#FFFFFF' : (isDark ? '#F1F5F9' : '#1E293B'), fontWeight: '700', fontSize: 13 }}>
+                      🗓️ {t("mm_period_last_month")}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 20,
+                      backgroundColor: mmPeriod === 'all_time' ? '#8B5CF6' : (isDark ? '#334155' : '#F1F5F9'),
+                      borderWidth: 1,
+                      borderColor: mmPeriod === 'all_time' ? '#7C3AED' : (isDark ? '#475569' : '#E2E8F0'),
+                    }}
+                    onPress={() => {
+                      handleSelectMMPeriod('all_time');
+                      setModalMMMonthPicker(false);
+                    }}
+                  >
+                    <Text style={{ color: mmPeriod === 'all_time' ? '#FFFFFF' : (isDark ? '#F1F5F9' : '#1E293B'), fontWeight: '700', fontSize: 13 }}>
+                      ⏱️ {t("mm_period_all_time")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Custom Date Range Section (Image 10) */}
+              <View style={{
+                padding: 14,
+                borderRadius: 16,
+                backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                borderWidth: 1,
+                borderColor: isDark ? '#334155' : '#E2E8F0',
+              }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#94A3B8' : '#64748B', marginBottom: 10 }}>
+                  {effectiveLanguage === 'en' ? 'or custom range' : 'বা নির্দিষ্ট সময়সীমা'}
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 12,
+                    borderRadius: 14,
+                    backgroundColor: isDark ? '#334155' : '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: isDark ? '#475569' : '#E2E8F0',
+                  }}
+                  onPress={() => {
+                    setModalMMMonthPicker(false);
+                    const today = moneyManagerService.getLocalDateString();
+                    if (mmCustomRange && mmCustomRange.startDate && mmCustomRange.endDate) {
+                      setMMRangeInputs(mmCustomRange.startDate, mmCustomRange.endDate);
+                    } else {
+                      setMMRangeInputs(today, today);
+                    }
+                    setModalMMCustomDateRange(true);
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 16 }}>📊</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#F1F5F9' : '#1E293B' }}>
+                      {mmPeriod === 'custom' && mmCustomRange ? getMmPeriodLabel() : (effectiveLanguage === 'en' ? 'Select Start & End Date' : 'শুরু ও শেষের তারিখ নির্বাচন করুন')}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 14, color: isDark ? '#93C5FD' : '#2563EB', fontWeight: 'bold' }}>→</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Bottom Done Button */}
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
+                <TouchableOpacity
+                  style={{
+                    paddingVertical: 12,
+                    paddingHorizontal: 24,
+                    borderRadius: 20,
+                    backgroundColor: '#10B981',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 120,
+                  }}
+                  onPress={() => setModalMMMonthPicker(false)}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' }}>✓ {effectiveLanguage === 'en' ? 'Done' : 'সম্পন্ন'}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+{/* 1. MODAL: ADD TRANSACTION */}
       <Modal
         visible={modalMMAddTxn}
         transparent
