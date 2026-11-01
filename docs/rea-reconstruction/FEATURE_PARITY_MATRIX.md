@@ -27,4 +27,4 @@
 ## 2. Verification Standards & Methodology
 1. **Integer Paisa Precision:** All monetary amounts calculate in exact integer paisa ($1\text{ Taka} = 100\text{ Paisa}$) with zero floating-point drift up to ৳100,000,000 single transactions.
 2. **Domain Isolation:** Strict separation between Business Accounting (`@tallykhata_state_v6`) and Personal Money Manager (`@tallykhata_personal_money_manager_v2`).
-3. **Automated Regression Suite:** 46 automated test suites (1,100+ passing assertions) verifying every parity dimension.
+3. **Automated Regression Suite:** 51 automated test suites (1,200+ passing assertions) verifying every parity dimension.

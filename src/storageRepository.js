@@ -228,6 +228,24 @@ class StorageRepository {
     this.adapter = storageAdapter || this.createInMemoryAdapter();
     this.currentStore = null;
     this.writeQueue = Promise.resolve();
+    this._pendingWrites = 0;
+  }
+
+  getPendingWritesCount() {
+    return Math.max(0, this._pendingWrites || 0);
+  }
+
+  isWriteQueueIdle() {
+    return (this._pendingWrites || 0) === 0;
+  }
+
+  async waitForIdle() {
+    if (this.writeQueue) {
+      try {
+        await Promise.resolve(this.writeQueue).catch(() => {});
+      } catch (_) {}
+    }
+    return true;
   }
 
   createInMemoryAdapter() {
@@ -288,6 +306,7 @@ class StorageRepository {
       if (typeof resetLedgerCache === 'function') resetLedgerCache();
     } catch (_) {}
     this.writeQueue = Promise.resolve();
+    this._pendingWrites = 0;
     return true;
   }
 
@@ -476,9 +495,12 @@ class StorageRepository {
           } catch (err) {
             console.error(`mutateCollection write error on ${collectionName}:`, err);
             resolve({ success: false, error: err });
+          } finally {
+            this._pendingWrites = Math.max(0, (this._pendingWrites || 0) - 1);
           }
         })
         .catch((fatalErr) => {
+          this._pendingWrites = Math.max(0, (this._pendingWrites || 0) - 1);
           console.error(`writeQueue recovered from error during mutateCollection(${collectionName}):`, fatalErr);
           resolve({ success: false, error: fatalErr });
         });
@@ -498,6 +520,7 @@ class StorageRepository {
       });
     }
 
+    this._pendingWrites = (this._pendingWrites || 0) + 1;
     return new Promise((resolve) => {
       this.writeQueue = this.writeQueue
         .then(async () => {
@@ -530,9 +553,12 @@ class StorageRepository {
           } catch (err) {
             console.error('mutateStore write error:', err);
             resolve({ success: false, error: err });
+          } finally {
+            this._pendingWrites = Math.max(0, (this._pendingWrites || 0) - 1);
           }
         })
         .catch((fatalErr) => {
+          this._pendingWrites = Math.max(0, (this._pendingWrites || 0) - 1);
           console.error('writeQueue recovered from error during mutateStore:', fatalErr);
           resolve({ success: false, error: fatalErr });
         });
@@ -1642,7 +1668,7 @@ class StorageRepository {
       return { success: false, error: new Error('Valid Money Manager state object is required') };
     }
 
-    this._pendingWrites++;
+    this._pendingWrites = (this._pendingWrites || 0) + 1;
     return new Promise((resolve) => {
       this.writeQueue = this.writeQueue
         .then(async () => {
@@ -1657,17 +1683,11 @@ class StorageRepository {
             console.error('saveMoneyManager write error:', err);
             resolve({ success: false, error: err });
           } finally {
-            this._pendingWrites--;
-            if (this._pendingWrites === 0) {
-              this.writeQueue = Promise.resolve();
-            }
+            this._pendingWrites = Math.max(0, (this._pendingWrites || 0) - 1);
           }
         })
         .catch((fatalErr) => {
-          this._pendingWrites--;
-          if (this._pendingWrites === 0) {
-            this.writeQueue = Promise.resolve();
-          }
+          this._pendingWrites = Math.max(0, (this._pendingWrites || 0) - 1);
           console.error('writeQueue recovered from error during saveMoneyManager:', fatalErr);
           resolve({ success: false, error: fatalErr });
         });
