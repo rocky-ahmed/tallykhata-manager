@@ -1,24 +1,24 @@
 # TALLYKHATA — NEXT SESSION RESUME INSTRUCTIONS
 **Document Purpose:** Enables seamless resumption across Codex sessions and thread interruptions without data loss or duplicate work.  
 **Last Updated:** 2026-11-01  
-**Last Completed Iteration:** `ITER-005` (VERIFIED COMPLETE)  
-**Next Queued Iteration:** `ITER-006` (Gradle Build Modernization & Retail User Journey Optimization)
+**Continuous Improvement Status:** `COMPLETE WITH DOCUMENTED LIMITATIONS` (Iterations 1–5 Certified)  
+**Authoritative Audit:** `docs/continuous-improvement/FINAL_COMPLETION_RECONCILIATION.md`
 
 ---
 
 ## 1. Resume Checkpoint
 - **Git HEAD:** Tracked on `main`.
 - **Protected Files:** `App.js.bak` and `extracted_apk/` must remain untracked and unmodified.
-- **Test Baseline:** 40 / 40 test suites passing (100% green, 890+ tests, 0 regressions).
-- **Worker Status:**
-  - Worker 1 (Gibbs): `01a19154-99ab-72a0-9e23-2611b9ffc74c` — Idle / Ready for `ITER-006`.
-  - Worker 2 (Averroes): `01a19154-c135-75d0-b38a-1ea50f004895` — Idle / Ready for `ITER-006`.
-  - Worker 3 (Ohm): `01a19154-e3ee-7ab2-b682-798b64a0bb6b` — Idle / Ready for `ITER-006`.
+- **Test Baseline:** 40 / 40 test suites passing (100% green, 959 discrete test cases, 0 regressions).
+- **Worker Registry:**
+  - Worker 1 (Gibbs): `01a19154-99ab-72a0-9e23-2611b9ffc74c` — UI / UX Specialist.
+  - Worker 2 (Averroes): `01a19154-c135-75d0-b38a-1ea50f004895` — Backend & Storage Architect.
+  - Worker 3 (Ohm): `01a19154-e3ee-7ab2-b682-798b64a0bb6b` — QA, Security & Performance Engineer.
 
 ---
 
 ## 2. Immediate Resume Actions
-1. Read `docs/continuous-improvement/CURRENT_ITERATION_PLAN.md` (`ITER-006`).
-2. Dispatch assignments to Gibbs, Averroes, and Ohm using their existing persistent thread IDs.
-3. Collect deliverables, run regression tests, audit results, and author `docs/continuous-improvement/iterations/ITERATION_006_REPORT.md`.
-4. Update `CONTINUOUS_BACKLOG.md` and `ITERATION_HISTORY.md`.
+1. Read `docs/continuous-improvement/FINAL_COMPLETION_RECONCILIATION.md` for full architectural status and audit evidence.
+2. In the event of future feature additions, consult `docs/continuous-improvement/CONTINUOUS_BACKLOG.md`.
+3. Dispatch new assignments to persistent workers Gibbs, Averroes, and Ohm without creating duplicate agent threads.
+4. Verify all 40 test suites pass with 100% green rate before and after any modification.

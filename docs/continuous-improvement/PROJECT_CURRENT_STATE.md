@@ -1,8 +1,8 @@
 # TALLYKHATA — PROJECT CURRENT STATE
-**Document Version:** 1.5.0  
+**Document Version:** 1.6.0  
 **Updated:** 2026-11-01  
-**Current Iteration:** `ITER-005` (Certified Complete)  
-**Last Certified Iteration:** `ITER-005` (Certified Complete)  
+**Continuous Improvement Status:** **COMPLETE WITH DOCUMENTED LIMITATIONS**  
+**Completed Iterations:** `ITER-001` through `ITER-005` (All Verified & Certified)  
 **Release Milestone:** Release Candidate 1 (RC-1)
 
 ---
@@ -10,10 +10,10 @@
 ## 1. Project Status Overview
 - **Application:** TallyKhata Offline Bookkeeping & Personal Money Manager (`com.progoti.tallykhata.offline`)
 - **Repository:** `tallybook-expo` (`rocky-ahmed/tallykhata-manager`)
-- **Current Milestone:** Phase 12 Final Quality Assurance Complete & Release Ready.
-- **Continuous Improvement Phase:** Autonomous Multi-Agent Continuous Development Loop Active.
-- **Git Branch:** `main`.
-- **Test Baseline:** 40 automated test suites, 100% passing rate (890+ test cases), 0 open P0/P1/P2/P3 defects.
+- **Current Milestone:** Continuous Improvement Loop Certified Complete with Documented Limitations.
+- **Git Branch:** `main` (Synchronized with `origin/main` at commit `bfe8cfa`).
+- **Test Baseline:** 40 automated test suites, 100% passing rate (959 discrete passing test cases), 0 open P0/P1/P2/P3 defects.
+- **Release Status:** Production keystore signing is an explicit human-dependent release blocker (keystore file and credentials must not be stored in repository).
 
 ---
 

@@ -1,6 +1,6 @@
 # TALLYKHATA — CONTINUOUS IMPROVEMENT BACKLOG
 **Maintained by:** Main Agent (Lead Architect)  
-**Last Updated:** 2026-11-01 (ITER-005 Completed)  
+**Last Updated:** 2026-11-01 (ITER-005 Completed & Reconciled)  
 **Iteration Cadence:** Iterative Multi-Agent Continuous Development
 
 ---
@@ -26,7 +26,7 @@
 | **BL-016** | **P3 (Low)** | UX / Feedback | Haptic feedback & sound feedback abstraction layer for primary accounting actions | Gibbs (Worker 1) | **COMPLETED** | ITER-005 |
 | **BL-017** | **P2 (Medium)** | Storage / Perf | Indexing optimization for transaction date-range queries in `src/storageRepository.js` | Averroes (Worker 2) | **COMPLETED** | ITER-005 |
 | **BL-018** | **P2 (Medium)** | QA / Perf | Benchmark memory consumption during high-frequency SQLite/AsyncStorage read-write loops | Ohm (Worker 3) | **COMPLETED** | ITER-005 |
-| **BL-010** | **P3 (Low)** | Build | Migrate Gradle build scripts from Groovy DSL to Kotlin DSL (`build.gradle.kts`) | Averroes (Worker 2) | **BACKLOG** | Future |
+| **BL-010** | **P3 (Low)** | Build | Migrate Gradle build scripts from Groovy DSL to Kotlin DSL (`build.gradle.kts`) | Averroes (Worker 2) | **DEFERRED (Justified)** | Future |
 
 ---
 
