@@ -31,7 +31,7 @@ function validateTransaction(amount, type, desc = '') {
     return { valid: false, error: 'টাকার পরিমাণ অবশ্যই শূন্য (০) থেকে বড় হতে হবে।' };
   }
   if (num > 100000000) {
-    return { valid: false, error: 'টাকার পরিমাণ অস্বাভাবিক বেশি (১০ কোটির বেশি অনুমোদিত নয়)।' };
+    return { valid: false, error: 'টাকার পরিমাণ অস্বাভাবিক বেশি (সর্বোচ্চ সীমা ১০ কোটির বেশি অনুমোদিত নয়)।' };
   }
 
   let normalizedType = type;

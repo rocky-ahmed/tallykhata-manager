@@ -648,7 +648,7 @@ class StorageRepository {
         const draft = JSON.parse(JSON.stringify(this.currentStore));
         const txOutput = await transactionFn(draft);
 
-        const updatedStore = (txOutput && txOutput.store) ? txOutput.store : txOutput;
+        const updatedStore = (txOutput && txOutput.store) ? txOutput.store : (txOutput !== undefined ? txOutput : draft);
         const result = (txOutput && txOutput.result !== undefined) ? txOutput.result : txOutput;
 
         if (!updatedStore || typeof updatedStore !== 'object') {
@@ -801,7 +801,7 @@ class StorageRepository {
         storageSizeAfter: finalSerialized.length,
       };
 
-      return { success: true, stats };
+      return { success: true, stats, purgedJournalsCount: orphanedJournalsRemoved, orphanedJournalsRemoved, deduplicatedRecords, prunedSnapshots, bytesReclaimed: stats.bytesReclaimed };
     });
   }
 
