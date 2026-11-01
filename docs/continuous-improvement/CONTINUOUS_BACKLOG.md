@@ -1,6 +1,6 @@
 # TALLYKHATA — CONTINUOUS IMPROVEMENT BACKLOG
 **Maintained by:** Main Agent (Lead Architect)  
-**Last Updated:** 2026-11-01 (ITER-003 Completed)  
+**Last Updated:** 2026-11-01 (ITER-005 Completed)  
 **Iteration Cadence:** Iterative Multi-Agent Continuous Development
 
 ---
@@ -20,9 +20,12 @@
 | **BL-011** | **P2 (Medium)** | UI / i18n | Audit complex Bengali conjunct glyphs (`যুক্তবর্ণ`) and custom font scale boundaries against clipping | Gibbs (Worker 1) | **COMPLETED** | ITER-003 |
 | **BL-012** | **P2 (Medium)** | Backup & UX | Pre-upload compressed backup size estimation in `src/googleDriveBackupService.js` for 2G/3G merchants | Averroes (Worker 2) | **COMPLETED** | ITER-003 |
 | **BL-013** | **P2 (Medium)** | QA / Testing | Author automated test suite verifying backup size estimation precision (`test_backup_size_estimation.js`) | Ohm (Worker 3) | **COMPLETED** | ITER-003 |
-| **BL-009** | **P3 (Low)** | Maintainability | Extract repetitive modal header subcomponents into reusable component definitions | Gibbs (Worker 1) | **NEXT** | ITER-004 |
-| **BL-014** | **P2 (Medium)** | Network / Cloud | Pre-upload Google Drive connectivity ping & exponential backoff retry policy formalization | Averroes (Worker 2) | **NEXT** | ITER-004 |
-| **BL-015** | **P2 (Medium)** | QA / Stress | Multi-device concurrent backup restore state collision simulation test suite | Ohm (Worker 3) | **NEXT** | ITER-004 |
+| **BL-009** | **P2 (Medium)** | Frontend / UX | Standardize reusable `ModalHeader` subcomponent across `src/components/` with $52\times 52\text{dp}$ touch hit-slop | Gibbs (Worker 1) | **COMPLETED** | ITER-004 |
+| **BL-014** | **P2 (Medium)** | Cloud / Network | Pre-upload Google Drive connectivity ping (`checkDriveConnectivity`) & exponential backoff (`executeWithRetry`) | Averroes (Worker 2) | **COMPLETED** | ITER-004 |
+| **BL-015** | **P2 (Medium)** | QA / Stress | Multi-device concurrent backup restore collision simulation suite (`test_concurrent_restoration_stress.js`) | Ohm (Worker 3) | **COMPLETED** | ITER-004 |
+| **BL-016** | **P3 (Low)** | UX / Feedback | Haptic feedback & sound feedback abstraction layer for primary accounting actions | Gibbs (Worker 1) | **COMPLETED** | ITER-005 |
+| **BL-017** | **P2 (Medium)** | Storage / Perf | Indexing optimization for transaction date-range queries in `src/storageRepository.js` | Averroes (Worker 2) | **COMPLETED** | ITER-005 |
+| **BL-018** | **P2 (Medium)** | QA / Perf | Benchmark memory consumption during high-frequency SQLite/AsyncStorage read-write loops | Ohm (Worker 3) | **COMPLETED** | ITER-005 |
 | **BL-010** | **P3 (Low)** | Build | Migrate Gradle build scripts from Groovy DSL to Kotlin DSL (`build.gradle.kts`) | Averroes (Worker 2) | **BACKLOG** | Future |
 
 ---

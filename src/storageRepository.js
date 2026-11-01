@@ -206,6 +206,7 @@ class StorageRepository {
     }
     this.currentStore = null;
     this._cachedMoneyManager = null;
+    clearJournalIndexCache();
     if (typeof moneyManagerService !== 'undefined' && moneyManagerService && typeof moneyManagerService.resetCache === 'function') {
       try { moneyManagerService.resetCache(); } catch (_) {}
     }
@@ -1468,6 +1469,299 @@ class StorageRepository {
     }
     return null;
   }
+
+  /**
+   * Returns a copy of journals sorted chronologically by date/time.
+   * Memoized via WeakMap caching with array length guard (__len).
+   * @param {Array|null} journals Optional journals array (defaults to authoritative state)
+   * @returns {Array} Sorted copy of journals
+   */
+  indexJournalsChronologically(journals = null) {
+    const target = Array.isArray(journals)
+      ? journals
+      : (this && typeof this.getAuthoritativeState === 'function'
+          ? (this.getAuthoritativeState()?.journals || [])
+          : []);
+    return indexJournalsChronologically(target);
+  }
+
+  /**
+   * Queries journals within a date range using O(log N) binary search on chronologically indexed records.
+   * Supports both signatures:
+   *   repo.queryJournalsByDateRange(journals, startDate, endDate, options)
+   *   repo.queryJournalsByDateRange(startDate, endDate, options)
+   *
+   * @param {Array|string|Date|null} journalsOrStart
+   * @param {string|Date|null} startOrEnd
+   * @param {string|Date|Object|null} endOrOptions
+   * @param {Object} [maybeOptions={}]
+   * @returns {{ journals: Array, totalCount: number, executionTimeMs: number }}
+   */
+  queryJournalsByDateRange(journalsOrStart, startOrEnd, endOrOptions, maybeOptions = {}) {
+    let journals, startDate, endDate, options;
+    if (Array.isArray(journalsOrStart)) {
+      journals = journalsOrStart;
+      startDate = startOrEnd;
+      endDate = endOrOptions;
+      options = maybeOptions || {};
+    } else {
+      journals = (this && typeof this.getAuthoritativeState === 'function')
+        ? (this.getAuthoritativeState()?.journals || [])
+        : [];
+      startDate = journalsOrStart;
+      endDate = startOrEnd;
+      options = (endOrOptions && typeof endOrOptions === 'object' && !(endOrOptions instanceof Date))
+        ? endOrOptions
+        : (maybeOptions || {});
+    }
+    return queryJournalsByDateRange(journals, startDate, endDate, options);
+  }
+}
+
+// ============================================================================
+// BL-017: TRANSACTION DATE-RANGE QUERY INDEXING & BINARY SEARCH ENGINE
+// ============================================================================
+
+let _journalIndexCache = new WeakMap();
+
+function clearJournalIndexCache() {
+  _journalIndexCache = new WeakMap();
+}
+
+/**
+ * Normalizes input date/timestamp into a canonical YYYY-MM-DD string.
+ * Supports Date objects, timestamps, ISO strings, Bengali numerals, and standard strings.
+ */
+function toStandardDateStr(val) {
+  if (val === null || val === undefined || val === '') return '';
+  if (typeof val === 'string') {
+    // Fast path: standard ASCII YYYY-MM-DD
+    if (val.length === 10 &&
+        val.charCodeAt(0) >= 48 && val.charCodeAt(0) <= 57 &&
+        val.charCodeAt(4) === 45 && val.charCodeAt(7) === 45) {
+      return val;
+    }
+    if (val.length >= 10 &&
+        val.charCodeAt(0) >= 48 && val.charCodeAt(0) <= 57 &&
+        val.charCodeAt(4) === 45 && val.charCodeAt(7) === 45) {
+      return val.slice(0, 10);
+    }
+  }
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '';
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  let str = String(val).trim();
+  const bengaliDigits = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+  for (let i = 0; i < 10; i++) {
+    if (str.indexOf(bengaliDigits[i]) !== -1) {
+      str = str.replace(new RegExp(bengaliDigits[i], 'g'), String(i));
+    }
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10);
+  }
+  const dt = new Date(str);
+  if (!isNaN(dt.getTime())) {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return str;
+}
+
+/**
+ * Normalizes 12-hour or 24-hour time string into a canonical 24-hour HH:MM:SS string for chronological comparison.
+ */
+function normalizeTimeComparable(timeStr) {
+  if (!timeStr) return '';
+  let str = String(timeStr).trim();
+  const bengaliDigits = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+  for (let i = 0; i < 10; i++) {
+    if (str.indexOf(bengaliDigits[i]) !== -1) {
+      str = str.replace(new RegExp(bengaliDigits[i], 'g'), String(i));
+    }
+  }
+  const match12 = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|am|pm)?$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = match12[2];
+    const seconds = match12[3] || '00';
+    const ampm = match12[4] ? match12[4].toUpperCase() : null;
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, '0')}:${minutes}:${seconds}`;
+  }
+  return str;
+}
+
+/**
+ * Deterministic chronological comparator for journal entries.
+ * Primary: Date (ascending YYYY-MM-DD)
+ * Secondary: Raw date/timestamp string
+ * Tertiary: Time string (e.g. '09:00 AM')
+ * Quaternary: ID (numeric or string)
+ */
+function compareJournals(a, b) {
+  const dateA = toStandardDateStr(a?.date || a?.createdAt);
+  const dateB = toStandardDateStr(b?.date || b?.createdAt);
+  if (dateA < dateB) return -1;
+  if (dateA > dateB) return 1;
+
+  const rawA = String(a?.date || a?.createdAt || '');
+  const rawB = String(b?.date || b?.createdAt || '');
+  if (rawA < rawB) return -1;
+  if (rawA > rawB) return 1;
+
+  const timeA = normalizeTimeComparable(a?.time);
+  const timeB = normalizeTimeComparable(b?.time);
+  if (timeA < timeB) return -1;
+  if (timeA > timeB) return 1;
+
+  const numA = Number(a?.id);
+  const numB = Number(b?.id);
+  if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+  return String(a?.id || '').localeCompare(String(b?.id || ''));
+}
+
+/**
+ * Returns a copy of journals sorted chronologically by date/time.
+ * Memoized via WeakMap caching with array length guard (__len) to prevent re-sorting unmodified arrays.
+ */
+function indexJournalsChronologically(journals = []) {
+  if (!Array.isArray(journals)) return [];
+  if (journals.length <= 1) return [...journals];
+
+  const cached = _journalIndexCache.get(journals);
+  if (cached && cached.__len === journals.length) {
+    return cached.indexed;
+  }
+
+  const copy = [...journals];
+  copy.sort(compareJournals);
+
+  _journalIndexCache.set(journals, { indexed: copy, __len: journals.length });
+  return copy;
+}
+
+/**
+ * Binary search for lower bound: first index where journal date >= targetDate
+ */
+function findLowerBound(arr, targetDate) {
+  let low = 0;
+  let high = arr.length - 1;
+  let result = arr.length;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const midDate = toStandardDateStr(arr[mid]?.date || arr[mid]?.createdAt);
+    if (midDate >= targetDate) {
+      result = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+  return result;
+}
+
+/**
+ * Binary search for upper bound: last index where journal date <= targetDate
+ */
+function findUpperBound(arr, targetDate) {
+  let low = 0;
+  let high = arr.length - 1;
+  let result = -1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const midDate = toStandardDateStr(arr[mid]?.date || arr[mid]?.createdAt);
+    if (midDate <= targetDate) {
+      result = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return result;
+}
+
+/**
+ * Queries journals within a date range using O(log N) binary search on chronologically indexed records.
+ * Supports optional multi-business (businessId) and accountId filtering.
+ *
+ * @param {Array} journals Array of journal objects
+ * @param {string|Date|null} startDate Start date (inclusive)
+ * @param {string|Date|null} endDate End date (inclusive)
+ * @param {Object} options Optional filters: { businessId, accountId, type, filter }
+ * @returns {{ journals: Array, totalCount: number, executionTimeMs: number }}
+ */
+function queryJournalsByDateRange(journals, startDate, endDate, options = {}) {
+  const startTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  const calcElapsed = () => {
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    return Math.max(0, Number((now - startTime).toFixed(2)));
+  };
+
+  if (!Array.isArray(journals) || journals.length === 0) {
+    return { journals: [], totalCount: 0, executionTimeMs: calcElapsed() };
+  }
+
+  const normStart = toStandardDateStr(startDate);
+  const normEnd = toStandardDateStr(endDate);
+
+  if (normStart && normEnd && normStart > normEnd) {
+    return { journals: [], totalCount: 0, executionTimeMs: calcElapsed() };
+  }
+
+  const indexed = indexJournalsChronologically(journals);
+  if (indexed.length === 0) {
+    return { journals: [], totalCount: 0, executionTimeMs: calcElapsed() };
+  }
+
+  const low = normStart ? findLowerBound(indexed, normStart) : (normEnd ? findLowerBound(indexed, '0000-00-00') : 0);
+  const high = normEnd ? findUpperBound(indexed, normEnd) : indexed.length - 1;
+
+  if (low > high || low >= indexed.length || high < 0) {
+    return { journals: [], totalCount: 0, executionTimeMs: calcElapsed() };
+  }
+
+  let candidates = indexed.slice(low, high + 1);
+
+  const hasBizFilter = options.businessId !== undefined && options.businessId !== null;
+  const hasAccFilter = options.accountId !== undefined && options.accountId !== null;
+  const hasTypeFilter = options.type !== undefined && options.type !== null && options.type !== '';
+  const hasCustomFilter = typeof options.filter === 'function';
+
+  if (hasBizFilter || hasAccFilter || hasTypeFilter || hasCustomFilter) {
+    const targetBizId = hasBizFilter ? String(options.businessId) : null;
+    const targetAccId = hasAccFilter ? String(options.accountId) : null;
+    const targetType = hasTypeFilter ? String(options.type) : null;
+
+    candidates = candidates.filter((item) => {
+      if (targetBizId !== null && String(item?.businessId || '1') !== targetBizId) {
+        return false;
+      }
+      if (targetAccId !== null && String(item?.accountId) !== targetAccId) {
+        return false;
+      }
+      if (targetType !== null && String(item?.type) !== targetType) {
+        return false;
+      }
+      if (hasCustomFilter && !options.filter(item)) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  return {
+    journals: candidates,
+    totalCount: candidates.length,
+    executionTimeMs: calcElapsed()
+  };
 }
 
 // Singleton repository instance for production and test suites
@@ -1489,6 +1783,9 @@ const repoExport = {
   migrateLegacySampleCustomerNames,
   loadStore,
   VALID_COLLECTIONS,
+  indexJournalsChronologically,
+  queryJournalsByDateRange,
+  clearJournalIndexCache,
   default: defaultRepository,
 };
 
@@ -1503,5 +1800,8 @@ if (typeof exports !== 'undefined') {
   exports.migrateLegacySampleCustomerNames = migrateLegacySampleCustomerNames;
   exports.loadStore = loadStore;
   exports.VALID_COLLECTIONS = VALID_COLLECTIONS;
+  exports.indexJournalsChronologically = indexJournalsChronologically;
+  exports.queryJournalsByDateRange = queryJournalsByDateRange;
+  exports.clearJournalIndexCache = clearJournalIndexCache;
   exports.default = defaultRepository;
 }

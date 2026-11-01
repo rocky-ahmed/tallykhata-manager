@@ -416,6 +416,105 @@ function validateBackupIntegrity(backupPayload, expectedOwnerSub = null) {
   return { valid: true, manifest, data };
 }
 
+
+/**
+ * Extracts numeric HTTP status code from an error object or error message.
+ * @param {Error|Object} err
+ * @returns {number|null}
+ */
+function extractHttpStatus(err) {
+  if (!err) return null;
+  if (typeof err.status === 'number') return err.status;
+  if (typeof err.statusCode === 'number') return err.statusCode;
+  if (err.response && typeof err.response.status === 'number') return err.response.status;
+  if (err.response && typeof err.response.statusCode === 'number') return err.response.statusCode;
+  if (typeof err.message === 'string') {
+    const match = err.message.match(/(?:HTTP|status|code)\s*:?\s*(\d{3})\b/i) || err.message.match(/\b(40[0-9]|429|50[0-9])\b/);
+    if (match) {
+      const code = parseInt(match[1], 10);
+      if (!isNaN(code)) return code;
+    }
+  }
+  return null;
+}
+
+/**
+ * Checks whether an error is non-retryable (fail-fast: 400, 401, 403, 404, payload validation).
+ * @param {Error|Object} err
+ * @param {number[]} [nonRetryableStatuses]
+ * @returns {boolean}
+ */
+function isErrorNonRetryable(err, nonRetryableStatuses = [400, 401, 403, 404, 409, 410, 422]) {
+  if (!err) return false;
+  const status = extractHttpStatus(err);
+  if (status && nonRetryableStatuses.includes(status)) {
+    return true;
+  }
+  const msg = ((err.message || '') + ' ' + (err.name || '')).toLowerCase();
+  if (
+    msg.includes('unauthorized') ||
+    msg.includes('forbidden') ||
+    msg.includes('invalid_token') ||
+    msg.includes('token expired') ||
+    msg.includes('permission denied') ||
+    msg.includes('cannot upload invalid') ||
+    msg.includes('invalid backup payload') ||
+    msg.includes('validation failed') ||
+    msg.includes('validation error') ||
+    msg.includes('checksum mismatch') ||
+    msg.includes('tampered') ||
+    msg.includes('not found')
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Checks whether an error is eligible for exponential backoff retry.
+ * Matches 408, 429, 500, 502, 503, 504 and transient network/timeout errors.
+ * @param {Error|Object} err
+ * @param {number[]} [retryableStatuses]
+ * @param {Object} [options]
+ * @returns {boolean}
+ */
+function isErrorRetryable(err, retryableStatuses = [408, 429, 500, 502, 503, 504], options = {}) {
+  if (!err) return false;
+  if (isErrorNonRetryable(err, options.nonRetryableStatuses)) {
+    return false;
+  }
+  const status = extractHttpStatus(err);
+  if (status && retryableStatuses.includes(status)) {
+    return true;
+  }
+  if (Array.isArray(options.retryableErrors)) {
+    const errText = (err.message || '') + ' ' + (err.code || '') + ' ' + (err.name || '');
+    for (const pattern of options.retryableErrors) {
+      if (typeof pattern === 'string' && errText.includes(pattern)) return true;
+      if (pattern instanceof RegExp && pattern.test(errText)) return true;
+    }
+  }
+  const msg = ((err.message || '') + ' ' + (err.code || '') + ' ' + (err.name || '')).toLowerCase();
+  if (
+    err.name === 'AbortError' ||
+    msg.includes('abort') ||
+    msg.includes('time') ||
+    msg.includes('network') ||
+    msg.includes('offline') ||
+    msg.includes('econnreset') ||
+    msg.includes('enotfound') ||
+    msg.includes('eai_again') ||
+    msg.includes('econnrefused') ||
+    msg.includes('connection lost') ||
+    msg.includes('socket closed') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('fetch failed')
+  ) {
+    return true;
+  }
+  return false;
+}
+
 class GoogleDriveBackupService {
   constructor(options = {}) {
     this.customFetch = options.fetch || (typeof fetch !== 'undefined' ? fetch : null);
@@ -531,7 +630,23 @@ class GoogleDriveBackupService {
   /**
    * Downloads and validates the backup file from Google Drive.
    */
-  async downloadBackup(accessToken, fileId, expectedSub = null) {
+  async downloadBackup(accessToken, fileId, expectedSub = null, options = {}) {
+    let sub = expectedSub;
+    let opts = options || {};
+    if (expectedSub && typeof expectedSub === 'object' && !Array.isArray(expectedSub)) {
+      opts = expectedSub;
+      sub = opts.expectedSub || null;
+    }
+    if (opts && (opts.retry || opts.retryOptions)) {
+      const retryOpts = typeof opts.retry === 'object' ? opts.retry : (opts.retryOptions || {});
+      return await this.executeWithRetry(async () => {
+        return await this._downloadBackupCore(accessToken, fileId, sub);
+      }, retryOpts);
+    }
+    return await this._downloadBackupCore(accessToken, fileId, sub);
+  }
+
+  async _downloadBackupCore(accessToken, fileId, expectedSub = null) {
     const url = this.driveApiBase + '/files/' + fileId + '?alt=media';
 
     const res = await this.fetchWithTimeout(url, {
@@ -566,6 +681,16 @@ class GoogleDriveBackupService {
    * Uploads or updates a backup in Google Drive appDataFolder.
    */
   async uploadBackup(accessToken, backupPayload, existingFileId = null, options = {}) {
+    if (options && (options.retry || options.retryOptions)) {
+      const retryOpts = typeof options.retry === 'object' ? options.retry : (options.retryOptions || {});
+      return await this.executeWithRetry(async () => {
+        return await this._uploadBackupCore(accessToken, backupPayload, existingFileId, options);
+      }, retryOpts);
+    }
+    return await this._uploadBackupCore(accessToken, backupPayload, existingFileId, options);
+  }
+
+  async _uploadBackupCore(accessToken, backupPayload, existingFileId = null, options = {}) {
     const fetchFn = this.getFetch();
     const valResult = validateBackupIntegrity(backupPayload);
     if (!valResult.valid) {
@@ -700,6 +825,241 @@ class GoogleDriveBackupService {
    */
   estimateBackupSize(storeOrState, googleUser = null, options = {}) {
     return estimateBackupSize(storeOrState, googleUser, options);
+  }
+
+    /**
+   * Performs a lightweight HTTP pre-flight check to verify Google Drive reachability.
+   * Handles network down, DNS failures, and timeout errors without throwing.
+   *
+   * @param {string|Object|null} [accessToken=null] - Optional Google OAuth access token or options object.
+   * @param {Object} [options={}] - Options (timeoutMs, pingUrl, headers).
+   * @returns {Promise<{ reachable: boolean, latencyMs: number, error: string|null, isAuthorized: boolean|null }>}
+   */
+  async checkDriveConnectivity(accessToken = null, options = {}) {
+    let token = accessToken;
+    let opts = options || {};
+
+    if (accessToken && typeof accessToken === 'object' && !Array.isArray(accessToken)) {
+      opts = accessToken;
+      token = opts.accessToken || null;
+    }
+
+    const timeoutMs = typeof opts.timeoutMs === 'number' && opts.timeoutMs > 0 ? opts.timeoutMs : 5000;
+    const startTime = Date.now();
+
+    const hasToken = typeof token === 'string' && token.trim().length > 0;
+    const cleanToken = hasToken ? token.trim() : null;
+
+    let pingUrl = opts.pingUrl;
+    if (!pingUrl) {
+      if (cleanToken) {
+        pingUrl = this.driveApiBase + '/files?spaces=appDataFolder&pageSize=1&fields=files(id)';
+      } else {
+        pingUrl = this.driveApiBase + '/files?pageSize=1';
+      }
+    }
+
+    const headers = { ...(opts.headers || {}) };
+    if (cleanToken && !headers.Authorization && !headers.authorization) {
+      headers.Authorization = 'Bearer ' + cleanToken;
+    }
+
+    const customFetch = opts.fetch || null;
+    let controller = null;
+    let timeoutId = null;
+
+    if (customFetch && typeof AbortController !== 'undefined') {
+      controller = new AbortController();
+      timeoutId = setTimeout(() => {
+        try { controller.abort(); } catch (_) {}
+      }, timeoutMs);
+    }
+
+    try {
+      let res;
+      if (customFetch) {
+        res = await customFetch(pingUrl, {
+          method: opts.method || 'GET',
+          headers,
+          signal: controller ? controller.signal : undefined,
+        });
+      } else {
+        res = await this.fetchWithTimeout(pingUrl, {
+          method: opts.method || 'GET',
+          headers,
+        }, timeoutMs);
+      }
+
+      const latencyMs = Math.max(0, Date.now() - startTime);
+
+      if (res.ok) {
+        return {
+          reachable: true,
+          latencyMs,
+          error: null,
+          isAuthorized: cleanToken ? true : null,
+          connected: true,
+          status: res.status,
+          authError: false,
+          message: 'গুগল ড্রাইভ সংযোগ সচল রয়েছে।',
+        };
+      }
+
+      const status = res.status;
+      const isAuthError = status === 401 || status === 403;
+
+      if (isAuthError) {
+        return {
+          reachable: true,
+          latencyMs,
+          error: cleanToken ? ('Google Drive ping failed with HTTP status ' + status) : null,
+          isAuthorized: false,
+          connected: !cleanToken,
+          status,
+          authError: true,
+          errorDetail: cleanToken ? 'গুগল ড্রাইভ একাউন্ট অনুমতি বাতিল বা মেয়াদোত্তীর্ণ।' : null,
+        };
+      }
+
+      return {
+        reachable: true,
+        latencyMs,
+        error: 'Google Drive ping failed with HTTP status ' + status,
+        isAuthorized: null,
+        connected: false,
+        status,
+        rateLimited: status === 429,
+        serverError: status >= 500 && status < 600,
+      };
+    } catch (netErr) {
+      const latencyMs = Math.max(0, Date.now() - startTime);
+      const isTimeout = netErr && (netErr.name === 'AbortError' || (netErr.message && netErr.message.toLowerCase().includes('timed out')));
+      const errorMsg = isTimeout
+        ? ('Google Drive connectivity check timed out after ' + Math.round(timeoutMs / 1000) + 's')
+        : ((netErr && netErr.message) || 'নেটওয়ার্ক সংযোগ বিচ্ছিন্ন।');
+
+      return {
+        reachable: false,
+        latencyMs,
+        error: errorMsg,
+        isAuthorized: null,
+        connected: false,
+        status: null,
+        offline: true,
+        timeout: Boolean(isTimeout),
+      };
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
+  async executeWithRetry(operationFn, options = {}) {
+    if (typeof operationFn !== 'function') {
+      throw new TypeError('executeWithRetry expects operationFn to be a function');
+    }
+
+    const maxRetries = typeof options.maxRetries === 'number' && options.maxRetries >= 0 ? options.maxRetries : 3;
+    const baseDelayMs = typeof options.baseDelayMs === 'number' && options.baseDelayMs >= 0 ? options.baseDelayMs : 500;
+    const maxDelayMs = typeof options.maxDelayMs === 'number' && options.maxDelayMs >= 0 ? options.maxDelayMs : 5000;
+    const retryableStatuses = Array.isArray(options.retryableStatuses)
+      ? options.retryableStatuses
+      : (Array.isArray(options.retryOnStatus) ? options.retryOnStatus : [408, 429, 500, 502, 503, 504]);
+    const nonRetryableStatuses = Array.isArray(options.nonRetryableStatuses)
+      ? options.nonRetryableStatuses
+      : (Array.isArray(options.nonRetryableStatus) ? options.nonRetryableStatus : [400, 401, 403, 404, 409, 410, 422]);
+    const sleepFn = typeof options.sleepFn === 'function'
+      ? options.sleepFn
+      : (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const onRetry = typeof options.onRetry === 'function' ? options.onRetry : null;
+    const isRetryableFn = typeof options.isRetryable === 'function' ? options.isRetryable : null;
+
+    let lastError = null;
+    let attempts = 0;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      attempts = attempt + 1;
+      try {
+        const result = await operationFn(attempts);
+        if (options.returnEnvelope === true) {
+          return {
+            success: true,
+            attempts,
+            retried: attempt > 0,
+            result,
+          };
+        }
+        if (result && typeof result === 'object' && !Array.isArray(result)) {
+          try {
+            Object.defineProperty(result, '_retryInfo', {
+              value: { attempts, retried: attempt > 0 },
+              enumerable: false,
+              configurable: true,
+            });
+          } catch (_) {}
+        }
+        return result;
+      } catch (err) {
+        lastError = err;
+
+        let canRetry = false;
+        if (isRetryableFn) {
+          canRetry = Boolean(isRetryableFn(err, attempt));
+        } else {
+          canRetry = isErrorRetryable(err, retryableStatuses, { ...options, nonRetryableStatuses });
+        }
+
+        // Fast-fail non-retryable errors
+        if (!canRetry) {
+          if (options.throwOnError === false) {
+            return {
+              success: false,
+              attempts,
+              retried: attempt > 0,
+              nonRetryable: true,
+              status: (err && err.status) || null,
+              error: err,
+            };
+          }
+          throw err;
+        }
+
+        if (attempt >= maxRetries) {
+          break;
+        }
+
+        // Backoff delay: Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt) + Math.random() * 200)
+        const jitter = options.noJitter || options.jitter === false
+          ? 0
+          : (typeof options.jitterAmount === 'number' ? options.jitterAmount : Math.random() * 200);
+        const computedDelay = baseDelayMs * Math.pow(2, attempt) + jitter;
+        const delayMs = Math.max(0, Math.min(maxDelayMs, Math.round(computedDelay)));
+
+        if (onRetry) {
+          try {
+            onRetry(err, attempts, delayMs);
+          } catch (_) {}
+        }
+
+        if (delayMs > 0) {
+          await sleepFn(delayMs);
+        }
+      }
+    }
+
+    if (options.throwOnError === false) {
+      return {
+        success: false,
+        attempts,
+        retried: true,
+        exhausted: true,
+        status: (lastError && lastError.status) || null,
+        error: lastError,
+      };
+    }
+
+    throw lastError;
   }
 }
 
@@ -2074,6 +2434,32 @@ function estimateBackupSize(storeOrState, arg2 = null, arg3 = {}) {
   };
 }
 
+const defaultGoogleDriveBackupService = new GoogleDriveBackupService();
+
+/**
+ * Standalone pre-upload Google Drive connectivity ping helper (BL-014).
+ * Performs a lightweight HTTP pre-flight check to verify Google Drive reachability.
+ */
+async function checkDriveConnectivity(accessToken = null, options = {}) {
+  let token = accessToken;
+  let opts = options || {};
+  if (accessToken && typeof accessToken === 'object' && !Array.isArray(accessToken)) {
+    opts = accessToken;
+    token = opts.accessToken || null;
+  }
+  const service = opts.driveService || defaultGoogleDriveBackupService;
+  return await service.checkDriveConnectivity(token, opts);
+}
+
+/**
+ * Standalone exponential backoff retry runner helper (BL-014).
+ * Executes an asynchronous network call with exponential backoff and jitter.
+ */
+async function executeWithRetry(operationFn, options = {}) {
+  const service = options.driveService || defaultGoogleDriveBackupService;
+  return await service.executeWithRetry(operationFn, options);
+}
+
 module.exports = {
   BACKUP_FILENAME,
   BACKUP_FORMAT_VERSION,
@@ -2093,6 +2479,8 @@ module.exports = {
   formatBytes,
   formatBytesBengali,
   estimateBackupSize,
+  checkDriveConnectivity,
+  executeWithRetry,
   GoogleDriveBackupService,
-  googleDriveBackupService: new GoogleDriveBackupService(),
+  googleDriveBackupService: defaultGoogleDriveBackupService,
 };
