@@ -9444,13 +9444,13 @@ function TallyKhataApp() {
             <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
               <View style={styles.inboxItem}>
                 <Text style={styles.inboxItemTitle}>{tStatic("টালিখাতা অফলাইন সংস্করণে স্বাগতম!")}</Text>
-                <Text style={styles.inboxItemBody}>{tStatic("আপনার অ্যাপটি সম্পূর্ণ ইন্টারনেট ছাড়া ১০০% অফলাইনে কাজ করে। কোনো মাসিক ফি বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।                   আপনার অ্যাপটি সম্পূর্ণ ইন্টারনেট ছাড়া ১০০% অফলাইনে কাজ করে। কোনো মাসিক ফি বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।")}</Text>
+                <Text style={styles.inboxItemBody}>{tStatic("আপনার অ্যাপটি সম্পূর্ণ ইন্টারনেট ছাড়া ১০০% অফলাইনে কাজ করে। কোনো মাসিক ফি বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।")}</Text>
                 <Text style={styles.inboxItemDate}>{getTodayDate()}</Text>
               </View>
 
               <View style={styles.inboxItem}>
                 <Text style={styles.inboxItemTitle}>{tStatic("ব্যাকআপ রাখার পরামর্শ")}</Text>
-                <Text style={styles.inboxItemBody}>{tStatic("প্রতি সপ্তাহে একবার মেনু থেকে \"ডাটা ব্যাকআপ ও রিস্টোর\" চেপে ব্যাকআপ কপি করে আপনার হোয়াটসঅ্যাপ বা ড্রাইভে রেখে দিন।                   প্রতি সপ্তাহে একবার মেনু থেকে \"ডাটা ব্যাকআপ ও রিস্টোর\" চেপে ব্যাকআপ কপি করে আপনার হোয়াটসঅ্যাপ বা ড্রাইভে রেখে দিন।")}</Text>
+                <Text style={styles.inboxItemBody}>{tStatic("প্রতি সপ্তাহে একবার মেনু থেকে \"ডাটা ব্যাকআপ ও রিস্টোর\" চেপে ব্যাকআপ কপি করে আপনার হোয়াটসঅ্যাপ বা ড্রাইভে রেখে দিন।")}</Text>
                 <Text style={styles.inboxItemDate}>{getYesterdayDate()}</Text>
               </View>
             </ScrollView>
@@ -9490,9 +9490,9 @@ function TallyKhataApp() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.supportBannerTitle}>{tStatic("টালিখাতা কাস্টমার সাপোর্ট")}</Text>
                   <TouchableOpacity onPress={() => Linking.openURL('tel:09612446677')}>
-                    <Text style={{ fontSize: 15, color: COLORS.primary, fontWeight: 'bold', marginTop: 3 }}>{tStatic("হটলাইন: ০৯৬১২-৪৪৬৬৭৭                       হটলাইন: ০৯৬১২-৪৪৬৬৭৭")}</Text>
+                    <Text style={{ fontSize: 15, color: COLORS.primary, fontWeight: 'bold', marginTop: 3 }}>{tStatic("হটলাইন: ০৯৬১২-৪৪৬৬৭৭")}</Text>
                   </TouchableOpacity>
-                  <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>{tStatic("সকাল ৯টা - রাত ৯টা (ছুটির দিনসহ)                     সকাল ৯টা - রাত ৯টা (ছুটির দিনসহ)")}</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>{tStatic("সকাল ৯টা - রাত ৯টা (ছুটির দিনসহ)")}</Text>
                 </View>
               </View>
 
