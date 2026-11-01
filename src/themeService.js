@@ -699,10 +699,506 @@ function getThemedStyles(theme, isDark) {
       backgroundColor: dark ? '#991B1B' : '#EF4444',
       borderColor: dark ? '#7F1D1D' : '#DC2626',
     },
+    // --- TAGADA THEMED STYLES (PHASE 8) ---
+    tagadaMetricCard: {
+      backgroundColor: dark ? '#1E293B' : '#FFFFFF',
+      borderColor: dark ? '#334155' : '#E2E8F0',
+      borderBottomColor: dark ? '#0F172A' : '#CBD5E1',
+    },
+    tagadaCardItem: {
+      backgroundColor: dark ? '#1E293B' : '#FFFFFF',
+      borderColor: dark ? '#334155' : '#E2E8F0',
+      borderBottomColor: dark ? '#0F172A' : '#F1F5F9',
+    },
+    tagadaCustName: {
+      color: t.textPrimary,
+    },
+    tagadaCustPhone: {
+      color: t.textSecondary,
+    },
+    tagadaCustDue: {
+      color: dark ? '#F87171' : '#B81414',
+    },
+    tagadaFilterChip: {
+      backgroundColor: dark ? '#1E293B' : '#F1F5F9',
+      borderColor: dark ? '#334155' : '#E2E8F0',
+    },
+    tagadaFilterChipActive: {
+      backgroundColor: dark ? '#3F1212' : '#FEF2F2',
+      borderColor: t.primary,
+    },
+    tagadaFilterChipText: {
+      color: t.textSecondary,
+    },
+    tagadaFilterChipTextActive: {
+      color: t.primary,
+    },
+    tagadaHistoryLog: {
+      backgroundColor: dark ? '#1E293B' : '#FFFFFF',
+      borderColor: dark ? '#334155' : '#E2E8F0',
+      borderBottomColor: dark ? '#0F172A' : '#F1F5F9',
+    },
+    // --- NOTES THEMED STYLES (PHASE 8) ---
+    noteCardItem: {
+      backgroundColor: dark ? '#1E293B' : '#FFFFFF',
+      borderColor: dark ? '#334155' : '#E2E8F0',
+      borderBottomColor: dark ? '#0F172A' : '#F1F5F9',
+    },
+    noteItemText: {
+      color: t.textPrimary,
+    },
+    noteItemTextDone: {
+      color: t.textMuted,
+    },
+    noteDateText: {
+      color: t.textSecondary,
+    },
+    noteFilterChip: {
+      backgroundColor: dark ? '#1E293B' : '#F1F5F9',
+      borderColor: dark ? '#334155' : '#E2E8F0',
+    },
+    noteFilterChipActive: {
+      backgroundColor: dark ? '#3F1212' : '#FEF2F2',
+      borderColor: t.primary,
+    },
+    noteFilterChipText: {
+      color: t.textSecondary,
+    },
+    noteFilterChipTextActive: {
+      color: t.primary,
+    },
+    // --- REPORTS THEMED STYLES (PHASE 8) ---
+    reportContainer: {
+      backgroundColor: t.screenBg,
+    },
+    reportHeader: {
+      backgroundColor: dark ? t.headerBg : '#B81414',
+      borderBottomColor: dark ? t.divider : '#B81414',
+    },
+    reportKpiCard: {
+      backgroundColor: dark ? '#1E293B' : '#FFFFFF',
+      borderColor: dark ? '#334155' : '#E5E7EB',
+      borderBottomColor: dark ? '#0F172A' : '#CBD5E1',
+    },
+    reportKpiLabel: {
+      color: t.textSecondary,
+    },
+    reportKpiValue: {
+      color: t.textPrimary,
+    },
+    reportSubKpiCard: {
+      backgroundColor: dark ? '#1E293B' : '#FFFFFF',
+      borderColor: dark ? '#334155' : '#F3F4F6',
+    },
+    reportSubKpiLabel: {
+      color: t.textMuted,
+    },
+    reportSubKpiValue: {
+      color: t.textPrimary,
+    },
+    reportRowCard: {
+      backgroundColor: dark ? '#1E293B' : '#FFFFFF',
+      borderColor: dark ? '#334155' : '#F3F4F6',
+      borderBottomColor: dark ? '#0F172A' : '#F3F4F6',
+    },
+    reportRowName: {
+      color: t.textPrimary,
+    },
+    reportRowSub: {
+      color: t.textSecondary,
+    },
+    reportRowAmt: {
+      color: t.textPrimary,
+    },
+    reportSectionTitle: {
+      color: t.textPrimary,
+    },
   };
 }
 
+// ===================================================================
+// MONEY MANAGER CUSTOMIZATION ENGINE & SECTION RESOLUTION (PHASE 9)
+// ===================================================================
+
+const MM_THEME_PRESETS = {
+  emerald: {
+    id: 'emerald',
+    name: 'এমারেল্ড',
+    nameEn: 'Emerald',
+    color: '#10B981',
+    accent: '#10B981',
+    light: { accent: '#10B981', cardBg: '#FFFFFF', textPrimary: '#064E3B', border: '#A7F3D0' },
+    dark: { accent: '#34D399', cardBg: '#064E3B', textPrimary: '#ECFDF5', border: '#047857' },
+  },
+  sapphire: {
+    id: 'sapphire',
+    name: 'স্যাফায়ার',
+    nameEn: 'Sapphire',
+    color: '#2563EB',
+    accent: '#2563EB',
+    light: { accent: '#2563EB', cardBg: '#FFFFFF', textPrimary: '#1E3A8A', border: '#BFDBFE' },
+    dark: { accent: '#60A5FA', cardBg: '#1E3A8A', textPrimary: '#EFF6FF', border: '#1D4ED8' },
+  },
+  obsidian: {
+    id: 'obsidian',
+    name: 'ওবসিডিয়ান',
+    nameEn: 'Obsidian',
+    color: '#334155',
+    accent: '#334155',
+    light: { accent: '#334155', cardBg: '#FFFFFF', textPrimary: '#0F172A', border: '#CBD5E1' },
+    dark: { accent: '#94A3B8', cardBg: '#0F172A', textPrimary: '#F8FAFC', border: '#334155' },
+  },
+  rose: {
+    id: 'rose',
+    name: 'রোজ গোল্ড',
+    nameEn: 'Rose Gold',
+    color: '#EC4899',
+    accent: '#EC4899',
+    light: { accent: '#EC4899', cardBg: '#FFFFFF', textPrimary: '#831843', border: '#FBCFE8' },
+    dark: { accent: '#F472B6', cardBg: '#831843', textPrimary: '#FDF2F8', border: '#BE185D' },
+  },
+  amber: {
+    id: 'amber',
+    name: 'অ্যাম্বার',
+    nameEn: 'Amber',
+    color: '#F59E0B',
+    accent: '#F59E0B',
+    light: { accent: '#F59E0B', cardBg: '#FFFFFF', textPrimary: '#78350F', border: '#FDE68A' },
+    dark: { accent: '#FBBF24', cardBg: '#78350F', textPrimary: '#FFFBEB', border: '#B45309' },
+  },
+  amethyst: {
+    id: 'amethyst',
+    name: 'অ্যামিথিস্ট',
+    nameEn: 'Deep Amethyst',
+    color: '#8B5CF6',
+    accent: '#8B5CF6',
+    light: { accent: '#8B5CF6', cardBg: '#FFFFFF', textPrimary: '#4C1D95', border: '#DDD6FE' },
+    dark: { accent: '#A78BFA', cardBg: '#4C1D95', textPrimary: '#F5F3FF', border: '#6D28D9' },
+  },
+  custom: {
+    id: 'custom',
+    name: 'কাস্টম',
+    nameEn: 'Custom',
+    color: '#B81414',
+    accent: '#B81414',
+    light: { accent: '#B81414', cardBg: '#FFFFFF', textPrimary: '#1E293B', border: '#E2E8F0' },
+    dark: { accent: '#EF4444', cardBg: '#1E293B', textPrimary: '#F8FAFC', border: '#334155' },
+  },
+};
+
+const MM_CUSTOMIZATION_SECTIONS = [
+  { id: 'dashboard', labelBn: 'ড্যাশবোর্ড', labelEn: 'Dashboard', icon: '📊', subsections: ['hero', 'inout', 'actions', 'carousel'] },
+  { id: 'transactions', labelBn: 'লেনদেন তালিকা', labelEn: 'Transactions', icon: '📝', subsections: ['list', 'header', 'amount', 'filter'] },
+  { id: 'wallets', labelBn: 'হিসাব ও ওয়ালেট', labelEn: 'Wallets & Accounts', icon: '💳', subsections: ['cards', 'balance', 'summary', 'add_btn'] },
+  { id: 'budgets', labelBn: 'বাজেট', labelEn: 'Budgets', icon: '🎯', subsections: ['overall', 'tiles', 'progress', 'alerts'] },
+  { id: 'goals', labelBn: 'সঞ্চয় লক্ষ্য', labelEn: 'Savings Goals', icon: '🏆', subsections: ['cards', 'progress', 'metrics', 'action_btns'] },
+  { id: 'analytics', labelBn: 'অ্যানালিটিক্স', labelEn: 'Analytics', icon: '📈', subsections: ['kpi', 'chart', 'breakdown', 'ranking'] },
+  { id: 'categories', labelBn: 'ক্যাটাগরি সমূহ', labelEn: 'Categories', icon: '🏷️', subsections: ['tiles', 'icon', 'type_badge', 'archive'] },
+  { id: 'reports', labelBn: 'রিপোর্ট ও বিবরণী', labelEn: 'Reports & Statements', icon: '📑', subsections: ['summary', 'table', 'export_btn', 'statement'] },
+];
+
+function hexToRgb(hex) {
+  if (!hex || typeof hex !== 'string') return { r: 184, g: 20, b: 20 };
+  const clean = hex.replace('#', '');
+  const num = parseInt(clean.slice(0, 6), 16);
+  if (isNaN(num)) return { r: 184, g: 20, b: 20 };
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255,
+  };
+}
+
+function getLuminance(r, g, b) {
+  const [rs, gs, bs] = [r / 255, g / 255, b / 255].map((c) =>
+    c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  );
+  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+}
+
+function getContrastRatio(hex1, hex2) {
+  const rgb1 = hexToRgb(hex1);
+  const rgb2 = hexToRgb(hex2);
+  const l1 = getLuminance(rgb1.r, rgb1.g, rgb1.b);
+  const l2 = getLuminance(rgb2.r, rgb2.g, rgb2.b);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function blendColors(fgHex, alpha, bgHex) {
+  const fg = hexToRgb(fgHex);
+  const bg = hexToRgb(bgHex);
+  const r = Math.round(fg.r * alpha + bg.r * (1 - alpha));
+  const g = Math.round(fg.g * alpha + bg.g * (1 - alpha));
+  const b = Math.round(fg.b * alpha + bg.b * (1 - alpha));
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+}
+
+function isValidHex(hex) {
+  return typeof hex === 'string' && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(hex.trim());
+}
+
+function coerceFloat(val, fallback, min, max) {
+  const p = parseFloat(val);
+  if (isNaN(p)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(p * 100) / 100));
+}
+
+function computeTintBackground(accentHex, tintOpacity, isDark, surfaceHex) {
+  const alphaVal = Math.min(255, Math.max(0, Math.round(tintOpacity * 255)));
+  const hexAlpha = alphaVal.toString(16).padStart(2, '0').toUpperCase();
+
+  if (isDark) {
+    const rgb = hexToRgb(accentHex);
+    return 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + Math.min(0.25, tintOpacity) + ')';
+  }
+  const cleanHex = accentHex.startsWith('#') ? accentHex.slice(0, 7) : '#' + accentHex.slice(0, 6);
+  return cleanHex + hexAlpha;
+}
+
+function getCanonicalDefaultCustomization() {
+  return {
+    schemaVersion: 3,
+    updatedAt: '2026-11-01T00:00:00.000Z',
+    global: {
+      preset: 'classic_red',
+      accent: '#B81414',
+      tint: 0.1,
+      textScale: 1.0,
+      surfaceMode: 'subtle_tint',
+      borderStyle: 'thin',
+      elevation: 'medium',
+    },
+    sections: {},
+    accessibility: {
+      minContrastRatio: 4.5,
+      minTextScale: 0.85,
+      maxTextScale: 1.3,
+      minTouchTargetDp: 48,
+      enforceContrastGuard: true,
+    },
+  };
+}
+
+function migrateCustomizationToV3(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return getCanonicalDefaultCustomization();
+  }
+  if (raw.schemaVersion === 3 && raw.global && raw.sections && raw.accessibility) {
+    return raw;
+  }
+
+  const rawGlobal = raw.global && typeof raw.global === 'object' ? raw.global : {};
+  const globalConfig = {
+    preset: rawGlobal.preset || 'classic_red',
+    accent: isValidHex(rawGlobal.accent) ? rawGlobal.accent : '#B81414',
+    tint: coerceFloat(rawGlobal.tint, 0.1, 0.05, 0.4),
+    textScale: coerceFloat(rawGlobal.textScale, 1.0, 0.85, 1.3),
+    surfaceMode: rawGlobal.surfaceMode || 'subtle_tint',
+    borderStyle: rawGlobal.borderStyle || 'thin',
+    elevation: rawGlobal.elevation || 'medium',
+  };
+
+  const VALID_SECTIONS = [
+    'dashboard', 'transactions', 'wallets', 'budgets',
+    'goals', 'analytics', 'reports', 'categories',
+  ];
+
+  const sourceSections = raw.sections && typeof raw.sections === 'object' ? raw.sections : raw;
+  const migratedSections = {};
+
+  VALID_SECTIONS.forEach((secKey) => {
+    const sec = sourceSections[secKey];
+    if (sec && typeof sec === 'object' && !Array.isArray(sec)) {
+      migratedSections[secKey] = {
+        preset: sec.preset || globalConfig.preset,
+        accent: isValidHex(sec.accent) ? sec.accent : globalConfig.accent,
+        tint: coerceFloat(sec.tint, globalConfig.tint, 0.05, 0.4),
+        textScale: coerceFloat(sec.textScale, globalConfig.textScale, 0.85, 1.3),
+        surfaceMode: sec.surfaceMode || globalConfig.surfaceMode,
+        borderStyle: sec.borderStyle || globalConfig.borderStyle,
+        elevation: sec.elevation || globalConfig.elevation,
+        ...(sec.subsections && typeof sec.subsections === 'object' ? { subsections: sec.subsections } : {}),
+      };
+    }
+  });
+
+  return {
+    schemaVersion: 3,
+    updatedAt: raw.updatedAt || new Date().toISOString(),
+    global: globalConfig,
+    sections: migratedSections,
+    accessibility: {
+      minContrastRatio: 4.5,
+      minTextScale: 0.85,
+      maxTextScale: 1.3,
+      minTouchTargetDp: 48,
+      enforceContrastGuard: raw.accessibility?.enforceContrastGuard !== false,
+    },
+  };
+}
+
+function resolveMMSectionStyle(sectionId, arg2, arg3, arg4, arg5) {
+  const isConsumerStyleCall = typeof arg2 === 'string';
+
+  let mmCustomization = isConsumerStyleCall ? (arg5 || {}) : (arg2 || {});
+  let isDark = isConsumerStyleCall ? !!arg4 : !!arg3;
+  let currentTheme = (!isConsumerStyleCall && arg4) ? arg4 : (isDark ? DARK_THEME : LIGHT_THEME);
+  let subsectionId = !isConsumerStyleCall ? arg5 : null;
+  let elementType = isConsumerStyleCall ? arg2 : null;
+  let fallbackStyle = isConsumerStyleCall ? arg3 : null;
+
+  // Layer 1: Base Design System Tokens
+  let accent = isDark ? currentTheme.primary : (currentTheme.primary || '#B81414');
+  let tint = 0.1;
+  let textScale = 1.0;
+  let surfaceMode = 'subtle_tint';
+  let borderStyle = 'thin';
+  let elevation = 'medium';
+
+  // Layer 2: Global Money Manager Customization Overrides
+  const globalConf = mmCustomization?.global;
+  if (globalConf && typeof globalConf === 'object') {
+    if (isValidHex(globalConf.accent)) accent = globalConf.accent;
+    if (!isNaN(parseFloat(globalConf.tint))) tint = parseFloat(globalConf.tint);
+    if (!isNaN(parseFloat(globalConf.textScale))) textScale = parseFloat(globalConf.textScale);
+    if (globalConf.surfaceMode) surfaceMode = globalConf.surfaceMode;
+    if (globalConf.borderStyle) borderStyle = globalConf.borderStyle;
+    if (globalConf.elevation) elevation = globalConf.elevation;
+  }
+
+  // Layer 3: Section-Specific Overrides
+  const secConf = mmCustomization?.sections?.[sectionId] || mmCustomization?.[sectionId];
+  if (secConf && typeof secConf === 'object') {
+    if (secConf.preset && MM_THEME_PRESETS[secConf.preset]) {
+      accent = MM_THEME_PRESETS[secConf.preset].color;
+    }
+    if (isValidHex(secConf.accent)) accent = secConf.accent;
+    if (!isNaN(parseFloat(secConf.tint))) tint = parseFloat(secConf.tint);
+    if (!isNaN(parseFloat(secConf.textScale))) textScale = parseFloat(secConf.textScale);
+    if (secConf.surfaceMode) surfaceMode = secConf.surfaceMode;
+    if (secConf.borderStyle) borderStyle = secConf.borderStyle;
+    if (secConf.elevation) elevation = secConf.elevation;
+  }
+
+  // Layer 4: Subsection Overrides
+  if (subsectionId && secConf?.subsections?.[subsectionId]) {
+    const subConf = secConf.subsections[subsectionId];
+    if (isValidHex(subConf.accent)) accent = subConf.accent;
+    if (!isNaN(parseFloat(subConf.tint))) tint = parseFloat(subConf.tint);
+    if (!isNaN(parseFloat(subConf.textScale))) textScale = parseFloat(subConf.textScale);
+  }
+
+  // Layer 5: Accessibility Clamping & Contrast Guard
+  const clampedScale = Math.min(1.3, Math.max(0.85, Math.round(textScale * 100) / 100));
+  const clampedTint = Math.min(0.4, Math.max(0.05, Math.round(tint * 100) / 100));
+
+  const cardSurface = isDark ? currentTheme.cardBgElevated : currentTheme.cardBg;
+  const cardBackground = surfaceMode === 'solid_card'
+    ? cardSurface
+    : computeTintBackground(accent, clampedTint, isDark, cardSurface);
+
+  let cardBorder = currentTheme.cardBorder;
+  if (borderStyle === 'accent_colored') cardBorder = accent;
+  else if (borderStyle === 'bold') cardBorder = isDark ? '#475569' : '#CBD5E1';
+  else if (borderStyle === 'none') cardBorder = 'transparent';
+
+  // Contrast auto-correction
+  let accessibleAccent = accent;
+  const effectiveBg = cardBackground.startsWith('#') && cardBackground.length === 9
+    ? blendColors(cardBackground.slice(0, 7), clampedTint, cardSurface)
+    : cardSurface;
+  const contrastRatio = getContrastRatio(accent, effectiveBg);
+  if (contrastRatio < 4.5) {
+    accessibleAccent = isDark ? '#FCA5A5' : '#7F1D1D';
+  }
+
+  const descriptor = {
+    sectionId,
+    accentColor: accessibleAccent,
+    cardBackground,
+    cardBorder,
+    primaryText: currentTheme.textPrimary,
+    secondaryText: currentTheme.textSecondary,
+    fontScale: clampedScale,
+    badgeBackground: computeTintBackground(accessibleAccent, 0.15, isDark, cardSurface),
+    badgeText: accessibleAccent,
+    elevation,
+    getScaledFontSize: (base) => Math.round(base * clampedScale),
+  };
+
+  if (!isConsumerStyleCall) {
+    return descriptor;
+  }
+
+  // Consumer style mapping
+  const base = Array.isArray(fallbackStyle)
+    ? Object.assign({}, ...fallbackStyle.filter(Boolean))
+    : (fallbackStyle || {});
+
+  switch (elementType) {
+    case 'card': {
+      const cardResult = { ...base };
+      if (cardBackground) cardResult.backgroundColor = cardBackground;
+      if (cardBorder) {
+        cardResult.borderColor = cardBorder;
+        cardResult.borderBottomColor = cardBorder;
+      }
+      return cardResult;
+    }
+    case 'header':
+    case 'text': {
+      const textResult = { ...base };
+      if (textResult.fontSize) {
+        textResult.fontSize = descriptor.getScaledFontSize(textResult.fontSize);
+      }
+      return textResult;
+    }
+    case 'amount': {
+      const amtResult = { ...base };
+      if (accessibleAccent) amtResult.color = accessibleAccent;
+      if (amtResult.fontSize) {
+        amtResult.fontSize = descriptor.getScaledFontSize(amtResult.fontSize);
+      }
+      return amtResult;
+    }
+    case 'accent':
+      return accessibleAccent;
+    case 'border': {
+      const borderResult = { ...base };
+      if (cardBorder) borderResult.borderColor = cardBorder;
+      return borderResult;
+    }
+    case 'progressBar': {
+      const pbResult = { ...base };
+      if (accessibleAccent) pbResult.backgroundColor = accessibleAccent;
+      return pbResult;
+    }
+    case 'pill': {
+      const pillResult = { ...base };
+      if (accessibleAccent) {
+        pillResult.borderColor = accessibleAccent;
+        pillResult.backgroundColor = computeTintBackground(accessibleAccent, 0.15, isDark, cardSurface);
+      }
+      return pillResult;
+    }
+    default:
+      return base;
+  }
+}
+
 module.exports = {
+  MM_THEME_PRESETS,
+  MM_CUSTOMIZATION_SECTIONS,
+  resolveMMSectionStyle,
+  migrateCustomizationToV3,
+  getCanonicalDefaultCustomization,
+  computeTintBackground,
+  hexToRgb,
+  getContrastRatio,
+  blendColors,
+  isValidHex,
   getThemedStyles,
   LIGHT_THEME,
   DARK_THEME,
