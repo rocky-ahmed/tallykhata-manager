@@ -36,6 +36,7 @@ import * as iconMetricsService from './src/iconMetrics';
 import { STANDARD_TOUCH_HIT_SLOP } from './src/iconMetrics';
 import * as typographyTokens from './src/typographyTokens';
 import { Card3D, Button3D, SquircleBadge } from './src/components';
+import hapticFeedbackService from './src/hapticFeedbackService';
 
 export const ThemeContext = React.createContext({
   theme: themeService.LIGHT_THEME,
@@ -2114,6 +2115,26 @@ function TallyKhataApp() {
       if (modalNotifications) { setModalNotifications(false); return true; }
       if (modalDataManagement) { setModalDataManagement(false); return true; }
       if (modalAbout) { setModalAbout(false); return true; }
+      if (modalFilter) { setModalFilter(false); return true; }
+
+      // Graceful dismissal for Money Manager modals before exiting or switching tabs
+      if (modalMMMonthPicker) { setModalMMMonthPicker(false); return true; }
+      if (modalMMCustomDateRange) { setModalMMCustomDateRange(false); return true; }
+      if (modalMMPreferences) { setModalMMPreferences(false); return true; }
+      if (modalMMAddRecurring) { setModalMMAddRecurring(false); return true; }
+      if (modalMMRecurring) { setModalMMRecurring(false); return true; }
+      if (modalMMEditCategory) { setModalMMEditCategory(false); return true; }
+      if (modalMMWithdrawGoal) { setModalMMWithdrawGoal(false); return true; }
+      if (modalMMDepositGoal) { setModalMMDepositGoal(false); return true; }
+      if (modalMMAddGoal) { setModalMMAddGoal(false); return true; }
+      if (modalMMOverallBudget) { setModalMMOverallBudget(false); return true; }
+      if (modalMMAddCategory) { setModalMMAddCategory(false); return true; }
+      if (modalMMEditTxn) { setModalMMEditTxn(false); return true; }
+      if (modalMMAddTxn) { setModalMMAddTxn(false); return true; }
+      if (modalMMAddAccount) { setModalMMAddAccount(false); return true; }
+      if (modalMMSetBudget) { setModalMMSetBudget(false); return true; }
+      if (modalMMTransfer) { setModalMMTransfer(false); return true; }
+      if (modalMoneyManager) { setModalMoneyManager(false); return true; }
 
       // Return to home screen from account_ledger
       if (currentScreenRef.current !== 'home') {
@@ -2138,7 +2159,7 @@ function TallyKhataApp() {
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalTagada, modalVoucher, modalPinSetup, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
-    modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, modalNotifications, modalDataManagement, modalAbout, currentScreen, activeTab
+    modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, modalNotifications, modalDataManagement, modalAbout, modalFilter, modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMWithdrawGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange, modalMMMonthPicker, currentScreen, activeTab
   ]);
 
   const loadSavedData = async () => {
@@ -2357,7 +2378,20 @@ function TallyKhataApp() {
   }, [businessInventory, stockFilterStatus, stockSearchQuery]);
 
   // --- CALCULATOR ENGINE HANDLER ---
+  const handleSwitchTxnType = (newType) => {
+    if (newType !== txnType) {
+      try { hapticFeedbackService.onTabPress(); } catch (e) {}
+      setTxnType(newType);
+    }
+  };
+
+  const handleSelectTxnDate = (newDate) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setTxnDate(newDate);
+  };
+
   const handleCalcPress = (btn) => {
+    try { hapticFeedbackService.onKeyPress(); } catch (e) {}
     if (btn === 'C') {
       setCalcExpr('');
       setCalcDisplay('০');
@@ -2384,6 +2418,7 @@ function TallyKhataApp() {
   };
 
   const handleQuickChipAdd = (val) => {
+    try { hapticFeedbackService.onKeyPress(); } catch (e) {}
     const currentNum = safeEvalCalc(calcExpr) || 0;
     const nextTotal = currentNum + val;
     setCalcExpr(String(nextTotal));
@@ -2392,6 +2427,7 @@ function TallyKhataApp() {
 
   // --- HANDLER: OPEN TRANSACTION ENTRY MODAL ---
   const handleOpenAddTxn = (type) => {
+    try { hapticFeedbackService.onTabPress(); } catch (e) {}
     setTxnType(type);
     setCalcExpr('');
     setCalcDisplay('০');
@@ -2408,6 +2444,7 @@ function TallyKhataApp() {
     const amt = safeEvalCalc(calcExpr);
     const valRes = validateTransaction(amt, txnType, txnDesc);
     if (!valRes.valid) {
+      try { hapticFeedbackService.onError(); } catch (e) {}
       Alert.alert(tStatic("সতর্কতা"), valRes.error);
       return;
     }
@@ -2459,10 +2496,12 @@ function TallyKhataApp() {
     setIsSaving(false);
 
     if (!saveRes.success) {
+      try { hapticFeedbackService.onError(); } catch (e) {}
       Alert.alert(tStatic("ত্রুটি"), tStatic("লেনদেন সংরক্ষণ করা যায়নি। দয়া করে আবার চেষ্টা করুন।"));
       return;
     }
 
+    try { hapticFeedbackService.onTransactionSave(); } catch (e) {}
     if (finalAccount) setSelectedAccount(finalAccount);
     setAccounts(saveRes.data.accounts);
     setJournals(saveRes.data.journals);
@@ -4950,14 +4989,20 @@ function TallyKhataApp() {
                     </View>
                   </View>
 
-                  {/* --- 3. SUMMARY CARD (১,০৮,৫০০ মোট পাবো | ০ মোট দেবো) --- */}
+                  {/* --- 3. SUMMARY CARD (মোট পাবো [Emerald Green] | মোট দেবো [Crimson/Ruby]) --- */}
                   <View style={[styles.summaryCardContainer, isDark && tStyles.card]}>
                     <TouchableOpacity
                       style={styles.summaryCardCol}
-                      onPress={() => setModalBakiReport(true)}
+                      onPress={() => {
+                        try { hapticFeedbackService.selection(); } catch (e) {}
+                        setModalBakiReport(true);
+                      }}
                       activeOpacity={0.8}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t("header_total_due")} ${formatAppNumber(totalCustomerDue)}`}
                     >
-                      <Text style={[styles.summaryCardAmountRed, isDark && { color: currentTheme.danger }]}>
+                      <Text style={[styles.summaryCardAmountGreen, isDark && { color: currentTheme.success }]}>
                         {formatAppNumber(totalCustomerDue)}
                       </Text>
                       <Text style={[styles.summaryCardLabel, isDark && tStyles.textSecondary]}>{t("header_total_due")}</Text>
@@ -4968,11 +5013,16 @@ function TallyKhataApp() {
                     <TouchableOpacity
                       style={styles.summaryCardCol}
                       onPress={() => {
+                        try { hapticFeedbackService.selection(); } catch (e) {}
                         setAccountTab('supplier');
+                        setAccType(2);
                       }}
                       activeOpacity={0.8}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t("header_total_owe")} ${formatAppNumber(totalSupplierDue)}`}
                     >
-                      <Text style={[styles.summaryCardAmountGreen, isDark && { color: currentTheme.success }]}>
+                      <Text style={[styles.summaryCardAmountRed, isDark && { color: currentTheme.danger }]}>
                         {formatAppNumber(totalSupplierDue)}
                       </Text>
                       <Text style={[styles.summaryCardLabel, isDark && tStyles.textSecondary]}>{t("header_total_owe")}</Text>
@@ -5029,30 +5079,52 @@ function TallyKhataApp() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* --- 5. COUNTER STRIP (কাস্টমার ১২ / সাপ্লায়ার ০) --- */}
+                  {/* --- 5. DUAL-TAB SWITCHER (কাস্টমার / হিসাব vs সাপ্লায়ার / মহাজন) --- */}
                   <View style={[styles.counterStripRow, isDark && { backgroundColor: currentTheme.cardBgElevated }]}>
                     <TouchableOpacity
                       onPress={() => {
+                        try { hapticFeedbackService.onTabPress(); } catch (e) {}
                         setAccountTab('customer');
                         setAccType(1);
                       }}
                       activeOpacity={0.7}
-                      style={[styles.counterTabPill, accountTab === 'customer' && (isDark ? { backgroundColor: currentTheme.cardBg } : styles.counterTabPillActive)]}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: accountTab === 'customer' }}
+                      style={[
+                        styles.counterTabPill,
+                        accountTab === 'customer' && (isDark ? { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.primary, borderWidth: 1 } : styles.counterTabPillActive)
+                      ]}
                     >
-                      <Text style={[styles.counterTabText, isDark && { color: currentTheme.textSecondary }, accountTab === 'customer' && { color: currentTheme.primary, fontWeight: 'bold' }]}>
+                      <Text style={[
+                        styles.counterTabText,
+                        isDark && { color: currentTheme.textSecondary },
+                        accountTab === 'customer' && { color: currentTheme.primary, fontWeight: 'bold' }
+                      ]}>
                         {t('header_filter_customer')} {formatAppNumber(customerCount)}
                       </Text>
                     </TouchableOpacity>
                     <Text style={[styles.counterStripDivider, isDark && tStyles.textSecondary]}>/</Text>
                     <TouchableOpacity
                       onPress={() => {
+                        try { hapticFeedbackService.onTabPress(); } catch (e) {}
                         setAccountTab('supplier');
                         setAccType(2);
                       }}
                       activeOpacity={0.7}
-                      style={[styles.counterTabPill, accountTab === 'supplier' && (isDark ? { backgroundColor: currentTheme.cardBg } : styles.counterTabPillActive)]}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: accountTab === 'supplier' }}
+                      style={[
+                        styles.counterTabPill,
+                        accountTab === 'supplier' && (isDark ? { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.primary, borderWidth: 1 } : styles.counterTabPillActive)
+                      ]}
                     >
-                      <Text style={[styles.counterTabText, isDark && { color: currentTheme.textSecondary }, accountTab === 'supplier' && { color: currentTheme.primary, fontWeight: 'bold' }]}>
+                      <Text style={[
+                        styles.counterTabText,
+                        isDark && { color: currentTheme.textSecondary },
+                        accountTab === 'supplier' && { color: currentTheme.primary, fontWeight: 'bold' }
+                      ]}>
                         {t('header_filter_supplier')} {formatAppNumber(supplierCount)}
                       </Text>
                     </TouchableOpacity>
@@ -7091,6 +7163,8 @@ function TallyKhataApp() {
                 style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("বন্ধ করুন")}
               >
                 <Image
                   source={require('./assets/icons/ic_close.png')}
@@ -7100,7 +7174,134 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            {/* Large 3D Calculator Display */}
+            {/* --- DUAL SWITCHER: বাকি দেওয়া vs টাকা নেওয়া --- */}
+            <View style={[
+              styles.txnModalTypeSwitcher,
+              isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }
+            ]}>
+              <TouchableOpacity
+                style={[
+                  styles.txnModalTypeBtn,
+                  txnType === 'given' && [
+                    styles.txnModalTypeBtnGivenActive,
+                    isDark && { backgroundColor: '#450A0A', borderColor: '#7F1D1D' }
+                  ]
+                ]}
+                onPress={() => handleSwitchTxnType('given')}
+                activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityState={{ selected: txnType === 'given' }}
+              >
+                <Text style={[
+                  styles.txnModalTypeText,
+                  isDark && tStyles.textSecondary,
+                  txnType === 'given' && [
+                    styles.txnModalTypeTextGivenActive,
+                    isDark && { color: currentTheme.danger }
+                  ]
+                ]}>
+                  {isCustomer ? tStatic("বাকি দেওয়া (-)") : tStatic("টাকা দেওয়া (-)")}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.txnModalTypeBtn,
+                  txnType === 'received' && [
+                    styles.txnModalTypeBtnReceivedActive,
+                    isDark && { backgroundColor: '#064E3B', borderColor: '#065F46' }
+                  ]
+                ]}
+                onPress={() => handleSwitchTxnType('received')}
+                activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityState={{ selected: txnType === 'received' }}
+              >
+                <Text style={[
+                  styles.txnModalTypeText,
+                  isDark && tStyles.textSecondary,
+                  txnType === 'received' && [
+                    styles.txnModalTypeTextReceivedActive,
+                    isDark && { color: currentTheme.success }
+                  ]
+                ]}>
+                  {isCustomer ? tStatic("টাকা নেওয়া (+)") : tStatic("বাকি নেওয়া (+)")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* --- TRANSACTION DATE SELECTOR (আজ / গতকাল / তারিখ) --- */}
+            <View style={[styles.txnDateBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+              <View style={styles.txnDateInfoRow}>
+                <Image
+                  source={require('./assets/icons/ic_calendar.png')}
+                  style={[styles.txnDateIcon, isDark && { tintColor: currentTheme.textSecondary }]}
+                  resizeMode="contain"
+                />
+                <Text style={[styles.txnDateLabel, isDark && tStyles.textSecondary]}>
+                  {tStatic("তারিখ: ")}
+                </Text>
+                <Text style={[styles.txnDateValue, isDark && tStyles.textPrimary]}>
+                  {formatDisplayDate(txnDate, effectiveLanguage)}
+                </Text>
+              </View>
+
+              <View style={styles.txnDatePillRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.txnDateChip,
+                    txnDate === getTodayDate() && [
+                      styles.txnDateChipActive,
+                      isDark && { backgroundColor: currentTheme.primaryContainer, borderColor: currentTheme.primary }
+                    ]
+                  ]}
+                  onPress={() => handleSelectTxnDate(getTodayDate())}
+                  activeOpacity={0.7}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                >
+                  <Text style={[
+                    styles.txnDateChipText,
+                    isDark && tStyles.textSecondary,
+                    txnDate === getTodayDate() && [
+                      styles.txnDateChipTextActive,
+                      isDark && { color: currentTheme.primary }
+                    ]
+                  ]}>
+                    {tStatic("আজ")}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.txnDateChip,
+                    txnDate === getYesterdayDate() && [
+                      styles.txnDateChipActive,
+                      isDark && { backgroundColor: currentTheme.primaryContainer, borderColor: currentTheme.primary }
+                    ]
+                  ]}
+                  onPress={() => handleSelectTxnDate(getYesterdayDate())}
+                  activeOpacity={0.7}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                >
+                  <Text style={[
+                    styles.txnDateChipText,
+                    isDark && tStyles.textSecondary,
+                    txnDate === getYesterdayDate() && [
+                      styles.txnDateChipTextActive,
+                      isDark && { color: currentTheme.primary }
+                    ]
+                  ]}>
+                    {tStatic("গতকাল")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Large 3D Calculator Display with ৳ Bengali Taka symbol */}
             <View style={[
               styles.calcDisplayBox,
               {
@@ -15405,6 +15606,120 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
   },
 
+  // --- TRANSACTION MODAL DUAL SWITCHER & DATE SELECTOR ---
+  txnModalTypeSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  txnModalTypeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    minHeight: 44,
+  },
+  txnModalTypeBtnGivenActive: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    elevation: 2,
+    shadowColor: '#B81414',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+  },
+  txnModalTypeBtnReceivedActive: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    elevation: 2,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+  },
+  txnModalTypeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  txnModalTypeTextGivenActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+  txnModalTypeTextReceivedActive: {
+    color: '#047857',
+    fontWeight: 'bold',
+  },
+  txnDateBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  txnDateInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  txnDateIcon: {
+    width: 16,
+    height: 16,
+    tintColor: '#64748B',
+    marginRight: 6,
+  },
+  txnDateLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  txnDateValue: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  txnDatePillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  txnDateChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    minHeight: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  txnDateChipActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#B81414',
+  },
+  txnDateChipText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  txnDateChipTextActive: {
+    color: '#B81414',
+    fontWeight: 'bold',
+  },
+
   // Search Pill & Counter Strip
   searchPillBar: {
     backgroundColor: '#FFFFFF',
@@ -15432,9 +15747,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   counterTabPill: {
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   counterTabPillActive: {
     backgroundColor: 'transparent',

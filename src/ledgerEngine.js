@@ -13,6 +13,13 @@ function generateUniqueId(prefix = '') {
 
 // --- 1. VALIDATION HELPERS ---
 function validateTransaction(amount, type, desc = '') {
+  if (typeof amount === 'object' && amount !== null) {
+    const rawAmt = amount.amount !== undefined && amount.amount !== null ? amount.amount : amount.amount_received;
+    const rawType = amount.type !== undefined && amount.type !== null ? amount.type : amount.txn_type;
+    const rawDesc = amount.desc || amount.description || '';
+    return validateTransaction(rawAmt, rawType, rawDesc);
+  }
+
   const num = Number(amount);
   if (amount === undefined || amount === null || String(amount).trim() === '') {
     return { valid: false, error: 'টাকার পরিমাণ খালি রাখা যাবে না।' };
@@ -26,10 +33,104 @@ function validateTransaction(amount, type, desc = '') {
   if (num > 100000000) {
     return { valid: false, error: 'টাকার পরিমাণ অস্বাভাবিক বেশি (১০ কোটির বেশি অনুমোদিত নয়)।' };
   }
-  if (type !== 'given' && type !== 'received') {
+
+  let normalizedType = type;
+  if (type === 1 || type === '1') normalizedType = 'given';
+  else if (type === 2 || type === '2') normalizedType = 'received';
+
+  if (normalizedType !== 'given' && normalizedType !== 'received') {
     return { valid: false, error: 'লেনদেনের ধরন সঠিক নয় (দিলাম অথবা পেলাম হতে হবে)।' };
   }
   return { valid: true, amount: Math.round(num * 100) / 100 };
+}
+
+/**
+ * Normalizes a journal record to guarantee 100% field parity with both:
+ * 1. Reference Room DB schema (orig_account_id, txn_type, txn_mode, amount, amount_received, business_id, txn_date, description)
+ * 2. TallyKhata clone fields (accountId, type, amount, businessId, date, time, desc)
+ * Preserves integer-paisa monetary precision (1 Taka = 100 Paisa).
+ */
+function normalizeJournalFields(journal, account = null) {
+  if (!journal || typeof journal !== 'object') return journal;
+
+  const res = { ...journal };
+
+  // 1. Account ID normalization
+  if (res.accountId !== undefined && res.accountId !== null) {
+    res.accountId = String(res.accountId);
+    if (res.orig_account_id === undefined || res.orig_account_id === null) {
+      res.orig_account_id = isNaN(Number(res.accountId)) ? res.accountId : Number(res.accountId);
+    }
+  } else if (res.orig_account_id !== undefined && res.orig_account_id !== null) {
+    res.accountId = String(res.orig_account_id);
+    res.orig_account_id = isNaN(Number(res.orig_account_id)) ? res.orig_account_id : Number(res.orig_account_id);
+  }
+
+  // 2. Business ID normalization (multi-business isolation)
+  const resolvedBizId = res.businessId !== undefined && res.businessId !== null
+    ? String(res.businessId)
+    : (res.business_id !== undefined && res.business_id !== null
+      ? String(res.business_id)
+      : (account && (account.businessId || account.business_id) ? String(account.businessId || account.business_id) : '1'));
+  res.businessId = resolvedBizId;
+  res.business_id = isNaN(Number(resolvedBizId)) ? resolvedBizId : Number(resolvedBizId);
+
+  // 3. Amount & Amount Received with Integer-Paisa Precision (1 Taka = 100 Paisa)
+  const rawAmt = Number(res.amount !== undefined && res.amount !== null ? res.amount : res.amount_received) || 0;
+  res.amount = Math.round(rawAmt * 100) / 100;
+
+  if (res.amount_received !== undefined && res.amount_received !== null) {
+    res.amount_received = Math.round(Number(res.amount_received) * 100) / 100;
+  } else {
+    const isCust = account ? account.type === 1 : true;
+    const isPayment = res.type === (isCust ? 'received' : 'given') ||
+                      res.txn_type === 2 ||
+                      res.txn_type === '2' ||
+                      res.txn_type === (isCust ? 'received' : 'given');
+    res.amount_received = isPayment ? res.amount : 0;
+  }
+
+  // 4. Transaction Type: txn_type (1=Credit, 2=Payment) <-> type ('given'/'received')
+  const isCust = account ? account.type === 1 : true;
+  if (res.type === 'given') {
+    if (res.txn_type === undefined || res.txn_type === null) {
+      res.txn_type = isCust ? 1 : 2;
+    }
+  } else if (res.type === 'received') {
+    if (res.txn_type === undefined || res.txn_type === null) {
+      res.txn_type = isCust ? 2 : 1;
+    }
+  } else if (res.txn_type === 1 || res.txn_type === '1') {
+    res.txn_type = 1;
+    if (!res.type) {
+      res.type = isCust ? 'given' : 'received';
+    }
+  } else if (res.txn_type === 2 || res.txn_type === '2') {
+    res.txn_type = 2;
+    if (!res.type) {
+      res.type = isCust ? 'received' : 'given';
+    }
+  } else if (res.txn_type === 'given' || res.txn_type === 'received') {
+    res.type = res.txn_type;
+    res.txn_type = res.type === (isCust ? 'given' : 'received') ? 1 : 2;
+  }
+
+  // 5. Transaction Mode: txn_mode (1=Cash, 2=Digital/Wallet)
+  const isDigital = res.isDigital === true ||
+                    res.txn_mode === 2 ||
+                    res.txn_mode === '2' ||
+                    res.txn_mode === 'digital' ||
+                    res.txn_mode === 'bank' ||
+                    res.txn_mode === 'mfs';
+  res.txn_mode = isDigital ? 2 : 1;
+
+  // 6. Dates, Times & Descriptions
+  if (!res.date && res.txn_date) res.date = res.txn_date;
+  if (!res.txn_date && res.date) res.txn_date = res.date;
+  if (!res.desc && res.description) res.desc = res.description;
+  if (!res.description && res.desc) res.description = res.desc;
+
+  return res;
 }
 
 function validateAccount(name, phone = '', initialBalance = 0) {
@@ -95,9 +196,13 @@ function establishAccountOpeningBalance(account, allJournals = []) {
   let jNetPaisa = 0;
   let hasInvalid = false;
 
-  const targetBizId = account.businessId !== undefined && account.businessId !== null ? String(account.businessId) : null;
+  const targetBizId = account.businessId !== undefined && account.businessId !== null
+    ? String(account.businessId)
+    : (account.business_id !== undefined && account.business_id !== null ? String(account.business_id) : null);
   const isBizMatch = (j) => {
-    const jBizId = j && j.businessId !== undefined && j.businessId !== null ? String(j.businessId) : null;
+    const jBizId = j && (j.businessId !== undefined && j.businessId !== null
+      ? String(j.businessId)
+      : (j.business_id !== undefined && j.business_id !== null ? String(j.business_id) : null));
     if (targetBizId && jBizId) return targetBizId === jBizId;
     if (targetBizId && !jBizId) return targetBizId === '1' || targetBizId === 'default';
     if (!targetBizId && jBizId) return jBizId === '1' || jBizId === 'default';
@@ -105,20 +210,37 @@ function establishAccountOpeningBalance(account, allJournals = []) {
   };
 
   for (const j of allJournals) {
-    if (j && String(j.accountId) === targetAccId && isBizMatch(j)) {
-      const numAmt = Number(j.amount);
+    const jAccId = j && (j.accountId !== undefined && j.accountId !== null
+      ? String(j.accountId)
+      : (j.orig_account_id !== undefined && j.orig_account_id !== null ? String(j.orig_account_id) : null));
+    if (j && jAccId === targetAccId && isBizMatch(j)) {
+      const numAmt = Number(j.amount !== undefined && j.amount !== null ? j.amount : j.amount_received);
       if (isNaN(numAmt)) {
         hasInvalid = true;
         break;
       }
       const amtPaisa = Math.round(numAmt * 100);
+
+      let isGiven = j.type === 'given' || j.txn_type === 'given';
+      let isReceived = j.type === 'received' || j.txn_type === 'received';
+      if (!isGiven && !isReceived && (j.txn_type === 1 || j.txn_type === 2 || j.txn_type === '1' || j.txn_type === '2')) {
+        const numType = Number(j.txn_type);
+        if (isCust) {
+          isGiven = numType === 1;
+          isReceived = numType === 2;
+        } else {
+          isReceived = numType === 1;
+          isGiven = numType === 2;
+        }
+      }
+
       if (isCust) {
-        if (j.type === 'given') jNetPaisa += amtPaisa;
-        else if (j.type === 'received') jNetPaisa -= amtPaisa;
+        if (isGiven) jNetPaisa += amtPaisa;
+        else if (isReceived) jNetPaisa -= amtPaisa;
         else hasInvalid = true;
       } else {
-        if (j.type === 'received') jNetPaisa += amtPaisa;
-        else if (j.type === 'given') jNetPaisa -= amtPaisa;
+        if (isReceived) jNetPaisa += amtPaisa;
+        else if (isGiven) jNetPaisa -= amtPaisa;
         else hasInvalid = true;
       }
     }
@@ -149,8 +271,8 @@ function establishAccountOpeningBalance(account, allJournals = []) {
 function sortJournalsChronologically(journals) {
   if (!Array.isArray(journals) || journals.length <= 1) return journals;
   return journals.sort((a, b) => {
-    const dA = a.date || '';
-    const dB = b.date || '';
+    const dA = a.date || a.txn_date || '';
+    const dB = b.date || b.txn_date || '';
     if (dA < dB) return -1;
     if (dA > dB) return 1;
 
@@ -185,15 +307,23 @@ function recalculateAllAccountBalances(accounts = [], allJournals = [], business
     return emptyResult;
   }
 
-  // 1. Index all journals by accountId in O(M) time
+  // 1. Index all journals by composite key `${jBizId}:${accId}` in O(M) time to prevent cross-business collisions
   const journalMap = new Map();
   for (let i = 0; i < allJournals.length; i++) {
     const j = allJournals[i];
-    if (!j || j.accountId === undefined || j.accountId === null) continue;
-    if (businessId && j.businessId && String(j.businessId) !== String(businessId)) {
+    if (!j) continue;
+    const accId = j.accountId !== undefined && j.accountId !== null ? j.accountId : j.orig_account_id;
+    if (accId === undefined || accId === null) continue;
+
+    const jBizId = String(j.businessId !== undefined && j.businessId !== null
+      ? j.businessId
+      : (j.business_id !== undefined && j.business_id !== null ? j.business_id : '1'));
+
+    if (businessId && jBizId !== String(businessId)) {
       continue;
     }
-    const accKey = String(j.accountId);
+
+    const accKey = `${jBizId}:${accId}`;
     let list = journalMap.get(accKey);
     if (!list) {
       list = [];
@@ -213,22 +343,19 @@ function recalculateAllAccountBalances(accounts = [], allJournals = [], business
       continue;
     }
 
-    if (businessId && account.businessId && String(account.businessId) !== String(businessId)) {
+    const targetBizId = String(account.businessId !== undefined && account.businessId !== null
+      ? account.businessId
+      : (account.business_id !== undefined && account.business_id !== null ? account.business_id : '1'));
+
+    if (businessId && targetBizId !== String(businessId)) {
       updatedAccounts.push(account);
       continue;
     }
 
     const isCustomer = account.type === 1;
     const targetAccId = String(account.id);
-    const targetBizId = account.businessId !== undefined && account.businessId !== null ? String(account.businessId) : null;
-    const rawTargetJournals = journalMap.get(targetAccId) || [];
-    const targetJournals = rawTargetJournals.filter(j => {
-      const jBizId = j.businessId !== undefined && j.businessId !== null ? String(j.businessId) : null;
-      if (targetBizId && jBizId) return targetBizId === jBizId;
-      if (targetBizId && !jBizId) return targetBizId === '1' || targetBizId === 'default';
-      if (!targetBizId && jBizId) return jBizId === '1' || jBizId === 'default';
-      return true;
-    });
+    const accKey = `${targetBizId}:${targetAccId}`;
+    const targetJournals = journalMap.get(accKey) || [];
 
     let openingBal = 0;
     if (account.openingBalance !== undefined && account.openingBalance !== null) {
@@ -243,14 +370,28 @@ function recalculateAllAccountBalances(accounts = [], allJournals = [], business
       let runningPaisa = Math.round(openingBal * 100);
       for (let k = 0; k < targetJournals.length; k++) {
         const j = targetJournals[k];
-        const numAmt = Number(j.amount) || 0;
+        const numAmt = Number(j.amount !== undefined && j.amount !== null ? j.amount : j.amount_received) || 0;
         const amtPaisa = Math.round(numAmt * 100);
+
+        let isGiven = j.type === 'given' || j.txn_type === 'given';
+        let isReceived = j.type === 'received' || j.txn_type === 'received';
+        if (!isGiven && !isReceived && (j.txn_type === 1 || j.txn_type === 2 || j.txn_type === '1' || j.txn_type === '2')) {
+          const numType = Number(j.txn_type);
+          if (isCustomer) {
+            isGiven = numType === 1;
+            isReceived = numType === 2;
+          } else {
+            isReceived = numType === 1;
+            isGiven = numType === 2;
+          }
+        }
+
         if (isCustomer) {
-          if (j.type === 'given') runningPaisa += amtPaisa;
-          else if (j.type === 'received') runningPaisa -= amtPaisa;
+          if (isGiven) runningPaisa += amtPaisa;
+          else if (isReceived) runningPaisa -= amtPaisa;
         } else {
-          if (j.type === 'received') runningPaisa += amtPaisa;
-          else if (j.type === 'given') runningPaisa -= amtPaisa;
+          if (isReceived) runningPaisa += amtPaisa;
+          else if (isGiven) runningPaisa -= amtPaisa;
         }
         j.runningBalance = runningPaisa / 100;
         updatedJournalsMap.set(String(j.id), j);
@@ -306,28 +447,33 @@ function recalculateAccountRunningBalances(accountOrAccounts, allJournals = [], 
 
   const isCustomer = account.type === 1;
   const targetAccId = String(account.id);
+  const targetBizId = String(account.businessId !== undefined && account.businessId !== null
+    ? account.businessId
+    : (account.business_id !== undefined && account.business_id !== null ? account.business_id : '1'));
+
+  const isBizMatch = (j) => {
+    const jBizId = String(j && (j.businessId !== undefined && j.businessId !== null
+      ? j.businessId
+      : (j.business_id !== undefined && j.business_id !== null ? j.business_id : '1')));
+    return targetBizId === jBizId;
+  };
 
   // If optionsOrIndex is a Map (pre-indexed journals), do O(1) lookup
   let targetJournals = [];
-  const targetBizId = account.businessId !== undefined && account.businessId !== null ? String(account.businessId) : null;
-  const isBizMatch = (j) => {
-    const jBizId = j && j.businessId !== undefined && j.businessId !== null ? String(j.businessId) : null;
-    if (targetBizId && jBizId) return targetBizId === jBizId;
-    if (targetBizId && !jBizId) return targetBizId === '1' || targetBizId === 'default';
-    if (!targetBizId && jBizId) return jBizId === '1' || jBizId === 'default';
-    return true;
-  };
-
   if (optionsOrIndex instanceof Map) {
-    const effectiveBiz = targetBizId || 'default';
-    const list = optionsOrIndex.get(`${effectiveBiz}:${targetAccId}`) || optionsOrIndex.get(targetAccId);
+    const list = optionsOrIndex.get(`${targetBizId}:${targetAccId}`) ||
+                 optionsOrIndex.get(`default:${targetAccId}`) ||
+                 optionsOrIndex.get(targetAccId);
     if (list) {
       targetJournals = list.filter(isBizMatch).map(j => ({ ...j }));
     }
   } else {
     for (let i = 0; i < allJournals.length; i++) {
       const j = allJournals[i];
-      if (j && String(j.accountId) === targetAccId && isBizMatch(j)) {
+      const jAccId = j && (j.accountId !== undefined && j.accountId !== null
+        ? String(j.accountId)
+        : (j.orig_account_id !== undefined && j.orig_account_id !== null ? String(j.orig_account_id) : null));
+      if (j && jAccId === targetAccId && isBizMatch(j)) {
         targetJournals.push({ ...j });
       }
     }
@@ -348,14 +494,28 @@ function recalculateAccountRunningBalances(accountOrAccounts, allJournals = [], 
   let runningPaisa = Math.round(openingBal * 100);
   for (let i = 0; i < targetJournals.length; i++) {
     const j = targetJournals[i];
-    const numAmt = Number(j.amount) || 0;
+    const numAmt = Number(j.amount !== undefined && j.amount !== null ? j.amount : j.amount_received) || 0;
     const amtPaisa = Math.round(numAmt * 100);
+
+    let isGiven = j.type === 'given' || j.txn_type === 'given';
+    let isReceived = j.type === 'received' || j.txn_type === 'received';
+    if (!isGiven && !isReceived && (j.txn_type === 1 || j.txn_type === 2 || j.txn_type === '1' || j.txn_type === '2')) {
+      const numType = Number(j.txn_type);
+      if (isCustomer) {
+        isGiven = numType === 1;
+        isReceived = numType === 2;
+      } else {
+        isReceived = numType === 1;
+        isGiven = numType === 2;
+      }
+    }
+
     if (isCustomer) {
-      if (j.type === 'given') runningPaisa += amtPaisa;
-      else if (j.type === 'received') runningPaisa -= amtPaisa;
+      if (isGiven) runningPaisa += amtPaisa;
+      else if (isReceived) runningPaisa -= amtPaisa;
     } else {
-      if (j.type === 'received') runningPaisa += amtPaisa;
-      else if (j.type === 'given') runningPaisa -= amtPaisa;
+      if (isReceived) runningPaisa += amtPaisa;
+      else if (isGiven) runningPaisa -= amtPaisa;
     }
     j.runningBalance = runningPaisa / 100;
   }
@@ -394,11 +554,45 @@ function recalculateAccountRunningBalances(accountOrAccounts, allJournals = [], 
 
 // --- 4. CASHBOX SYNCHRONIZATION & REFERENTIAL INTEGRITY ---
 function syncCashboxForTransaction(txn, account, cashEntries = []) {
-  if (!txn || !account) return cashEntries;
+  if (!txn || !account) return Array.isArray(cashEntries) ? cashEntries : [];
+  if (!Array.isArray(cashEntries)) cashEntries = [];
 
   const isCust = account.type === 1;
-  const requiresCashIn = isCust && txn.type === 'received'; // Customer gave cash to me -> cash in (baki aday)
-  const requiresCashOut = !isCust && txn.type === 'given'; // I gave cash to supplier -> cash out (supplier pay)
+
+  // Determine transaction mode: 1 = Cash (নগদ), 2 = Digital/Wallet (ডিজিটাল)
+  // Non-cash / digital adjustments bypass cashbox entry
+  const isDigital = txn.isDigital === true ||
+                    txn.txn_mode === 2 ||
+                    txn.txn_mode === '2' ||
+                    txn.txn_mode === 'digital' ||
+                    txn.txn_mode === 'bank' ||
+                    txn.txn_mode === 'mfs';
+  const isCash = !isDigital && (
+    txn.txn_mode === 1 ||
+    txn.txn_mode === '1' ||
+    txn.txn_mode === 'cash' ||
+    txn.txn_mode === 'CASH' ||
+    txn.txn_mode === undefined ||
+    txn.txn_mode === null
+  );
+
+  // Determine transaction nature: payment vs credit
+  // Customer: type 'received' or txn_type 2 is payment collection (baki aday) -> cash in
+  // Supplier: type 'given' or txn_type 2 is supplier payment (powna porishodh) -> cash out
+  // Credit entries (txn_type === 1 / baki dewa/neya) do not affect cashbox
+  let isPayment = false;
+  if (txn.type === 'received') {
+    isPayment = isCust;
+  } else if (txn.type === 'given') {
+    isPayment = !isCust;
+  } else if (txn.txn_type === 2 || txn.txn_type === '2') {
+    isPayment = true;
+  } else if (txn.txn_type === (isCust ? 'received' : 'given')) {
+    isPayment = true;
+  }
+
+  const requiresCashIn = isCash && isCust && isPayment;
+  const requiresCashOut = isCash && !isCust && isPayment;
   const requiresEntry = requiresCashIn || requiresCashOut;
 
   const strTxnId = String(txn.id);
@@ -407,18 +601,34 @@ function syncCashboxForTransaction(txn, account, cashEntries = []) {
   if (requiresEntry) {
     const entryType = requiresCashIn ? 'in' : 'out';
     const entryCategory = requiresCashIn ? 'baki_aday' : 'supplier_pay';
-    const entryDesc = `${account.name} (${requiresCashIn ? 'বাকি আদায়' : 'পাওনা পরিশোধ'})`;
+    const entryDesc = `${account.name || ''} (${requiresCashIn ? 'বাকি আদায়' : 'পাওনা পরিশোধ'})`;
+
+    const rawAmt = (txn.amount_received !== undefined && txn.amount_received !== null && Number(txn.amount_received) > 0)
+      ? Number(txn.amount_received)
+      : (Number(txn.amount) || 0);
+    const cleanAmount = Math.round(rawAmt * 100) / 100;
+
+    const bizId = String(
+      account.businessId ||
+      account.business_id ||
+      txn.businessId ||
+      txn.business_id ||
+      '1'
+    );
 
     const linkedEntry = {
       id: existingIdx >= 0 ? cashEntries[existingIdx].id : 'c_' + strTxnId,
-      businessId: account.businessId || txn.businessId || '1',
+      businessId: bizId,
+      business_id: isNaN(Number(bizId)) ? bizId : Number(bizId),
       linkedTxnId: strTxnId,
       category: entryCategory,
       type: entryType,
-      amount: Number(txn.amount) || 0,
-      desc: txn.desc && txn.desc.trim() ? txn.desc.trim() : entryDesc,
-      date: txn.date,
+      amount: cleanAmount,
+      desc: (txn.desc && txn.desc.trim()) ? txn.desc.trim() : ((txn.description && txn.description.trim()) ? txn.description.trim() : entryDesc),
+      date: txn.date || txn.txn_date || '',
+      txn_date: txn.txn_date || txn.date || '',
       time: txn.time || '',
+      txn_mode: 1,
     };
 
     if (existingIdx >= 0) {
@@ -429,6 +639,8 @@ function syncCashboxForTransaction(txn, account, cashEntries = []) {
       return [linkedEntry, ...cashEntries];
     }
   } else {
+    // Non-cash mode (digital, bank, mfs) or credit entry:
+    // If an existing linked cashbox entry exists, safely remove it to maintain referential integrity.
     if (existingIdx >= 0) {
       return cashEntries.filter((c) => String(c.linkedTxnId) !== strTxnId);
     }
@@ -561,7 +773,8 @@ function calculateAggregateMetrics(accounts = [], journals = [], businessId = nu
 
   for (const acc of accounts) {
     if (!acc) continue;
-    if (businessId && acc.businessId && String(acc.businessId) !== String(businessId)) {
+    const accBiz = acc.businessId !== undefined && acc.businessId !== null ? acc.businessId : acc.business_id;
+    if (businessId && accBiz && String(accBiz) !== String(businessId)) {
       continue;
     }
     const bal = Number(acc.balance) || 0;
@@ -612,7 +825,8 @@ function deriveCashBoxSummary(cashEntries = [], businessId = null) {
 
   for (const entry of cashEntries) {
     if (!entry) continue;
-    if (businessId && entry.businessId && String(entry.businessId) !== String(businessId)) {
+    const entryBiz = entry.businessId !== undefined && entry.businessId !== null ? entry.businessId : entry.business_id;
+    if (businessId && entryBiz && String(entryBiz) !== String(businessId)) {
       continue;
     }
     const numAmt = Number(entry.amount) || 0;
@@ -650,16 +864,28 @@ function deriveCashBoxSummary(cashEntries = [], businessId = null) {
 function indexJournalsByAccount(allJournals = [], businessId = null) {
   const map = new Map();
   for (const j of allJournals) {
-    if (!j || j.accountId === undefined || j.accountId === null) continue;
-    const effectiveBizId = j.businessId || businessId || 'default';
-    if (businessId && j.businessId && String(j.businessId) !== String(businessId)) {
+    if (!j) continue;
+    const accId = j.accountId !== undefined && j.accountId !== null ? j.accountId : j.orig_account_id;
+    if (accId === undefined || accId === null) continue;
+    const effectiveBizId = j.businessId !== undefined && j.businessId !== null
+      ? j.businessId
+      : (j.business_id !== undefined && j.business_id !== null ? j.business_id : (businessId || '1'));
+    if (businessId && String(effectiveBizId) !== String(businessId)) {
       continue;
     }
-    const key = `${effectiveBizId}:${j.accountId}`;
+    const key = `${effectiveBizId}:${accId}`;
     if (!map.has(key)) {
       map.set(key, []);
     }
     map.get(key).push(j);
+
+    if (businessId) {
+      const plainKey = String(accId);
+      if (!map.has(plainKey)) {
+        map.set(plainKey, []);
+      }
+      map.get(plainKey).push(j);
+    }
   }
   return map;
 }
@@ -725,6 +951,7 @@ const ledgerEngine = {
   deriveCashBoxSummary,
   resetCache,
   indexJournalsByAccount,
+  normalizeJournalFields,
   V5_KEY,
   V6_KEY,
   V5_BACKUP_KEY,
@@ -737,4 +964,5 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 if (typeof exports !== 'undefined') {
   exports.ledgerEngine = ledgerEngine;
+  exports.normalizeJournalFields = normalizeJournalFields;
 }

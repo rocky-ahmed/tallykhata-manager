@@ -1,6 +1,6 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-003`  
-**Next Iteration Target:** `REA-ITER-004` (Feature 003: Inventory, Stock & Product Catalog)  
+**Current Iteration Completed:** `REA-ITER-004`  
+**Next Iteration Target:** `REA-ITER-005` (Feature 004: Tagada, Due Reminders & Customer Communication)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
@@ -19,11 +19,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 004)
-1. **Gibbs (Worker 1):** Investigate `classes4.dex` for `inventory`, `stock`, `inventory_lot`, `lot_transaction` tables, and product catalog activities in `com/progoti/tallykhata/v2/inventory`.
-2. **Averroes (Worker 2):** Audit `src/storageRepository.js` (`inventory`, `stock`, `validateStockAdjustment`) against the reference Room DB stock tables to ensure 100% column and inventory calculation parity.
-3. **Ohm (Worker 3):** Reconcile the Inventory/Product tab in `App.js` with reference layout: stock search, low stock alert badge, item edit modal, and stock in/out entry buttons.
-4. **Main Orchestrator:** Run test suite (`node test_phase7_inventory_stock.js`), verify 0 regressions across all 40 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_004_REPORT.md`.
+## 2. Immediate Resume Action Plan (Iteration 005)
+1. **Gibbs (Worker 1):** Investigate `classes4.dex` for `tagada_log` table, `com/progoti/tallykhata/v2/cstxn/TallySmsWorker`, and customer due notification mechanisms.
+2. **Averroes (Worker 2):** Audit `src/storageRepository.js` (`tagadaLogs`, `remainingSmsCount`, `tallyMessageBalance`) against the reference Room DB schema to ensure 100% column parity and decrement invariants.
+3. **Ohm (Worker 3):** Reconcile Tagada reminder modal in `App.js`: SMS reminder preview, payment link button, and direct phone/WhatsApp launch actions.
+4. **Main Orchestrator:** Run test suite (`node test_phase8_tagada_reports_notes.js`), verify 0 regressions across all 40 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_005_REPORT.md`.
 
 ---
 

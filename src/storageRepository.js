@@ -707,7 +707,14 @@ class StorageRepository {
   filterByBusiness(collection, businessId) {
     if (!Array.isArray(collection)) return [];
     const targetId = String(businessId || '1');
-    return collection.filter((item) => String(item.businessId || '1') === targetId);
+    return collection.filter((item) => {
+      const itemBizId = String(
+        item?.businessId !== undefined && item?.businessId !== null
+          ? item.businessId
+          : (item?.business_id !== undefined && item?.business_id !== null ? item.business_id : '1')
+      );
+      return itemBizId === targetId;
+    });
   }
 
   /**
@@ -929,9 +936,18 @@ class StorageRepository {
       const cash = Array.isArray(prevStore.cashEntries) ? prevStore.cashEntries : [];
       const stock = Array.isArray(prevStore.stock) ? prevStore.stock : (Array.isArray(prevStore.inventory) ? prevStore.inventory : []);
 
-      const hasAccounts = accounts.some((a) => String(a.businessId || '1') === targetId);
-      const hasCash = cash.some((c) => String(c.businessId || '1') === targetId);
-      const hasStock = stock.some((s) => String(s.businessId || '1') === targetId);
+      const hasAccounts = accounts.some((a) => {
+        const bId = a.businessId !== undefined && a.businessId !== null ? String(a.businessId) : (a.business_id !== undefined && a.business_id !== null ? String(a.business_id) : '1');
+        return bId === targetId;
+      });
+      const hasCash = cash.some((c) => {
+        const bId = c.businessId !== undefined && c.businessId !== null ? String(c.businessId) : (c.business_id !== undefined && c.business_id !== null ? String(c.business_id) : '1');
+        return bId === targetId;
+      });
+      const hasStock = stock.some((s) => {
+        const bId = s.businessId !== undefined && s.businessId !== null ? String(s.businessId) : (s.business_id !== undefined && s.business_id !== null ? String(s.business_id) : '1');
+        return bId === targetId;
+      });
 
       if ((hasAccounts || hasCash || hasStock) && !options.force) {
         throw new Error(
@@ -986,14 +1002,15 @@ class StorageRepository {
       }
 
       // Purge all records matching targetId across collections
-      const accounts = (prevStore.accounts || []).filter((a) => String(a.businessId || '1') !== targetId);
-      const journals = (prevStore.journals || []).filter((j) => String(j.businessId || '1') !== targetId);
-      const cashEntries = (prevStore.cashEntries || []).filter((c) => String(c.businessId || '1') !== targetId);
-      const inventory = (prevStore.inventory || []).filter((i) => String(i.businessId || '1') !== targetId);
-      const stock = (prevStore.stock || []).filter((s) => String(s.businessId || '1') !== targetId);
-      const notes = (prevStore.notes || []).filter((n) => String(n.businessId || '1') !== targetId);
-      const walletTxns = (prevStore.walletTxns || []).filter((w) => String(w.businessId || '1') !== targetId);
-      const tagadaLogs = (prevStore.tagadaLogs || []).filter((t) => String(t.businessId || '1') !== targetId);
+      const getBizId = (item) => String(item?.businessId !== undefined && item?.businessId !== null ? item.businessId : (item?.business_id !== undefined && item?.business_id !== null ? item.business_id : '1'));
+      const accounts = (prevStore.accounts || []).filter((a) => getBizId(a) !== targetId);
+      const journals = (prevStore.journals || []).filter((j) => getBizId(j) !== targetId);
+      const cashEntries = (prevStore.cashEntries || []).filter((c) => getBizId(c) !== targetId);
+      const inventory = (prevStore.inventory || []).filter((i) => getBizId(i) !== targetId);
+      const stock = (prevStore.stock || []).filter((s) => getBizId(s) !== targetId);
+      const notes = (prevStore.notes || []).filter((n) => getBizId(n) !== targetId);
+      const walletTxns = (prevStore.walletTxns || []).filter((w) => getBizId(w) !== targetId);
+      const tagadaLogs = (prevStore.tagadaLogs || []).filter((t) => getBizId(t) !== targetId);
 
       const remainingBusinesses = list.filter((b) => String(b.id) !== targetId);
 
@@ -1184,10 +1201,17 @@ class StorageRepository {
 
       if (Array.isArray(newStore.accounts) && Array.isArray(newStore.journals)) {
         newStore.accounts = newStore.accounts.map(acc => {
-          const accJournals = newStore.journals.filter(j => String(j.accountId) === String(acc.id) && (!acc.businessId || !j.businessId || String(j.businessId) === String(acc.businessId)));
+          const accIdStr = String(acc.id);
+          const accBizId = String(acc.businessId !== undefined && acc.businessId !== null ? acc.businessId : (acc.business_id !== undefined && acc.business_id !== null ? acc.business_id : '1'));
+          const accJournals = newStore.journals.filter(j => {
+            const jAccId = String(j?.accountId !== undefined && j?.accountId !== null ? j.accountId : (j?.orig_account_id !== undefined && j?.orig_account_id !== null ? j.orig_account_id : ''));
+            if (jAccId !== accIdStr) return false;
+            const jBizId = String(j?.businessId !== undefined && j?.businessId !== null ? j.businessId : (j?.business_id !== undefined && j?.business_id !== null ? j.business_id : '1'));
+            return jBizId === accBizId;
+          });
           if (accJournals.length > 0) {
             accJournals.sort((a, b) => {
-              const dateComp = (a.date || '').localeCompare(b.date || '');
+              const dateComp = (a.date || a.txn_date || '').localeCompare(b.date || b.txn_date || '');
               if (dateComp !== 0) return dateComp;
 
               const timeComp = (a.time || '').localeCompare(b.time || '');
@@ -1201,18 +1225,32 @@ class StorageRepository {
               return String(a.id || '').localeCompare(String(b.id || ''));
             });
             const opening = Number(acc.openingBalance) || 0;
-            let running = opening;
+            let runningPaisa = Math.round(opening * 100);
             for (const j of accJournals) {
-              const amount = Number(j.amount) || 0;
-              if (acc.type === 1) {
-                if (j.type === 'given' || j.type === 'credit') running += amount;
-                else if (j.type === 'received' || j.type === 'cash') running -= amount;
+              const amount = Number(j.amount !== undefined && j.amount !== null ? j.amount : j.amount_received) || 0;
+              const amtPaisa = Math.round(amount * 100);
+              const isCust = acc.type === 1;
+              let isGiven = j.type === 'given' || j.type === 'credit' || j.type === 'purchase' || j.txn_type === 'given';
+              let isReceived = j.type === 'received' || j.type === 'cash' || j.type === 'payment' || j.txn_type === 'received';
+              if (!isGiven && !isReceived && (j.txn_type === 1 || j.txn_type === 2 || j.txn_type === '1' || j.txn_type === '2')) {
+                const numType = Number(j.txn_type);
+                if (isCust) {
+                  isGiven = numType === 1;
+                  isReceived = numType === 2;
+                } else {
+                  isReceived = numType === 1;
+                  isGiven = numType === 2;
+                }
+              }
+              if (isCust) {
+                if (isGiven) runningPaisa += amtPaisa;
+                else if (isReceived) runningPaisa -= amtPaisa;
               } else {
-                if (j.type === 'purchase' || j.type === 'credit') running += amount;
-                else if (j.type === 'payment' || j.type === 'cash') running -= amount;
+                if (isReceived) runningPaisa += amtPaisa;
+                else if (isGiven) runningPaisa -= amtPaisa;
               }
             }
-            return { ...acc, balance: running };
+            return { ...acc, balance: runningPaisa / 100 };
           }
           return acc;
         });
@@ -1607,13 +1645,13 @@ function normalizeTimeComparable(timeStr) {
  * Quaternary: ID (numeric or string)
  */
 function compareJournals(a, b) {
-  const dateA = toStandardDateStr(a?.date || a?.createdAt);
-  const dateB = toStandardDateStr(b?.date || b?.createdAt);
+  const dateA = toStandardDateStr(a?.date || a?.txn_date || a?.createdAt || a?.create_date);
+  const dateB = toStandardDateStr(b?.date || b?.txn_date || b?.createdAt || b?.create_date);
   if (dateA < dateB) return -1;
   if (dateA > dateB) return 1;
 
-  const rawA = String(a?.date || a?.createdAt || '');
-  const rawB = String(b?.date || b?.createdAt || '');
+  const rawA = String(a?.date || a?.txn_date || a?.createdAt || a?.create_date || '');
+  const rawB = String(b?.date || b?.txn_date || b?.createdAt || b?.create_date || '');
   if (rawA < rawB) return -1;
   if (rawA > rawB) return 1;
 
@@ -1657,7 +1695,7 @@ function findLowerBound(arr, targetDate) {
   let result = arr.length;
   while (low <= high) {
     const mid = (low + high) >> 1;
-    const midDate = toStandardDateStr(arr[mid]?.date || arr[mid]?.createdAt);
+    const midDate = toStandardDateStr(arr[mid]?.date || arr[mid]?.txn_date || arr[mid]?.createdAt || arr[mid]?.create_date);
     if (midDate >= targetDate) {
       result = mid;
       high = mid - 1;
@@ -1677,7 +1715,7 @@ function findUpperBound(arr, targetDate) {
   let result = -1;
   while (low <= high) {
     const mid = (low + high) >> 1;
-    const midDate = toStandardDateStr(arr[mid]?.date || arr[mid]?.createdAt);
+    const midDate = toStandardDateStr(arr[mid]?.date || arr[mid]?.txn_date || arr[mid]?.createdAt || arr[mid]?.create_date);
     if (midDate <= targetDate) {
       result = mid;
       low = mid + 1;
@@ -1730,26 +1768,76 @@ function queryJournalsByDateRange(journals, startDate, endDate, options = {}) {
 
   let candidates = indexed.slice(low, high + 1);
 
-  const hasBizFilter = options.businessId !== undefined && options.businessId !== null;
-  const hasAccFilter = options.accountId !== undefined && options.accountId !== null;
-  const hasTypeFilter = options.type !== undefined && options.type !== null && options.type !== '';
+  const rawBizFilter = options.businessId !== undefined && options.businessId !== null
+    ? options.businessId
+    : (options.business_id !== undefined && options.business_id !== null ? options.business_id : null);
+  const rawAccFilter = options.accountId !== undefined && options.accountId !== null
+    ? options.accountId
+    : (options.orig_account_id !== undefined && options.orig_account_id !== null ? options.orig_account_id : null);
+
+  const hasBizFilter = rawBizFilter !== null;
+  const hasAccFilter = rawAccFilter !== null;
+  const hasTypeFilter = (options.type !== undefined && options.type !== null && options.type !== '') ||
+                        (options.txn_type !== undefined && options.txn_type !== null && options.txn_type !== '');
+  const hasModeFilter = (options.txn_mode !== undefined && options.txn_mode !== null && options.txn_mode !== '');
   const hasCustomFilter = typeof options.filter === 'function';
 
-  if (hasBizFilter || hasAccFilter || hasTypeFilter || hasCustomFilter) {
-    const targetBizId = hasBizFilter ? String(options.businessId) : null;
-    const targetAccId = hasAccFilter ? String(options.accountId) : null;
-    const targetType = hasTypeFilter ? String(options.type) : null;
+  if (hasBizFilter || hasAccFilter || hasTypeFilter || hasModeFilter || hasCustomFilter) {
+    const targetBizId = hasBizFilter ? String(rawBizFilter) : null;
+    const targetAccId = hasAccFilter ? String(rawAccFilter) : null;
+    const targetType = options.type !== undefined && options.type !== null && options.type !== ''
+      ? String(options.type)
+      : (options.txn_type !== undefined && options.txn_type !== null && options.txn_type !== '' ? String(options.txn_type) : null);
+    const targetMode = hasModeFilter ? Number(options.txn_mode) : null;
 
     candidates = candidates.filter((item) => {
-      if (targetBizId !== null && String(item?.businessId || '1') !== targetBizId) {
-        return false;
+      // 1. Business ID scoping (multi-business isolation)
+      if (targetBizId !== null) {
+        const itemBizId = String(
+          item?.businessId !== undefined && item?.businessId !== null
+            ? item.businessId
+            : (item?.business_id !== undefined && item?.business_id !== null ? item.business_id : '1')
+        );
+        if (itemBizId !== targetBizId) {
+          return false;
+        }
       }
-      if (targetAccId !== null && String(item?.accountId) !== targetAccId) {
-        return false;
+
+      // 2. Account ID scoping (orig_account_id <-> accountId)
+      if (targetAccId !== null) {
+        const itemAccId = item?.accountId !== undefined && item?.accountId !== null
+          ? String(item.accountId)
+          : (item?.orig_account_id !== undefined && item?.orig_account_id !== null ? String(item.orig_account_id) : null);
+        if (itemAccId !== targetAccId) {
+          return false;
+        }
       }
-      if (targetType !== null && String(item?.type) !== targetType) {
-        return false;
+
+      // 3. Transaction Type (type <-> txn_type)
+      if (targetType !== null) {
+        const itemType = item?.type !== undefined && item?.type !== null ? String(item.type) : null;
+        const itemTxnType = item?.txn_type !== undefined && item?.txn_type !== null ? String(item.txn_type) : null;
+        let matched = (itemType === targetType || itemTxnType === targetType);
+        if (!matched) {
+          if (targetType === 'given' && itemTxnType === '1') matched = true;
+          else if (targetType === 'received' && itemTxnType === '2') matched = true;
+          else if (targetType === '1' && itemType === 'given') matched = true;
+          else if (targetType === '2' && itemType === 'received') matched = true;
+        }
+        if (!matched) return false;
       }
+
+      // 4. Transaction Mode (txn_mode)
+      if (targetMode !== null) {
+        const itemMode = item?.txn_mode !== undefined && item?.txn_mode !== null
+          ? Number(item.txn_mode)
+          : (item?.isDigital ? 2 : 1);
+        if (itemMode !== targetMode) {
+          return false;
+        }
+      }
+
+      // 5. Custom predicate filter
       if (hasCustomFilter && !options.filter(item)) {
         return false;
       }
