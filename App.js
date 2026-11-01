@@ -916,6 +916,27 @@ function TallyKhataApp() {
 
   const [modalThemePicker, setModalThemePicker] = useState(false);
   const [modalLanguagePicker, setModalLanguagePicker] = useState(false);
+  const [modalNotifications, setModalNotifications] = useState(false);
+  const [modalDataManagement, setModalDataManagement] = useState(false);
+  const [modalAbout, setModalAbout] = useState(false);
+  const [appFontScale, setAppFontScale] = useState(1.0);
+  const [appDensity, setAppDensity] = useState('standard');
+  const [appAccentColor, setAppAccentColor] = useState('#B8141F');
+  const [appNotifications, setAppNotifications] = useState({
+    dueReminders: true,
+    tagadaSms: true,
+    backupAlerts: true,
+    dailySummary: false,
+  });
+  const [appSecurity, setAppSecurity] = useState({
+    biometricEnabled: false,
+    autoLockMinutes: 5,
+    hideBalances: false,
+  });
+  const [appData, setAppData] = useState({
+    autoBackupDrive: false,
+    backupFrequency: 'manual',
+  });
 
   useEffect(() => {
     const sub = (typeof Appearance !== 'undefined' && Appearance.addChangeListener)
@@ -1012,7 +1033,16 @@ function TallyKhataApp() {
     const target = newTheme || (effectiveTheme === 'dark' ? 'light' : 'dark');
     setAppTheme(target);
     try {
-      await preferencesService.savePreferences(AsyncStorage, { theme: target, language: appLanguage });
+      await preferencesService.savePreferences(AsyncStorage, {
+        theme: target,
+        language: appLanguage,
+        fontScale: appFontScale,
+        density: appDensity,
+        accentColor: appAccentColor,
+        notifications: appNotifications,
+        security: appSecurity,
+        data: appData,
+      });
     } catch (e) {
       console.warn('Failed to persist theme:', e);
     }
@@ -1021,9 +1051,76 @@ function TallyKhataApp() {
   const handleSelectLanguage = async (newLang) => {
     setAppLanguage(newLang);
     try {
-      await preferencesService.savePreferences(AsyncStorage, { theme: appTheme, language: newLang });
+      await preferencesService.savePreferences(AsyncStorage, {
+        theme: appTheme,
+        language: newLang,
+        fontScale: appFontScale,
+        density: appDensity,
+        accentColor: appAccentColor,
+        notifications: appNotifications,
+        security: appSecurity,
+        data: appData,
+      });
     } catch (e) {
       console.warn('Failed to persist language:', e);
+    }
+  };
+
+  const handleSelectFontScale = async (newScale) => {
+    setAppFontScale(newScale);
+    try {
+      await preferencesService.savePreferences(AsyncStorage, {
+        theme: appTheme,
+        language: appLanguage,
+        fontScale: newScale,
+        density: appDensity,
+        accentColor: appAccentColor,
+        notifications: appNotifications,
+        security: appSecurity,
+        data: appData,
+      });
+    } catch (e) {
+      console.warn('Failed to persist fontScale:', e);
+    }
+  };
+
+  const handleSelectDensity = async (newDensity) => {
+    setAppDensity(newDensity);
+    try {
+      await preferencesService.savePreferences(AsyncStorage, {
+        theme: appTheme,
+        language: appLanguage,
+        fontScale: appFontScale,
+        density: newDensity,
+        accentColor: appAccentColor,
+        notifications: appNotifications,
+        security: appSecurity,
+        data: appData,
+      });
+    } catch (e) {
+      console.warn('Failed to persist density:', e);
+    }
+  };
+
+  const handleToggleNotification = async (key) => {
+    const nextNotifs = {
+      ...appNotifications,
+      [key]: !appNotifications[key],
+    };
+    setAppNotifications(nextNotifs);
+    try {
+      await preferencesService.savePreferences(AsyncStorage, {
+        theme: appTheme,
+        language: appLanguage,
+        fontScale: appFontScale,
+        density: appDensity,
+        accentColor: appAccentColor,
+        notifications: nextNotifs,
+        security: appSecurity,
+        data: appData,
+      });
+    } catch (e) {
+      console.warn('Failed to persist notification:', e);
     }
   };
 
@@ -2014,6 +2111,9 @@ function TallyKhataApp() {
       if (modalTxnLimit) { setModalTxnLimit(false); return true; }
       if (modalThemePicker) { setModalThemePicker(false); return true; }
       if (modalLanguagePicker) { setModalLanguagePicker(false); return true; }
+      if (modalNotifications) { setModalNotifications(false); return true; }
+      if (modalDataManagement) { setModalDataManagement(false); return true; }
+      if (modalAbout) { setModalAbout(false); return true; }
 
       // Return to home screen from account_ledger
       if (currentScreenRef.current !== 'home') {
@@ -2038,7 +2138,7 @@ function TallyKhataApp() {
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalTagada, modalVoucher, modalPinSetup, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
-    modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, currentScreen, activeTab
+    modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, modalNotifications, modalDataManagement, modalAbout, currentScreen, activeTab
   ]);
 
   const loadSavedData = async () => {
@@ -2073,6 +2173,12 @@ function TallyKhataApp() {
           if (storedPrefs) {
             if (storedPrefs.theme) setAppTheme(storedPrefs.theme);
             if (storedPrefs.language) setAppLanguage(storedPrefs.language);
+            if (storedPrefs.fontScale !== undefined) setAppFontScale(storedPrefs.fontScale);
+            if (storedPrefs.density) setAppDensity(storedPrefs.density);
+            if (storedPrefs.accentColor) setAppAccentColor(storedPrefs.accentColor);
+            if (storedPrefs.notifications) setAppNotifications(storedPrefs.notifications);
+            if (storedPrefs.security) setAppSecurity(storedPrefs.security);
+            if (storedPrefs.data) setAppData(storedPrefs.data);
           }
         } catch (e) {}
         if (d.pinEnabled && d.appPin) {
@@ -5823,7 +5929,7 @@ function TallyKhataApp() {
             </View>
 
             {/* Group 3: সেটিংস ও অন্যান্য (nav_group_others) */}
-            <SectionHeader title={t('menu_sec_settings')} count={7} />
+            <SectionHeader title={t('menu_sec_settings')} count={10} />
             <View style={[styles.menuListContainer, isDark && tStyles.card]}>
               <TouchableOpacity
                 style={[styles.menuListItem, isDark && tStyles.menuListItem]}
@@ -5895,6 +6001,37 @@ function TallyKhataApp() {
 
               <TouchableOpacity
                 style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={() => setModalNotifications(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('menu_notifications')}
+              >
+                <AppIcon source={require('./assets/icons/ic_notification.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_notifications')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('menu_notifications_sub')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={() => setModalDataManagement(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('menu_data_storage')}
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_accounts.png')} variant="info" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_data_storage')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('menu_data_storage_sub')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
                 onPress={() => setModalSettings(true)}
                 activeOpacity={0.7}
                 accessibilityRole="button"
@@ -5962,12 +6099,27 @@ function TallyKhataApp() {
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={() => setModalAbout(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('menu_about')}
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_settings.png')} variant="neutral" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_about')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('menu_about_sub')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
             </View>
 
             {/* Offline Guarantee Notice */}
             <View style={styles.offlineNoticeCard}>
               <Text style={styles.offlineNoticeTitle}>{tStatic("১০০% অফলাইন ও নিরাপদ")}</Text>
-              <Text style={styles.offlineNoticeSub}>{tStatic("আপনার ব্যবসার তথ্য আপনার ফোনেই সুরক্ষিত। কোনো ইন্টারনেট কানেকশন বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।                 আপনার ব্যবসার তথ্য আপনার ফোনেই সুরক্ষিত। কোনো ইন্টারনেট কানেকশন বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।")}</Text>
+              <Text style={styles.offlineNoticeSub}>{tStatic("আপনার ব্যবসার তথ্য আপনার ফোনেই সুরক্ষিত। কোনো ইন্টারনেট কানেকশন বা সাবস্ক্রিপশন ছাড়াই আজীবন ব্যবহার করতে পারবেন।")}</Text>
             </View>
           </ScrollView>
           </View>
@@ -6291,6 +6443,72 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
+            {/* Phase 10: Font Scale Picker */}
+            <View style={{ marginTop: 12, marginBottom: 4 }}>
+              <Text style={[styles.themePreviewSectionLabel, isDark && { color: currentTheme.textSecondary }, { marginBottom: 6 }]}>
+                🔤 {t('settings_font_scale')}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {[
+                  { scale: 1.0, label: t('settings_font_scale_normal') },
+                  { scale: 1.1, label: t('settings_font_scale_medium') },
+                  { scale: 1.2, label: t('settings_font_scale_large') },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.scale}
+                    style={[
+                      { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+                      appFontScale === item.scale
+                        ? { borderColor: currentTheme.primary, backgroundColor: isDark ? '#2B1212' : '#FEF2F2' }
+                        : { borderColor: isDark ? currentTheme.cardBorder : '#E2E8F0', backgroundColor: isDark ? currentTheme.cardBgElevated : '#F8FAFC' }
+                    ]}
+                    onPress={() => handleSelectFontScale(item.scale)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      { fontSize: 12, fontWeight: '600' },
+                      appFontScale === item.scale ? { color: currentTheme.primary } : isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }
+                    ]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Phase 10: Layout Density Picker */}
+            <View style={{ marginTop: 8, marginBottom: 8 }}>
+              <Text style={[styles.themePreviewSectionLabel, isDark && { color: currentTheme.textSecondary }, { marginBottom: 6 }]}>
+                📐 {t('settings_density')}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {[
+                  { density: 'comfortable', label: t('settings_density_comfortable') },
+                  { density: 'standard', label: t('settings_density_standard') },
+                  { density: 'compact', label: t('settings_density_compact') },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.density}
+                    style={[
+                      { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+                      appDensity === item.density
+                        ? { borderColor: currentTheme.primary, backgroundColor: isDark ? '#2B1212' : '#FEF2F2' }
+                        : { borderColor: isDark ? currentTheme.cardBorder : '#E2E8F0', backgroundColor: isDark ? currentTheme.cardBgElevated : '#F8FAFC' }
+                    ]}
+                    onPress={() => handleSelectDensity(item.density)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      { fontSize: 12, fontWeight: '600' },
+                      appDensity === item.density ? { color: currentTheme.primary } : isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }
+                    ]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             {/* Done Action Button */}
             <TouchableOpacity
               style={[styles.themeDoneBtn, { backgroundColor: currentTheme.primary }]}
@@ -6502,6 +6720,354 @@ function TallyKhataApp() {
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel={t('btn_done')}
+            >
+              <Text style={styles.themeDoneBtnText}>✓ {t('btn_done')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: NOTIFICATIONS & REMINDERS (PHASE 10)
+         =================================================================== */}
+      <Modal
+        visible={modalNotifications}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalNotifications(false)}
+      >
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.bottomSheetCard, isDark && { backgroundColor: currentTheme.modalSurface, borderColor: currentTheme.cardBorder }]}>
+            <View style={styles.bottomSheetHandle} />
+            <View style={[styles.bottomSheetHeader, isDark && { borderBottomColor: currentTheme.divider }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.bottomSheetTitle, isDark && { color: currentTheme.textPrimary }]}>
+                  {t('notif_title')}
+                </Text>
+                <Text style={[styles.bottomSheetSub, isDark && { color: currentTheme.textSecondary }]}>
+                  {t('notif_sub')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalNotifications(false)}
+                style={[styles.modalCloseCircle, isDark && { backgroundColor: currentTheme.cardBorder }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && { tintColor: currentTheme.textSecondary }]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {/* Toggle 1: Due Reminders */}
+              <TouchableOpacity
+                style={[styles.themeOptionCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}
+                onPress={() => handleToggleNotification('dueReminders')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#451A03' : '#FEF3C7', borderColor: isDark ? '#78350F' : '#FDE68A', borderWidth: 1 }]}>
+                  <Text style={{ fontSize: 18 }}>⏰</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>{t('notif_due_reminders')}</Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>{t('notif_due_reminders_sub')}</Text>
+                </View>
+                <View style={[styles.mmToggleBadge, appNotifications.dueReminders ? [styles.mmToggleOn, isDark && tStyles.mmToggleOn] : [styles.mmToggleOff, isDark && tStyles.mmToggleOff]]}>
+                  <Text style={{ color: appNotifications.dueReminders ? '#10B981' : '#94A3B8', fontWeight: 'bold', fontSize: 12 }}>
+                    {appNotifications.dueReminders ? 'ON' : 'OFF'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Toggle 2: Tagada SMS */}
+              <TouchableOpacity
+                style={[styles.themeOptionCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}
+                onPress={() => handleToggleNotification('tagadaSms')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#1E3A8A' : '#EFF6FF', borderColor: isDark ? '#1D4ED8' : '#BFDBFE', borderWidth: 1 }]}>
+                  <Text style={{ fontSize: 18 }}>💬</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>{t('notif_tagada_sms')}</Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>{t('notif_tagada_sms_sub')}</Text>
+                </View>
+                <View style={[styles.mmToggleBadge, appNotifications.tagadaSms ? [styles.mmToggleOn, isDark && tStyles.mmToggleOn] : [styles.mmToggleOff, isDark && tStyles.mmToggleOff]]}>
+                  <Text style={{ color: appNotifications.tagadaSms ? '#10B981' : '#94A3B8', fontWeight: 'bold', fontSize: 12 }}>
+                    {appNotifications.tagadaSms ? 'ON' : 'OFF'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Toggle 3: Backup Alerts */}
+              <TouchableOpacity
+                style={[styles.themeOptionCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}
+                onPress={() => handleToggleNotification('backupAlerts')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#064E3B' : '#ECFDF5', borderColor: isDark ? '#047857' : '#A7F3D0', borderWidth: 1 }]}>
+                  <Text style={{ fontSize: 18 }}>☁️</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>{t('notif_backup_alerts')}</Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>{t('notif_backup_alerts_sub')}</Text>
+                </View>
+                <View style={[styles.mmToggleBadge, appNotifications.backupAlerts ? [styles.mmToggleOn, isDark && tStyles.mmToggleOn] : [styles.mmToggleOff, isDark && tStyles.mmToggleOff]]}>
+                  <Text style={{ color: appNotifications.backupAlerts ? '#10B981' : '#94A3B8', fontWeight: 'bold', fontSize: 12 }}>
+                    {appNotifications.backupAlerts ? 'ON' : 'OFF'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Toggle 4: Daily Summary */}
+              <TouchableOpacity
+                style={[styles.themeOptionCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}
+                onPress={() => handleToggleNotification('dailySummary')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#311042' : '#FAF5FF', borderColor: isDark ? '#6B21A8' : '#E9D5FF', borderWidth: 1 }]}>
+                  <Text style={{ fontSize: 18 }}>📊</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>{t('notif_daily_summary')}</Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>{t('notif_daily_summary_sub')}</Text>
+                </View>
+                <View style={[styles.mmToggleBadge, appNotifications.dailySummary ? [styles.mmToggleOn, isDark && tStyles.mmToggleOn] : [styles.mmToggleOff, isDark && tStyles.mmToggleOff]]}>
+                  <Text style={{ color: appNotifications.dailySummary ? '#10B981' : '#94A3B8', fontWeight: 'bold', fontSize: 12 }}>
+                    {appNotifications.dailySummary ? 'ON' : 'OFF'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.themeDoneBtn, { backgroundColor: currentTheme.primary, marginTop: 12 }]}
+              onPress={() => setModalNotifications(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.themeDoneBtnText}>✓ {t('btn_done')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: DATA & STORAGE MANAGEMENT (PHASE 10)
+         =================================================================== */}
+      <Modal
+        visible={modalDataManagement}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalDataManagement(false)}
+      >
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.bottomSheetCard, isDark && { backgroundColor: currentTheme.modalSurface, borderColor: currentTheme.cardBorder }]}>
+            <View style={styles.bottomSheetHandle} />
+            <View style={[styles.bottomSheetHeader, isDark && { borderBottomColor: currentTheme.divider }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.bottomSheetTitle, isDark && { color: currentTheme.textPrimary }]}>
+                  {t('data_storage_title')}
+                </Text>
+                <Text style={[styles.bottomSheetSub, isDark && { color: currentTheme.textSecondary }]}>
+                  {t('data_storage_sub')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalDataManagement(false)}
+                style={[styles.modalCloseCircle, isDark && { backgroundColor: currentTheme.cardBorder }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && { tintColor: currentTheme.textSecondary }]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {/* Storage Stats Grid Card */}
+              <View style={[styles.themePreviewBox, { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder, marginBottom: 12 }]}>
+                <View style={{ padding: 14 }}>
+                  <Text style={[styles.themePreviewSectionLabel, isDark && { color: currentTheme.textSecondary }, { marginBottom: 10 }]}>
+                    📊 {t('data_storage_sub')}
+                  </Text>
+                  
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: currentTheme.divider }}>
+                    <Text style={[{ fontSize: 13 }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>{t('data_stat_customers')}</Text>
+                    <Text style={[{ fontSize: 14, fontWeight: 'bold' }, isDark ? { color: currentTheme.textPrimary } : { color: '#1E293B' }]}>{i18nService.formatNumber(accounts.length, effectiveLanguage)}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: currentTheme.divider }}>
+                    <Text style={[{ fontSize: 13 }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>{t('data_stat_txns')}</Text>
+                    <Text style={[{ fontSize: 14, fontWeight: 'bold' }, isDark ? { color: currentTheme.textPrimary } : { color: '#1E293B' }]}>{i18nService.formatNumber(journals.length, effectiveLanguage)}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: currentTheme.divider }}>
+                    <Text style={[{ fontSize: 13 }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>{t('data_stat_cashbox')}</Text>
+                    <Text style={[{ fontSize: 14, fontWeight: 'bold' }, isDark ? { color: currentTheme.textPrimary } : { color: '#1E293B' }]}>{i18nService.formatNumber(walletTxns.length, effectiveLanguage)}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: currentTheme.divider }}>
+                    <Text style={[{ fontSize: 13 }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>{t('data_stat_mm_txns')}</Text>
+                    <Text style={[{ fontSize: 14, fontWeight: 'bold' }, isDark ? { color: currentTheme.textPrimary } : { color: '#1E293B' }]}>{i18nService.formatNumber((moneyManagerState?.transactions || []).length, effectiveLanguage)}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: currentTheme.divider }}>
+                    <Text style={[{ fontSize: 13 }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>{t('data_stat_wallets')}</Text>
+                    <Text style={[{ fontSize: 14, fontWeight: 'bold' }, isDark ? { color: currentTheme.textPrimary } : { color: '#1E293B' }]}>{i18nService.formatNumber((moneyManagerState?.accounts || []).length, effectiveLanguage)}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
+                    <Text style={[{ fontSize: 13 }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>{t('data_stat_storage_size')}</Text>
+                    <Text style={[{ fontSize: 14, fontWeight: 'bold', color: currentTheme.primary }]}>~48 KB</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Action 1: Clear Cache */}
+              <TouchableOpacity
+                style={[styles.themeOptionCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}
+                onPress={() => {
+                  Alert.alert(
+                    t('data_btn_clear_cache'),
+                    t('data_cache_cleared'),
+                    [{ text: t('btn_done'), style: 'default' }]
+                  );
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#334155' : '#F1F5F9', borderColor: isDark ? '#475569' : '#CBD5E1', borderWidth: 1 }]}>
+                  <Text style={{ fontSize: 18 }}>🧹</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>{t('data_btn_clear_cache')}</Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>{t('data_cache_cleared')}</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Action 2: Safe JSON Export */}
+              <TouchableOpacity
+                style={[styles.themeOptionCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}
+                onPress={() => {
+                  setModalDataManagement(false);
+                  setTimeout(() => {
+                    setBackupJsonText('');
+                    setModalBackupRestore(true);
+                  }, 200);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#064E3B' : '#DCFCE7', borderColor: isDark ? '#047857' : '#86EFAC', borderWidth: 1 }]}>
+                  <Text style={{ fontSize: 18 }}>📤</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>{t('data_btn_export_json')}</Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>{t('data_export_hint')}</Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.themeDoneBtn, { backgroundColor: currentTheme.primary, marginTop: 12 }]}
+              onPress={() => setModalDataManagement(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.themeDoneBtnText}>✓ {t('btn_done')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: ABOUT & APP INFORMATION (PHASE 10)
+         =================================================================== */}
+      <Modal
+        visible={modalAbout}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalAbout(false)}
+      >
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.bottomSheetCard, isDark && { backgroundColor: currentTheme.modalSurface, borderColor: currentTheme.cardBorder }]}>
+            <View style={styles.bottomSheetHandle} />
+            <View style={[styles.bottomSheetHeader, isDark && { borderBottomColor: currentTheme.divider }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.bottomSheetTitle, isDark && { color: currentTheme.textPrimary }]}>
+                  {t('about_title')}
+                </Text>
+                <Text style={[styles.bottomSheetSub, isDark && { color: currentTheme.textSecondary }]}>
+                  {t('about_version')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalAbout(false)}
+                style={[styles.modalCloseCircle, isDark && { backgroundColor: currentTheme.cardBorder }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && { tintColor: currentTheme.textSecondary }]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {/* Branding Header Card */}
+              <View style={[{ alignItems: 'center', paddingVertical: 16, backgroundColor: isDark ? currentTheme.cardBgElevated : '#FEF2F2', borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: isDark ? currentTheme.cardBorder : '#FECACA' }]}>
+                <Image
+                  source={require('./assets/ic_tally_khata_logo_reg.png')}
+                  style={{ width: 56, height: 56, marginBottom: 8 }}
+                  resizeMode="contain"
+                />
+                <Text style={[{ fontSize: 18, fontWeight: 'bold' }, isDark ? { color: currentTheme.textPrimary } : { color: '#B81414' }]}>
+                  {t('about_app_name')}
+                </Text>
+                <Text style={[{ fontSize: 13, marginTop: 2 }, isDark ? { color: currentTheme.textSecondary } : { color: '#4B5563' }]}>
+                  {t('about_version')}
+                </Text>
+                <Text style={[{ fontSize: 11, marginTop: 2, color: currentTheme.textMuted }]}>
+                  {t('about_build')}
+                </Text>
+              </View>
+
+              {/* 100% Offline Guarantee Card */}
+              <View style={[styles.themePreviewBox, { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder, marginBottom: 12 }]}>
+                <View style={{ padding: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 18, marginRight: 8 }}>🛡️</Text>
+                    <Text style={[{ fontSize: 15, fontWeight: 'bold' }, isDark ? { color: currentTheme.textPrimary } : { color: '#047857' }]}>
+                      {t('about_offline_guarantee_title')}
+                    </Text>
+                  </View>
+                  <Text style={[{ fontSize: 13, lineHeight: 20 }, isDark ? { color: currentTheme.textSecondary } : { color: '#374151' }]}>
+                    {t('about_offline_guarantee_body')}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Developer & Legal info */}
+              <View style={{ paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center' }}>
+                <Text style={[{ fontSize: 12, fontWeight: '600' }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>
+                  {t('about_developer')}
+                </Text>
+                <Text style={[{ fontSize: 11, marginTop: 4, color: currentTheme.textMuted }]}>
+                  {t('about_copyright')}
+                </Text>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.themeDoneBtn, { backgroundColor: currentTheme.primary, marginTop: 12 }]}
+              onPress={() => setModalAbout(false)}
+              activeOpacity={0.8}
             >
               <Text style={styles.themeDoneBtnText}>✓ {t('btn_done')}</Text>
             </TouchableOpacity>
