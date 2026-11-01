@@ -1,10 +1,10 @@
-﻿# REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-007` (Feature 006: Customer & Supplier Double-Entry Accounting Ledger)  
-**Next Iteration Target:** `REA-ITER-008` (Feature 007: Personal Money Manager & Ivy Wallet Integration)  
+# REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
+**Current Iteration Completed:** `REA-ITER-008` (Feature 007: Personal Money Manager & Ivy Wallet Architecture)  
+**Next Iteration Target:** `REA-ITER-009` (Feature 008: Google Drive Cloud Backup & Restore Parity)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
-**Test Baseline:** 45 / 45 test suites passing (100% green, 1,000+ discrete assertions, 0 regressions)  
+**Test Baseline:** 46 / 46 test suites passing (100% green, 1,100+ discrete assertions, 0 regressions)  
 
 ---
 
@@ -20,11 +20,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 008)
-1. **Gibbs (Worker 1):** Investigate Ivy Wallet integration artifacts and Personal Money Manager schema schemas (`@tallykhata_personal_money_manager_v2`).
-2. **Averroes (Worker 2):** Audit `src/moneyManagerService.js` for category budgets (`safe`/`warning`/`exceeded`), recurring transaction execution rules, and fund transfers.
-3. **Ohm (Worker 3):** Reconcile Personal Money Manager screens, account cards, budget progress meters, and transaction modals in `App.js`.
-4. **Main Orchestrator:** Run test suite (`node test_ivy_wallet_integration.js`, `node test_money_management.js`), verify 0 regressions across all 45 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_008_REPORT.md`.
+## 2. Immediate Resume Action Plan (Iteration 009)
+1. **Gibbs (Worker 1):** Investigate Google Drive backup and restore payloads, AppDataFolder scope, and checksum validation (`src/googleDriveBackupService.js`).
+2. **Averroes (Worker 2):** Audit full unified backup serialization containing both Business Accounting and Personal Money Manager domains, SHA-256 manifest verification, and selective restore filters.
+3. **Ohm (Worker 3):** Reconcile Cloud Backup UI components, last backup timestamp indicators, and progress modals in `App.js`.
+4. **Main Orchestrator:** Run test suites (`node test_google_drive_backup.js`, `node test_full_backup_restore.js`), verify 0 regressions across all 46 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_009_REPORT.md`.
 
 ---
 
