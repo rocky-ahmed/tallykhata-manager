@@ -217,7 +217,7 @@ function sanitizeState(parsed, defaultState) {
         ...t,
         payee: t.payee || "",
       }))
-    : def.transactions;
+    : [];
 
   const goals = Array.isArray(parsed.goals)
     ? parsed.goals
@@ -378,7 +378,7 @@ function reconcileGoalBalance(state, goalId, strategy) {
 }
 
 function toEnglishDigits(str) {
-  if (!str) return '';
+  if (str === undefined || str === null || str === '') return '';
   const bnToEn = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
   return String(str).replace(/[০-৯]/g, d => bnToEn[d] || d);
 }
@@ -1289,7 +1289,7 @@ function addAccount(state, params) {
 }
 
 function updateAccount(state, accountId, params) {
-  const { name, icon, color } = params;
+  const { name, icon, color, balance, type } = params || {};
   const acc = (state.accounts || []).find(a => a.id === accountId);
   if (!acc) throw new Error("অ্যাকাউন্ট পাওয়া যায়নি");
 
@@ -1300,6 +1300,8 @@ function updateAccount(state, accountId, params) {
         name: name ? name.trim() : a.name,
         icon: icon || a.icon,
         color: color || a.color,
+        type: type || a.type,
+        balance: (balance !== undefined && balance !== null && !isNaN(Number(balance))) ? roundCurrency(balance) : a.balance,
       };
     }
     return a;
@@ -1367,7 +1369,7 @@ function addCategory(state, params) {
   const catType = type === "income" ? "income" : "expense";
   const numBudget = parseFloat(toEnglishDigits(budget)) || 0;
   if (numBudget < 0) {
-    throw new Error("সঠিক বাজেট সীমা প্রদান করুন");
+    throw new Error("সঠিক বাজেট সীমা প্রদান করুন (বাজেট ঋণাত্মক হতে পারে না)");
   }
 
   const newCat = {
@@ -1393,7 +1395,7 @@ function updateCategory(state, categoryId, params) {
   const { name, icon, color, budget, isArchived } = params;
   const numBudget = budget !== undefined ? parseFloat(toEnglishDigits(budget)) : cat.budget;
   if (isNaN(numBudget) || numBudget < 0) {
-    throw new Error("সঠিক বাজেট সীমা প্রদান করুন");
+    throw new Error("সঠিক বাজেট সীমা প্রদান করুন (বাজেট ঋণাত্মক হতে পারে না)");
   }
 
   const updatedCategories = (state.categories || []).map(c => {
@@ -1473,7 +1475,7 @@ function deleteCategory(state, categoryId, options = {}) {
 function setCategoryBudget(state, categoryId, limit) {
   const numLimit = parseFloat(toEnglishDigits(limit));
   if (isNaN(numLimit) || numLimit < 0) {
-    throw new Error("সঠিক বাজেট সীমা প্রদান করুন");
+    throw new Error("সঠিক বাজেট সীমা প্রদান করুন (বাজেট ঋণাত্মক হতে পারে না)");
   }
 
   const updatedCategories = (state.categories || []).map(cat => {
