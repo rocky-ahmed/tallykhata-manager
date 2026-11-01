@@ -4180,11 +4180,24 @@ function TallyKhataApp() {
       return;
     }
     const newCount = remainingSmsCount - 1;
+    const nowIso = new Date().toISOString();
+    const logBizId = String(account.businessId || activeBusinessId || '1');
     const log = {
       id: generateUniqueId('tag_'),
+      accountId: String(account.id || ''),
+      account_id: isNaN(Number(account.id)) ? account.id : Number(account.id),
+      businessId: logBizId,
+      business_id: isNaN(Number(logBizId)) ? logBizId : Number(logBizId),
       customerName: account.name,
       phone: account.phone,
       amount: account.balance,
+      credit_amount: account.balance,
+      creditAmount: account.balance,
+      tagada_type: 'TAGADA_BY_FREE_SMS',
+      tagadaType: 'TAGADA_BY_FREE_SMS',
+      synced: 0,
+      create_date: nowIso,
+      createDate: nowIso,
       date: getTodayDate(),
       time: getTimeString(),
     };
@@ -4203,6 +4216,7 @@ function TallyKhataApp() {
       Alert.alert(tStatic("ত্রুটি"), tStatic("তাগাদা মেসেজ রেকর্ড সংরক্ষণ করা যায়নি।"));
       return;
     }
+    try { hapticFeedbackService.onTransactionSave(); } catch (e) {}
     setRemainingSmsCount(saveRes.data.remainingSmsCount);
     setTagadaLogs(saveRes.data.tagadaLogs);
     setModalTagada(false);
@@ -4235,11 +4249,24 @@ function TallyKhataApp() {
             }
             const todayStr = getTodayDate();
             const timeStr = getTimeString();
+            const nowIso = new Date().toISOString();
+            const bulkBizId = String(activeBusinessId || '1');
             const newLogs = dueCustomers.map((cust) => ({
               id: generateUniqueId('tag_'),
+              accountId: String(cust.id || ''),
+              account_id: isNaN(Number(cust.id)) ? cust.id : Number(cust.id),
+              businessId: String(cust.businessId || bulkBizId),
+              business_id: isNaN(Number(cust.businessId || bulkBizId)) ? String(cust.businessId || bulkBizId) : Number(cust.businessId || bulkBizId),
               customerName: cust.name,
               phone: cust.phone || '',
               amount: cust.balance,
+              credit_amount: cust.balance,
+              creditAmount: cust.balance,
+              tagada_type: 'BULK_TAGADA',
+              tagadaType: 'BULK_TAGADA',
+              synced: 0,
+              create_date: nowIso,
+              createDate: nowIso,
               date: todayStr,
               time: timeStr,
             }));
@@ -4258,6 +4285,7 @@ function TallyKhataApp() {
               Alert.alert(tStatic("ত্রুটি"), tStatic("গ্রুপ তাগাদা সংরক্ষণ ব্যর্থ হয়েছে।"));
               return;
             }
+            try { hapticFeedbackService.onTransactionSave(); } catch (e) {}
             setRemainingSmsCount(saveRes.data.remainingSmsCount);
             setTagadaLogs(saveRes.data.tagadaLogs);
             Alert.alert(

@@ -934,6 +934,57 @@ function queryCustomerAccounts(accounts = [], options = {}) {
   return results;
 }
 
+/**
+ * Normalizes Tagada audit log records across Room DB schema and React Native state.
+ * Reference Room DB: CREATE TABLE tagada_log (id, account_id, create_date, credit_amount, tagada_type, synced)
+ * 
+ * @param {Object} rawLog Raw Tagada log record (snake_case or camelCase)
+ * @returns {Object} Canonical normalized log object preserving both field conventions
+ */
+function normalizeTagadaLogFields(rawLog = {}) {
+  if (!rawLog || typeof rawLog !== 'object') return null;
+
+  const accId = rawLog.account_id !== undefined && rawLog.account_id !== null
+    ? rawLog.account_id
+    : (rawLog.accountId !== undefined && rawLog.accountId !== null ? rawLog.accountId : null);
+
+  const rawAmt = rawLog.credit_amount !== undefined && rawLog.credit_amount !== null
+    ? Number(rawLog.credit_amount)
+    : (rawLog.creditAmount !== undefined && rawLog.creditAmount !== null
+        ? Number(rawLog.creditAmount)
+        : (rawLog.amount !== undefined && rawLog.amount !== null ? Number(rawLog.amount) : 0));
+  const cleanAmt = Math.round((Number.isFinite(rawAmt) ? rawAmt : 0) * 100) / 100;
+
+  const rawDate = rawLog.create_date || rawLog.createDate || rawLog.date || new Date().toISOString();
+  const rawType = rawLog.tagada_type || rawLog.tagadaType || rawLog.type || 'TAGADA_BY_FREE_SMS';
+  const synced = rawLog.synced !== undefined && rawLog.synced !== null ? Number(rawLog.synced) : 0;
+
+  const bizId = rawLog.business_id !== undefined && rawLog.business_id !== null
+    ? String(rawLog.business_id)
+    : (rawLog.businessId !== undefined && rawLog.businessId !== null ? String(rawLog.businessId) : '1');
+
+  const strDate = rawDate.includes('T') ? rawDate.split('T')[0] : (rawDate.split(' ')[0] || rawDate);
+
+  return {
+    ...rawLog,
+    id: rawLog.id !== undefined && rawLog.id !== null ? rawLog.id : generateUniqueId('tag_'),
+    account_id: isNaN(Number(accId)) ? accId : Number(accId),
+    accountId: String(accId || ''),
+    create_date: rawDate,
+    createDate: rawDate,
+    date: rawLog.date || strDate,
+    time: rawLog.time || (rawDate.includes('T') ? rawDate.split('T')[1].slice(0, 5) : ''),
+    credit_amount: cleanAmt,
+    creditAmount: cleanAmt,
+    amount: cleanAmt,
+    tagada_type: String(rawType),
+    tagadaType: String(rawType),
+    synced: synced === 1 ? 1 : 0,
+    business_id: isNaN(Number(bizId)) ? bizId : Number(bizId),
+    businessId: bizId,
+  };
+}
+
 const ledgerEngine = {
   generateUniqueId,
   validateTransaction,
@@ -952,6 +1003,7 @@ const ledgerEngine = {
   resetCache,
   indexJournalsByAccount,
   normalizeJournalFields,
+  normalizeTagadaLogFields,
   V5_KEY,
   V6_KEY,
   V5_BACKUP_KEY,
@@ -965,4 +1017,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof exports !== 'undefined') {
   exports.ledgerEngine = ledgerEngine;
   exports.normalizeJournalFields = normalizeJournalFields;
+  exports.normalizeTagadaLogFields = normalizeTagadaLogFields;
 }
