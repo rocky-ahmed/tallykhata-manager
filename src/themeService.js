@@ -328,6 +328,7 @@ function getThemedStyles(theme, isDark) {
   const dark = isDark !== undefined ? isDark : t.isDark;
   return {
     screenBg: { backgroundColor: t.screenBg },
+    container: { backgroundColor: t.screenBg },
     card: { backgroundColor: t.cardBg, borderColor: t.cardBorder },
     cardElevated: { backgroundColor: t.cardBgElevated, borderColor: t.cardBorder },
     textPrimary: { color: t.textPrimary },
