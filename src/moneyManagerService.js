@@ -913,7 +913,15 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
   const overallBudget = state.overallMonthlyBudget || 0;
   const overallBudgetPercent = overallBudget > 0 ? Math.min(100, Math.round((totalExpense / overallBudget) * 100)) : 0;
   const isOverallBudgetOver = overallBudget > 0 && totalExpense > overallBudget;
-  const overallBudgetRemaining = overallBudget > 0 ? overallBudget - totalExpense : 0;
+  const overallBudgetRemaining = overallBudget > 0 ? (totalExpense > overallBudget ? 0 : roundCurrency(overallBudget - totalExpense)) : 0;
+  const overallBudgetStatus = overallBudget <= 0
+    ? "no_budget"
+    : totalExpense > overallBudget
+    ? "exceeded"
+    : (overallBudget > 0 && Math.round((totalExpense / overallBudget) * 100) >= 80)
+    ? "warning"
+    : "safe";
+  const overallBudgetRawPct = overallBudget > 0 ? Math.round((totalExpense / overallBudget) * 100) : 0;
 
   const netWorth = calculateNetWorth(state);
   const result = {
@@ -930,6 +938,8 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
     overallBudgetLimit: overallBudget,
     overallBudgetPercent,
     overallBudgetPct: overallBudgetPercent,
+    overallBudgetRawPct,
+    overallBudgetStatus,
     isOverallBudgetOver,
     overallBudgetRemaining,
   };
