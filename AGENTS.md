@@ -2,22 +2,22 @@
 
 ## 1. THREE DESIGNATED WORKER ROLES
 
-The project operates with exactly THREE permanent Subagent worker roles:
+The project operates under the REA-Driven Autonomous Reconstruction System with exactly THREE permanent Subagent worker roles:
 
-1. **Worker 1: FRONTEND & UI/UX SPECIALIST**
+1. **Worker 1: PERMANENT REA REVERSE ENGINEERING INVESTIGATOR**
    - Active Thread ID: `01a19154-99ab-72a0-9e23-2611b9ffc74c` (Nickname: `Gibbs`)
-   - Responsibilities: React Native / Expo UI, components, navigation, layouts, theme tokens, localization UI.
-   - Exclusive Ownership: `App.js`, `part1_header_and_utils.js`, `part3_views_and_tabs.js`, `part5_stylesheet.js`, `src/themeService.js`, `src/i18nService.js`.
+   - Responsibilities: Continuously investigate authorized reference applications (e.g. `TallyKhata-Demo.apk`) using REA tools; deliver evidence-backed specifications and data models.
+   - REA Toolset: `rea inspect-artifact`, `rea project-android-application-graph`, `rea inspect-apk-signature`, `rea doctor`.
 
-2. **Worker 2: BACKEND & DATA ARCHITECT**
+2. **Worker 2: PERMANENT BACKEND DEVELOPER & BUSINESS LOGIC**
    - Active Thread ID: `01a19154-c135-75d0-b38a-1ea50f004895` (Nickname: `Averroes`)
-   - Responsibilities: Financial logic, ledgerEngine, integer paisa math, storage repositories, Google Drive backup/restore, data consistency.
+   - Responsibilities: Implement backend data models, storage repositories, integer-paisa financial engines, cloud backup/restore, and mutex serialization based on REA specifications.
    - Exclusive Ownership: `src/moneyManagerService.js`, `src/ledgerEngine.js`, `src/storageRepository.js`, `src/googleDriveBackupService.js`, `src/preferencesService.js`.
 
-3. **Worker 3: QA, TESTING & SECURITY ENGINEER**
+3. **Worker 3: PERMANENT FRONTEND DEVELOPER, UI/UX & INTERACTIONS**
    - Active Thread ID: `01a19154-e3ee-7ab2-b682-798b64a0bb6b` (Nickname: `Ohm`)
-   - Responsibilities: Automated regression tests, independent code review, security audits, data isolation verification, build verification.
-   - Exclusive Ownership: Test suites (`test_*.js`), mock storage adapters, test fixtures.
+   - Responsibilities: Implement React Native screens, components, user journeys, navigation, tactile haptics, and bilingual localization based on REA specifications.
+   - Exclusive Ownership: `App.js`, `src/components/`, `src/themeService.js`, `src/i18nService.js`, `src/hapticFeedbackService.js`.
 
 ---
 
