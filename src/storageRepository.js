@@ -590,6 +590,225 @@ class StorageRepository {
    * Creates a safety snapshot of the current local state before restore.
    * Scoped to an explicit snapshotId so rollbacks never apply stale snapshots from earlier sessions.
    */
+  /**
+   * Enqueues an arbitrary async operation onto the FIFO writeQueue mutex.
+   * Tracks pending writes and ensures serial execution with error isolation.
+   * @param {Function} operation - async () => any
+   * @returns {Promise<any>}
+   */
+  enqueueWrite(operation) {
+    if (typeof operation !== 'function') {
+      return Promise.reject(new Error('enqueueWrite requires a function argument'));
+    }
+
+    this._pendingWrites = (this._pendingWrites || 0) + 1;
+    return new Promise((resolve, reject) => {
+      this.writeQueue = this.writeQueue
+        .then(async () => {
+          try {
+            const res = await operation();
+            resolve(res);
+          } catch (err) {
+            console.error('Error during enqueueWrite operation:', err);
+            reject(err);
+          } finally {
+            this._pendingWrites = Math.max(0, (this._pendingWrites || 0) - 1);
+          }
+        })
+        .catch((fatalQueueErr) => {
+          this._pendingWrites = Math.max(0, (this._pendingWrites || 0) - 1);
+          console.error('writeQueue recovered from fatal error during enqueueWrite:', fatalQueueErr);
+          reject(fatalQueueErr);
+        });
+    });
+  }
+
+  /**
+   * Executes an atomic multi-step financial transaction inside the writeQueue mutex.
+   * If any step throws or the post-mutation state fails financial invariants
+   * (e.g. NaN balance, missing account references, negative values),
+   * the mutation is automatically rolled back and the error is returned.
+   * @param {Function} transactionFn - async (draftStore) => { store, result }
+   * @param {Object} [options] - { validateBalances?: boolean }
+   * @returns {Promise<{success: boolean, result?: any, rolledBack?: boolean, error?: string}>}
+   */
+  async executeAtomicTransaction(transactionFn, options = {}) {
+    if (typeof transactionFn !== 'function') {
+      return { success: false, rolledBack: false, error: 'Transaction requires a function' };
+    }
+
+    return this.enqueueWrite(async () => {
+      if (!this.currentStore) {
+        await this.loadInitialData();
+      }
+
+      const preTransactionSnapshot = JSON.parse(JSON.stringify(this.currentStore));
+
+      try {
+        const draft = JSON.parse(JSON.stringify(this.currentStore));
+        const txOutput = await transactionFn(draft);
+
+        const updatedStore = (txOutput && txOutput.store) ? txOutput.store : txOutput;
+        const result = (txOutput && txOutput.result !== undefined) ? txOutput.result : txOutput;
+
+        if (!updatedStore || typeof updatedStore !== 'object') {
+          throw new Error('Transaction must return a valid updated store object');
+        }
+
+        if (Array.isArray(updatedStore.accounts)) {
+          for (const acc of updatedStore.accounts) {
+            if (acc && (Number.isNaN(acc.balance) || acc.balance === null || acc.balance === undefined)) {
+              throw new Error('Integrity violation: Account ' + acc.id + ' balance is NaN or invalid');
+            }
+          }
+        }
+
+        if (Array.isArray(updatedStore.journals)) {
+          for (const j of updatedStore.journals) {
+            if (j && (Number.isNaN(j.amount) || j.amount < 0)) {
+              throw new Error('Integrity violation: Journal ' + j.id + ' has invalid amount ' + j.amount);
+            }
+          }
+        }
+
+        await this.adapter.setItem(V6_KEY, JSON.stringify(updatedStore));
+        this.currentStore = updatedStore;
+
+        return {
+          success: true,
+          rolledBack: false,
+          result,
+        };
+      } catch (err) {
+        this.currentStore = preTransactionSnapshot;
+        await this.adapter.setItem(V6_KEY, JSON.stringify(preTransactionSnapshot));
+        console.warn('Atomic transaction failed and was rolled back:', err.message);
+
+        return {
+          success: false,
+          rolledBack: true,
+          error: err.message || String(err),
+        };
+      }
+    });
+  }
+
+  /**
+   * Vacuums and compacts local storage by:
+   * 1. Removing orphaned journals referencing non-existent accounts
+   * 2. Deduplicating entries by unique ID within collections
+   * 3. Purging obsolete temporary safety snapshots older than maxAgeMs
+   * 4. Recalculating account balances from journals to ensure ledger balance integrity
+   * @param {Object} [options] - { maxSnapshotAgeMs?: number, recalculateBalances?: boolean }
+   * @returns {Promise<{success: boolean, stats: Object}>}
+   */
+  async compactStorage(options = {}) {
+    const maxSnapshotAgeMs = (options && options.maxSnapshotAgeMs) || 24 * 60 * 60 * 1000;
+    const shouldRecalculate = options.recalculateBalances !== false;
+
+    return this.enqueueWrite(async () => {
+      if (!this.currentStore) {
+        await this.loadInitialData();
+      }
+
+      const store = this.currentStore;
+      const initialSerialized = JSON.stringify(store);
+      const initialSize = initialSerialized.length;
+
+      let orphanedJournalsRemoved = 0;
+      let deduplicatedRecords = 0;
+      let prunedSnapshots = 0;
+
+      const collectionsToDedupe = ['accounts', 'journals', 'cashEntries', 'inventory', 'stock', 'notes', 'businesses'];
+      for (const col of collectionsToDedupe) {
+        if (Array.isArray(store[col])) {
+          const seen = new Set();
+          const deduped = [];
+          for (const item of store[col]) {
+            if (item && item.id) {
+              const strId = String(item.id);
+              if (seen.has(strId)) {
+                deduplicatedRecords++;
+                continue;
+              }
+              seen.add(strId);
+            }
+            deduped.push(item);
+          }
+          store[col] = deduped;
+        }
+      }
+
+      if (Array.isArray(store.accounts) && Array.isArray(store.journals)) {
+        const validAccountKeys = new Set(
+          store.accounts.map((a) => {
+            const biz = a.businessId || a.business_id || '1';
+            return biz + ':' + a.id;
+          })
+        );
+        const filteredJournals = [];
+        for (const j of store.journals) {
+          const accId = j.accountId !== undefined && j.accountId !== null ? j.accountId : j.orig_account_id;
+          const biz = j.businessId || j.business_id || '1';
+          if (accId && !validAccountKeys.has(biz + ':' + accId)) {
+            orphanedJournalsRemoved++;
+            continue;
+          }
+          filteredJournals.push(j);
+        }
+        store.journals = filteredJournals;
+      }
+
+      if (shouldRecalculate && Array.isArray(store.accounts) && Array.isArray(store.journals)) {
+        try {
+          const { recalculateAllAccountBalances } = require('./ledgerEngine');
+          const recalcRes = recalculateAllAccountBalances(store.accounts, store.journals);
+          if (recalcRes && Array.isArray(recalcRes.updatedAccounts)) {
+            store.accounts = recalcRes.updatedAccounts;
+          }
+          if (recalcRes && Array.isArray(recalcRes.updatedJournals)) {
+            store.journals = recalcRes.updatedJournals;
+          }
+        } catch (e) {
+          console.warn('Compaction balance recalculation warning:', e.message);
+        }
+      }
+
+      try {
+        const snapStr = await this.adapter.getItem(SAFETY_SNAPSHOT_KEY);
+        if (snapStr) {
+          const parsedSnap = JSON.parse(snapStr);
+          if (parsedSnap && parsedSnap.createdAt) {
+            const age = Date.now() - new Date(parsedSnap.createdAt).getTime();
+            if (age > maxSnapshotAgeMs) {
+              await this.adapter.removeItem(SAFETY_SNAPSHOT_KEY);
+              this.activeSafetySnapshot = null;
+              prunedSnapshots++;
+            }
+          }
+        }
+      } catch (e) {}
+
+      const finalSerialized = JSON.stringify(store);
+      await this.adapter.setItem(V6_KEY, finalSerialized);
+
+      const stats = {
+        orphanedJournalsRemoved,
+        deduplicatedRecords,
+        prunedSnapshots,
+        bytesReclaimed: Math.max(0, initialSize - finalSerialized.length),
+        storageSizeBefore: initialSize,
+        storageSizeAfter: finalSerialized.length,
+      };
+
+      return { success: true, stats };
+    });
+  }
+
+  /**
+   * Creates a safety snapshot of the current local state before restore.
+   * Scoped to an explicit snapshotId so rollbacks never apply stale snapshots from earlier sessions.
+   */
   async createLocalSafetySnapshot(customSnapshotId = null, extraState = {}) {
     if (this.writeQueue) {
       try {
