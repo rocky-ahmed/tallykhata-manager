@@ -61,9 +61,19 @@ const VIBRATION_FALLBACK_PATTERNS = {
   [HAPTIC_PATTERNS.NOTIFICATION_ERROR]: [0, 50, 50, 50, 50, 80],
 };
 
+// Sound Pattern Identifiers
+const SOUND_PATTERNS = {
+  CASH_CHIME: 'cash_chime',
+  BEEP_SUCCESS: 'beep_success',
+  BEEP_ERROR: 'beep_error',
+  CLICK: 'click',
+};
+
 // Internal State
 let _enabled = true;
 let _customAdapter = null;
+let _soundEnabled = true;
+let _customSoundAdapter = null;
 
 /**
  * Checks whether haptic feedback is currently enabled.
@@ -110,6 +120,95 @@ function resetHapticsAdapter() {
 function resetSettings() {
   _enabled = true;
   _customAdapter = null;
+  _soundEnabled = true;
+  _customSoundAdapter = null;
+}
+
+/**
+ * Checks whether merchant sound feedback is enabled.
+ * @returns {boolean}
+ */
+function isSoundEnabled() {
+  return _soundEnabled;
+}
+
+/**
+ * Enables or disables merchant sound feedback globally.
+ * @param {boolean} flag
+ */
+function setSoundEnabled(flag) {
+  _soundEnabled = Boolean(flag);
+}
+
+/**
+ * Sets a custom sound adapter (e.g. for testing, native audio player, or logging).
+ * @param {Object|null} adapter
+ */
+function setSoundAdapter(adapter) {
+  _customSoundAdapter = adapter;
+}
+
+/**
+ * Returns the currently active custom sound adapter, if any.
+ * @returns {Object|null}
+ */
+function getSoundAdapter() {
+  return _customSoundAdapter;
+}
+
+/**
+ * Clears the custom sound adapter.
+ */
+function resetSoundAdapter() {
+  _customSoundAdapter = null;
+}
+
+/**
+ * Plays a merchant sound pattern by identifier.
+ * @param {string} soundName
+ * @returns {boolean}
+ */
+function playMerchantSound(soundName = SOUND_PATTERNS.CASH_CHIME) {
+  if (!_soundEnabled) return false;
+  if (_customSoundAdapter) {
+    try {
+      if (typeof _customSoundAdapter[soundName] === 'function') {
+        _customSoundAdapter[soundName]();
+        return true;
+      }
+      if (typeof _customSoundAdapter.playSound === 'function') {
+        _customSoundAdapter.playSound(soundName);
+        return true;
+      }
+      if (typeof _customSoundAdapter.play === 'function') {
+        _customSoundAdapter.play(soundName);
+        return true;
+      }
+    } catch (e) {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Combined merchant commit feedback: triggers both success haptic and cash chime sound.
+ * @returns {boolean}
+ */
+function onTransactionCommitFeedback() {
+  const hapticDone = notificationSuccess();
+  const soundDone = playMerchantSound(SOUND_PATTERNS.CASH_CHIME);
+  return hapticDone || soundDone;
+}
+
+/**
+ * Combined error feedback: triggers error haptic and error beep sound.
+ * @returns {boolean}
+ */
+function onErrorFeedback() {
+  const hapticDone = notificationError();
+  const soundDone = playMerchantSound(SOUND_PATTERNS.BEEP_ERROR);
+  return hapticDone || soundDone;
 }
 
 /**
@@ -321,11 +420,20 @@ const onError = notificationError;
 module.exports = {
   HAPTIC_PATTERNS,
   VIBRATION_FALLBACK_PATTERNS,
+  SOUND_PATTERNS,
   isEnabled,
   setEnabled,
   setHapticsAdapter,
   getHapticsAdapter,
   resetHapticsAdapter,
+  isSoundEnabled,
+  setSoundEnabled,
+  setSoundAdapter,
+  getSoundAdapter,
+  resetSoundAdapter,
+  playMerchantSound,
+  onTransactionCommitFeedback,
+  onErrorFeedback,
   resetSettings,
   trigger,
   selection,
@@ -343,11 +451,20 @@ module.exports = {
   default: {
     HAPTIC_PATTERNS,
     VIBRATION_FALLBACK_PATTERNS,
+    SOUND_PATTERNS,
     isEnabled,
     setEnabled,
     setHapticsAdapter,
     getHapticsAdapter,
     resetHapticsAdapter,
+    isSoundEnabled,
+    setSoundEnabled,
+    setSoundAdapter,
+    getSoundAdapter,
+    resetSoundAdapter,
+    playMerchantSound,
+    onTransactionCommitFeedback,
+    onErrorFeedback,
     resetSettings,
     trigger,
     selection,

@@ -1,10 +1,10 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-010` (Feature 009: Bilingual i18n & High-DPI Font Parity)  
-**Next Iteration Target:** `REA-ITER-011` (Feature 010: Tactile Feedback & UX Parity)  
+**Current Iteration Completed:** `REA-ITER-011` (Feature 010: Tactile Feedback & UX Parity)  
+**Next Iteration Target:** `REA-ITER-012` (Feature 011: Transaction Query Index Parity)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
-**Test Baseline:** 48 / 48 test suites passing (100% green, 1,140+ discrete assertions, 0 regressions)  
+**Test Baseline:** 49 / 49 test suites passing (100% green, 1,160+ discrete assertions, 0 regressions)  
 
 ---
 
@@ -20,11 +20,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 011)
-1. **Gibbs (Worker 1):** Investigate audio assets and haptic feedback timings in reference app (`res/raw/`, `Vibrator` patterns).
-2. **Averroes (Worker 2):** Audit merchant transaction commit audio feedback and 3-tier fallback engine (`src/hapticFeedbackService.js`).
-3. **Ohm (Worker 3):** Reconcile 3D tactile buttons, press animations, and sound triggers in `App.js`.
-4. **Main Orchestrator:** Run test suites (`node test_haptic_feedback.js`), verify 0 regressions across all 48 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_011_REPORT.md`.
+## 2. Immediate Resume Action Plan (Iteration 012)
+1. **Gibbs (Worker 1):** Investigate Room DB journal indexing, date-range SQLite indices, and query plans in reference app.
+2. **Averroes (Worker 2):** Audit binary search indexing (`queryJournalsByDateRange`), composite indexing by `${businessId}:${accountId}`, and pagination in `src/storageRepository.js`.
+3. **Ohm (Worker 3):** Reconcile date-range filter UI in Customer & Supplier ledger views in `App.js`.
+4. **Main Orchestrator:** Run test suites (`node test_journal_query_indexing.js`), verify 0 regressions across all 49 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_012_REPORT.md`.
 
 ---
 
