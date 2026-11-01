@@ -1,10 +1,10 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-009` (Feature 008: Google Drive Cloud Backup & Restore Parity)  
-**Next Iteration Target:** `REA-ITER-010` (Feature 009: Bilingual i18n & High-DPI Font Parity)  
+**Current Iteration Completed:** `REA-ITER-010` (Feature 009: Bilingual i18n & High-DPI Font Parity)  
+**Next Iteration Target:** `REA-ITER-011` (Feature 010: Tactile Feedback & UX Parity)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
-**Test Baseline:** 47 / 47 test suites passing (100% green, 1,120+ discrete assertions, 0 regressions)  
+**Test Baseline:** 48 / 48 test suites passing (100% green, 1,140+ discrete assertions, 0 regressions)  
 
 ---
 
@@ -20,11 +20,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 010)
-1. **Gibbs (Worker 1):** Investigate bilingual translation keys, high-DPI Bengali typography scaling, and English toggle in reference app (`src/i18nService.js`).
-2. **Averroes (Worker 2):** Audit language persistence in `@tallykhata_app_preferences_v1`, default locale fallback, and dynamic number formatting.
-3. **Ohm (Worker 3):** Reconcile language switcher UI in `App.js` and drawer/modal text rendering.
-4. **Main Orchestrator:** Run test suites (`node test_preferences_theme_i18n.js`), verify 0 regressions across all 47 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_010_REPORT.md`.
+## 2. Immediate Resume Action Plan (Iteration 011)
+1. **Gibbs (Worker 1):** Investigate audio assets and haptic feedback timings in reference app (`res/raw/`, `Vibrator` patterns).
+2. **Averroes (Worker 2):** Audit merchant transaction commit audio feedback and 3-tier fallback engine (`src/hapticFeedbackService.js`).
+3. **Ohm (Worker 3):** Reconcile 3D tactile buttons, press animations, and sound triggers in `App.js`.
+4. **Main Orchestrator:** Run test suites (`node test_haptic_feedback.js`), verify 0 regressions across all 48 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_011_REPORT.md`.
 
 ---
 

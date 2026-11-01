@@ -6,6 +6,23 @@
  */
 
 const BN_NUMS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+const BN_TO_EN = {
+  '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+  '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9'
+};
+
+function toEnglishDigits(str) {
+  if (str === undefined || str === null || str === '') return '';
+  return String(str).replace(/[০-৯]/g, (d) => BN_TO_EN[d] || d);
+}
+
+function parseNumber(str) {
+  if (str === undefined || str === null || str === '') return 0;
+  const english = toEnglishDigits(String(str));
+  const cleaned = english.replace(/[^0-9.-]/g, '').trim();
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
 
 function formatNumber(num, lang = 'bn') {
   if (num === null || num === undefined) return '';
@@ -2500,7 +2517,7 @@ function t(key, lang = 'bn', params = {}) {
   if (params && typeof params === 'object') {
     Object.keys(params).forEach((k) => {
       const val = params[k] !== undefined && params[k] !== null ? String(params[k]) : '';
-      text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), val);
+      text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), () => val);
     });
   }
   return text;
@@ -2516,4 +2533,6 @@ module.exports = {
   translateMoneyManagerError,
   formatNumber,
   formatCurrency,
+  toEnglishDigits,
+  parseNumber,
 };
