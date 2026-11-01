@@ -815,6 +815,9 @@ function TallyKhataApp() {
   const [prodStock, setProdStock] = useState('');
   const [stockAdjustType, setStockAdjustType] = useState('in');
   const [stockAdjustQty, setStockAdjustQty] = useState('');
+  const [stockSearchQuery, setStockSearchQuery] = useState('');
+  const [stockFilterStatus, setStockFilterStatus] = useState('all'); // 'all' | 'low_stock' | 'out_of_stock' | 'in_stock'
+  const [showAddProductForm, setShowAddProductForm] = useState(false);
 
   // Business Notes Form
   const [newNoteText, setNewNoteText] = useState('');
@@ -2189,11 +2192,37 @@ function TallyKhataApp() {
 
   let totalStockCost = 0;
   let totalStockSaleValue = 0;
+  let lowStockCount = 0;
+  let outOfStockCount = 0;
+  let inStockCount = 0;
   (businessInventory || []).forEach((item) => {
     const qty = Number(item.stock) || 0;
     totalStockCost += qty * (Number(item.buyPrice) || 0);
     totalStockSaleValue += qty * (Number(item.sellPrice) || 0);
+    if (qty <= 0) {
+      outOfStockCount++;
+    } else if (qty <= 5) {
+      lowStockCount++;
+    } else {
+      inStockCount++;
+    }
   });
+
+  const filteredInventory = useMemo(() => {
+    const q = (stockSearchQuery || '').toLowerCase().trim();
+    return (businessInventory || []).filter((item) => {
+      const qty = Number(item.stock) || 0;
+      if (stockFilterStatus === 'low_stock' && !(qty > 0 && qty <= 5)) return false;
+      if (stockFilterStatus === 'out_of_stock' && qty !== 0) return false;
+      if (stockFilterStatus === 'in_stock' && qty <= 5) return false;
+      if (q) {
+        const mName = (item.name || '').toLowerCase().includes(q);
+        const mUnit = (item.unit || '').toLowerCase().includes(q);
+        if (!mName && !mUnit) return false;
+      }
+      return true;
+    });
+  }, [businessInventory, stockFilterStatus, stockSearchQuery]);
 
   // --- CALCULATOR ENGINE HANDLER ---
   const handleCalcPress = (btn) => {
@@ -2736,7 +2765,7 @@ function TallyKhataApp() {
     setProdBuyPrice('');
     setProdSellPrice('');
     setProdStock('');
-    setModalAddStock(false);
+    setShowAddProductForm(false);
   };
 
   const handleAdjustStock = async () => {
@@ -7267,176 +7296,454 @@ function TallyKhataApp() {
         </View>
       </Modal>
 
-      {/* ===================================================================
-          MODAL: STOCK INVENTORY (পণ্য ও স্টক)
+            {/* ===================================================================
+          MODAL: STOCK INVENTORY (পণ্য ও স্টক) (SCR-20, SCR-21)
          =================================================================== */}
       <Modal visible={modalAddStock} animationType="slide" transparent onRequestClose={() => setModalAddStock(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 16, borderRadius: 16 }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalCardTitle}>{tStatic("স্টক ও পণ্য তালিকা")}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <AppIcon
+                  source={require('./assets/icons/grid_stock.png')}
+                  iconKey='grid_stock'
+                  variant="warning"
+                  size={20}
+                  containerSize={36}
+                  shape="squircle"
+                />
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>{tStatic("স্টক ও পণ্য তালিকা")}</Text>
+              </View>
               <TouchableOpacity
                 onPress={() => setModalAddStock(false)}
-                style={styles.modalCloseCircle}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={[styles.modalCloseCircle, isDark && { backgroundColor: currentTheme.surfaceVariant }]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
                 activeOpacity={0.7}
               >
                 <Image
-                source={require('./assets/icons/ic_close.png')}
-                style={styles.modalCloseIcon}
-                resizeMode="contain"
-              />
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && { tintColor: currentTheme.textSecondary }]}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingBottom: 10 }}>
-              <View style={styles.stockSummaryRow}>
-                <View style={styles.stockSummaryBox}>
-                  <Text style={styles.stockSummaryBoxLabel}>{tStatic("মোট পণ্য")}</Text>
-                  <Text style={styles.stockSummaryBoxVal}>{businessInventory.length}{tStatic(" টি")}</Text>
-                </View>
-                <View style={[styles.stockSummaryBox, { borderColor: COLORS.primary }]}>
-                  <Text style={styles.stockSummaryBoxLabel}>{tStatic("স্টক ক্রয়মূল্য")}</Text>
-                  <Text style={[styles.stockSummaryBoxVal, { color: COLORS.primary }]}>{tStatic("৳ ")}{formatMoney(totalStockCost)}</Text>
-                </View>
-                <View style={[styles.stockSummaryBox, { borderColor: COLORS.green }]}>
-                  <Text style={styles.stockSummaryBoxLabel}>{tStatic("আনুমানিক বিক্রয়")}</Text>
-                  <Text style={[styles.stockSummaryBoxVal, { color: COLORS.green }]}>{tStatic("৳ ")}{formatMoney(totalStockSaleValue)}</Text>
-                </View>
-              </View>
-
-              <Text style={[styles.sectionHeading, { marginTop: 12 }]}>{tStatic("নতুন পণ্য যোগ করুন")}</Text>
-              <TextInput
-                style={styles.modalSimpleInput}
-                placeholder={tStatic("পণ্যের নাম (যেমন: মিনিকেট চাল)")}
-                value={prodName}
-                onChangeText={setProdName}
-              />
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <TextInput
-                  style={[styles.modalSimpleInput, { flex: 1 }]}
-                  placeholder={tStatic("একক (কেজি/লিটার/পিস)")}
-                  value={prodUnit}
-                  onChangeText={setProdUnit}
-                />
-                <TextInput
-                  style={[styles.modalSimpleInput, { flex: 1 }]}
-                  placeholder={tStatic("বর্তমান স্টক")}
-                  keyboardType="numeric"
-                  value={prodStock}
-                  onChangeText={setProdStock}
-                />
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <TextInput
-                  style={[styles.modalSimpleInput, { flex: 1 }]}
-                  placeholder={tStatic("ক্রয়মূল্য (৳)")}
-                  keyboardType="numeric"
-                  value={prodBuyPrice}
-                  onChangeText={setProdBuyPrice}
-                />
-                <TextInput
-                  style={[styles.modalSimpleInput, { flex: 1 }]}
-                  placeholder={tStatic("বিক্রয়মূল্য (৳)")}
-                  keyboardType="numeric"
-                  value={prodSellPrice}
-                  onChangeText={setProdSellPrice}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary, marginTop: 4 }]}
-                onPress={handleSaveProduct}
-              >
-                <Text style={styles.modalBtnSubmitText}>{tStatic("+ পণ্য যোগ করুন")}</Text>
-              </TouchableOpacity>
-
-              <Text style={[styles.sectionHeading, { marginTop: 16 }]}>{tStatic("বিদ্যমান পণ্যসমূহ (")}{businessInventory.length})</Text>
-              {businessInventory.map((item) => (
-                <View key={item.id} style={styles.stockItemRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.stockItemName}>{item.name}</Text>
-                    <Text style={styles.stockItemSub}>{tStatic("ক্রয়: ৳                        ক্রয়: ৳ ")}{formatMoney(item.buyPrice)}{tStatic(" • বিক্রয়: ৳ ")}{formatMoney(item.sellPrice)} / {item.unit}
-                    </Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* 3D Stock Metric Cards Grid */}
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                  <View style={[styles.stockMetricCard, isDark && tStyles.stockMetricCard]}>
+                    <Text style={[styles.stockMetricLabel, isDark && tStyles.textSecondary]}>{tStatic("মোট পণ্য")}</Text>
+                    <Text style={[styles.stockMetricVal, isDark && tStyles.textPrimary]}>{businessInventory.length} {tStatic("টি")}</Text>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.stockQtyText, item.stock <= 5 && { color: COLORS.red }]}>
-                      {item.stock} {item.unit}
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-                      <TouchableOpacity
-                        style={styles.stockAdjustMiniBtn}
-                        onPress={() => {
-                          setSelectedProduct(item);
-                          setStockAdjustType('in');
-                          setModalAdjustStock(true);
-                        }}
-                      >
-                        <Text style={styles.stockAdjustMiniBtnText}>{tStatic("+ ইন")}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.stockAdjustMiniBtn, { backgroundColor: COLORS.red }]}
-                        onPress={() => {
-                          setSelectedProduct(item);
-                          setStockAdjustType('out');
-                          setModalAdjustStock(true);
-                        }}
-                      >
-                        <Text style={styles.stockAdjustMiniBtnText}>{tStatic("- আউট")}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDeleteProduct(item.id)} style={{ padding: 2 }}>
-                        <Image source={require('./assets/icons/ic_delete.png')} style={{ width: 16, height: 16 }} resizeMode="contain" />
-                      </TouchableOpacity>
+                  <View style={[styles.stockMetricCard, isDark && tStyles.stockMetricCard, { borderBottomColor: isDark ? '#7F1D1D' : '#FCA5A5' }]}>
+                    <Text style={[styles.stockMetricLabel, isDark && tStyles.textSecondary]}>{tStatic("স্টক ক্রয়মূল্য")}</Text>
+                    <Text style={[styles.stockMetricVal, { color: currentTheme.primary }]}>৳ {formatMoney(totalStockCost)}</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={[styles.stockMetricCard, isDark && tStyles.stockMetricCard, { borderBottomColor: isDark ? '#065F46' : '#86EFAC' }]}>
+                    <Text style={[styles.stockMetricLabel, isDark && tStyles.textSecondary]}>{tStatic("আনুমানিক বিক্রয়")}</Text>
+                    <Text style={[styles.stockMetricVal, { color: isDark ? '#34D399' : '#047857' }]}>৳ {formatMoney(totalStockSaleValue)}</Text>
+                  </View>
+                  <View style={[styles.stockMetricCard, isDark && tStyles.stockMetricCard, { borderBottomColor: isDark ? '#713F12' : '#FDE68A' }]}>
+                    <Text style={[styles.stockMetricLabel, isDark && tStyles.textSecondary]}>{tStatic("স্বল্প স্টক")}</Text>
+                    <Text style={[styles.stockMetricVal, { color: isDark ? '#FBBF24' : '#B45309' }]}>{lowStockCount} {tStatic("টি")}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Action & Add Product Form Launcher */}
+              <View style={{ marginBottom: 12 }}>
+                <Button3D
+                  title={showAddProductForm ? tStatic("ফর্ম লুকান") : tStatic("+ নতুন পণ্য যোগ করুন")}
+                  variant={showAddProductForm ? "secondary" : "primary"}
+                  onPress={() => setShowAddProductForm(!showAddProductForm)}
+                  height={48}
+                />
+              </View>
+
+              {/* SCR-21: Add Product Form */}
+              {(showAddProductForm || businessInventory.length === 0) && (
+                <View style={[
+                  {
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 16,
+                    borderWidth: 1,
+                    borderColor: isDark ? currentTheme.cardBorder : '#E2E8F0',
+                    backgroundColor: isDark ? currentTheme.cardBgElevated : '#F8FAFC',
+                  }
+                ]}>
+                  <Text style={[styles.sectionHeading, isDark && tStyles.textPrimary, { marginBottom: 10 }]}>
+                    {tStatic("নতুন পণ্য যোগ করুন")}
+                  </Text>
+                  <TextInput
+                    style={[styles.modalSimpleInput, isDark && tStyles.input, { color: isDark ? currentTheme.inputText : '#1A1A1A' }]}
+                    placeholder={tStatic("পণ্যের নাম (যেমন: মিনিকেট চাল)")}
+                    placeholderTextColor={isDark ? currentTheme.inputPlaceholder : '#9CA3AF'}
+                    value={prodName}
+                    onChangeText={setProdName}
+                  />
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TextInput
+                      style={[styles.modalSimpleInput, isDark && tStyles.input, { flex: 1, color: isDark ? currentTheme.inputText : '#1A1A1A' }]}
+                      placeholder={tStatic("একক (কেজি/লিটার/পিস)")}
+                      placeholderTextColor={isDark ? currentTheme.inputPlaceholder : '#9CA3AF'}
+                      value={prodUnit}
+                      onChangeText={setProdUnit}
+                    />
+                    <TextInput
+                      style={[styles.modalSimpleInput, isDark && tStyles.input, { flex: 1, color: isDark ? currentTheme.inputText : '#1A1A1A' }]}
+                      placeholder={tStatic("বর্তমান স্টক")}
+                      placeholderTextColor={isDark ? currentTheme.inputPlaceholder : '#9CA3AF'}
+                      keyboardType="numeric"
+                      value={prodStock}
+                      onChangeText={setProdStock}
+                    />
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TextInput
+                      style={[styles.modalSimpleInput, isDark && tStyles.input, { flex: 1, color: isDark ? currentTheme.inputText : '#1A1A1A' }]}
+                      placeholder={tStatic("ক্রয়মূল্য (৳)")}
+                      placeholderTextColor={isDark ? currentTheme.inputPlaceholder : '#9CA3AF'}
+                      keyboardType="numeric"
+                      value={prodBuyPrice}
+                      onChangeText={setProdBuyPrice}
+                    />
+                    <TextInput
+                      style={[styles.modalSimpleInput, isDark && tStyles.input, { flex: 1, color: isDark ? currentTheme.inputText : '#1A1A1A' }]}
+                      placeholder={tStatic("বিক্রয়মূল্য (৳)")}
+                      placeholderTextColor={isDark ? currentTheme.inputPlaceholder : '#9CA3AF'}
+                      keyboardType="numeric"
+                      value={prodSellPrice}
+                      onChangeText={setProdSellPrice}
+                    />
+                  </View>
+                  <View style={{ marginTop: 6 }}>
+                    <Button3D
+                      title={tStatic("+ পণ্য যোগ করুন")}
+                      variant="success"
+                      onPress={handleSaveProduct}
+                      height={48}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {/* Real-time Search & Filter Controls */}
+              <View style={[styles.stockSearchContainer, isDark && { backgroundColor: currentTheme.inputSurface, borderColor: currentTheme.inputBorder }]}>
+                <Image
+                  source={require('./assets/icons/ic_search.png')}
+                  style={{ width: 18, height: 18, tintColor: isDark ? currentTheme.textSecondary : '#94A3B8' }}
+                  resizeMode="contain"
+                />
+                <TextInput
+                  style={[styles.stockSearchInput, isDark && { color: currentTheme.inputText }]}
+                  placeholder={tStatic("পণ্য খুঁজুন...")}
+                  placeholderTextColor={isDark ? currentTheme.inputPlaceholder : '#94A3B8'}
+                  value={stockSearchQuery}
+                  onChangeText={setStockSearchQuery}
+                />
+                {stockSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setStockSearchQuery('')} hitSlop={STANDARD_TOUCH_HIT_SLOP} style={{ padding: 4 }}>
+                    <Image
+                      source={require('./assets/icons/ic_close.png')}
+                      style={{ width: 14, height: 14, tintColor: isDark ? currentTheme.textSecondary : '#94A3B8' }}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Status Filter Chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stockFilterScroll}>
+                <TouchableOpacity
+                  style={[
+                    styles.stockFilterChip,
+                    isDark && tStyles.stockFilterChip,
+                    stockFilterStatus === 'all' && (isDark ? tStyles.stockFilterChipActive : styles.stockFilterChipActive),
+                  ]}
+                  onPress={() => setStockFilterStatus('all')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.stockFilterChipText,
+                    isDark && tStyles.stockFilterChipText,
+                    stockFilterStatus === 'all' && (isDark ? tStyles.stockFilterChipTextActive : styles.stockFilterChipTextActive),
+                  ]}>
+                    {tStatic("সব পণ্য")} ({businessInventory.length})
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.stockFilterChip,
+                    isDark && tStyles.stockFilterChip,
+                    stockFilterStatus === 'low_stock' && (isDark ? tStyles.stockFilterChipActive : styles.stockFilterChipActive),
+                  ]}
+                  onPress={() => setStockFilterStatus('low_stock')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.stockFilterChipText,
+                    isDark && tStyles.stockFilterChipText,
+                    stockFilterStatus === 'low_stock' && (isDark ? tStyles.stockFilterChipTextActive : styles.stockFilterChipTextActive),
+                  ]}>
+                    {tStatic("স্বল্প স্টক")} ({lowStockCount})
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.stockFilterChip,
+                    isDark && tStyles.stockFilterChip,
+                    stockFilterStatus === 'out_of_stock' && (isDark ? tStyles.stockFilterChipActive : styles.stockFilterChipActive),
+                  ]}
+                  onPress={() => setStockFilterStatus('out_of_stock')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.stockFilterChipText,
+                    isDark && tStyles.stockFilterChipText,
+                    stockFilterStatus === 'out_of_stock' && (isDark ? tStyles.stockFilterChipTextActive : styles.stockFilterChipTextActive),
+                  ]}>
+                    {tStatic("স্টক শেষ")} ({outOfStockCount})
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.stockFilterChip,
+                    isDark && tStyles.stockFilterChip,
+                    stockFilterStatus === 'in_stock' && (isDark ? tStyles.stockFilterChipActive : styles.stockFilterChipActive),
+                  ]}
+                  onPress={() => setStockFilterStatus('in_stock')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.stockFilterChipText,
+                    isDark && tStyles.stockFilterChipText,
+                    stockFilterStatus === 'in_stock' && (isDark ? tStyles.stockFilterChipTextActive : styles.stockFilterChipTextActive),
+                  ]}>
+                    {tStatic("পর্যাপ্ত স্টক")} ({inStockCount})
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+
+              {/* Product List Section */}
+              <Text style={[styles.sectionHeading, isDark && tStyles.textPrimary, { marginTop: 4, marginBottom: 8 }]}>
+                {tStatic("বিদ্যমান পণ্যসমূহ (")}{filteredInventory.length}{tStatic(")")}
+              </Text>
+
+              {filteredInventory.length === 0 ? (
+                <View style={[
+                  styles.stockItemRow,
+                  isDark && tStyles.stockItemRow,
+                  { padding: 20, alignItems: 'center', justifyContent: 'center' }
+                ]}>
+                  <Text style={[{ fontSize: 13, color: isDark ? currentTheme.textSecondary : '#6B7280' }]}>
+                    {tStatic("কোনো পণ্য পাওয়া যায়নি")}
+                  </Text>
+                </View>
+              ) : (
+                filteredInventory.map((item) => {
+                  const qty = Number(item.stock) || 0;
+                  const isOut = qty <= 0;
+                  const isLow = qty > 0 && qty <= 5;
+                  return (
+                    <View key={item.id} style={[styles.stockItemRow, isDark && tStyles.stockItemRow]}>
+                      {/* Left Avatar Squircle Icon */}
+                      <View style={{ marginRight: 10 }}>
+                        <AppIcon
+                          source={require('./assets/icons/ic_menu_stock.png')}
+                          variant={isOut ? "danger" : isLow ? "warning" : "success"}
+                          size={18}
+                          containerSize={38}
+                          shape="squircle"
+                        />
+                      </View>
+
+                      {/* Middle Details */}
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.stockItemName, isDark && tStyles.stockItemName]}>{item.name}</Text>
+                        <Text style={[styles.stockItemSub, isDark && tStyles.stockItemSub]}>
+                          {tStatic("ক্রয়: ৳ ")}{formatMoney(item.buyPrice)}{tStatic(" • বিক্রয়: ৳ ")}{formatMoney(item.sellPrice)} / {item.unit}
+                        </Text>
+                        <View style={[
+                          styles.stockStatusBadge,
+                          isOut ? (isDark ? { backgroundColor: '#7F1D1D', borderColor: '#991B1B' } : { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }) :
+                          isLow ? (isDark ? { backgroundColor: '#713F12', borderColor: '#92400E' } : { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }) :
+                          (isDark ? { backgroundColor: '#064E3B', borderColor: '#065F46' } : { backgroundColor: '#DCFCE7', borderColor: '#BBF7D0' })
+                        ]}>
+                          <Text style={[
+                            styles.stockStatusBadgeText,
+                            isOut ? { color: isDark ? '#F87171' : '#DC2626' } :
+                            isLow ? { color: isDark ? '#FBBF24' : '#B45309' } :
+                            { color: isDark ? '#34D399' : '#047857' }
+                          ]}>
+                            {isOut ? tStatic("স্টক শেষ") : isLow ? tStatic("স্বল্প স্টক") : tStatic("পর্যাপ্ত স্টক")}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Right Stock & Actions */}
+                      <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                        <Text style={[
+                          styles.stockQtyText,
+                          isOut ? { color: isDark ? '#F87171' : '#DC2626' } :
+                          isLow ? { color: isDark ? '#FBBF24' : '#B45309' } :
+                          { color: isDark ? '#34D399' : '#047857' }
+                        ]}>
+                          {item.stock} {item.unit}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                          <TouchableOpacity
+                            style={[styles.stockAdjustMiniBtn, isDark && tStyles.stockAdjustMiniBtnIn]}
+                            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                            onPress={() => {
+                              setSelectedProduct(item);
+                              setStockAdjustType('in');
+                              setModalAdjustStock(true);
+                            }}
+                          >
+                            <Text style={[styles.stockAdjustMiniBtnText, isDark && { color: currentTheme.stockIn }]}>{tStatic("+ ইন")}</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.stockAdjustMiniBtn, isDark ? tStyles.stockAdjustMiniBtnOut : { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}
+                            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                            onPress={() => {
+                              setSelectedProduct(item);
+                              setStockAdjustType('out');
+                              setModalAdjustStock(true);
+                            }}
+                          >
+                            <Text style={[styles.stockAdjustMiniBtnText, { color: isDark ? '#F87171' : '#DC2626' }]}>{tStatic("- আউট")}</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={() => handleDeleteProduct(item.id)}
+                            style={{ padding: 8 }}
+                            hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                          >
+                            <Image
+                              source={require('./assets/icons/ic_delete.png')}
+                              style={{ width: 16, height: 16, tintColor: isDark ? currentTheme.textSecondary : '#9CA3AF' }}
+                              resizeMode="contain"
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                </View>
-              ))}
+                  );
+                })
+              )}
             </ScrollView>
           </View>
         </View>
       </Modal>
 
       {/* ===================================================================
-          MODAL: ADJUST PRODUCT STOCK
+          MODAL: ADJUST PRODUCT STOCK (SCR-22)
          =================================================================== */}
       <Modal visible={modalAdjustStock} animationType="fade" transparent onRequestClose={() => setModalAdjustStock(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalCardTitle}>
-              {selectedProduct ? selectedProduct.name + tStatic(" - স্টক সমন্বয়") : tStatic("স্টক সমন্বয়")}
-            </Text>
-            <View style={styles.accTypeToggleRow}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { padding: 18, borderRadius: 16 }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>
+                {selectedProduct ? selectedProduct.name + tStatic(" - স্টক সমন্বয়") : tStatic("স্টক সমন্বয়")}
+              </Text>
               <TouchableOpacity
-                style={[styles.accTypeToggleBtn, stockAdjustType === 'in' && styles.accTypeToggleBtnActiveGreen]}
-                onPress={() => setStockAdjustType('in')}
+                onPress={() => setModalAdjustStock(false)}
+                style={[styles.modalCloseCircle, isDark && { backgroundColor: currentTheme.surfaceVariant }]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.accTypeToggleText, stockAdjustType === 'in' && { color: COLORS.white }]}>{tStatic("+ নতুন স্টক এলো                   + নতুন স্টক এলো")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.accTypeToggleBtn, stockAdjustType === 'out' && styles.accTypeToggleBtnActiveRed]}
-                onPress={() => setStockAdjustType('out')}
-              >
-                <Text style={[styles.accTypeToggleText, stockAdjustType === 'out' && { color: COLORS.white }]}>{tStatic("- স্টক কমেছে / নষ্ট                   - স্টক কমেছে / নষ্ট")}</Text>
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && { tintColor: currentTheme.textSecondary }]}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </View>
+
+            {/* Current Stock Indicator Banner */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isDark ? currentTheme.surfaceVariant : '#F1F5F9',
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              borderRadius: 10,
+              marginVertical: 12,
+            }}>
+              <Text style={[{ fontSize: 13, fontWeight: '600' }, isDark && tStyles.textSecondary]}>
+                {tStatic("বর্তমান স্টক:")}{' '}
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: currentTheme.primary }}>
+                {selectedProduct ? selectedProduct.stock + ' ' + selectedProduct.unit : '০'}
+              </Text>
+            </View>
+
+            {/* High-Contrast Segmented Switch */}
+            <View style={[styles.accTypeToggleRow, { marginBottom: 14 }]}>
+              <TouchableOpacity
+                style={[
+                  styles.accTypeToggleBtn,
+                  isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder },
+                  stockAdjustType === 'in' && (isDark ? { backgroundColor: '#064E3B', borderColor: '#10B981' } : styles.accTypeToggleBtnActiveGreen),
+                ]}
+                onPress={() => setStockAdjustType('in')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.accTypeToggleText, stockAdjustType === 'in' && { color: COLORS.white }]}>
+                  {tStatic("+ নতুন স্টক এলো")}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.accTypeToggleBtn,
+                  isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder },
+                  stockAdjustType === 'out' && (isDark ? { backgroundColor: '#7F1D1D', borderColor: '#EF4444' } : styles.accTypeToggleBtnActiveRed),
+                ]}
+                onPress={() => setStockAdjustType('out')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.accTypeToggleText, stockAdjustType === 'out' && { color: COLORS.white }]}>
+                  {tStatic("- স্টক কমেছে / নষ্ট")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             <TextInput
-              style={styles.modalBigInput}
+              style={[styles.modalBigInput, isDark && tStyles.input, { color: isDark ? currentTheme.inputText : '#1A1A1A' }]}
               placeholder={tStatic("পরিমাণ")}
+              placeholderTextColor={isDark ? currentTheme.inputPlaceholder : '#9CA3AF'}
               keyboardType="numeric"
               autoFocus
               value={stockAdjustQty}
               onChangeText={setStockAdjustQty}
             />
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalAdjustStock(false)}>
-                <Text style={styles.modalBtnCancelText}>{tStatic("বাতিল")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtnSubmit, { backgroundColor: COLORS.primary }]}
-                onPress={handleAdjustStock}
-              >
-                <Text style={styles.modalBtnSubmitText}>{tStatic("আপডেট করুন")}</Text>
-              </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Button3D
+                  title={tStatic("বাতিল")}
+                  variant="secondary"
+                  onPress={() => setModalAdjustStock(false)}
+                  height={48}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button3D
+                  title={stockAdjustType === 'in' ? tStatic("স্টক বৃদ্ধি (+ ইন)") : tStatic("স্টক হ্রাস (- আউট)")}
+                  variant={stockAdjustType === 'in' ? "success" : "destructive"}
+                  onPress={handleAdjustStock}
+                  height={48}
+                />
+              </View>
             </View>
           </View>
         </View>
@@ -15583,8 +15890,29 @@ const styles = StyleSheet.create({
   // --- STOCK & INVENTORY ---
   stockSummaryRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     marginBottom: 12,
+  },
+  stockMetricCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 3,
+    borderBottomColor: '#CBD5E1',
+  },
+  stockMetricLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  stockMetricVal: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
   },
   stockSummaryBox: {
     flex: 1,
@@ -15604,42 +15932,105 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1A1A1A',
   },
+  stockSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 10,
+    height: 42,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  stockSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1E293B',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  stockFilterScroll: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 12,
+    paddingVertical: 2,
+  },
+  stockFilterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  stockFilterChipActive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#B81414',
+  },
+  stockFilterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  stockFilterChipTextActive: {
+    color: '#B81414',
+    fontWeight: '700',
+  },
+  stockStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  stockStatusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
   stockItemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderBottomWidth: 2,
+    borderBottomColor: '#E2E8F0',
+    marginBottom: 8,
   },
   stockItemName: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#1A1A1A',
   },
   stockItemSub: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
   },
   stockQtyText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#B81414',
   },
   stockAdjustMiniBtn: {
     backgroundColor: '#F3F4F6',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginLeft: 6,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   stockAdjustMiniBtnText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#374151',
   },
-
   // --- BUSINESS NOTES & CHECKLIST ---
   noteItemRow: {
     flexDirection: 'row',

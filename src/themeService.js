@@ -55,6 +55,12 @@ const LIGHT_THEME = {
   savings: '#0D9488',
   profit: '#047857',
   loss: '#DC2626',
+  stockIn: '#047857',
+  stockInContainer: '#DCFCE7',
+  stockOut: '#DC2626',
+  stockOutContainer: '#FEE2E2',
+  stockLow: '#D97706',
+  stockLowContainer: '#FEF3C7',
   subtleTint: 0.08,
   selectedOverlay: 0.12,
   scrim: 0.5,
@@ -129,6 +135,12 @@ const DARK_THEME = {
   savings: '#2DD4BF',
   profit: '#34D399',
   loss: '#F87171',
+  stockIn: '#10B981',
+  stockInContainer: '#064E3B',
+  stockOut: '#EF4444',
+  stockOutContainer: '#7F1D1D',
+  stockLow: '#F59E0B',
+  stockLowContainer: '#713F12',
   subtleTint: 0.08,
   selectedOverlay: 0.12,
   scrim: 0.5,
@@ -624,6 +636,68 @@ function getThemedStyles(theme, isDark) {
     },
     activeBizBadgeText: {
       color: dark ? '#6EE7B7' : '#047857',
+    },
+    // --- INVENTORY & STOCK THEMED STYLES (PHASE 7) ---
+    stockMetricCard: {
+      backgroundColor: dark ? '#1E293B' : '#FFFFFF',
+      borderColor: dark ? '#334155' : '#E2E8F0',
+      borderBottomColor: dark ? '#0F172A' : '#CBD5E1',
+    },
+    stockItemRow: {
+      backgroundColor: dark ? '#1E293B' : '#FFFFFF',
+      borderColor: dark ? '#334155' : '#E2E8F0',
+      borderBottomColor: dark ? '#0F172A' : '#F1F5F9',
+    },
+    stockItemName: {
+      color: t.textPrimary,
+    },
+    stockItemSub: {
+      color: t.textSecondary,
+    },
+    stockFilterChip: {
+      backgroundColor: dark ? '#1E293B' : '#F1F5F9',
+      borderColor: dark ? '#334155' : '#E2E8F0',
+    },
+    stockFilterChipActive: {
+      backgroundColor: dark ? '#3F1212' : '#FEF2F2',
+      borderColor: t.primary,
+    },
+    stockFilterChipText: {
+      color: t.textSecondary,
+    },
+    stockFilterChipTextActive: {
+      color: t.primary,
+    },
+    stockBadgeLow: {
+      backgroundColor: dark ? '#713F12' : '#FEF3C7',
+      borderColor: dark ? '#92400E' : '#FDE68A',
+      color: dark ? '#FBBF24' : '#B45309',
+    },
+    stockBadgeZero: {
+      backgroundColor: dark ? '#7F1D1D' : '#FEE2E2',
+      borderColor: dark ? '#991B1B' : '#FECACA',
+      color: dark ? '#F87171' : '#DC2626',
+    },
+    stockBadgeOk: {
+      backgroundColor: dark ? '#064E3B' : '#DCFCE7',
+      borderColor: dark ? '#065F46' : '#BBF7D0',
+      color: dark ? '#34D399' : '#047857',
+    },
+    stockAdjustToggleIn: {
+      backgroundColor: dark ? '#064E3B' : '#DCFCE7',
+      borderColor: dark ? '#047857' : '#86EFAC',
+    },
+    stockAdjustToggleOut: {
+      backgroundColor: dark ? '#7F1D1D' : '#FEE2E2',
+      borderColor: dark ? '#DC2626' : '#FECACA',
+    },
+    stockAdjustMiniBtnIn: {
+      backgroundColor: dark ? '#065F46' : '#10B981',
+      borderColor: dark ? '#047857' : '#059669',
+    },
+    stockAdjustMiniBtnOut: {
+      backgroundColor: dark ? '#991B1B' : '#EF4444',
+      borderColor: dark ? '#7F1D1D' : '#DC2626',
     },
   };
 }
