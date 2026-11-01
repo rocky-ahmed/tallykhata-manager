@@ -268,10 +268,18 @@ function calculateNetWorth(accountsOrState) {
     : null;
 
   if (state && _netWorthCache.has(state)) {
-    return _netWorthCache.get(state);
+    const entry = _netWorthCache.get(state);
+    const accLen = Array.isArray(state.accounts) ? state.accounts.length : 0;
+    const goalLen = Array.isArray(state.goals) ? state.goals.length : 0;
+    if (entry && entry.__accLen === accLen && entry.__goalLen === goalLen) {
+      return entry.result;
+    }
   }
   if (Array.isArray(accountsOrState) && _netWorthCache.has(accountsOrState)) {
-    return _netWorthCache.get(accountsOrState);
+    const entry = _netWorthCache.get(accountsOrState);
+    if (entry && entry.__len === accountsOrState.length) {
+      return entry.result;
+    }
   }
 
   const accounts = Array.isArray(accountsOrState)
@@ -293,9 +301,11 @@ function calculateNetWorth(accountsOrState) {
   const result = roundCurrency(accountNetWorth + allocatedGoalFunds);
 
   if (state) {
-    _netWorthCache.set(state, result);
+    const accLen = Array.isArray(state.accounts) ? state.accounts.length : 0;
+    const goalLen = Array.isArray(state.goals) ? state.goals.length : 0;
+    _netWorthCache.set(state, { result, __accLen: accLen, __goalLen: goalLen });
   } else if (Array.isArray(accountsOrState)) {
-    _netWorthCache.set(accountsOrState, result);
+    _netWorthCache.set(accountsOrState, { result, __len: accountsOrState.length });
   }
   return result;
 }
@@ -525,7 +535,10 @@ function calculateCashFlow(transactions, period, customRange = null) {
   const cacheKey = `${period || "all"}:${customKey}`;
   let txnCache = _cashFlowCache.get(transactions);
   if (txnCache && txnCache.has(cacheKey)) {
-    return txnCache.get(cacheKey);
+    const entry = txnCache.get(cacheKey);
+    if (entry && entry.__len === transactions.length) {
+      return entry.result;
+    }
   }
 
   let totalIncome = 0;
@@ -551,7 +564,7 @@ function calculateCashFlow(transactions, period, customRange = null) {
     txnCache = new Map();
     _cashFlowCache.set(transactions, txnCache);
   }
-  txnCache.set(cacheKey, result);
+  txnCache.set(cacheKey, { result, __len: transactions.length });
   return result;
 }
 
@@ -588,7 +601,12 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
   if (sourceState) {
     let stateCache = _categoryBudgetsCache.get(sourceState);
     if (stateCache && stateCache.has(periodKey)) {
-      return stateCache.get(periodKey);
+      const entry = stateCache.get(periodKey);
+      const catLen = Array.isArray(sourceState.categories) ? sourceState.categories.length : 0;
+      const txnLen = Array.isArray(sourceState.transactions) ? sourceState.transactions.length : 0;
+      if (entry && entry.__catLen === catLen && entry.__txnLen === txnLen) {
+        return entry.result;
+      }
     }
   }
 
@@ -636,7 +654,9 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
       stateCache = new Map();
       _categoryBudgetsCache.set(sourceState, stateCache);
     }
-    stateCache.set(periodKey, result);
+    const catLen = Array.isArray(sourceState.categories) ? sourceState.categories.length : 0;
+    const txnLen = Array.isArray(sourceState.transactions) ? sourceState.transactions.length : 0;
+    stateCache.set(periodKey, { result, __catLen: catLen, __txnLen: txnLen });
   }
 
   return result;
@@ -673,7 +693,12 @@ function calculateCategoryDistribution(arg1, arg2, arg3, arg4) {
   if (sourceState) {
     let stateCache = _categoryDistCache.get(sourceState);
     if (stateCache && stateCache.has(periodKey)) {
-      return stateCache.get(periodKey);
+      const entry = stateCache.get(periodKey);
+      const catLen = Array.isArray(sourceState.categories) ? sourceState.categories.length : 0;
+      const txnLen = Array.isArray(sourceState.transactions) ? sourceState.transactions.length : 0;
+      if (entry && entry.__catLen === catLen && entry.__txnLen === txnLen) {
+        return entry.result;
+      }
     }
   }
 
@@ -706,7 +731,9 @@ function calculateCategoryDistribution(arg1, arg2, arg3, arg4) {
       stateCache = new Map();
       _categoryDistCache.set(sourceState, stateCache);
     }
-    stateCache.set(periodKey, res);
+    const catLen = Array.isArray(sourceState.categories) ? sourceState.categories.length : 0;
+    const txnLen = Array.isArray(sourceState.transactions) ? sourceState.transactions.length : 0;
+    stateCache.set(periodKey, { result: res, __catLen: catLen, __txnLen: txnLen });
   }
 
   return res;
@@ -831,7 +858,13 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
   if (state && typeof state === "object") {
     let stateCache = _periodMetricsCache.get(state);
     if (stateCache && stateCache.has(periodKey)) {
-      return stateCache.get(periodKey);
+      const entry = stateCache.get(periodKey);
+      const txnLen = Array.isArray(state.transactions) ? state.transactions.length : 0;
+      const catLen = Array.isArray(state.categories) ? state.categories.length : 0;
+      const accLen = Array.isArray(state.accounts) ? state.accounts.length : 0;
+      if (entry && entry.__txnLen === txnLen && entry.__catLen === catLen && entry.__accLen === accLen) {
+        return entry.result;
+      }
     }
   }
 
@@ -907,7 +940,10 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
       stateCache = new Map();
       _periodMetricsCache.set(state, stateCache);
     }
-    stateCache.set(periodKey, result);
+    const txnLen = Array.isArray(state.transactions) ? state.transactions.length : 0;
+    const catLen = Array.isArray(state.categories) ? state.categories.length : 0;
+    const accLen = Array.isArray(state.accounts) ? state.accounts.length : 0;
+    stateCache.set(periodKey, { result, __txnLen: txnLen, __catLen: catLen, __accLen: accLen });
   }
 
   return result;

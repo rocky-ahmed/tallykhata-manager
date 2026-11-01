@@ -547,7 +547,10 @@ function calculateAggregateMetrics(accounts = [], journals = [], businessId = nu
     let bizCache = _aggregateMetricsCache.get(accounts);
     const key = String(businessId || 'all');
     if (bizCache && bizCache.has(key)) {
-      return bizCache.get(key);
+      const entry = bizCache.get(key);
+      if (entry && entry.__len === accounts.length) {
+        return entry.result;
+      }
     }
   }
 
@@ -586,7 +589,7 @@ function calculateAggregateMetrics(accounts = [], journals = [], businessId = nu
       bizCache = new Map();
       _aggregateMetricsCache.set(accounts, bizCache);
     }
-    bizCache.set(String(businessId || 'all'), result);
+    bizCache.set(String(businessId || 'all'), { result, __len: accounts.length });
   }
 
   return result;
@@ -597,7 +600,10 @@ function deriveCashBoxSummary(cashEntries = [], businessId = null) {
     let bizCache = _cashboxSummaryCache.get(cashEntries);
     const key = String(businessId || 'all');
     if (bizCache && bizCache.has(key)) {
-      return bizCache.get(key);
+      const entry = bizCache.get(key);
+      if (entry && entry.__len === cashEntries.length) {
+        return entry.result;
+      }
     }
   }
 
@@ -635,7 +641,7 @@ function deriveCashBoxSummary(cashEntries = [], businessId = null) {
       bizCache = new Map();
       _cashboxSummaryCache.set(cashEntries, bizCache);
     }
-    bizCache.set(String(businessId || 'all'), result);
+    bizCache.set(String(businessId || 'all'), { result, __len: cashEntries.length });
   }
 
   return result;

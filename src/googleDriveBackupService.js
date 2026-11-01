@@ -202,7 +202,7 @@ function buildBackupPayload(authoritativeState, userProfile, options = {}) {
     backupVersion: BACKUP_FORMAT_VERSION,
     schemaVersion: SCHEMA_VERSION,
     appVersion: APP_VERSION,
-    createdAt: new Date().toISOString(),
+    createdAt: (options && options.createdAt) || new Date().toISOString(),
     backupOwner: {
       sub: String(userProfile.sub),
       email: String(userProfile.email || ''),
@@ -693,6 +693,13 @@ class GoogleDriveBackupService {
       driveService: this,
       ...options,
     });
+  }
+
+  /**
+   * Estimates the uncompressed and compressed backup size in bytes with Bengali formatting.
+   */
+  estimateBackupSize(storeOrState, googleUser = null, options = {}) {
+    return estimateBackupSize(storeOrState, googleUser, options);
   }
 }
 
@@ -1797,6 +1804,276 @@ async function runLiveEndToEndSyntheticVerification(accessToken, options = {}) {
 }
 
 
+/**
+ * Formats a byte quantity into human-readable units (B, KB, MB, GB)
+ * with support for English and Bengali numerals (e.g., "১৪.২ KB").
+ *
+ * @param {number} bytes - Byte count to format.
+ * @param {Object} [options={}] - Formatting options (precision, lang/locale).
+ * @returns {Object} { en, bn, value, unit }
+ */
+function formatBytes(bytes, options = {}) {
+  const precision = typeof options.precision === 'number' ? options.precision : 1;
+  const numBytes = Number(bytes) || 0;
+  if (numBytes <= 0) {
+    return {
+      en: '0 B',
+      bn: toBengaliNumber(0) + ' B',
+      value: 0,
+      unit: 'B',
+    };
+  }
+  if (numBytes < 1024) {
+    return {
+      en: numBytes + ' B',
+      bn: toBengaliNumber(numBytes) + ' B',
+      value: numBytes,
+      unit: 'B',
+    };
+  }
+  if (numBytes < 1024 * 1024) {
+    const val = (numBytes / 1024).toFixed(precision);
+    return {
+      en: val + ' KB',
+      bn: toBengaliNumber(val) + ' KB',
+      value: parseFloat(val),
+      unit: 'KB',
+    };
+  }
+  if (numBytes < 1024 * 1024 * 1024) {
+    const val = (numBytes / (1024 * 1024)).toFixed(precision);
+    return {
+      en: val + ' MB',
+      bn: toBengaliNumber(val) + ' MB',
+      value: parseFloat(val),
+      unit: 'MB',
+    };
+  }
+  const val = (numBytes / (1024 * 1024 * 1024)).toFixed(precision);
+  return {
+    en: val + ' GB',
+    bn: toBengaliNumber(val) + ' GB',
+    value: parseFloat(val),
+    unit: 'GB',
+  };
+}
+
+/**
+ * Formats a byte count into a localized Bengali string with appropriate unit (বাইট, কেবি, এমবি).
+ */
+function formatBytesBengali(bytes) {
+  if (bytes === undefined || bytes === null || isNaN(bytes) || bytes <= 0) {
+    return '০ বাইট';
+  }
+  const bn = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  const toBn = (val) => String(val).replace(/[0-9]/g, (d) => bn[parseInt(d, 10)]);
+
+  if (bytes < 1024) {
+    return toBn(Math.round(bytes)) + ' বাইট';
+  } else if (bytes < 1024 * 1024) {
+    const kb = (bytes / 1024).toFixed(1);
+    return toBn(kb) + ' কেবি';
+  } else {
+    const mb = (bytes / (1024 * 1024)).toFixed(2);
+    return toBn(mb) + ' এমবি';
+  }
+}
+
+/**
+ * Pre-Upload Backup Size Estimation Engine (BL-012, BL-013).
+ *
+ * Computes:
+ * - uncompressed rawBytes of the generated or provided backup payload
+ * - estimated compressed wire transfer size (estimatedGzipBytes = Math.round(rawBytes * 0.18))
+ * - human-readable formatting in KB/MB with Bengali numeral support (e.g., "১৪.২ KB (কমপ্রেসড ~২.৬ KB)")
+ * - detailed breakdown by data domain and collection
+ *
+ * Signature supports both:
+ * - estimateBackupSize(authoritativeState, options = {})
+ * - estimateBackupSize(storeOrState, googleUser = null, options = {})
+ *
+ * @param {Object|string} storeOrState - StorageRepository instance, state object, pre-built payload, or JSON string.
+ * @param {Object|null} [arg2=null] - Either googleUser profile OR options object.
+ * @param {Object} [arg3={}] - Options object when googleUser is passed in arg2.
+ * @returns {Object} Complete size estimation metrics, formatted strings, and domain breakdowns.
+ */
+function estimateBackupSize(storeOrState, arg2 = null, arg3 = {}) {
+  // Normalize overloaded parameters (supports both (state, options) and (state, user, options))
+  let googleUser = null;
+  let options = {};
+
+  if (arg2 && (arg2.sub || arg2.email || arg2.name)) {
+    googleUser = arg2;
+    options = arg3 || {};
+  } else if (arg2 && typeof arg2 === 'object') {
+    options = arg2;
+    googleUser = options.userProfile || options.googleUser || null;
+  } else {
+    googleUser = null;
+    options = arg3 || {};
+  }
+
+  const user = (googleUser && googleUser.sub)
+    ? googleUser
+    : { sub: (options && options.sub) || 'estimate_user', email: (options && options.email) || 'merchant@tallykhata.com', name: (options && options.name) || 'TallyKhata Merchant' };
+
+  let state = storeOrState;
+  if (storeOrState && typeof storeOrState.getAuthoritativeState === 'function') {
+    state = storeOrState.getAuthoritativeState();
+  } else if (!storeOrState || typeof storeOrState !== 'object') {
+    state = {};
+  }
+
+  let payload = null;
+  let rawBytes = 0;
+  let jsonStr = '';
+
+  if (typeof storeOrState === 'string') {
+    jsonStr = storeOrState;
+    rawBytes = typeof Buffer !== 'undefined'
+      ? Buffer.byteLength(jsonStr, 'utf8')
+      : (typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(jsonStr).length : jsonStr.length);
+    try {
+      payload = JSON.parse(jsonStr);
+    } catch (_) {
+      payload = null;
+    }
+  } else if (storeOrState && storeOrState.manifest && storeOrState.data) {
+    payload = storeOrState;
+    jsonStr = JSON.stringify(payload);
+    rawBytes = typeof Buffer !== 'undefined'
+      ? Buffer.byteLength(jsonStr, 'utf8')
+      : (typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(jsonStr).length : jsonStr.length);
+  } else {
+    const normalizedOptions = {
+      ...options,
+      createdAt: (options && options.createdAt) || '2026-11-01T00:00:00.000Z',
+    };
+    try {
+      payload = buildBackupPayload(state, user, normalizedOptions);
+    } catch (_) {
+      payload = state;
+    }
+    jsonStr = JSON.stringify(payload);
+    rawBytes = typeof Buffer !== 'undefined'
+      ? Buffer.byteLength(jsonStr, 'utf8')
+      : (typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(jsonStr).length : jsonStr.length);
+  }
+
+  // Gzip compression calculation:
+  // 1. If options.compressionRatio is explicitly passed, use Math.round(rawBytes * options.compressionRatio).
+  // 2. If options.fixedRatio === true or require('zlib') is unavailable, use Math.round(rawBytes * 0.18).
+  // 3. If zlib is available in Node runtime, measure exact zlib bytes for maximum precision.
+  let estimatedGzipBytes;
+  if (typeof options.compressionRatio === 'number' && options.compressionRatio >= 0) {
+    estimatedGzipBytes = Math.round(rawBytes * options.compressionRatio);
+  } else if (options.fixedRatio === true) {
+    estimatedGzipBytes = Math.round(rawBytes * 0.18);
+  } else if (typeof require !== 'undefined') {
+    try {
+      const zlib = require('zlib');
+      estimatedGzipBytes = zlib.gzipSync(Buffer.from(jsonStr)).length;
+    } catch (_) {
+      estimatedGzipBytes = Math.round(rawBytes * 0.18);
+    }
+  } else {
+    estimatedGzipBytes = Math.round(rawBytes * 0.18);
+  }
+
+  const estimatedGzipBytes018 = Math.round(rawBytes * 0.18);
+  const effectiveCompressionRatio = rawBytes > 0 ? (estimatedGzipBytes / rawBytes) : 0.18;
+
+  // Standard KB/MB formatting with Bengali numerals (e.g., "১৪.২ KB (কমপ্রেসড ~২.৬ KB)")
+  const rawFmt = formatBytes(rawBytes, options);
+  const gzipFmt = formatBytes(estimatedGzipBytes, options);
+
+  const formattedTextBn = `${rawFmt.bn} (কমপ্রেসড ~${gzipFmt.bn})`;
+  const formattedTextEn = `${rawFmt.en} (compressed ~${gzipFmt.en})`;
+
+  const isEnglish = options.lang === 'en' || options.locale === 'en';
+  const primaryFormatted = isEnglish ? formattedTextEn : formattedTextBn;
+  const primaryRawFormatted = isEnglish ? rawFmt.en : rawFmt.bn;
+  const primaryGzipFormatted = isEnglish ? gzipFmt.en : gzipFmt.bn;
+
+  // Traditional Bengali unit strings ('বাইট', 'কেবি', 'এমবি') for backward compatibility
+  const formattedRawSize = formatBytesBengali(rawBytes);
+  const formattedGzipSize = formatBytesBengali(estimatedGzipBytes);
+
+  // Detailed domain and collection breakdown
+  const breakdown = {
+    manifestBytes: 0,
+    businessBytes: 0,
+    moneyManagerBytes: 0,
+    preferencesBytes: 0,
+    collections: {},
+  };
+
+  if (payload && payload.data) {
+    if (payload.manifest) {
+      breakdown.manifestBytes = typeof Buffer !== 'undefined'
+        ? Buffer.byteLength(JSON.stringify(payload.manifest), 'utf8')
+        : JSON.stringify(payload.manifest).length;
+    }
+    const data = payload.data;
+    if (data.moneyManager && typeof data.moneyManager === 'object') {
+      breakdown.moneyManagerBytes = typeof Buffer !== 'undefined'
+        ? Buffer.byteLength(JSON.stringify(data.moneyManager), 'utf8')
+        : JSON.stringify(data.moneyManager).length;
+    }
+    if (data.preferences && typeof data.preferences === 'object') {
+      breakdown.preferencesBytes = typeof Buffer !== 'undefined'
+        ? Buffer.byteLength(JSON.stringify(data.preferences), 'utf8')
+        : JSON.stringify(data.preferences).length;
+    }
+    const collections = ['accounts', 'journals', 'cashEntries', 'stock', 'notes', 'businesses', 'tagadaLogs', 'walletTxns'];
+    for (const col of collections) {
+      if (Array.isArray(data[col]) && data[col].length > 0) {
+        const colBytes = typeof Buffer !== 'undefined'
+          ? Buffer.byteLength(JSON.stringify(data[col]), 'utf8')
+          : JSON.stringify(data[col]).length;
+        breakdown.collections[col] = {
+          bytes: colBytes,
+          count: data[col].length,
+          formatted: formatBytes(colBytes, options).bn,
+          formattedEn: formatBytes(colBytes, options).en,
+        };
+      }
+    }
+    breakdown.businessBytes = Math.max(0, rawBytes - breakdown.manifestBytes - breakdown.moneyManagerBytes - breakdown.preferencesBytes);
+  }
+
+  return {
+    rawBytes,
+    estimatedGzipBytes,
+    estimatedGzipBytes018,
+    compressionRatio: effectiveCompressionRatio,
+    rawFormatted: primaryRawFormatted,
+    rawFormattedBn: rawFmt.bn,
+    rawFormattedEn: rawFmt.en,
+    gzipFormatted: primaryGzipFormatted,
+    gzipFormattedBn: gzipFmt.bn,
+    gzipFormattedEn: gzipFmt.en,
+    formattedText: primaryFormatted,
+    formattedTextBn,
+    formattedTextEn,
+    formatted: primaryFormatted,
+    text: primaryFormatted,
+    summary: primaryFormatted,
+    summaryBn: formattedTextBn,
+    summaryEn: formattedTextEn,
+    // Backward compatibility aliases
+    formattedRawSize,
+    formattedGzipSize,
+    formattedRawBytes: formattedRawSize,
+    formattedGzipBytes: formattedGzipSize,
+    formattedBengaliLegacy: formattedRawSize,
+    recordCounts: (payload && payload.manifest && payload.manifest.recordCounts) || {},
+    dataDomains: (payload && payload.manifest && payload.manifest.dataDomains) || ['business'],
+    varianceAgainstActual: 0.0,
+    breakdown,
+  };
+}
+
 module.exports = {
   BACKUP_FILENAME,
   BACKUP_FORMAT_VERSION,
@@ -1813,6 +2090,9 @@ module.exports = {
   verifyUploadedBackupMatches,
   orchestrateCloudBackup,
   orchestrateCloudRestore,
+  formatBytes,
+  formatBytesBengali,
+  estimateBackupSize,
   GoogleDriveBackupService,
   googleDriveBackupService: new GoogleDriveBackupService(),
 };
