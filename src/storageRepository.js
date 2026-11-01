@@ -46,9 +46,78 @@ const VALID_COLLECTIONS = new Set([
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
 const DEFAULT_BUSINESSES = [
-  { id: '1', name: 'Mobile Xpress', owner: 'স্বত্বাধিকারী', phone: '01700000000', address: 'বাজার রোড, ঢাকা', isSelected: true, isArchived: false, createdAt: '2026-10-15T00:00:00.000Z' },
-  { id: '2', name: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ', owner: 'হাজী মো: করিম', phone: '01811223344', address: 'পাইকারি আড়ৎ, ঢাকা', isSelected: false, isArchived: false, createdAt: '2026-10-15T00:00:00.000Z' },
-  { id: '3', name: 'সোনালী ফ্যাশন ও বস্ত্রালয়', owner: 'আহমেদ উল্লাহ', phone: '01911334455', address: 'নিউ মার্কেট, ঢাকা', isSelected: false, isArchived: false, createdAt: '2026-10-15T00:00:00.000Z' },
+  {
+    id: '1',
+    business_id: 1,
+    name: 'Mobile Xpress',
+    business_name: 'Mobile Xpress',
+    businessName: 'Mobile Xpress',
+    owner: 'স্বত্বাধিকারী',
+    phone: '01700000000',
+    address: 'বাজার রোড, ঢাকা',
+    business_address: 'বাজার রোড, ঢাকা',
+    businessAddress: 'বাজার রোড, ঢাকা',
+    business_type: 'RETAIL',
+    businessType: 'RETAIL',
+    business_age: 0,
+    synced: 0,
+    is_active: 1,
+    is_primary: 1,
+    is_current: 1,
+    isSelected: true,
+    isArchived: false,
+    isPrimary: true,
+    createdAt: '2026-10-15T00:00:00.000Z',
+    create_date: '2026-10-15T00:00:00.000Z',
+  },
+  {
+    id: '2',
+    business_id: 2,
+    name: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ',
+    business_name: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ',
+    businessName: 'মেসার্স ভাই ভাই এন্টারপ্রাইজ',
+    owner: 'হাজী মো: করিম',
+    phone: '01811223344',
+    address: 'পাইকারি আড়ৎ, ঢাকা',
+    business_address: 'পাইকারি আড়ৎ, ঢাকা',
+    businessAddress: 'পাইকারি আড়ৎ, ঢাকা',
+    business_type: 'WHOLESALE',
+    businessType: 'WHOLESALE',
+    business_age: 0,
+    synced: 0,
+    is_active: 1,
+    is_primary: 0,
+    is_current: 0,
+    isSelected: false,
+    isArchived: false,
+    isPrimary: false,
+    createdAt: '2026-10-15T00:00:00.000Z',
+    create_date: '2026-10-15T00:00:00.000Z',
+  },
+  {
+    id: '3',
+    business_id: 3,
+    name: 'সোনালী ফ্যাশন ও বস্ত্রালয়',
+    business_name: 'সোনালী ফ্যাশন ও বস্ত্রালয়',
+    businessName: 'সোনালী ফ্যাশন ও বস্ত্রালয়',
+    owner: 'আহমেদ উল্লাহ',
+    phone: '01911334455',
+    address: 'নিউ মার্কেট, ঢাকা',
+    business_address: 'নিউ মার্কেট, ঢাকা',
+    businessAddress: 'নিউ মার্কেট, ঢাকা',
+    business_type: 'RETAIL',
+    businessType: 'RETAIL',
+    business_age: 0,
+    synced: 0,
+    is_active: 1,
+    is_primary: 0,
+    is_current: 0,
+    isSelected: false,
+    isArchived: false,
+    isPrimary: false,
+    createdAt: '2026-10-15T00:00:00.000Z',
+    create_date: '2026-10-15T00:00:00.000Z',
+  },
 ];
 
 
@@ -734,10 +803,18 @@ class StorageRepository {
         throw new Error('আর্কাইভ করা ব্যবসা সরাসরি নির্বাচন করা যাবে না। প্রথমে এটি পুনরুদ্ধার করুন।');
       }
 
-      const updatedBusinesses = list.map((b) => ({
-        ...b,
-        isSelected: String(b.id) === targetId,
-      }));
+      const nowIso = new Date().toISOString();
+      const updatedBusinesses = list.map((b) => {
+        const isCur = String(b.id) === targetId;
+        return {
+          ...b,
+          isSelected: isCur,
+          is_current: isCur ? 1 : 0,
+          isCurrent: isCur,
+          update_date: isCur ? nowIso : (b.update_date || b.updateDate || null),
+          updateDate: isCur ? nowIso : (b.update_date || b.updateDate || null),
+        };
+      });
 
       return {
         ...prevStore,
@@ -766,15 +843,36 @@ class StorageRepository {
     const newId = bizData.id ? String(bizData.id) : ('biz_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
     const isSelected = bizData.isSelected !== false;
 
+    const nowIso = new Date().toISOString();
+    const bType = String(bizData.business_type || bizData.businessType || bizData.type || 'RETAIL');
     const newBiz = {
       id: newId,
+      business_id: isNaN(Number(newId)) ? newId : Number(newId),
       name,
+      business_name: name,
+      businessName: name,
       owner: String(bizData.owner || '').trim() || 'স্বত্বাধিকারী',
       phone: String(bizData.phone || '').trim() || '01700000000',
       address: String(bizData.address || '').trim() || 'ঢাকা, বাংলাদেশ',
+      business_address: String(bizData.address || '').trim() || 'ঢাকা, বাংলাদেশ',
+      businessAddress: String(bizData.address || '').trim() || 'ঢাকা, বাংলাদেশ',
+      business_type: bType,
+      businessType: bType,
+      business_age: Number(bizData.business_age || bizData.businessAge || 0),
+      businessAge: Number(bizData.business_age || bizData.businessAge || 0),
+      synced: 0,
+      is_active: 1,
+      is_primary: 0,
+      is_current: isSelected ? 1 : 0,
       isSelected,
       isArchived: false,
-      createdAt: bizData.createdAt || new Date().toISOString(),
+      isPrimary: false,
+      createdAt: bizData.createdAt || nowIso,
+      create_date: bizData.create_date || bizData.createDate || bizData.createdAt || nowIso,
+      createDate: bizData.create_date || bizData.createDate || bizData.createdAt || nowIso,
+      update_date: null,
+      updateDate: null,
+      sync_date: null,
     };
 
     return this.mutateStore((prevStore) => {
@@ -784,7 +882,7 @@ class StorageRepository {
       }
 
       const updatedBusinesses = isSelected
-        ? [...list.map((b) => ({ ...b, isSelected: false })), newBiz]
+        ? [...list.map((b) => ({ ...b, isSelected: false, is_current: 0, isCurrent: false })), newBiz]
         : [...list, newBiz];
 
       return {
@@ -832,19 +930,30 @@ class StorageRepository {
       const wasSelected = target.isSelected || String(prevStore.activeBusinessId) === targetId;
       const nextActive = wasSelected ? remainingActive[0] : null;
 
+      const nowIso = new Date().toISOString();
       const updatedBusinesses = list.map((b) => {
         if (String(b.id) === targetId) {
           return {
             ...b,
             isArchived: true,
+            is_active: 0,
+            isActive: false,
             isSelected: false,
-            archivedAt: new Date().toISOString(),
+            is_current: 0,
+            isCurrent: false,
+            archivedAt: nowIso,
+            update_date: nowIso,
+            updateDate: nowIso,
           };
         }
         if (nextActive && String(b.id) === String(nextActive.id)) {
           return {
             ...b,
             isSelected: true,
+            is_current: 1,
+            isCurrent: true,
+            update_date: nowIso,
+            updateDate: nowIso,
           };
         }
         return b;
@@ -869,6 +978,69 @@ class StorageRepository {
   /**
    * Restores an archived business safely.
    */
+
+  /**
+   * Updates business profile attributes with Room DB parity.
+   * Reference Room DB: UPDATE business SET business_name = ?, business_type = ?, synced=0, update_date = ? WHERE id = ?
+   */
+  async updateBusiness(bizId, updateData = {}) {
+    if (!bizId) return { success: false, error: new Error('Business ID is required') };
+    const targetId = String(bizId);
+
+    return this.mutateStore((prevStore) => {
+      const list = Array.isArray(prevStore.businesses) ? prevStore.businesses : DEFAULT_BUSINESSES;
+      const targetIndex = list.findIndex((b) => String(b.id) === targetId);
+      if (targetIndex === -1) {
+        throw new Error('ব্যবসা প্রতিষ্ঠানটি পাওয়া যায়নি: ' + targetId);
+      }
+      const existing = list[targetIndex];
+      const nowIso = new Date().toISOString();
+      const newName = String(updateData.name || updateData.business_name || updateData.businessName || existing.name || '').trim();
+      if (!newName) {
+        throw new Error('ব্যবসার নাম খালি রাখা যাবে না');
+      }
+
+      const updatedBiz = {
+        ...existing,
+        ...updateData,
+        id: targetId,
+        business_id: isNaN(Number(targetId)) ? targetId : Number(targetId),
+        name: newName,
+        business_name: newName,
+        businessName: newName,
+        owner: updateData.owner !== undefined ? String(updateData.owner).trim() : existing.owner,
+        phone: updateData.phone !== undefined ? String(updateData.phone).trim() : existing.phone,
+        address: updateData.address !== undefined ? String(updateData.address).trim() : (updateData.business_address || existing.address),
+        business_address: updateData.address !== undefined ? String(updateData.address).trim() : (updateData.business_address || existing.address),
+        businessAddress: updateData.address !== undefined ? String(updateData.address).trim() : (updateData.business_address || existing.address),
+        business_type: String(updateData.business_type || updateData.businessType || updateData.type || existing.business_type || 'RETAIL'),
+        businessType: String(updateData.business_type || updateData.businessType || updateData.type || existing.business_type || 'RETAIL'),
+        synced: 0,
+        update_date: nowIso,
+        updateDate: nowIso,
+        updatedAt: nowIso,
+      };
+
+      const updatedList = [...list];
+      updatedList[targetIndex] = updatedBiz;
+
+      const isCurrentActive = String(prevStore.activeBusinessId) === targetId;
+
+      return {
+        ...prevStore,
+        businesses: updatedList,
+        ...(isCurrentActive
+          ? {
+              businessName: updatedBiz.name,
+              ownerName: updatedBiz.owner,
+              ownerPhone: updatedBiz.phone,
+              businessAddress: updatedBiz.address,
+            }
+          : {}),
+      };
+    });
+  }
+
   async restoreBusiness(bizId, options = {}) {
     if (!bizId) return { success: false, error: new Error('Business ID is required') };
     const targetId = String(bizId);
@@ -883,18 +1055,30 @@ class StorageRepository {
         return prevStore; // Already active
       }
 
-      const makeActive = Boolean(options.makeActive);
+      const makeActive = Boolean(options.makeActive || options.selectImmediately);
+      const nowIso = new Date().toISOString();
       const updatedBusinesses = list.map((b) => {
         if (String(b.id) === targetId) {
           return {
             ...b,
             isArchived: false,
+            is_active: 1,
+            isActive: true,
             isSelected: makeActive ? true : Boolean(b.isSelected),
-            restoredAt: new Date().toISOString(),
+            is_current: makeActive ? 1 : (b.isSelected ? 1 : 0),
+            isCurrent: makeActive ? true : Boolean(b.isSelected),
+            restoredAt: nowIso,
+            update_date: nowIso,
+            updateDate: nowIso,
           };
         }
         if (makeActive) {
-          return { ...b, isSelected: false };
+          return {
+            ...b,
+            isSelected: false,
+            is_current: 0,
+            isCurrent: false,
+          };
         }
         return b;
       });
@@ -1020,11 +1204,17 @@ class StorageRepository {
         nextActiveId = firstActive ? String(firstActive.id) : '1';
       }
 
-      const updatedBusinesses = remainingBusinesses.map((b) => ({
-        ...b,
-        isSelected: String(b.id) === String(nextActiveId),
-        isActive: !b.isArchived,
-      }));
+      const updatedBusinesses = remainingBusinesses.map((b) => {
+        const isCur = String(b.id) === String(nextActiveId);
+        return {
+          ...b,
+          isSelected: isCur,
+          is_current: isCur ? 1 : 0,
+          isCurrent: isCur,
+          isActive: !b.isArchived,
+          is_active: b.isArchived ? 0 : 1,
+        };
+      });
 
       const activeBiz = updatedBusinesses.find((b) => String(b.id) === String(nextActiveId));
 

@@ -3988,6 +3988,7 @@ function TallyKhataApp() {
 
   // --- BUSINESS PICKER & COMPLETE LIFECYCLE HANDLERS ---
   const handleSelectBusiness = async (biz) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
     setIsSaving(true);
     const res = await storageRepository.selectBusiness(biz.id);
     setIsSaving(false);
@@ -4024,6 +4025,7 @@ function TallyKhataApp() {
       Alert.alert(tStatic("ত্রুটি"), res.error?.message || tStatic("নতুন ব্যবসা তৈরি ব্যর্থ হয়েছে।"));
       return;
     }
+    try { hapticFeedbackService.onTransactionSave(); } catch (e) {}
     const store = res.data;
     if (store.activeBusinessId) setActiveBusinessId(String(store.activeBusinessId));
     if (Array.isArray(store.businesses)) setBusinesses(store.businesses);
@@ -4057,6 +4059,7 @@ function TallyKhataApp() {
               Alert.alert(tStatic("আর্কাইভ ব্যর্থ"), res.error?.message || tStatic("ব্যবসা আর্কাইভ করা সম্ভব হয়নি।"));
               return;
             }
+            try { hapticFeedbackService.selection(); } catch (e) {}
             const store = res.data;
             if (store.activeBusinessId) setActiveBusinessId(String(store.activeBusinessId));
             if (Array.isArray(store.businesses)) setBusinesses(store.businesses);
@@ -4079,6 +4082,7 @@ function TallyKhataApp() {
       Alert.alert(tStatic("পুনরুদ্ধার ব্যর্থ"), res.error?.message || tStatic("ব্যবসা পুনরুদ্ধার করা সম্ভব হয়নি।"));
       return;
     }
+    try { hapticFeedbackService.onTransactionSave(); } catch (e) {}
     const store = res.data;
     if (store.activeBusinessId) setActiveBusinessId(String(store.activeBusinessId));
     if (Array.isArray(store.businesses)) setBusinesses(store.businesses);

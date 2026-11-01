@@ -985,6 +985,71 @@ function normalizeTagadaLogFields(rawLog = {}) {
   };
 }
 
+function normalizeBusinessFields(rawBiz) {
+  if (!rawBiz || typeof rawBiz !== 'object') return null;
+
+  const rawId = rawBiz.id !== undefined && rawBiz.id !== null ? rawBiz.id : '1';
+  const name = rawBiz.business_name || rawBiz.businessName || rawBiz.name || '';
+  const address = rawBiz.business_address || rawBiz.businessAddress || rawBiz.address || '';
+  const type = rawBiz.business_type || rawBiz.businessType || rawBiz.type || 'RETAIL';
+  const age = rawBiz.business_age !== undefined && rawBiz.business_age !== null
+    ? Number(rawBiz.business_age)
+    : (rawBiz.businessAge !== undefined ? Number(rawBiz.businessAge) : 0);
+
+  const isActive = rawBiz.is_active !== undefined && rawBiz.is_active !== null
+    ? (Number(rawBiz.is_active) === 1 ? 1 : 0)
+    : (rawBiz.isArchived ? 0 : 1);
+
+  const isCurrent = rawBiz.is_current !== undefined && rawBiz.is_current !== null
+    ? (Number(rawBiz.is_current) === 1 ? 1 : 0)
+    : (rawBiz.isSelected ? 1 : 0);
+
+  const isPrimary = rawBiz.is_primary !== undefined && rawBiz.is_primary !== null
+    ? (Number(rawBiz.is_primary) === 1 ? 1 : 0)
+    : (rawBiz.isPrimary ? 1 : (String(rawId) === '1' ? 1 : 0));
+
+  const synced = rawBiz.synced !== undefined && rawBiz.synced !== null ? Number(rawBiz.synced) : 0;
+  const createDate = rawBiz.create_date || rawBiz.createDate || rawBiz.createdAt || new Date().toISOString();
+  const updateDate = rawBiz.update_date || rawBiz.updateDate || rawBiz.updatedAt || null;
+  const syncDate = rawBiz.sync_date || rawBiz.syncDate || null;
+  const owner = rawBiz.owner || rawBiz.ownerName || 'স্বত্বাধিকারী';
+  const phone = rawBiz.phone || rawBiz.ownerPhone || '';
+  const comment = rawBiz.comment || null;
+
+  return {
+    ...rawBiz,
+    id: String(rawId),
+    business_id: isNaN(Number(rawId)) ? rawId : Number(rawId),
+    business_name: String(name),
+    businessName: String(name),
+    name: String(name),
+    business_address: String(address),
+    businessAddress: String(address),
+    address: String(address),
+    business_type: String(type),
+    businessType: String(type),
+    business_age: Number.isFinite(age) ? age : 0,
+    businessAge: Number.isFinite(age) ? age : 0,
+    synced: synced === 1 ? 1 : 0,
+    is_active: isActive,
+    isArchived: isActive === 0,
+    is_current: isCurrent,
+    isSelected: isCurrent === 1,
+    is_primary: isPrimary,
+    isPrimary: isPrimary === 1,
+    owner: String(owner),
+    phone: String(phone),
+    create_date: createDate,
+    createDate: createDate,
+    createdAt: createDate,
+    update_date: updateDate,
+    updateDate: updateDate,
+    updatedAt: updateDate,
+    sync_date: syncDate,
+    syncDate: syncDate,
+    comment: comment,
+  };
+}
 const ledgerEngine = {
   generateUniqueId,
   validateTransaction,
@@ -1004,6 +1069,7 @@ const ledgerEngine = {
   indexJournalsByAccount,
   normalizeJournalFields,
   normalizeTagadaLogFields,
+  normalizeBusinessFields,
   V5_KEY,
   V6_KEY,
   V5_BACKUP_KEY,
@@ -1018,4 +1084,5 @@ if (typeof exports !== 'undefined') {
   exports.ledgerEngine = ledgerEngine;
   exports.normalizeJournalFields = normalizeJournalFields;
   exports.normalizeTagadaLogFields = normalizeTagadaLogFields;
+  exports.normalizeBusinessFields = normalizeBusinessFields;
 }

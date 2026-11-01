@@ -1,6 +1,6 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-005`  
-**Next Iteration Target:** `REA-ITER-006` (Feature 005: Multi-Shop Tenancy & Profile Switcher)  
+**Current Iteration Completed:** `REA-ITER-006`  
+**Next Iteration Target:** `REA-ITER-007` (Feature 006: Customer & Supplier Double-Entry Accounting Ledger)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
@@ -19,11 +19,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 006)
-1. **Gibbs (Worker 1):** Investigate `classes4.dex` for `business` Room DB table, `com.progoti.tallykhata.v2._clean_arch.business`, and shop profile switching mechanics.
-2. **Averroes (Worker 2):** Audit `src/storageRepository.js` and `src/ledgerEngine.js` for multi-business tenancy, cross-business `accountId` collision isolation, and cascade cleanup logic (`deleteBusinessCascade`).
-3. **Ohm (Worker 3):** Reconcile business switcher dropdown, shop creation/edit modals, and active business state transitions in `App.js`.
-4. **Main Orchestrator:** Run test suite (`node test_business_management.js`), verify 0 regressions across all 43 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_006_REPORT.md`.
+## 2. Immediate Resume Action Plan (Iteration 007)
+1. **Gibbs (Worker 1):** Investigate `classes4.dex` for advanced `account` and `journal` queries (`recalculateAccountRunningBalances`, discount transactions, and credit limit validations).
+2. **Averroes (Worker 2):** Audit `src/ledgerEngine.js` for transaction running balance reconciliation, discount adjustments, and compound business-account indexing.
+3. **Ohm (Worker 3):** Reconcile customer ledger detail screen, timeline entries, date filter chips, and running balance badges in `App.js`.
+4. **Main Orchestrator:** Run test suite (`node test_phase4_tali_accounting.js`), verify 0 regressions across all 44 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_007_REPORT.md`.
 
 ---
 
