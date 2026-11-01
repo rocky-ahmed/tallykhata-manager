@@ -1308,10 +1308,10 @@ class StorageRepository {
 
     const requestedDomains = (options && Array.isArray(options.domains) && options.domains.length > 0)
       ? options.domains
-      : ['all'];
+      : (options && typeof options.domain === 'string' ? [options.domain] : ['all']);
     const shouldRestoreAll = requestedDomains.includes('all');
     const shouldRestoreBusiness = shouldRestoreAll || requestedDomains.includes('business');
-    const shouldRestoreMM = shouldRestoreAll || requestedDomains.includes('moneyManager') || requestedDomains.includes('money_manager');
+    const shouldRestoreMM = shouldRestoreAll || requestedDomains.includes('moneyManager') || requestedDomains.includes('money_manager') || requestedDomains.includes('personal');
     const shouldRestorePrefs = shouldRestoreAll || requestedDomains.includes('preferences');
 
     // Create safety snapshot before altering live store if not already created
