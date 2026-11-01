@@ -1,6 +1,6 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-002`  
-**Next Iteration Target:** `REA-ITER-003` (Feature 002: Cashbox & Cash Reconciliations)  
+**Current Iteration Completed:** `REA-ITER-003`  
+**Next Iteration Target:** `REA-ITER-004` (Feature 003: Inventory, Stock & Product Catalog)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
@@ -19,11 +19,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 003)
-1. **Gibbs (Worker 1):** Investigate `classes4.dex` for `CashbookFragment`, `cash_sales`, `costs`, `closing_balance`, `opening_balance`, and `reconciliations` tables. Document cash drawer lifecycle (daily opening balance, cash sales, cash costs, closing balance reconciliation).
-2. **Averroes (Worker 2):** Audit `src/storageRepository.js` (`cashEntries`, `openingBalance`, `deriveCashBoxSummary`) against the reference Room DB cash tables to ensure 100% column and calculation parity.
-3. **Ohm (Worker 3):** Reconcile the `Cashbook` tab in `App.js` with reference layout: daily cash-in vs cash-out cards, balance meter, and quick entry buttons.
-4. **Main Orchestrator:** Run test suite (`node -e "...test_*.js"`), verify 0 regressions, and draft `docs/rea-reconstruction/iterations/ITERATION_003_REPORT.md`.
+## 2. Immediate Resume Action Plan (Iteration 004)
+1. **Gibbs (Worker 1):** Investigate `classes4.dex` for `inventory`, `stock`, `inventory_lot`, `lot_transaction` tables, and product catalog activities in `com/progoti/tallykhata/v2/inventory`.
+2. **Averroes (Worker 2):** Audit `src/storageRepository.js` (`inventory`, `stock`, `validateStockAdjustment`) against the reference Room DB stock tables to ensure 100% column and inventory calculation parity.
+3. **Ohm (Worker 3):** Reconcile the Inventory/Product tab in `App.js` with reference layout: stock search, low stock alert badge, item edit modal, and stock in/out entry buttons.
+4. **Main Orchestrator:** Run test suite (`node test_phase7_inventory_stock.js`), verify 0 regressions across all 40 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_004_REPORT.md`.
 
 ---
 
