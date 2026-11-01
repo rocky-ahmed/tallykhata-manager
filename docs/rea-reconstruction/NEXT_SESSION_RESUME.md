@@ -1,10 +1,10 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-014` (Milestone Parity Synthesis across all 12 Core Domains)  
-**Next Iteration Target:** `REA-ITER-015` (Production Release Packaging & Native APK Prebuild Verification)  
+**Current Iteration Completed:** `REA-ITER-015` (Production Release Packaging & Native APK Prebuild Verification)  
+**Next Iteration Target:** `REA-ITER-016` (Offline Network Resiliency, Storage Snapshot Rollback & State Compaction)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
-**Test Baseline:** 52 / 52 test suites passing (100% green, 1,250+ discrete assertions, 0 regressions)  
+**Test Baseline:** 53 / 53 test suites passing (100% green, 1,270+ discrete assertions, 0 regressions)  
 
 ---
 
@@ -20,11 +20,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 015)
-1. **Gibbs (Worker 1):** Verify native packaging artifacts and manifest declarations against reference APK.
-2. **Averroes (Worker 2):** Verify runtime database migration path and SQLite backup persistence readiness.
-3. **Ohm (Worker 3):** Validate APK prebuild and native build assets.
-4. **Main Orchestrator:** Run all 52 test suites, perform final integration audit, and manage release packaging.
+## 2. Immediate Resume Action Plan (Iteration 016)
+1. **Gibbs (Worker 1):** Investigate offline synchronization queue and network failure recovery policies in reference APK.
+2. **Averroes (Worker 2):** Implement safety snapshot auto-rollback on transaction corruption and vacuum state compaction.
+3. **Ohm (Worker 3):** Validate offline toast and retry interaction states in mobile UI.
+4. **Main Orchestrator:** Run all 53 test suites, perform final integration audit, and verify native delivery invariants.
 
 ---
 
