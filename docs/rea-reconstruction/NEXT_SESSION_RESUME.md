@@ -1,9 +1,10 @@
-# REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-006`  
-**Next Iteration Target:** `REA-ITER-007` (Feature 006: Customer & Supplier Double-Entry Accounting Ledger)  
+﻿# REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
+**Current Iteration Completed:** `REA-ITER-007` (Feature 006: Customer & Supplier Double-Entry Accounting Ledger)  
+**Next Iteration Target:** `REA-ITER-008` (Feature 007: Personal Money Manager & Ivy Wallet Integration)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
+**Test Baseline:** 45 / 45 test suites passing (100% green, 1,000+ discrete assertions, 0 regressions)  
 
 ---
 
@@ -19,11 +20,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 007)
-1. **Gibbs (Worker 1):** Investigate `classes4.dex` for advanced `account` and `journal` queries (`recalculateAccountRunningBalances`, discount transactions, and credit limit validations).
-2. **Averroes (Worker 2):** Audit `src/ledgerEngine.js` for transaction running balance reconciliation, discount adjustments, and compound business-account indexing.
-3. **Ohm (Worker 3):** Reconcile customer ledger detail screen, timeline entries, date filter chips, and running balance badges in `App.js`.
-4. **Main Orchestrator:** Run test suite (`node test_phase4_tali_accounting.js`), verify 0 regressions across all 44 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_007_REPORT.md`.
+## 2. Immediate Resume Action Plan (Iteration 008)
+1. **Gibbs (Worker 1):** Investigate Ivy Wallet integration artifacts and Personal Money Manager schema schemas (`@tallykhata_personal_money_manager_v2`).
+2. **Averroes (Worker 2):** Audit `src/moneyManagerService.js` for category budgets (`safe`/`warning`/`exceeded`), recurring transaction execution rules, and fund transfers.
+3. **Ohm (Worker 3):** Reconcile Personal Money Manager screens, account cards, budget progress meters, and transaction modals in `App.js`.
+4. **Main Orchestrator:** Run test suite (`node test_ivy_wallet_integration.js`, `node test_money_management.js`), verify 0 regressions across all 45 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_008_REPORT.md`.
 
 ---
 

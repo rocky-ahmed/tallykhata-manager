@@ -184,6 +184,12 @@ function establishAccountOpeningBalance(account, allJournals = []) {
   if (account.openingBalance !== undefined && account.openingBalance !== null && !isNaN(Number(account.openingBalance))) {
     return Number(account.openingBalance);
   }
+  if (account.start_balance !== undefined && account.start_balance !== null && !isNaN(Number(account.start_balance))) {
+    return Number(account.start_balance);
+  }
+  if (account.startBalance !== undefined && account.startBalance !== null && !isNaN(Number(account.startBalance))) {
+    return Number(account.startBalance);
+  }
   if (account.initialBalance !== undefined && account.initialBalance !== null && !isNaN(Number(account.initialBalance))) {
     return Number(account.initialBalance);
   }
@@ -360,6 +366,10 @@ function recalculateAllAccountBalances(accounts = [], allJournals = [], business
     let openingBal = 0;
     if (account.openingBalance !== undefined && account.openingBalance !== null) {
       openingBal = Number(account.openingBalance) || 0;
+    } else if (account.start_balance !== undefined && account.start_balance !== null) {
+      openingBal = Number(account.start_balance) || 0;
+    } else if (account.startBalance !== undefined && account.startBalance !== null) {
+      openingBal = Number(account.startBalance) || 0;
     } else if (account.initialBalance !== undefined && account.initialBalance !== null) {
       openingBal = Number(account.initialBalance) || 0;
     }
@@ -398,10 +408,13 @@ function recalculateAllAccountBalances(accounts = [], allJournals = [], business
       }
 
       const finalBalance = runningPaisa / 100;
+      const normalizedOpeningBal = Math.round(openingBal * 100) / 100;
       updatedAccounts.push({
         ...account,
         balance: finalBalance,
-        openingBalance: Math.round(openingBal * 100) / 100,
+        openingBalance: normalizedOpeningBal,
+        start_balance: normalizedOpeningBal,
+        startBalance: normalizedOpeningBal,
       });
     } else {
       const finalBalance = Math.round(openingBal * 100) / 100;
@@ -409,6 +422,8 @@ function recalculateAllAccountBalances(accounts = [], allJournals = [], business
         ...account,
         balance: finalBalance,
         openingBalance: finalBalance,
+        start_balance: finalBalance,
+        startBalance: finalBalance,
       });
     }
   }
@@ -486,6 +501,10 @@ function recalculateAccountRunningBalances(accountOrAccounts, allJournals = [], 
   let openingBal = 0;
   if (account.openingBalance !== undefined && account.openingBalance !== null) {
     openingBal = Number(account.openingBalance) || 0;
+  } else if (account.start_balance !== undefined && account.start_balance !== null) {
+    openingBal = Number(account.start_balance) || 0;
+  } else if (account.startBalance !== undefined && account.startBalance !== null) {
+    openingBal = Number(account.startBalance) || 0;
   } else if (account.initialBalance !== undefined && account.initialBalance !== null) {
     openingBal = Number(account.initialBalance) || 0;
   }
@@ -521,10 +540,13 @@ function recalculateAccountRunningBalances(accountOrAccounts, allJournals = [], 
   }
 
   const finalBalance = runningPaisa / 100;
+  const normalizedOpeningBal = Math.round(openingBal * 100) / 100;
   const updatedAccount = {
     ...account,
     balance: finalBalance,
-    openingBalance: Math.round(openingBal * 100) / 100,
+    openingBalance: normalizedOpeningBal,
+    start_balance: normalizedOpeningBal,
+    startBalance: normalizedOpeningBal,
   };
 
   // For UI display, account journals are displayed newest first
@@ -917,12 +939,12 @@ function queryCustomerAccounts(accounts = [], options = {}) {
     const a = accounts[i];
     if (!a) continue;
     if (businessId && a.businessId && String(a.businessId) !== String(businessId)) continue;
-    if (type !== 'all' && a.type !== type) continue;
+    if (type !== 'all' && a.type !== type && a.account_type !== type) continue;
     const bal = Number(a.balance) || 0;
     if (filter === 'due' && bal <= 0) continue;
     if (q) {
       const mName = (a.name || '').toLowerCase().includes(q);
-      const mPhone = (a.phone || '').includes(q);
+      const mPhone = (a.phone || a.contact || a.mobile || '').includes(q);
       if (!mName && !mPhone) continue;
     }
     results.push(a);
@@ -1050,6 +1072,141 @@ function normalizeBusinessFields(rawBiz) {
     comment: comment,
   };
 }
+function normalizeAccountFields(rawAccount, defaultBusinessId = '1') {
+  if (!rawAccount || typeof rawAccount !== 'object') return null;
+
+  const rawId = rawAccount.id !== undefined && rawAccount.id !== null ? rawAccount.id : '';
+  const strId = String(rawId);
+
+  // 1. Account Name
+  const name = rawAccount.name ? String(rawAccount.name).trim() : '';
+
+  // 2. Contact / Phone / Mobile normalization
+  const contact = rawAccount.contact || rawAccount.phone || rawAccount.mobile || '';
+  const strContact = String(contact).trim();
+
+  // 3. Account Type: 1 = Customer, 2 = Supplier
+  let accountType = 1;
+  if (rawAccount.type === 2 || rawAccount.type === '2' || String(rawAccount.type).toLowerCase() === 'supplier') {
+    accountType = 2;
+  } else if (rawAccount.type === 1 || rawAccount.type === '1' || String(rawAccount.type).toLowerCase() === 'customer') {
+    accountType = 1;
+  } else if (Number.isFinite(Number(rawAccount.type))) {
+    accountType = Number(rawAccount.type);
+  }
+
+  // 4. Multi-business Tenancy Isolation (businessId / business_id)
+  const resolvedBizId = rawAccount.businessId !== undefined && rawAccount.businessId !== null
+    ? String(rawAccount.businessId)
+    : (rawAccount.business_id !== undefined && rawAccount.business_id !== null
+      ? String(rawAccount.business_id)
+      : String(defaultBusinessId));
+
+  // 5. Monetary Baseline with Integer-Paisa Precision (1 Taka = 100 Paisa)
+  const rawStart = rawAccount.start_balance !== undefined && rawAccount.start_balance !== null
+    ? rawAccount.start_balance
+    : (rawAccount.startBalance !== undefined && rawAccount.startBalance !== null
+        ? rawAccount.startBalance
+        : (rawAccount.openingBalance !== undefined && rawAccount.openingBalance !== null
+            ? rawAccount.openingBalance
+            : (rawAccount.initialBalance !== undefined && rawAccount.initialBalance !== null
+                ? rawAccount.initialBalance
+                : 0)));
+  const cleanStart = Math.round((Number(rawStart) || 0) * 100) / 100;
+
+  // Stored / Current balance
+  let cleanBalance = cleanStart;
+  if (rawAccount.balance !== undefined && rawAccount.balance !== null && !isNaN(Number(rawAccount.balance))) {
+    cleanBalance = Math.round(Number(rawAccount.balance) * 100) / 100;
+  }
+
+  // 6. Dates & Timeline
+  const acDate = rawAccount.ac_date || rawAccount.date || rawAccount.create_date || rawAccount.createdAt || new Date().toISOString().split('T')[0];
+  const createDate = rawAccount.create_date || rawAccount.createDate || rawAccount.createdAt || acDate;
+  const updateDate = rawAccount.last_update_date || rawAccount.lastUpdateDate || rawAccount.update_date || rawAccount.updatedAt || null;
+  const syncDate = rawAccount.synced_date || rawAccount.syncedDate || null;
+
+  // 7. Active / Archived Status (Room DB is_active = 1 means active)
+  let isActive = 1;
+  if (rawAccount.is_active !== undefined && rawAccount.is_active !== null) {
+    isActive = Number(rawAccount.is_active) === 1 ? 1 : 0;
+  } else if (rawAccount.isArchived !== undefined) {
+    isActive = rawAccount.isArchived ? 0 : 1;
+  } else if (rawAccount.isActive !== undefined) {
+    isActive = rawAccount.isActive ? 1 : 0;
+  }
+
+  // 8. Update & Sync status
+  const isUpdated = rawAccount.is_updated !== undefined && rawAccount.is_updated !== null
+    ? (Number(rawAccount.is_updated) === 1 ? 1 : 0)
+    : (rawAccount.isUpdated ? 1 : 0);
+  const synced = (rawAccount.synced === 1 || rawAccount.synced === true) ? 1 : 0;
+  const serverId = rawAccount.server_id !== undefined ? rawAccount.server_id : null;
+
+  // 9. Visibility & Description
+  const reportVisibility = (rawAccount.report_visibility === 0 || rawAccount.report_visibility === false || rawAccount.reportVisibility === false) ? 0 : 1;
+  const description = rawAccount.description || rawAccount.desc || rawAccount.notes || '';
+
+  // 10. Media & Sharing Links
+  const shareLink = rawAccount.share_link || rawAccount.shareLink || null;
+  const lastShareMedia = rawAccount.last_share_media || rawAccount.lastShareMedia || null;
+  const profileImage = rawAccount.profile_image || rawAccount.profileImage || null;
+  const profileImageDevice = rawAccount.profile_image_device || rawAccount.profileImageDevice || null;
+
+  return {
+    ...rawAccount,
+    // Primary Key & Foreign Keys
+    id: strId,
+    account_id: isNaN(Number(rawId)) ? strId : Number(rawId),
+    businessId: resolvedBizId,
+    business_id: isNaN(Number(resolvedBizId)) ? resolvedBizId : Number(resolvedBizId),
+
+    // Identity & Contact
+    name,
+    contact: strContact,
+    phone: strContact,
+    mobile: strContact,
+    type: accountType,
+    account_type: accountType,
+
+    // Monetary Balances
+    start_balance: cleanStart,
+    startBalance: cleanStart,
+    openingBalance: cleanStart,
+    initialBalance: cleanStart,
+    balance: cleanBalance,
+
+    // Temporal fields
+    ac_date: acDate,
+    date: acDate,
+    create_date: createDate,
+    createDate: createDate,
+    createdAt: createDate,
+    is_updated: isUpdated,
+    last_update_date: updateDate,
+    lastUpdateDate: updateDate,
+    updatedAt: updateDate,
+    synced,
+    synced_date: syncDate,
+    server_id: serverId,
+
+    // Flags & Presentation
+    is_active: isActive,
+    isArchived: isActive === 0,
+    isActive: isActive === 1,
+    report_visibility: reportVisibility,
+    reportVisibility: reportVisibility === 1,
+    description: String(description),
+    desc: String(description),
+    notes: String(description),
+
+    // Media & Sharing
+    share_link: shareLink,
+    last_share_media: lastShareMedia,
+    profile_image: profileImage,
+    profile_image_device: profileImageDevice,
+  };
+}
 const ledgerEngine = {
   generateUniqueId,
   validateTransaction,
@@ -1070,6 +1227,7 @@ const ledgerEngine = {
   normalizeJournalFields,
   normalizeTagadaLogFields,
   normalizeBusinessFields,
+  normalizeAccountFields,
   V5_KEY,
   V6_KEY,
   V5_BACKUP_KEY,
@@ -1085,4 +1243,5 @@ if (typeof exports !== 'undefined') {
   exports.normalizeJournalFields = normalizeJournalFields;
   exports.normalizeTagadaLogFields = normalizeTagadaLogFields;
   exports.normalizeBusinessFields = normalizeBusinessFields;
+  exports.normalizeAccountFields = normalizeAccountFields;
 }

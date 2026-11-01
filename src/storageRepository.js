@@ -30,6 +30,7 @@ const {
   V6_KEY,
   V5_BACKUP_KEY,
   recalculateAccountRunningBalances,
+  normalizeAccountFields,
 } = require('./ledgerEngine');
 
 const VALID_COLLECTIONS = new Set([
@@ -2064,6 +2065,7 @@ const repoExport = {
   indexJournalsChronologically,
   queryJournalsByDateRange,
   clearJournalIndexCache,
+  normalizeAccountFields,
   default: defaultRepository,
 };
 
@@ -2081,5 +2083,6 @@ if (typeof exports !== 'undefined') {
   exports.indexJournalsChronologically = indexJournalsChronologically;
   exports.queryJournalsByDateRange = queryJournalsByDateRange;
   exports.clearJournalIndexCache = clearJournalIndexCache;
+  exports.normalizeAccountFields = normalizeAccountFields;
   exports.default = defaultRepository;
 }
