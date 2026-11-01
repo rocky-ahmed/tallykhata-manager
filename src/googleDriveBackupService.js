@@ -520,6 +520,7 @@ class GoogleDriveBackupService {
     this.customFetch = options.fetch || (typeof fetch !== 'undefined' ? fetch : null);
     this.driveApiBase = 'https://www.googleapis.com/drive/v3';
     this.uploadApiBase = 'https://www.googleapis.com/upload/drive/v3';
+    this.backupFilename = options.backupFilename || BACKUP_FILENAME;
   }
 
   setFetch(fetchFn) {

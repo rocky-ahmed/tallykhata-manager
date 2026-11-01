@@ -1,10 +1,10 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-008` (Feature 007: Personal Money Manager & Ivy Wallet Architecture)  
-**Next Iteration Target:** `REA-ITER-009` (Feature 008: Google Drive Cloud Backup & Restore Parity)  
+**Current Iteration Completed:** `REA-ITER-009` (Feature 008: Google Drive Cloud Backup & Restore Parity)  
+**Next Iteration Target:** `REA-ITER-010` (Feature 009: Bilingual i18n & High-DPI Font Parity)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
-**Test Baseline:** 46 / 46 test suites passing (100% green, 1,100+ discrete assertions, 0 regressions)  
+**Test Baseline:** 47 / 47 test suites passing (100% green, 1,120+ discrete assertions, 0 regressions)  
 
 ---
 
@@ -20,11 +20,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 009)
-1. **Gibbs (Worker 1):** Investigate Google Drive backup and restore payloads, AppDataFolder scope, and checksum validation (`src/googleDriveBackupService.js`).
-2. **Averroes (Worker 2):** Audit full unified backup serialization containing both Business Accounting and Personal Money Manager domains, SHA-256 manifest verification, and selective restore filters.
-3. **Ohm (Worker 3):** Reconcile Cloud Backup UI components, last backup timestamp indicators, and progress modals in `App.js`.
-4. **Main Orchestrator:** Run test suites (`node test_google_drive_backup.js`, `node test_full_backup_restore.js`), verify 0 regressions across all 46 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_009_REPORT.md`.
+## 2. Immediate Resume Action Plan (Iteration 010)
+1. **Gibbs (Worker 1):** Investigate bilingual translation keys, high-DPI Bengali typography scaling, and English toggle in reference app (`src/i18nService.js`).
+2. **Averroes (Worker 2):** Audit language persistence in `@tallykhata_app_preferences_v1`, default locale fallback, and dynamic number formatting.
+3. **Ohm (Worker 3):** Reconcile language switcher UI in `App.js` and drawer/modal text rendering.
+4. **Main Orchestrator:** Run test suites (`node test_preferences_theme_i18n.js`), verify 0 regressions across all 47 suites, and draft `docs/rea-reconstruction/iterations/ITERATION_010_REPORT.md`.
 
 ---
 
