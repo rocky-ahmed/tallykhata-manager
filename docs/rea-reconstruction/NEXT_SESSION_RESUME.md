@@ -1,10 +1,10 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-016` (Offline Network Resiliency, Storage Snapshot Rollback & State Compaction)  
-**Next Iteration Target:** `REA-ITER-017` (Deep Native Profile & Production Delivery Finalization)  
+**Current Iteration Completed:** `REA-ITER-017` (Storage Metrics, High-Volume Journal Pagination & Production Readiness)  
+**Next Iteration Target:** `REA-ITER-018` (Production Release Final Sign-Off & Verification)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
-**Test Baseline:** 54 / 54 test suites passing (100% green, 1,290+ discrete assertions, 0 regressions)  
+**Test Baseline:** 55 / 55 test suites passing (100% green, 1,310+ discrete assertions, 0 regressions)  
 
 ---
 
@@ -20,11 +20,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 017)
-1. **Gibbs (Worker 1):** Audit native binary symbols and room database schema versioning in reference APK.
-2. **Averroes (Worker 2):** Audit storage quota limits and high-volume journal batching performance.
-3. **Ohm (Worker 3):** Inspect release build asset crunching and font metrics for Bengali glyph stability.
-4. **Main Orchestrator:** Run all 54 test suites, perform final integration audit, and manage production milestone delivery.
+## 2. Immediate Resume Action Plan (Iteration 018)
+1. **Gibbs (Worker 1):** Complete final reference binary comparison against decompiled Room SQLite schema.
+2. **Averroes (Worker 2):** Audit full multi-currency and integer paisa rounding precision bounds.
+3. **Ohm (Worker 3):** Validate theme token propagation and touch target contrast in dark/light modes.
+4. **Main Orchestrator:** Run all 55 test suites, perform final integration audit, and manage production milestone delivery.
 
 ---
 

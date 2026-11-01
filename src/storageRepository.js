@@ -1984,6 +1984,67 @@ class StorageRepository {
     }
     return queryJournalsByDateRange(journals, startDate, endDate, options);
   }
+
+  /**
+   * Calculates comprehensive storage resource metrics, byte allocations, and quota status.
+   * @returns {Promise<{
+   *   totalBytes: number,
+   *   domains: { business: number, personal: number, preferences: number },
+   *   collectionCounts: Object,
+   *   quotaBytes: number,
+   *   usagePercent: number,
+   *   isNearQuota: boolean,
+   *   recommendedAction: 'none' | 'compactStorage'
+   * }>}
+   */
+  async getStorageMetrics() {
+    if (!this.currentStore) {
+      await this.loadInitialData();
+    }
+
+    const v6Str = (await this.adapter.getItem(V6_KEY)) || JSON.stringify(this.currentStore);
+    const mmStr = (await this.adapter.getItem(MM_STORAGE_KEY)) || '{}';
+    const prefsStr = (await this.adapter.getItem(PREFERENCES_STORAGE_KEY)) || '{}';
+
+    const businessBytes = Buffer.byteLength(v6Str, 'utf8');
+    const personalBytes = Buffer.byteLength(mmStr, 'utf8');
+    const prefsBytes = Buffer.byteLength(prefsStr, 'utf8');
+    const totalBytes = businessBytes + personalBytes + prefsBytes;
+
+    const QUOTA_LIMIT_BYTES = 50 * 1024 * 1024;
+    const usagePercent = Number(((totalBytes / QUOTA_LIMIT_BYTES) * 100).toFixed(2));
+    const isNearQuota = usagePercent >= 80;
+
+    let parsedMM = {};
+    try { parsedMM = JSON.parse(mmStr); } catch (e) {}
+
+    const store = this.currentStore;
+    const collectionCounts = {
+      accounts: Array.isArray(store.accounts) ? store.accounts.length : 0,
+      journals: Array.isArray(store.journals) ? store.journals.length : 0,
+      cashEntries: Array.isArray(store.cashEntries) ? store.cashEntries.length : 0,
+      inventory: Array.isArray(store.inventory) ? store.inventory.length : 0,
+      stock: Array.isArray(store.stock) ? store.stock.length : 0,
+      notes: Array.isArray(store.notes) ? store.notes.length : 0,
+      businesses: Array.isArray(store.businesses) ? store.businesses.length : 0,
+      wallets: Array.isArray(parsedMM.wallets) ? parsedMM.wallets.length : (Array.isArray(parsedMM.accounts) ? parsedMM.accounts.length : 0),
+      moneyManagerTxns: Array.isArray(parsedMM.transactions) ? parsedMM.transactions.length : 0,
+    };
+
+    return {
+      totalBytes,
+      domains: {
+        business: businessBytes,
+        personal: personalBytes,
+        preferences: prefsBytes,
+      },
+      collectionCounts,
+      quotaBytes: QUOTA_LIMIT_BYTES,
+      usagePercent,
+      isNearQuota,
+      recommendedAction: isNearQuota || collectionCounts.journals > 5000 ? 'compactStorage' : 'none',
+    };
+  }
 }
 
 // ============================================================================
@@ -2275,9 +2336,21 @@ function queryJournalsByDateRange(journals, startDate, endDate, options = {}) {
     });
   }
 
+  const totalCount = candidates.length;
+
+  if (options && options.sortOrder === 'desc') {
+    candidates.reverse();
+  }
+
+  if (options && (options.offset > 0 || (options.limit !== undefined && options.limit !== null))) {
+    const offset = Math.max(0, Number(options.offset) || 0);
+    const limit = options.limit !== undefined && options.limit !== null ? Math.max(0, Number(options.limit)) : candidates.length;
+    candidates = candidates.slice(offset, offset + limit);
+  }
+
   return {
     journals: candidates,
-    totalCount: candidates.length,
+    totalCount,
     executionTimeMs: calcElapsed()
   };
 }
