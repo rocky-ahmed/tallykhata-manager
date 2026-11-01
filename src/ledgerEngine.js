@@ -529,7 +529,28 @@ function migrateV5toV6(rawV5Data) {
 }
 
 
+// Calculation memoization caches (Phase 11 Performance Optimization)
+let _aggregateMetricsCache = new WeakMap();
+let _cashboxSummaryCache = new WeakMap();
+
+function clearLedgerCalculationCaches() {
+  _aggregateMetricsCache = new WeakMap();
+  _cashboxSummaryCache = new WeakMap();
+}
+
+function resetCache() {
+  clearLedgerCalculationCaches();
+}
+
 function calculateAggregateMetrics(accounts = [], journals = [], businessId = null) {
+  if (Array.isArray(accounts)) {
+    let bizCache = _aggregateMetricsCache.get(accounts);
+    const key = String(businessId || 'all');
+    if (bizCache && bizCache.has(key)) {
+      return bizCache.get(key);
+    }
+  }
+
   let totalReceivablePaisa = 0;
   let totalPayablePaisa = 0;
   let customerCount = 0;
@@ -551,16 +572,35 @@ function calculateAggregateMetrics(accounts = [], journals = [], businessId = nu
     }
   }
 
-  return {
+  const result = {
     totalReceivable: totalReceivablePaisa / 100,
     totalPayable: totalPayablePaisa / 100,
     netBalance: (totalReceivablePaisa - totalPayablePaisa) / 100,
     customerCount,
     supplierCount,
   };
+
+  if (Array.isArray(accounts)) {
+    let bizCache = _aggregateMetricsCache.get(accounts);
+    if (!bizCache) {
+      bizCache = new Map();
+      _aggregateMetricsCache.set(accounts, bizCache);
+    }
+    bizCache.set(String(businessId || 'all'), result);
+  }
+
+  return result;
 }
 
 function deriveCashBoxSummary(cashEntries = [], businessId = null) {
+  if (Array.isArray(cashEntries)) {
+    let bizCache = _cashboxSummaryCache.get(cashEntries);
+    const key = String(businessId || 'all');
+    if (bizCache && bizCache.has(key)) {
+      return bizCache.get(key);
+    }
+  }
+
   let totalInPaisa = 0;
   let totalOutPaisa = 0;
 
@@ -582,12 +622,23 @@ function deriveCashBoxSummary(cashEntries = [], businessId = null) {
   const cashOut = totalOutPaisa / 100;
   const balance = (totalInPaisa - totalOutPaisa) / 100;
 
-  return {
+  const result = {
     cashIn,
     cashOut,
     balance,
     netCash: balance,
   };
+
+  if (Array.isArray(cashEntries)) {
+    let bizCache = _cashboxSummaryCache.get(cashEntries);
+    if (!bizCache) {
+      bizCache = new Map();
+      _cashboxSummaryCache.set(cashEntries, bizCache);
+    }
+    bizCache.set(String(businessId || 'all'), result);
+  }
+
+  return result;
 }
 
 function indexJournalsByAccount(allJournals = [], businessId = null) {
@@ -666,6 +717,7 @@ const ledgerEngine = {
   migrateV5toV6,
   calculateAggregateMetrics,
   deriveCashBoxSummary,
+  resetCache,
   indexJournalsByAccount,
   V5_KEY,
   V6_KEY,

@@ -212,6 +212,10 @@ class StorageRepository {
     if (typeof preferencesService !== 'undefined' && preferencesService && typeof preferencesService.resetCache === 'function') {
       try { preferencesService.resetCache(); } catch (_) {}
     }
+    try {
+      const { resetCache: resetLedgerCache } = require('./ledgerEngine');
+      if (typeof resetLedgerCache === 'function') resetLedgerCache();
+    } catch (_) {}
     this.writeQueue = Promise.resolve();
     return true;
   }

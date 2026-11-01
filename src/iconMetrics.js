@@ -14,6 +14,7 @@ const STANDARD_TOUCH_HIT_SLOP = {
 const ICON_METRICS = {
   // Required task specifications
   ic_cash_buy: { opticalScale: 1.28, translateY: 0 },
+  ic_cash_sale: { opticalScale: 1.28, translateY: 0 },
   ic_delete: { opticalScale: 1.35, translateY: 0 },
   ic_edit: { opticalScale: 1.25, translateY: 0 },
   grid_backup: { opticalScale: 1.0, translateY: 2 },

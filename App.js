@@ -5138,7 +5138,7 @@ function TallyKhataApp() {
            =================================================================== */}
         {activeTab === 'cashbox' && (
           <View style={[{ flex: 1, backgroundColor: '#F8F9FA', borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden' }, isDark && tStyles.screenBg]}>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
+            <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Cash Dashboard Card (layout_cashbook_dashboard_total.xml) */}
             <View style={[styles.cashTopCard, isDark && tStyles.card]}>
               {/* Upper Box: আজকের বেচা & বর্তমান ক্যাশ */}
@@ -5363,7 +5363,7 @@ function TallyKhataApp() {
            =================================================================== */}
         {activeTab === 'tagada' && (
           <View style={[{ flex: 1, backgroundColor: '#F8F9FA', borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden' }, isDark && tStyles.screenBg]}>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 95 }}>
+            <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 95 }}>
             {/* Tagada Top Header Bar with Back navigation */}
             <View style={[{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }, isDark && tStyles.headerNav]}>
               <TouchableOpacity
@@ -7078,7 +7078,7 @@ function TallyKhataApp() {
       <Modal visible={modalAddTxn} animationType="slide" transparent onRequestClose={() => setModalAddTxn(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '95%' }]}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 16 }}>
             <View style={styles.modalHeaderRow}>
               <Text style={[styles.modalCardTitle, { color: txnType === 'given' ? (isDark ? currentTheme.danger : COLORS.primary) : (isDark ? currentTheme.success : COLORS.green) }]}>
                 {isCustomer
@@ -7758,7 +7758,7 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ marginVertical: 8 }}>
+            <ScrollView style={{ marginVertical: 8 }} keyboardShouldPersistTaps="handled">
               <View style={styles.denomContainer}>
                 <View style={styles.denomHeaderRow}>
                   <Text style={styles.denomHeaderCol}>{tStatic("নোটের মান")}</Text>
@@ -8092,7 +8092,7 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               {/* 3D Stock Metric Cards Grid */}
               <View style={{ marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
@@ -8762,7 +8762,7 @@ function TallyKhataApp() {
             </View>
 
             {/* Notes List */}
-            <ScrollView contentContainerStyle={{ paddingBottom: 10 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 10 }}>
               {filteredBusinessNotes.map((n) => (
                 <View
                   key={n.id}
@@ -8929,7 +8929,7 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: 10 }}>
               <View style={[styles.reportSummaryBox, { borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', padding: 14, backgroundColor: '#F9FAFB' }, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
                 <View style={styles.reportItemRow}>
                   <Text style={[styles.reportItemTitle, isDark && tStyles.textSecondary]}>{tStatic("মোট বাকি পাবো (কাস্টমার):")}</Text>
@@ -9003,7 +9003,7 @@ function TallyKhataApp() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: 10 }}>
               <Text style={styles.inputLabel}>{tStatic("ব্যবসা প্রতিষ্ঠান বা দোকানের নাম")}</Text>
               <TextInput
                 style={styles.modalSimpleInput}
@@ -9105,11 +9105,11 @@ function TallyKhataApp() {
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.cloudBackupTabLabel, backupActiveTab === 'offline' && styles.cloudBackupTabLabelActive]}>{tStatic("অফলাইন ফাইল                   অফলাইন ফাইল")}</Text>
+                <Text style={[styles.cloudBackupTabLabel, backupActiveTab === 'offline' && styles.cloudBackupTabLabelActive]}>{tStatic("অফলাইন ফাইল")}</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16 }}>
               {/* Domain Selection UI for Restore */}
               <View style={{ marginBottom: 14, backgroundColor: isDark ? currentTheme.cardBgElevated : '#F3F4F6', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: isDark ? currentTheme.cardBorder : '#E5E7EB' }}>
                 <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#374151', marginBottom: 6 }}>
@@ -12711,8 +12711,7 @@ function TallyKhataApp() {
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>
                 {effectiveLanguage === 'en' ? 'Choose Month & Period' : 'মাস ও সময়কাল নির্বাচন'}
               </Text>
-              <TouchableOpacity
-                style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]}
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP}
                 onPress={() => setModalMMMonthPicker(false)}
                 accessibilityRole="button"
                 accessibilityLabel="Close"
@@ -12863,7 +12862,7 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_add_txn_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddTxn(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMAddTxn(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -13044,7 +13043,7 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_edit_transaction_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMEditTxn(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMEditTxn(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -13135,7 +13134,7 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_new_wallet_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddAccount(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMAddAccount(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -13212,7 +13211,7 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_set_category_budget_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMSetBudget(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMSetBudget(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -13264,7 +13263,7 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_overall_budget_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMOverallBudget(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMOverallBudget(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -13303,7 +13302,7 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_create_category_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddCategory(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMAddCategory(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -13391,7 +13390,7 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_create_goal_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddGoal(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMAddGoal(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -13498,7 +13497,7 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_deposit_to_goal_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMDepositGoal(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMDepositGoal(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -13568,8 +13567,7 @@ function TallyKhataApp() {
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>
                 {t(mmWithdrawMode === 'refund-and-delete' ? 'mm_refund_goal_title' : 'mm_withdraw_to_goal_title')}
               </Text>
-              <TouchableOpacity
-                style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]}
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP}
                 onPress={() => setModalMMWithdrawGoal(false)}
                 accessibilityRole="button"
                 accessibilityLabel={t('mm_close')}
@@ -13681,7 +13679,7 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_transfer_funds_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMTransfer(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMTransfer(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -13759,12 +13757,12 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_settings_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMPreferences(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMPreferences(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               {/* Default Period */}
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>{t('mm_default_period')}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
@@ -14393,12 +14391,12 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_schedules_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMRecurring(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMRecurring(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 13 }}>{t('mm_schedule_subtitle')}</Text>
                 <TouchableOpacity
@@ -14506,12 +14504,12 @@ function TallyKhataApp() {
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>
                 {mmRecEditId ? t('mm_add_edit_schedule_title') : t('mm_new_schedule_title')}
               </Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMAddRecurring(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMAddRecurring(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               {/* Type Selector Chips */}
               <View style={styles.mmTypeChipContainer}>
                 <TouchableOpacity
@@ -14696,12 +14694,12 @@ function TallyKhataApp() {
           <View style={[styles.mmModalSheet, tStyles.mmModalSheet]}>
             <View style={[styles.mmModalHeader, tStyles.mmModalHeader]}>
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t('mm_manage_category_title')}</Text>
-              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} onPress={() => setModalMMEditCategory(false)}>
+              <TouchableOpacity style={[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn]} hitSlop={STANDARD_TOUCH_HIT_SLOP} onPress={() => setModalMMEditCategory(false)}>
                 <Text style={{ color: currentTheme.textSecondary, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
               <Text style={[styles.mmInputLabel, tStyles.mmInputLabel]}>{t('mm_category_name')}</Text>
               <TextInput
                 style={[styles.mmInput, tStyles.mmInput]}
@@ -14802,6 +14800,7 @@ function TallyKhataApp() {
               <Text style={[styles.mmModalTitle, tStyles.mmModalTitle]}>{t("mm_custom_range_title")}</Text>
               <TouchableOpacity
                 style={[[styles.mmModalCloseBtn, tStyles.mmModalCloseBtn], isDark && { backgroundColor: currentTheme.cardBorder }]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
                 onPress={() => setModalMMCustomDateRange(false)}
                 accessibilityRole="button"
                 accessibilityLabel={t('mm_close')}
@@ -19944,7 +19943,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   mmModalCloseBtn: {
-    padding: 4,
+    padding: 6,
+    minWidth: 36,
+    minHeight: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mmInputLabel: {
     color: '#94A3B8',

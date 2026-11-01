@@ -11,11 +11,29 @@ const MM_SCHEMA_VERSION = 3;
  * (e.g. 0.1 + 0.2 = 0.30000000000000004). Rounds to 2 decimal places.
  */
 let _cachedMMState = null;
+
+// Calculation memoization caches (Phase 11 Performance Optimization)
+let _periodMetricsCache = new WeakMap();
+let _categoryBudgetsCache = new WeakMap();
+let _categoryDistCache = new WeakMap();
+let _netWorthCache = new WeakMap();
+let _cashFlowCache = new WeakMap();
+
+function clearCalculationCaches() {
+  _periodMetricsCache = new WeakMap();
+  _categoryBudgetsCache = new WeakMap();
+  _categoryDistCache = new WeakMap();
+  _netWorthCache = new WeakMap();
+  _cashFlowCache = new WeakMap();
+}
+
 function resetCache() {
   _cachedMMState = null;
+  clearCalculationCaches();
 }
 function reloadCache(newState = null) {
   _cachedMMState = newState;
+  clearCalculationCaches();
 }
 
 function roundCurrency(val) {
@@ -248,6 +266,14 @@ function calculateNetWorth(accountsOrState) {
   const state = !Array.isArray(accountsOrState) && accountsOrState && typeof accountsOrState === "object"
     ? accountsOrState
     : null;
+
+  if (state && _netWorthCache.has(state)) {
+    return _netWorthCache.get(state);
+  }
+  if (Array.isArray(accountsOrState) && _netWorthCache.has(accountsOrState)) {
+    return _netWorthCache.get(accountsOrState);
+  }
+
   const accounts = Array.isArray(accountsOrState)
     ? accountsOrState
     : state && Array.isArray(state.accounts)
@@ -264,7 +290,14 @@ function calculateNetWorth(accountsOrState) {
     return sum + roundCurrency(balance * effectiveRate);
   }, 0);
   const allocatedGoalFunds = state ? getTrackedGoalBalances(state).total : 0;
-  return roundCurrency(accountNetWorth + allocatedGoalFunds);
+  const result = roundCurrency(accountNetWorth + allocatedGoalFunds);
+
+  if (state) {
+    _netWorthCache.set(state, result);
+  } else if (Array.isArray(accountsOrState)) {
+    _netWorthCache.set(accountsOrState, result);
+  }
+  return result;
 }
 
 function isGoalAllocationTransaction(transaction) {
@@ -488,13 +521,22 @@ function calculateCashFlow(transactions, period, customRange = null) {
   if (!Array.isArray(transactions)) {
     return { totalIncome: 0, totalExpense: 0, totalTransfer: 0, netSavings: 0, savingsRate: 0 };
   }
+  const customKey = customRange ? `${customRange.startDate}_${customRange.endDate}` : "";
+  const cacheKey = `${period || "all"}:${customKey}`;
+  let txnCache = _cashFlowCache.get(transactions);
+  if (txnCache && txnCache.has(cacheKey)) {
+    return txnCache.get(cacheKey);
+  }
+
   let totalIncome = 0;
   let totalExpense = 0;
   let totalTransfer = 0;
+  const inPeriod = getDateFilterPredicate(period, customRange);
 
-  for (const t of transactions) {
-    if (isGoalAllocationTransaction(t)) continue;
-    if (period && !isDateInPeriod(t.date, period, customRange)) continue;
+  for (let i = 0; i < transactions.length; i++) {
+    const t = transactions[i];
+    if (!t || isGoalAllocationTransaction(t)) continue;
+    if (period && t.date && !inPeriod(t.date)) continue;
     const amt = Number(t.amount || 0);
     if (t.type === "income") totalIncome += amt;
     else if (t.type === "expense") totalExpense += amt;
@@ -503,8 +545,14 @@ function calculateCashFlow(transactions, period, customRange = null) {
 
   const netSavings = totalIncome - totalExpense;
   const savingsRate = totalIncome > 0 ? Math.max(0, Math.round((netSavings / totalIncome) * 100)) : 0;
+  const result = { totalIncome, totalExpense, totalTransfer, netSavings, savingsRate };
 
-  return { totalIncome, totalExpense, totalTransfer, netSavings, savingsRate };
+  if (!txnCache) {
+    txnCache = new Map();
+    _cashFlowCache.set(transactions, txnCache);
+  }
+  txnCache.set(cacheKey, result);
+  return result;
 }
 
 function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
@@ -512,6 +560,7 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
   let transactions = [];
   let period = "this_month";
   let customRange = null;
+  let sourceState = null;
 
   if (Array.isArray(arg1)) {
     categories = arg1;
@@ -519,30 +568,44 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
     period = (arg3 !== undefined && arg3 !== null) ? arg3 : "this_month";
     customRange = arg4 || null;
   } else if (arg1 && typeof arg1 === "object") {
+    sourceState = arg1;
     categories = Array.isArray(arg1.categories) ? arg1.categories : [];
     transactions = Array.isArray(arg1.transactions) ? arg1.transactions : [];
-    period = (arg2 !== undefined && arg2 !== null) ? arg2 : "this_month";
-    customRange = arg3 || null;
+    if (arg2 && typeof arg2 === "object" && !Array.isArray(arg2)) {
+      period = (arg2.period !== undefined && arg2.period !== null) ? arg2.period : "this_month";
+      customRange = arg2.customRange || null;
+    } else {
+      period = (arg2 !== undefined && arg2 !== null) ? arg2 : "this_month";
+      customRange = arg3 || null;
+    }
   } else {
     return [];
   }
 
-  const expTransactions = (transactions || []).filter(t => {
-    if (isGoalAllocationTransaction(t)) return false;
-    if (t.type !== "expense") return false;
-    if (period && t.date && !isDateInPeriod(t.date, period, customRange)) return false;
-    return true;
-  });
+  const customKey = customRange ? `${customRange.startDate}_${customRange.endDate}` : "";
+  const periodKey = `${period}:${customKey}`;
 
+  if (sourceState) {
+    let stateCache = _categoryBudgetsCache.get(sourceState);
+    if (stateCache && stateCache.has(periodKey)) {
+      return stateCache.get(periodKey);
+    }
+  }
+
+  const inPeriod = getDateFilterPredicate(period, customRange);
   const spentMap = new Map();
-  for (const t of expTransactions) {
+
+  for (let i = 0; i < transactions.length; i++) {
+    const t = transactions[i];
+    if (!t || t.type !== "expense" || isGoalAllocationTransaction(t)) continue;
+    if (period && t.date && !inPeriod(t.date)) continue;
     if (t.categoryId) {
       const cur = spentMap.get(t.categoryId) || 0;
       spentMap.set(t.categoryId, roundCurrency(cur + Number(t.amount || 0)));
     }
   }
 
-  return categories
+  const result = categories
     .filter(cat => cat.type === "expense")
     .map(cat => {
       const budget = roundCurrency(cat.budget || 0);
@@ -566,6 +629,17 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
         hasBudget: budget > 0,
       };
     });
+
+  if (sourceState) {
+    let stateCache = _categoryBudgetsCache.get(sourceState);
+    if (!stateCache) {
+      stateCache = new Map();
+      _categoryBudgetsCache.set(sourceState, stateCache);
+    }
+    stateCache.set(periodKey, result);
+  }
+
+  return result;
 }
 
 function calculateCategoryDistribution(arg1, arg2, arg3, arg4) {
@@ -573,6 +647,7 @@ function calculateCategoryDistribution(arg1, arg2, arg3, arg4) {
   let transactions = [];
   let period = null;
   let customRange = null;
+  let sourceState = null;
 
   if (Array.isArray(arg1)) {
     categories = arg1;
@@ -580,10 +655,26 @@ function calculateCategoryDistribution(arg1, arg2, arg3, arg4) {
     period = arg3;
     customRange = arg4 || null;
   } else if (arg1 && typeof arg1 === "object") {
+    sourceState = arg1;
     categories = Array.isArray(arg1.categories) ? arg1.categories : [];
     transactions = Array.isArray(arg1.transactions) ? arg1.transactions : [];
-    period = arg2;
-    customRange = arg3 || null;
+    if (arg2 === "expense" || arg2 === "income") {
+      period = arg3;
+      customRange = arg4 || null;
+    } else {
+      period = arg2;
+      customRange = arg3 || null;
+    }
+  }
+
+  const customKey = customRange ? `${customRange.startDate}_${customRange.endDate}` : "";
+  const periodKey = `${period || "all"}:${customKey}`;
+
+  if (sourceState) {
+    let stateCache = _categoryDistCache.get(sourceState);
+    if (stateCache && stateCache.has(periodKey)) {
+      return stateCache.get(periodKey);
+    }
   }
 
   const budgets = calculateCategoryBudgets(categories, transactions, period, customRange);
@@ -608,6 +699,16 @@ function calculateCategoryDistribution(arg1, arg2, arg3, arg4) {
   const res = [...distributionList];
   res.totalExpense = totalExpense;
   res.distribution = distributionList;
+
+  if (sourceState) {
+    let stateCache = _categoryDistCache.get(sourceState);
+    if (!stateCache) {
+      stateCache = new Map();
+      _categoryDistCache.set(sourceState, stateCache);
+    }
+    stateCache.set(periodKey, res);
+  }
+
   return res;
 }
 
@@ -618,6 +719,7 @@ function filterAndSortTransactions(txnsOrState, filterParams = {}) {
     ? txnsOrState.transactions
     : [];
   const { filterType, accountId, categoryId, searchQuery, period, sortOrder, customRange } = filterParams;
+  const inPeriod = getDateFilterPredicate(period, customRange);
 
   let result = transactions.filter(t => {
     if (isGoalAllocationTransaction(t) && filterType && filterType !== "all") return false;
@@ -634,7 +736,7 @@ function filterAndSortTransactions(txnsOrState, filterParams = {}) {
     if (categoryId && categoryId !== "all" && t.categoryId !== categoryId) {
       return false;
     }
-    if (period && !isDateInPeriod(t.date, period, customRange)) {
+    if (period && !inPeriod(t.date)) {
       return false;
     }
     if (searchQuery && searchQuery.trim()) {
@@ -723,6 +825,16 @@ function getDateFilterPredicate(period, customRange = null) {
 }
 
 function calculatePeriodMetrics(state, period = "this_month", customRange = null) {
+  const customKey = customRange ? `${customRange.startDate}_${customRange.endDate}` : "";
+  const periodKey = `${period}:${customKey}`;
+
+  if (state && typeof state === "object") {
+    let stateCache = _periodMetricsCache.get(state);
+    if (stateCache && stateCache.has(periodKey)) {
+      return stateCache.get(periodKey);
+    }
+  }
+
   const allTxns = (state && Array.isArray(state.transactions)) ? state.transactions : [];
   let totalIncome = 0;
   let totalExpense = 0;
@@ -771,7 +883,7 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
   const overallBudgetRemaining = overallBudget > 0 ? overallBudget - totalExpense : 0;
 
   const netWorth = calculateNetWorth(state);
-  return {
+  const result = {
     period,
     netWorth,
     income: totalIncome,
@@ -788,6 +900,17 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
     isOverallBudgetOver,
     overallBudgetRemaining,
   };
+
+  if (state && typeof state === "object") {
+    let stateCache = _periodMetricsCache.get(state);
+    if (!stateCache) {
+      stateCache = new Map();
+      _periodMetricsCache.set(state, stateCache);
+    }
+    stateCache.set(periodKey, result);
+  }
+
+  return result;
 }
 
 function addTransfer(state, params) {
