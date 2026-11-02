@@ -341,7 +341,7 @@ runTest("6.1: App.js compiles cleanly via Babel parser with Flow & JSX plugins",
 runTest("6.2: App.js contains zero syntax errors, unclosed JSX tags, or malformed hooks", () => {
   assert(appSource.includes("const [modalCustomerStatement, setModalCustomerStatement] = useState(false);"), "modalCustomerStatement state hook declared");
   assert(appSource.includes("const [statementDateFilter, setStatementDateFilter] = useState('all');"), "statementDateFilter state hook declared");
-  assert(appSource.includes("modalCustomerStatement, modalVoucher,"), "modalCustomerStatement included in BackHandler dependencies");
+  assert(appSource.includes("modalCustomerStatement,") && appSource.includes("modalVoucher,"), "modalCustomerStatement included in BackHandler dependencies");
   assert(appSource.includes("visible={modalCustomerStatement}"), "Customer Statement Modal component present in JSX");
 });
 

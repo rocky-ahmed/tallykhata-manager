@@ -34,6 +34,10 @@ const {
   normalizeTagadaLogFields,
   resolveStatementDateRange,
   generateAccountStatement,
+  calculateSmsSegments,
+  getBulkTagadaEligibleCustomers,
+  prepareBulkTagadaBatch,
+  generateStatementDocumentPayload,
 } = require('./ledgerEngine');
 
 const VALID_COLLECTIONS = new Set([
@@ -2239,6 +2243,277 @@ class StorageRepository {
    *   recommendedAction: 'none' | 'compactStorage'
    * }>}
    */
+  /**
+   * Retrieves all active customers with positive outstanding debt for bulk Tagada dispatch.
+   * Scoped to businessId, sorted descending by balance.
+   *
+   * @param {string|number|null} [businessId=null]
+   * @param {Array|null} [accounts=null]
+   * @returns {Array<Object>} Eligible customers
+   */
+  getBulkTagadaEligibleCustomers(businessId = null, accounts = null) {
+    const targetBizId = businessId !== null && businessId !== undefined
+      ? String(businessId)
+      : this.getActiveBusinessId();
+    let accList = Array.isArray(accounts) ? accounts : null;
+    if (!accList) {
+      const state = this.getAuthoritativeState() || this.currentStore || {};
+      accList = Array.isArray(state.accounts) ? state.accounts : [];
+    }
+    return getBulkTagadaEligibleCustomers(targetBizId, accList);
+  }
+
+  /**
+   * Prepares a bulk Tagada batch:
+   * - Localized Bengali SMS reminders with telecom UCS-2 character counting & segments
+   * - Aggregate quota checks and shortfall calculation
+   *
+   * @param {Array<Object|string|number>} customerIdsOrCustomers Customer objects or IDs
+   * @param {Object} [options={}] Options
+   * @returns {Object} Compiled batch metadata
+   */
+  prepareBulkTagadaBatch(customerIdsOrCustomers = [], options = {}) {
+    const targetBizId = options.businessId !== undefined && options.businessId !== null
+      ? String(options.businessId)
+      : this.getActiveBusinessId();
+    const state = this.getAuthoritativeState() || this.currentStore || {};
+    const accounts = Array.isArray(options.accounts) ? options.accounts : (state.accounts || []);
+
+    let businessName = options.businessName;
+    let businessPhone = options.businessPhone;
+    if (!businessName || !businessPhone) {
+      const bizList = Array.isArray(state.businesses) ? state.businesses : [];
+      const currentBiz = bizList.find(b => String(b.id || b.business_id) === targetBizId) || null;
+      if (currentBiz) {
+        if (!businessName) businessName = currentBiz.name || currentBiz.business_name || currentBiz.businessName;
+        if (!businessPhone) businessPhone = currentBiz.phone;
+      }
+    }
+
+    const remainingQuota = options.remainingSmsCount !== undefined && options.remainingSmsCount !== null
+      ? options.remainingSmsCount
+      : this.getTagadaQuota(targetBizId).remainingSmsCount;
+
+    return prepareBulkTagadaBatch(customerIdsOrCustomers, {
+      businessId: targetBizId,
+      accounts,
+      businessName,
+      businessPhone,
+      remainingSmsCount: remainingQuota,
+      ...options,
+    });
+  }
+
+  /**
+   * Dispatches bulk Tagada batch atomically under writeQueue mutex:
+   * - Idempotency guard: skips items whose ID is already recorded in tagadaLogs
+   * - SMS quota deduction with zero-floor clamping
+   * - Fast-rejection on SMS_QUOTA_EXHAUSTED
+   * - Creates normalized Room DB-compliant tagada_log entries
+   * - Dispatches telemetry events for each sent reminder
+   *
+   * @param {Array|Object} batchItemsOrPrep Array of items or prepareBulkTagadaBatch result
+   * @param {Object} [options={}] Options ({ isFreeSms, bypassQuota, countBySegments })
+   * @returns {Promise<{ success: boolean, dispatchedCount: number, skippedDuplicates: number, deductedQuota: number, remainingSmsCount: number, tagadaLogs: Array, error?: string }>}
+   */
+  async dispatchBulkTagadaBatch(batchItemsOrPrep = [], options = {}) {
+    let items = [];
+    if (batchItemsOrPrep && typeof batchItemsOrPrep === 'object' && Array.isArray(batchItemsOrPrep.batchItems)) {
+      items = batchItemsOrPrep.batchItems;
+    } else if (Array.isArray(batchItemsOrPrep)) {
+      items = batchItemsOrPrep;
+    }
+
+    if (!items || items.length === 0) {
+      return {
+        success: true,
+        dispatchedCount: 0,
+        skippedDuplicates: 0,
+        deductedQuota: 0,
+        remainingSmsCount: this.getTagadaQuota().remainingSmsCount,
+        tagadaLogs: [],
+        totalRecipients: 0,
+      };
+    }
+
+    const isFreeSms = options.isFreeSms !== false;
+    const bypassQuota = options.bypassQuota === true;
+    const countBySegments = options.countBySegments !== false;
+
+    let dispatchedLogs = [];
+    let skippedCount = 0;
+    let finalQuotaDeducted = 0;
+    let finalRemaining = 0;
+
+    const mutateRes = await this.mutateStore((latestStore) => {
+      const curLogs = Array.isArray(latestStore.tagadaLogs) ? latestStore.tagadaLogs : [];
+      const curRemaining = Number(latestStore.remainingSmsCount !== undefined && latestStore.remainingSmsCount !== null
+        ? latestStore.remainingSmsCount
+        : 5);
+
+      const existingIdSet = new Set(curLogs.map(l => String(l.id)));
+      const newItems = [];
+      let quotaNeeded = 0;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!item) continue;
+        const itemId = String(item.id || '');
+        if (itemId && existingIdSet.has(itemId)) {
+          skippedCount++;
+          continue;
+        }
+        const norm = normalizeTagadaLogFields(item);
+        if (!norm || !norm.accountId) continue;
+
+        newItems.push(norm);
+        existingIdSet.add(String(norm.id));
+
+        const segs = Number(item.segments || norm.segments || 1);
+        quotaNeeded += countBySegments ? segs : 1;
+      }
+
+      if (isFreeSms && !bypassQuota && curRemaining < quotaNeeded) {
+        throw new Error(`SMS_QUOTA_EXHAUSTED: required ${quotaNeeded}, available ${curRemaining}`);
+      }
+
+      const nextRemaining = (isFreeSms && !bypassQuota)
+        ? Math.max(0, curRemaining - quotaNeeded)
+        : curRemaining;
+
+      finalQuotaDeducted = (isFreeSms && !bypassQuota) ? quotaNeeded : 0;
+      finalRemaining = nextRemaining;
+      dispatchedLogs = newItems;
+
+      return {
+        ...latestStore,
+        remainingSmsCount: nextRemaining,
+        tagadaLogs: [...newItems, ...curLogs],
+      };
+    });
+
+    if (!mutateRes.success) {
+      const errMsg = mutateRes.error ? String(mutateRes.error) : 'MUTATION_FAILED';
+      if (errMsg.includes('SMS_QUOTA_EXHAUSTED')) {
+        return {
+          success: false,
+          error: 'SMS_QUOTA_EXHAUSTED',
+          dispatchedCount: 0,
+          skippedDuplicates: skippedCount,
+          deductedQuota: 0,
+          remainingSmsCount: this.getTagadaQuota().remainingSmsCount,
+        };
+      }
+      return {
+        success: false,
+        error: errMsg,
+        dispatchedCount: 0,
+        skippedDuplicates: skippedCount,
+        deductedQuota: 0,
+        remainingSmsCount: this.getTagadaQuota().remainingSmsCount,
+      };
+    }
+
+    // Emit telemetry events
+    if (this.telemetry && typeof this.telemetry.logEvent === 'function') {
+      for (let i = 0; i < dispatchedLogs.length; i++) {
+        const log = dispatchedLogs[i];
+        try {
+          this.telemetry.logEvent(EVENT_TYPES.TAGADA_SENT, {
+            accountId: log.accountId,
+            businessId: log.businessId,
+            tagadaType: log.tagadaType,
+            creditAmount: log.creditAmount,
+            remainingSmsCount: finalRemaining,
+            isBulk: true,
+          });
+        } catch (_) {}
+      }
+    }
+
+    return {
+      success: true,
+      dispatchedCount: dispatchedLogs.length,
+      skippedDuplicates: skippedCount,
+      deductedQuota: finalQuotaDeducted,
+      remainingSmsCount: finalRemaining,
+      tagadaLogs: dispatchedLogs,
+      totalRecipients: items.length,
+    };
+  }
+
+  /**
+   * Generates a printable/exportable statement document payload with business metadata,
+   * customer profile, date-range headers, itemized ledger entries, running balances,
+   * and localized Bengali summary presentation copy.
+   *
+   * @param {Object|string|number} accountOrId Account object or accountId
+   * @param {Array|string|number} [journalsOrBizId] Journals array or businessId
+   * @param {string|Object} [dateRange='all'] 'all' | 'today' | 'this_month' | 'last_month' | 'custom'
+   * @param {Object} [options={}] Additional presentation options
+   * @returns {Object} Comprehensive statement document payload
+   */
+  generateStatementDocumentPayload(accountOrId, journalsOrBizId = null, dateRange = 'all', options = {}) {
+    let account = null;
+    let journals = [];
+    let businessId = null;
+
+    if (accountOrId && typeof accountOrId === 'object' && !Array.isArray(accountOrId)) {
+      account = accountOrId;
+      journals = Array.isArray(journalsOrBizId)
+        ? journalsOrBizId
+        : (this.currentStore?.journals || this.getAuthoritativeState()?.journals || []);
+      businessId = account.businessId || account.business_id || options.businessId || this.getActiveBusinessId();
+    } else {
+      const targetAccId = String(accountOrId);
+      if (typeof journalsOrBizId === 'string' || typeof journalsOrBizId === 'number') {
+        businessId = String(journalsOrBizId);
+      } else if (Array.isArray(journalsOrBizId)) {
+        journals = journalsOrBizId;
+        businessId = String(options.businessId || this.getActiveBusinessId() || '1');
+      } else if (journalsOrBizId && typeof journalsOrBizId === 'object' && (dateRange === 'all' || !dateRange)) {
+        dateRange = journalsOrBizId;
+        businessId = String(options.businessId || this.getActiveBusinessId() || '1');
+      } else {
+        businessId = String(options.businessId || this.getActiveBusinessId() || '1');
+      }
+
+      const state = this.getAuthoritativeState() || this.currentStore || {};
+      if (!journals || journals.length === 0) {
+        journals = Array.isArray(options.journals) ? options.journals : (state.journals || []);
+      }
+      const accounts = Array.isArray(options.accounts) ? options.accounts : (state.accounts || []);
+      account = accounts.find(a => String(a.id) === targetAccId && String(a.businessId || a.business_id || '1') === businessId);
+      if (!account) {
+        account = { id: targetAccId, name: options.name || 'Account', type: options.type || 1, businessId };
+      }
+    }
+
+    // Resolve business info if missing in options
+    const state = this.getAuthoritativeState() || this.currentStore || {};
+    let businessName = options.businessName;
+    let businessPhone = options.businessPhone;
+    let businessAddress = options.businessAddress;
+
+    if (!businessName || !businessPhone || !businessAddress) {
+      const bizList = Array.isArray(state.businesses) ? state.businesses : [];
+      const currentBiz = bizList.find(b => String(b.id || b.business_id) === String(businessId || '1')) || null;
+      if (currentBiz) {
+        if (!businessName) businessName = currentBiz.name || currentBiz.business_name || currentBiz.businessName;
+        if (!businessPhone) businessPhone = currentBiz.phone;
+        if (!businessAddress) businessAddress = currentBiz.address || currentBiz.business_address || currentBiz.businessAddress;
+      }
+    }
+
+    return generateStatementDocumentPayload(account, journals, dateRange, {
+      ...options,
+      businessId,
+      businessName,
+      businessPhone,
+      businessAddress,
+    });
+  }
+
   async getStorageMetrics() {
     if (!this.currentStore) {
       await this.loadInitialData();
@@ -2820,6 +3095,34 @@ function listTagadaLogs(accountId = null, businessId = null, options = {}, repo 
   return repo.listTagadaLogs(accountId, businessId, options);
 }
 
+function getBulkTagadaEligibleCustomersRepo(businessId = null, accounts = null, repo = defaultRepository) {
+  if (repo && typeof repo.getBulkTagadaEligibleCustomers === 'function') {
+    return repo.getBulkTagadaEligibleCustomers(businessId, accounts);
+  }
+  return getBulkTagadaEligibleCustomers(businessId, accounts);
+}
+
+function prepareBulkTagadaBatchRepo(customerIdsOrCustomers = [], options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.prepareBulkTagadaBatch === 'function') {
+    return repo.prepareBulkTagadaBatch(customerIdsOrCustomers, options);
+  }
+  return prepareBulkTagadaBatch(customerIdsOrCustomers, options);
+}
+
+function dispatchBulkTagadaBatchRepo(batchItemsOrPrep = [], options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.dispatchBulkTagadaBatch === 'function') {
+    return repo.dispatchBulkTagadaBatch(batchItemsOrPrep, options);
+  }
+  throw new Error('STORAGE_REPOSITORY_REQUIRED_FOR_DISPATCH');
+}
+
+function generateStatementDocumentPayloadRepo(accountOrId, journalsOrBizId = null, dateRange = 'all', options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.generateStatementDocumentPayload === 'function') {
+    return repo.generateStatementDocumentPayload(accountOrId, journalsOrBizId, dateRange, options);
+  }
+  return generateStatementDocumentPayload(accountOrId, journalsOrBizId, dateRange, options);
+}
+
 function generateAccountStatementRepo(accountOrId, journalsOrBizId, dateRange = 'all', options = {}, repo = defaultRepository) {
   if (repo && typeof repo.generateAccountStatement === 'function') {
     return repo.generateAccountStatement(accountOrId, journalsOrBizId, dateRange, options);
@@ -2846,6 +3149,11 @@ const repoExport = {
   getTagadaQuota,
   adjustTagadaQuota,
   listTagadaLogs,
+  calculateSmsSegments,
+  getBulkTagadaEligibleCustomers: getBulkTagadaEligibleCustomersRepo,
+  prepareBulkTagadaBatch: prepareBulkTagadaBatchRepo,
+  dispatchBulkTagadaBatch: dispatchBulkTagadaBatchRepo,
+  generateStatementDocumentPayload: generateStatementDocumentPayloadRepo,
   TelemetryService,
   telemetryService: defaultTelemetryService,
   EVENT_TYPES,
@@ -2875,6 +3183,11 @@ if (typeof exports !== 'undefined') {
   exports.getTagadaQuota = getTagadaQuota;
   exports.adjustTagadaQuota = adjustTagadaQuota;
   exports.listTagadaLogs = listTagadaLogs;
+  exports.calculateSmsSegments = calculateSmsSegments;
+  exports.getBulkTagadaEligibleCustomers = getBulkTagadaEligibleCustomersRepo;
+  exports.prepareBulkTagadaBatch = prepareBulkTagadaBatchRepo;
+  exports.dispatchBulkTagadaBatch = dispatchBulkTagadaBatchRepo;
+  exports.generateStatementDocumentPayload = generateStatementDocumentPayloadRepo;
   exports.TelemetryService = TelemetryService;
   exports.telemetryService = defaultTelemetryService;
   exports.EVENT_TYPES = EVENT_TYPES;

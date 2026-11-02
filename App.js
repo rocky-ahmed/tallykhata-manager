@@ -844,6 +844,8 @@ function TallyKhataApp() {
   const [modalTagada, setModalTagada] = useState(false);
   const [modalCustomerStatement, setModalCustomerStatement] = useState(false);
   const [statementDateFilter, setStatementDateFilter] = useState('all'); // 'all' | 'today' | 'this_month' | 'last_month'
+  const [modalBulkTagada, setModalBulkTagada] = useState(false);
+  const [selectedBulkCustomerIds, setSelectedBulkCustomerIds] = useState({});
   const [modalTallyMessage, setModalTallyMessage] = useState(false);
   const [tallyMessageBalance, setTallyMessageBalance] = useState(50);
   const [modalTxnLimit, setModalTxnLimit] = useState(false);
@@ -2104,6 +2106,7 @@ function TallyKhataApp() {
       if (modalMobileRecharge) { setModalMobileRecharge(false); return true; }
       if (modalTagada) { setModalTagada(false); return true; }
       if (modalCustomerStatement) { setModalCustomerStatement(false); return true; }
+      if (modalBulkTagada) { setModalBulkTagada(false); return true; }
       if (modalVoucher) { setModalVoucher(false); return true; }
       if (modalPinSetup) { setModalPinSetup(false); return true; }
       if (modalProfitLoss) { setModalProfitLoss(false); return true; }
@@ -2161,7 +2164,7 @@ function TallyKhataApp() {
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
     modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
-    modalMobileRecharge, modalTagada, modalCustomerStatement, modalVoucher, modalPinSetup, modalProfitLoss,
+    modalMobileRecharge, modalTagada, modalCustomerStatement, modalBulkTagada, modalVoucher, modalPinSetup, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
     modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, modalNotifications, modalDataManagement, modalAbout, modalFilter, modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMWithdrawGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange, modalMMMonthPicker, currentScreen, activeTab
   ]);
@@ -4239,70 +4242,110 @@ function TallyKhataApp() {
       Alert.alert(tStatic("তথ্য"), tStatic("কোনো কাস্টমারের কাছে বকেয়া বাকি নেই।"));
       return;
     }
+    const initialSelected = {};
+    dueCustomers.forEach((cust) => {
+      initialSelected[cust.id] = true;
+    });
+    setSelectedBulkCustomerIds(initialSelected);
+    setModalBulkTagada(true);
+  };
+
+  const handleToggleBulkCustomer = (id) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSelectedBulkCustomerIds((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const handleToggleSelectAllBulk = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    if (isAllBulkSelected) {
+      setSelectedBulkCustomerIds({});
+    } else {
+      const allSelected = {};
+      dueCustomers.forEach((cust) => {
+        allSelected[cust.id] = true;
+      });
+      setSelectedBulkCustomerIds(allSelected);
+    }
+  };
+
+  const handleTriggerBulkTagadaConfirm = () => {
+    if (selectedBulkCount === 0) {
+      Alert.alert(tStatic("সতর্কতা"), tStatic("অনুগ্রহ করে অন্তত একজন কাস্টমার সিলেক্ট করুন।"));
+      return;
+    }
     if (remainingSmsCount <= 0) {
       Alert.alert(tStatic("ফ্রি এসএমএস সমাপ্ত"), tStatic("আপনার কোনো ফ্রি মেসেজ বা এসএমএস কোটা অবশিষ্ট নেই।"));
       return;
     }
     Alert.alert(
-      tStatic("গ্রুপ তাগাদা পাঠান"),
-      `${tStatic("মোট ")}${dueCustomers.length}${tStatic(" জন বাকি কাস্টমারকে একসাথে টালি-মেসেজ পাঠাতে চান? মোট বকেয়া ৳ ")}${formatMoney(totalCustomerDue)}।`,
+      tStatic("গ্রুপ তাগাদা নিশ্চিতকরণ"),
+      tStatic("আপনি কি ") + selectedBulkCount + tStatic(" জন কাস্টমারকে মোট ৳ ") + formatMoney(selectedBulkTotalDue) + tStatic(" টাকার বকেয়া তাগাদা পাঠাতে চান?"),
       [
-        { text: tStatic("বাতিল"), style: 'cancel' },
+        { text: tStatic("বাতিল"), style: "cancel" },
         {
-          text: tStatic("পাঠান"),
-          onPress: async () => {
-            if (remainingSmsCount <= 0) {
-              Alert.alert(tStatic("ফ্রি এসএমএস সমাপ্ত"), tStatic("আপনার কোনো ফ্রি মেসেজ বা এসএমএস কোটা অবশিষ্ট নেই।"));
-              return;
-            }
-            const todayStr = getTodayDate();
-            const timeStr = getTimeString();
-            const nowIso = new Date().toISOString();
-            const bulkBizId = String(activeBusinessId || '1');
-            const newLogs = dueCustomers.map((cust) => ({
-              id: generateUniqueId('tag_'),
-              accountId: String(cust.id || ''),
-              account_id: isNaN(Number(cust.id)) ? cust.id : Number(cust.id),
-              businessId: String(cust.businessId || bulkBizId),
-              business_id: isNaN(Number(cust.businessId || bulkBizId)) ? String(cust.businessId || bulkBizId) : Number(cust.businessId || bulkBizId),
-              customerName: cust.name,
-              phone: cust.phone || '',
-              amount: cust.balance,
-              credit_amount: cust.balance,
-              creditAmount: cust.balance,
-              tagada_type: 'BULK_TAGADA',
-              tagadaType: 'BULK_TAGADA',
-              synced: 0,
-              create_date: nowIso,
-              createDate: nowIso,
-              date: todayStr,
-              time: timeStr,
-            }));
-            setIsSaving(true);
-            const saveRes = await storageRepository.mutateStore((latestStore) => {
-              const curCount = Number(latestStore.remainingSmsCount) || 0;
-              const curLogs = latestStore.tagadaLogs || [];
-              return {
-                ...latestStore,
-                remainingSmsCount: Math.max(0, curCount - 1),
-                tagadaLogs: [...newLogs, ...curLogs],
-              };
-            });
-            setIsSaving(false);
-            if (!saveRes.success) {
-              Alert.alert(tStatic("ত্রুটি"), tStatic("গ্রুপ তাগাদা সংরক্ষণ ব্যর্থ হয়েছে।"));
-              return;
-            }
-            try { hapticFeedbackService.onTransactionSave(); } catch (e) {}
-            setRemainingSmsCount(saveRes.data.remainingSmsCount);
-            setTagadaLogs(saveRes.data.tagadaLogs);
-            Alert.alert(
-              tStatic("সফল"),
-              `${tStatic("সকল ")}${dueCustomers.length}${tStatic(" জন বকেয়া কাস্টমারকে গ্রুপ তাগাদা মেসেজ সফলভাবে পাঠানো হয়েছে!")}`
-            );
-          },
+          text: tStatic("নিশ্চিত করুন"),
+          onPress: executeBulkTagadaDispatch,
         },
       ]
+    );
+  };
+
+  const executeBulkTagadaDispatch = async () => {
+    if (remainingSmsCount <= 0) {
+      Alert.alert(tStatic("ফ্রি এসএমএস সমাপ্ত"), tStatic("আপনার কোনো ফ্রি মেসেজ বা এসএমএস কোটা অবশিষ্ট নেই।"));
+      return;
+    }
+    const todayStr = getTodayDate();
+    const timeStr = getTimeString();
+    const nowIso = new Date().toISOString();
+    const bulkBizId = String(activeBusinessId || '1');
+    const newLogs = dueCustomers.map((cust) => ({
+      id: generateUniqueId('tag_'),
+      accountId: String(cust.id || ''),
+      account_id: isNaN(Number(cust.id)) ? cust.id : Number(cust.id),
+      businessId: String(cust.businessId || bulkBizId),
+      business_id: isNaN(Number(cust.businessId || bulkBizId)) ? String(cust.businessId || bulkBizId) : Number(cust.businessId || bulkBizId),
+      customerName: cust.name,
+      phone: cust.phone || '',
+      amount: cust.balance,
+      credit_amount: cust.balance,
+      creditAmount: cust.balance,
+      tagada_type: 'BULK_TAGADA',
+      tagadaType: 'BULK_TAGADA',
+      synced: 0,
+      create_date: nowIso,
+      createDate: nowIso,
+      date: todayStr,
+      time: timeStr,
+    })).filter((log) => selectedBulkCustomerIds[log.accountId]);
+
+    if (newLogs.length === 0) return;
+
+    setIsSaving(true);
+    const saveRes = await storageRepository.mutateStore((latestStore) => {
+      const curCount = Number(latestStore.remainingSmsCount) || 0;
+      const curLogs = latestStore.tagadaLogs || [];
+      return {
+        ...latestStore,
+        remainingSmsCount: Math.max(0, curCount - 1),
+        tagadaLogs: [...newLogs, ...curLogs],
+      };
+    });
+    setIsSaving(false);
+    if (!saveRes.success) {
+      Alert.alert(tStatic("ত্রুটি"), tStatic("গ্রুপ তাগাদা সংরক্ষণ ব্যর্থ হয়েছে।"));
+      return;
+    }
+    try { hapticFeedbackService.onTransactionSave(); } catch (e) {}
+    setRemainingSmsCount(saveRes.data.remainingSmsCount);
+    setTagadaLogs(saveRes.data.tagadaLogs);
+    setModalBulkTagada(false);
+    Alert.alert(
+      tStatic("সফল"),
+      newLogs.length + tStatic(" জন কাস্টমারকে গ্রুপ তাগাদা মেসেজ সফলভাবে পাঠানো হয়েছে! অবশিষ্ট ফ্রি কোটা: ") + saveRes.data.remainingSmsCount + tStatic(" টি।")
     );
   };
 
@@ -4375,6 +4418,25 @@ function TallyKhataApp() {
   const dueCustomers = useMemo(() => {
     return (businessAccounts || []).filter((a) => a.type === 1 && (Number(a.balance) || 0) > 0);
   }, [businessAccounts]);
+
+  const selectedBulkCount = useMemo(() => {
+    return Object.values(selectedBulkCustomerIds || {}).filter(Boolean).length;
+  }, [selectedBulkCustomerIds]);
+
+  const selectedBulkTotalDue = useMemo(() => {
+    let sum = 0;
+    (dueCustomers || []).forEach((c) => {
+      if (selectedBulkCustomerIds && selectedBulkCustomerIds[c.id]) {
+        sum += (Number(c.balance) || 0);
+      }
+    });
+    return sum;
+  }, [dueCustomers, selectedBulkCustomerIds]);
+
+  const isAllBulkSelected = useMemo(() => {
+    if (!dueCustomers || dueCustomers.length === 0) return false;
+    return dueCustomers.every((c) => selectedBulkCustomerIds && selectedBulkCustomerIds[c.id]);
+  }, [dueCustomers, selectedBulkCustomerIds]);
 
   const filteredDueCustomers = useMemo(() => {
     let list = [...dueCustomers];
@@ -9128,6 +9190,154 @@ function TallyKhataApp() {
               />
               <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
                 {tStatic("PDF / স্টেটমেন্ট শেয়ার")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: BULK TAGADA (একসাথে তাগাদা পাঠান) (ITERATION 208)
+         =================================================================== */}
+      <Modal visible={modalBulkTagada} animationType="slide" onRequestClose={() => setModalBulkTagada(false)}>
+        <SafeAreaView style={[styles.reportContainer, isDark && tStyles.reportContainer]}>
+          <View style={[styles.reportHeader, isDark && tStyles.reportHeader]}>
+            <TouchableOpacity
+              onPress={() => setModalBulkTagada(false)}
+              style={styles.reportHeaderBack}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Image
+                source={require('./assets/icons/arrow_left.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.reportHeaderTitle}>{tStatic("একসাথে তাগাদা পাঠান")}</Text>
+              <Text style={[styles.reportHeaderSubtitle, { color: 'rgba(255, 255, 255, 0.9)' }]}>
+                {"৳ " + formatMoney(selectedBulkTotalDue) + " (" + selectedBulkCount + " জন সিলেক্টেড)"}
+              </Text>
+            </View>
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>
+                {"ফ্রি: " + remainingSmsCount}
+              </Text>
+            </View>
+          </View>
+
+          {/* Master Toggle Bar: সবাইকে সিলেক্ট করুন */}
+          <View style={[styles.bulkTagadaMasterBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderBottomColor: currentTheme.cardBorder }]}>
+            <TouchableOpacity
+              style={styles.bulkTagadaMasterToggle}
+              onPress={handleToggleSelectAllBulk}
+              activeOpacity={0.7}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isAllBulkSelected }}
+              accessibilityLabel={tStatic("সবাইকে সিলেক্ট করুন")}
+            >
+              <View style={[styles.bulkCheckbox, isAllBulkSelected && styles.bulkCheckboxChecked]}>
+                {isAllBulkSelected ? (
+                  <Text style={styles.bulkCheckboxCheckmark}>✓</Text>
+                ) : null}
+              </View>
+              <Text style={[styles.bulkTagadaMasterLabel, isDark && tStyles.textPrimary]}>
+                {tStatic("সবাইকে সিলেক্ট করুন")}
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.bulkTagadaSelectionStats, isDark && tStyles.textSecondary]}>
+              {selectedBulkCount + " / " + dueCustomers.length + " জন"}
+            </Text>
+          </View>
+
+          {/* Multi-Customer List (layout_bulk_tagada_customer_item.xml) */}
+          <FlatList
+            data={dueCustomers}
+            keyExtractor={(item, index) => item.id || ("bulk_cust_" + index)}
+            contentContainerStyle={{ paddingBottom: 120 }}
+            renderItem={({ item }) => {
+              const isSelected = !!selectedBulkCustomerIds[item.id];
+              return (
+                <TouchableOpacity
+                  style={[styles.bulkCustomerRow, isDark && { backgroundColor: currentTheme.cardBg, borderBottomColor: currentTheme.cardBorder }]}
+                  onPress={() => handleToggleBulkCustomer(item.id)}
+                  activeOpacity={0.7}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isSelected }}
+                  accessibilityLabel={item.name + ", বকেয়া ৳ " + formatMoney(item.balance)}
+                >
+                  <View style={[styles.bulkCheckbox, isSelected && styles.bulkCheckboxChecked]}>
+                    {isSelected ? (
+                      <Text style={styles.bulkCheckboxCheckmark}>✓</Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.bulkCustomerAvatar}>
+                    <Text style={styles.bulkCustomerAvatarText}>
+                      {(item.name || "ন").trim().charAt(0)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={[styles.bulkCustomerName, isDark && tStyles.textPrimary]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={[styles.bulkCustomerPhone, isDark && tStyles.textSecondary]}>
+                      {item.phone || tStatic("মোবাইল নম্বর নেই")}
+                    </Text>
+                  </View>
+                  <View style={styles.bulkDuePill}>
+                    <Text style={styles.bulkDueAmount}>
+                      {"৳ " + formatMoney(item.balance)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <Text style={[{ color: '#6B7280', fontSize: 14 }, isDark && tStyles.textSecondary]}>
+                  {tStatic("কোনো বকেয়া কাস্টমার পাওয়া যায়নি")}
+                </Text>
+              </View>
+            }
+          />
+
+          {/* Sticky Bottom Action Bar with Safe Area Padding */}
+          <View style={[styles.bulkBottomBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
+            <View style={styles.bulkBottomMetaRow}>
+              <Text style={[styles.bulkQuotaText, isDark && tStyles.textSecondary]}>
+                {"অবশিষ্ট ফ্রি কোটা: " + remainingSmsCount + "টি"}
+              </Text>
+              <Text style={[styles.bulkQuotaText, { fontWeight: 'bold', color: selectedBulkCount > remainingSmsCount ? '#DC2626' : (isDark ? currentTheme.textSecondary : '#475569') }]}>
+                {"প্রয়োজন: " + selectedBulkCount + "টি SMS"}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.bulkSendBtn,
+                selectedBulkCount === 0 && { opacity: 0.5 },
+                { minHeight: 48, borderRadius: 12 }
+              ]}
+              onPress={handleTriggerBulkTagadaConfirm}
+              activeOpacity={0.85}
+              disabled={selectedBulkCount === 0}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("তাগাদা পাঠান")}
+            >
+              <Image
+                source={require('./assets/icons/ic_sms.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
+              <Text style={styles.bulkSendBtnText}>
+                {selectedBulkCount > 0
+                  ? (tStatic("তাগাদা পাঠান") + " (" + selectedBulkCount + " জন)")
+                  : tStatic("তাগাদা পাঠান")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -17031,9 +17241,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   bulkTagadaArrow: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    width: 16,
+    height: 16,
+    tintColor: '#FFFFFF',
     marginLeft: 8,
   },
 
@@ -18691,6 +18901,139 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#7C3AED',
     paddingVertical: 12,
+  },
+
+  // --- BULK TAGADA UI (ITERATION 208) ---
+  bulkTagadaMasterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  bulkTagadaMasterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  bulkTagadaMasterLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  bulkTagadaSelectionStats: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#64748B',
+  },
+  bulkCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#64748B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  bulkCheckboxChecked: {
+    backgroundColor: '#B81414',
+    borderColor: '#B81414',
+  },
+  bulkCheckboxCheckmark: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    lineHeight: 16,
+  },
+  bulkCustomerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+  },
+  bulkCustomerAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  bulkCustomerAvatarText: {
+    color: '#B81414',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  bulkCustomerName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  bulkCustomerPhone: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  bulkDuePill: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  bulkDueAmount: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#B91C1C',
+  },
+  bulkBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'android' ? 46 : 14,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    elevation: 8,
+  },
+  bulkBottomMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  bulkQuotaText: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  bulkSendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#B81414',
+    borderRadius: 12,
+    height: 50,
+    elevation: 3,
+  },
+  bulkSendBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 
 

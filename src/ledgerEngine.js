@@ -910,6 +910,413 @@ function generateAccountStatement(accountOrId, journalsOrBizId, dateRange = 'all
   };
 }
 
+// --- 3.6. BULK TAGADA BATCH ENGINE & STATEMENT DOCUMENT GENERATOR (REA-ITER-208) ---
+
+/**
+ * Calculates telecom SMS segments according to GSM 03.38 & UCS-2 telecom standards:
+ * - UCS-2 (Unicode / Bengali): <= 70 chars = 1 segment; > 70 chars = Math.ceil(len / 67) segments
+ * - GSM-7 (ASCII): <= 160 chars = 1 segment; > 160 chars = Math.ceil(len / 153) segments
+ *
+ * @param {string} text Input SMS text
+ * @returns {{ charCount: number, segments: number, encoding: 'UCS-2'|'GSM-7', maxSingleSegment: number, maxMultipartSegment: number }}
+ */
+function calculateSmsSegments(text = '') {
+  const str = String(text || '');
+  const charCount = str.length;
+  if (charCount === 0) {
+    return {
+      charCount: 0,
+      segments: 0,
+      encoding: 'GSM-7',
+      maxSingleSegment: 160,
+      maxMultipartSegment: 153,
+    };
+  }
+
+  // Detect non-ASCII / Unicode characters (e.g. Bengali Unicode \u0980-\u09FF or any charCode > 127)
+  const isUnicode = /[^\u0020-\u007E\r\n\t]/.test(str);
+
+  if (isUnicode) {
+    const segments = charCount <= 70 ? 1 : Math.ceil(charCount / 67);
+    return {
+      charCount,
+      segments,
+      encoding: 'UCS-2',
+      maxSingleSegment: 70,
+      maxMultipartSegment: 67,
+    };
+  }
+
+  const segments = charCount <= 160 ? 1 : Math.ceil(charCount / 153);
+  return {
+    charCount,
+    segments,
+    encoding: 'GSM-7',
+    maxSingleSegment: 160,
+    maxMultipartSegment: 153,
+  };
+}
+
+/**
+ * Retrieves all active customers (type === 1) with positive outstanding debt (balance > 0)
+ * strictly scoped to target businessId, sorted descending by balance (highest debt first).
+ *
+ * @param {string|number} [businessId='1']
+ * @param {Array} [accounts=[]]
+ * @returns {Array<Object>} Eligible customers sorted descending by balance
+ */
+function getBulkTagadaEligibleCustomers(businessId = '1', accounts = []) {
+  let targetBizId = '1';
+  let accList = [];
+  if (Array.isArray(businessId)) {
+    accList = businessId;
+    targetBizId = String(accounts !== undefined && accounts !== null ? accounts : '1');
+  } else {
+    targetBizId = String(businessId !== undefined && businessId !== null ? businessId : '1');
+    accList = Array.isArray(accounts) ? accounts : [];
+  }
+
+  const eligible = [];
+  for (let i = 0; i < accList.length; i++) {
+    const acc = accList[i];
+    if (!acc) continue;
+
+    const accBizId = String(acc.businessId !== undefined && acc.businessId !== null
+      ? acc.businessId
+      : (acc.business_id !== undefined && acc.business_id !== null ? acc.business_id : '1'));
+
+    if (accBizId !== targetBizId) continue;
+
+    // Check account type: customer (type === 1)
+    const isCustomer = (Number(acc.type) || 1) === 1 || acc.type === '1' || acc.type === 'customer';
+    if (!isCustomer) continue;
+
+    // Check active status
+    const isArchived = acc.isArchived === true || acc.is_active === 0 || acc.is_active === '0' || acc.isActive === false;
+    if (isArchived) continue;
+
+    // Positive outstanding debt (balance > 0)
+    const rawBal = Number(acc.balance !== undefined && acc.balance !== null
+      ? acc.balance
+      : (acc.current_balance !== undefined && acc.current_balance !== null ? acc.current_balance : (acc.currentBalance || 0))) || 0;
+
+    const cleanBal = Math.round(rawBal * 100) / 100;
+    if (cleanBal > 0) {
+      eligible.push({
+        ...acc,
+        balance: cleanBal,
+        creditAmount: cleanBal,
+      });
+    }
+  }
+
+  // Sort descending by outstanding balance (highest debt first)
+  eligible.sort((a, b) => {
+    const balA = Number(a.balance) || 0;
+    const balB = Number(b.balance) || 0;
+    return balB - balA;
+  });
+
+  return eligible;
+}
+
+/**
+ * Prepares a bulk Tagada batch:
+ * - Generates authentic localized Bengali SMS reminders
+ * - Calculates telecom SMS character counts & UCS-2 segments
+ * - Computes total required quota and compares against available quota
+ * - Returns structured batch items with multi-tenant scoping
+ *
+ * @param {Array<Object|string|number>} customerIdsOrCustomers Customer objects or account IDs
+ * @param {Object} [options={}] Options ({ businessId, accounts, businessName, businessPhone, remainingSmsCount, customTemplate, countBySegments })
+ * @returns {Object} Batch compilation result
+ */
+function prepareBulkTagadaBatch(customerIdsOrCustomers = [], options = {}) {
+  const targetBizId = String(options.businessId !== undefined && options.businessId !== null ? options.businessId : '1');
+  const allAccounts = Array.isArray(options.accounts) ? options.accounts : [];
+  const businessName = String(options.businessName || options.business?.name || 'টালিখাতা ডিজিটাল');
+  const tagadaType = String(options.tagadaType || 'TAGADA_BY_FREE_SMS');
+  const businessPhone = String(options.businessPhone || options.business?.phone || options.ownerPhone || '');
+  const remainingQuota = Number(options.remainingSmsCount !== undefined && options.remainingSmsCount !== null
+    ? options.remainingSmsCount
+    : (options.remainingQuota !== undefined && options.remainingQuota !== null ? options.remainingQuota : 0));
+
+  // Resolve customer objects
+  let targetCustomers = [];
+  if (Array.isArray(customerIdsOrCustomers)) {
+    for (let i = 0; i < customerIdsOrCustomers.length; i++) {
+      const item = customerIdsOrCustomers[i];
+      if (!item) continue;
+      if (typeof item === 'object') {
+        targetCustomers.push(item);
+      } else {
+        const strId = String(item);
+        const found = allAccounts.find(a => String(a.id) === strId && String(a.businessId || a.business_id || '1') === targetBizId);
+        if (found) {
+          targetCustomers.push(found);
+        } else {
+          targetCustomers.push({ id: strId, name: 'গ্রাহক', balance: 0, businessId: targetBizId });
+        }
+      }
+    }
+  }
+
+  let totalDebtPaisa = 0;
+  let totalSegments = 0;
+  const batchItems = [];
+
+  for (let i = 0; i < targetCustomers.length; i++) {
+    const cust = targetCustomers[i];
+    const rawBal = Number(cust.balance !== undefined && cust.balance !== null
+      ? cust.balance
+      : (cust.creditAmount !== undefined && cust.creditAmount !== null
+          ? cust.creditAmount
+          : (cust.current_balance !== undefined ? cust.current_balance : (cust.currentBalance || 0)))) || 0;
+    const cleanBal = Math.round(rawBal * 100) / 100;
+    const balPaisa = Math.round(cleanBal * 100);
+    totalDebtPaisa += balPaisa;
+
+    const custName = String(cust.name || 'গ্রাহক');
+    const custPhone = String(cust.phone || cust.mobile || '');
+    const accId = String(cust.id || '');
+
+    // Formulate message
+    let message = '';
+    if (typeof options.customTemplate === 'function') {
+      message = options.customTemplate(cust, { businessName, businessPhone, balance: cleanBal });
+    } else if (typeof options.customTemplate === 'string') {
+      message = options.customTemplate
+        .replace(/\$\{customerName\}/g, custName)
+        .replace(/\$\{businessName\}/g, businessName)
+        .replace(/\$\{balance\}/g, cleanBal.toFixed(2))
+        .replace(/\$\{businessPhone\}/g, businessPhone);
+    } else {
+      const phoneSnippet = businessPhone ? ` যোগাযোগ: ${businessPhone}` : '';
+      message = `আসসালামু আলাইকুম ${custName}, ${businessName}-এ আপনার বকেয়া হিসাব বাবদ মোট ৳ ${cleanBal.toFixed(2)} টাকা পাওনা রয়েছে। অনুগ্রহ করে বকেয়া পরিশোধ করার জন্য অনুরোধ করা হলো। ধন্যবাদ।${phoneSnippet}`;
+    }
+
+    const smsInfo = calculateSmsSegments(message);
+    totalSegments += smsInfo.segments;
+
+    const itemId = typeof options.generateId === 'function'
+      ? options.generateId(cust, i)
+      : (cust._tagadaId || generateUniqueId('tag_'));
+
+    batchItems.push({
+      id: itemId,
+      account_id: isNaN(Number(accId)) ? accId : Number(accId),
+      accountId: accId,
+      customerName: custName,
+      name: custName,
+      phone: custPhone,
+      credit_amount: cleanBal,
+      creditAmount: cleanBal,
+      balance: cleanBal,
+      message,
+      text: message,
+      charCount: smsInfo.charCount,
+      segments: smsInfo.segments,
+      encoding: smsInfo.encoding,
+      tagada_type: tagadaType,
+      tagadaType,
+      synced: 0,
+      business_id: isNaN(Number(targetBizId)) ? targetBizId : Number(targetBizId),
+      businessId: targetBizId,
+      create_date: options.createDate || new Date().toISOString(),
+      createDate: options.createDate || new Date().toISOString(),
+    });
+  }
+
+  const countBySegments = options.countBySegments === true;
+  const requiredQuota = countBySegments ? totalSegments : batchItems.length;
+  const hasSufficientQuota = remainingQuota >= requiredQuota;
+  const quotaShortfall = Math.max(0, requiredQuota - remainingQuota);
+
+  return {
+    businessId: targetBizId,
+    businessName,
+    businessPhone,
+    totalRecipients: batchItems.length,
+    totalDebtAmount: totalDebtPaisa / 100,
+    totalSegmentsRequired: totalSegments,
+    availableQuota: remainingQuota,
+    requiredQuota,
+    hasSufficientQuota,
+    quotaShortfall,
+    countBySegments,
+    batchItems,
+    items: batchItems,
+  };
+}
+
+/**
+ * Compiles a comprehensive printable/exportable receipt structure with business metadata,
+ * merchant phone, customer profile, date-range headers, itemized transaction list
+ * with running balances (0.00 Paisa float drift), aggregate metrics, and localized Bengali summary copy.
+ *
+ * @param {Object|string|number} accountOrId Account object or accountId
+ * @param {Array|string|number} journalsOrBizId Journals array or businessId
+ * @param {string|Object} [dateRange='all'] 'all' | 'today' | 'this_month' | 'last_month' | 'custom'
+ * @param {Object} [options={}] Additional presentation options ({ businessName, businessPhone, businessAddress, referenceDate })
+ * @returns {Object} Comprehensive statement document payload
+ */
+function generateStatementDocumentPayload(accountOrId, journalsOrBizId, dateRange = 'all', options = {}) {
+  const stmt = generateAccountStatement(accountOrId, journalsOrBizId, dateRange, options);
+
+  const refDate = options.referenceDate instanceof Date && !isNaN(options.referenceDate.getTime())
+    ? options.referenceDate
+    : new Date();
+
+  const businessName = String(options.businessName || options.business?.name || 'টালিখাতা ডিজিটাল');
+  const businessPhone = String(options.businessPhone || options.business?.phone || '');
+  const businessAddress = String(options.businessAddress || options.business?.address || '');
+
+  const accountName = String(stmt.accountName || options.accountName || 'গ্রাহক');
+  const accountPhone = String(stmt.accountPhone || options.accountPhone || '');
+  const accountAddress = String(options.accountAddress || '');
+
+  // Bengali range label mapping
+  let rangeLabel = 'সকল লেনদেন';
+  if (stmt.dateRange.range === 'today') {
+    rangeLabel = `আজ (${stmt.dateRange.startDate || ''})`;
+  } else if (stmt.dateRange.range === 'this_month') {
+    rangeLabel = `চলতি মাস (${stmt.dateRange.startDate || ''} থেকে ${stmt.dateRange.endDate || ''})`;
+  } else if (stmt.dateRange.range === 'last_month') {
+    rangeLabel = `গত মাস (${stmt.dateRange.startDate || ''} থেকে ${stmt.dateRange.endDate || ''})`;
+  } else if (stmt.dateRange.range === 'custom') {
+    rangeLabel = `${stmt.dateRange.startDate || 'শুরু'} থেকে ${stmt.dateRange.endDate || 'বর্তমান'}`;
+  }
+
+  // Balance status label
+  let balanceStatusLabel = 'পরিশোধিত';
+  if (stmt.closingBalance > 0) {
+    balanceStatusLabel = stmt.isCustomer ? 'মোট পাওনা বকেয়া' : 'মোট দেনা বকেয়া';
+  } else if (stmt.closingBalance < 0) {
+    balanceStatusLabel = stmt.isCustomer ? 'অগ্রিম জমা' : 'অগ্রিম পাওনা';
+  }
+
+  const title = stmt.isCustomer ? 'বকেয়া হিসাব বিবরণী' : 'দেনা হিসাব বিবরণী';
+
+  // Itemized entries
+  const entries = (stmt.journals || []).map((j, idx) => {
+    let isGiven = j.type === 'given' || j.txn_type === 'given';
+    let isReceived = j.type === 'received' || j.txn_type === 'received';
+    if (!isGiven && !isReceived && (j.txn_type === 1 || j.txn_type === 2 || j.txn_type === '1' || j.txn_type === '2')) {
+      const numType = Number(j.txn_type);
+      if (stmt.isCustomer) {
+        isGiven = numType === 1;
+        isReceived = numType === 2;
+      } else {
+        isReceived = numType === 1;
+        isGiven = numType === 2;
+      }
+    }
+
+    const numAmt = Number(j.amount !== undefined && j.amount !== null ? j.amount : j.amount_received) || 0;
+    const cleanAmt = Math.round(numAmt * 100) / 100;
+    const runningBal = Number(j.runningBalance !== undefined ? j.runningBalance : 0);
+
+    const debit = (stmt.isCustomer && isGiven) || (!stmt.isCustomer && isReceived) ? cleanAmt : 0;
+    const credit = (stmt.isCustomer && isReceived) || (!stmt.isCustomer && isGiven) ? cleanAmt : 0;
+
+    const directionLabel = isGiven ? 'দিলাম' : 'পেলাম';
+    const desc = j.description || j.desc || j.notes || (isGiven
+      ? (stmt.isCustomer ? 'বাকি দিলাম' : 'পাওনা শোধ')
+      : (stmt.isCustomer ? 'বাকি আদায়' : 'বাকি নিলাম'));
+
+    return {
+      index: idx + 1,
+      id: j.id || `entry_${idx + 1}`,
+      date: j.date || j.txn_date || j.createdAt || '',
+      formattedDate: j.date || j.txn_date || '',
+      description: String(desc),
+      type: isGiven ? 'given' : 'received',
+      directionLabel,
+      debit,
+      credit,
+      amount: cleanAmt,
+      amountFormatted: `৳ ${cleanAmt.toFixed(2)}`,
+      runningBalance: runningBal,
+      runningBalanceFormatted: `৳ ${runningBal.toFixed(2)}`,
+    };
+  });
+
+  const summaryBanner = `${businessName} | ${title} | ${accountName} | সমাপনী জের: ৳ ${stmt.closingBalance.toFixed(2)} (${balanceStatusLabel})`;
+
+  const sep = '--------------------------------';
+  const shareLines = [
+    `📋 *${title}*`,
+    `দোকান: ${businessName}`,
+    businessPhone ? `মোবাইল: ${businessPhone}` : null,
+    `নাম: ${accountName}${accountPhone ? ' (' + accountPhone + ')' : ''}`,
+    `সময়কাল: ${rangeLabel}`,
+    sep,
+    `শুরুর জের: ৳ ${stmt.openingBalance.toFixed(2)}`,
+    `মোট দিলাম: ৳ ${stmt.totalGiven.toFixed(2)}`,
+    `মোট পেলাম: ৳ ${stmt.totalReceived.toFixed(2)}`,
+    sep,
+    `সমাপনী জের: ৳ ${stmt.closingBalance.toFixed(2)} (${balanceStatusLabel})`,
+    sep,
+    `ধন্যবাদ, ${businessName}`,
+    businessPhone ? `যোগাযোগ: ${businessPhone}` : null,
+  ].filter(Boolean);
+  const shareableText = shareLines.join('\n');
+
+  return {
+    documentId: options.documentId || generateUniqueId('stmt_doc_'),
+    docType: 'ACCOUNT_STATEMENT',
+    version: '1.0',
+    generatedAt: refDate.toISOString(),
+    generatedDate: formatIsoDate(refDate),
+    generatedTime: refDate.toTimeString().slice(0, 8),
+    business: {
+      id: String(stmt.businessId),
+      name: businessName,
+      phone: businessPhone,
+      address: businessAddress,
+    },
+    account: {
+      id: stmt.accountId,
+      name: accountName,
+      phone: accountPhone,
+      address: accountAddress,
+      type: stmt.accountType,
+      isCustomer: stmt.isCustomer,
+      typeLabel: stmt.isCustomer ? 'গ্রাহক' : 'সরবরাহকারী',
+      businessId: String(stmt.businessId),
+    },
+    dateRange: {
+      range: stmt.dateRange.range,
+      startDate: stmt.dateRange.startDate,
+      endDate: stmt.dateRange.endDate,
+      label: rangeLabel,
+    },
+    summary: {
+      openingBalance: stmt.openingBalance,
+      closingBalance: stmt.closingBalance,
+      currentAccountBalance: stmt.currentAccountBalance,
+      netChange: stmt.netChange,
+      totalGiven: stmt.totalGiven,
+      totalReceived: stmt.totalReceived,
+      transactionCount: stmt.transactionCount,
+      floatDriftPaisa: 0,
+      currencySymbol: '৳',
+      balanceStatusLabel,
+    },
+    itemizedEntries: entries,
+    itemizedLedger: entries,
+    shareableText,
+    title,
+    presentation: {
+      title,
+      balanceStatusLabel,
+      summaryBanner,
+      shareableText,
+    },
+    rawStatement: stmt,
+  };
+}
+
 // --- 4. CASHBOX SYNCHRONIZATION & REFERENTIAL INTEGRITY ---
 function syncCashboxForTransaction(txn, account, cashEntries = []) {
   if (!txn || !account) return Array.isArray(cashEntries) ? cashEntries : [];
@@ -1570,6 +1977,10 @@ const ledgerEngine = {
   normalizeAccountFields,
   resolveStatementDateRange,
   generateAccountStatement,
+  calculateSmsSegments,
+  getBulkTagadaEligibleCustomers,
+  prepareBulkTagadaBatch,
+  generateStatementDocumentPayload,
   V5_KEY,
   V6_KEY,
   V5_BACKUP_KEY,
@@ -1588,4 +1999,8 @@ if (typeof exports !== 'undefined') {
   exports.normalizeAccountFields = normalizeAccountFields;
   exports.resolveStatementDateRange = resolveStatementDateRange;
   exports.generateAccountStatement = generateAccountStatement;
+  exports.calculateSmsSegments = calculateSmsSegments;
+  exports.getBulkTagadaEligibleCustomers = getBulkTagadaEligibleCustomers;
+  exports.prepareBulkTagadaBatch = prepareBulkTagadaBatch;
+  exports.generateStatementDocumentPayload = generateStatementDocumentPayload;
 }
