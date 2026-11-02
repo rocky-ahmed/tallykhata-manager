@@ -11004,7 +11004,7 @@ function TallyKhataApp() {
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? currentTheme.headerBg : '#FFFFFF'} translucent={false} />
         <SafeAreaView style={[{ flex: 1 }, tStyles.mmScreen]}>
           {/* Header */}
-          <View style={[styles.mmHeader, tStyles.mmHeader, { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : (currentTheme.divider || '#E2E8F0') }]}>
+          <View style={[styles.mmHeader, tStyles.mmHeader, { paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : (currentTheme.divider || '#E2E8F0') }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               {/* Left: Back Button + Title */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
