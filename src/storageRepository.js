@@ -658,7 +658,7 @@ class StorageRepository {
 
         if (Array.isArray(updatedStore.accounts)) {
           for (const acc of updatedStore.accounts) {
-            if (acc && (Number.isNaN(acc.balance) || acc.balance === null || acc.balance === undefined)) {
+            if (acc && (acc.balance === null || acc.balance === undefined || isNaN(Number(acc.balance)))) {
               throw new Error('Integrity violation: Account ' + acc.id + ' balance is NaN or invalid');
             }
           }
@@ -666,7 +666,7 @@ class StorageRepository {
 
         if (Array.isArray(updatedStore.journals)) {
           for (const j of updatedStore.journals) {
-            if (j && (Number.isNaN(j.amount) || j.amount < 0)) {
+            if (j && (j.amount === null || j.amount === undefined || isNaN(Number(j.amount)) || Number(j.amount) < 0)) {
               throw new Error('Integrity violation: Journal ' + j.id + ' has invalid amount ' + j.amount);
             }
           }
