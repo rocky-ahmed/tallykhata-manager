@@ -31,6 +31,9 @@ const {
   V5_BACKUP_KEY,
   recalculateAccountRunningBalances,
   normalizeAccountFields,
+  normalizeTagadaLogFields,
+  resolveStatementDateRange,
+  generateAccountStatement,
 } = require('./ledgerEngine');
 
 const VALID_COLLECTIONS = new Set([
@@ -1993,6 +1996,238 @@ class StorageRepository {
   }
 
   /**
+   * Generates an account statement with exact integer-paisa opening balance,
+   * range-filtered transactions, step-by-step running balance, and closing balance
+   * with 0.00 Paisa float drift and multi-tenant business isolation.
+   *
+   * @param {Object|string|number} accountOrId Account object or accountId
+   * @param {Array|string|number} [journalsOrBizId] Journals array or businessId
+   * @param {string|Object} [dateRange='all'] 'all' | 'today' | 'this_month' | 'last_month' | 'custom'
+   * @param {Object} [options={}] Additional filter options ({ startDate, endDate, referenceDate })
+   * @returns {Object} Statement result
+   */
+  generateAccountStatement(accountOrId, journalsOrBizId = null, dateRange = 'all', options = {}) {
+    let account = null;
+    let journals = [];
+    let businessId = null;
+
+    if (accountOrId && typeof accountOrId === 'object' && !Array.isArray(accountOrId)) {
+      account = accountOrId;
+      journals = Array.isArray(journalsOrBizId)
+        ? journalsOrBizId
+        : (this.currentStore?.journals || this.getAuthoritativeState()?.journals || []);
+      businessId = account.businessId || account.business_id || options.businessId || this.getActiveBusinessId();
+    } else {
+      const targetAccId = String(accountOrId);
+      if (typeof journalsOrBizId === 'string' || typeof journalsOrBizId === 'number') {
+        businessId = String(journalsOrBizId);
+      } else if (Array.isArray(journalsOrBizId)) {
+        journals = journalsOrBizId;
+        businessId = String(options.businessId || this.getActiveBusinessId() || '1');
+      } else if (journalsOrBizId && typeof journalsOrBizId === 'object' && (dateRange === 'all' || !dateRange)) {
+        dateRange = journalsOrBizId;
+        businessId = String(options.businessId || this.getActiveBusinessId() || '1');
+      } else {
+        businessId = String(options.businessId || this.getActiveBusinessId() || '1');
+      }
+
+      const state = this.getAuthoritativeState() || this.currentStore || {};
+      if (!journals || journals.length === 0) {
+        journals = Array.isArray(options.journals) ? options.journals : (state.journals || []);
+      }
+      const accounts = Array.isArray(options.accounts) ? options.accounts : (state.accounts || []);
+      account = accounts.find(a => String(a.id) === targetAccId && String(a.businessId || a.business_id || '1') === businessId);
+      if (!account) {
+        account = { id: targetAccId, name: options.name || 'Account', type: options.type || 1, businessId };
+      }
+    }
+
+    return generateAccountStatement(account, journals, dateRange, { ...options, businessId });
+  }
+
+  /**
+   * Records a Tagada reminder audit log with Room DB schema parity,
+   * SMS quota deduction, and idempotency guard against duplicate submissions.
+   *
+   * @param {Object} rawLog Raw Tagada log record (snake_case or camelCase)
+   * @param {Object} [options={}] Options ({ bypassQuota, isFreeSms })
+   * @returns {Promise<{ success: boolean, data?: Object, duplicate?: boolean, remainingSmsCount: number, error?: string }>} 
+   */
+  async recordTagadaLog(rawLog = {}, options = {}) {
+    const normalized = normalizeTagadaLogFields(rawLog);
+    if (!normalized || !normalized.accountId) {
+      return { success: false, error: 'INVALID_TAGADA_LOG', remainingSmsCount: 0 };
+    }
+
+    const isFreeSms = options.isFreeSms !== false && (
+      normalized.tagada_type === 'TAGADA_BY_FREE_SMS' ||
+      normalized.tagadaType === 'TAGADA_BY_FREE_SMS' ||
+      options.isFreeSms === true
+    );
+
+    let duplicateDetected = false;
+    let finalLog = normalized;
+    let finalRemaining = 0;
+
+    const mutateRes = await this.mutateStore((latestStore) => {
+      const curLogs = Array.isArray(latestStore.tagadaLogs) ? latestStore.tagadaLogs : [];
+      const curCount = Number(latestStore.remainingSmsCount !== undefined && latestStore.remainingSmsCount !== null
+        ? latestStore.remainingSmsCount
+        : 5);
+
+      const existing = curLogs.find(l => String(l.id) === String(normalized.id));
+      if (existing) {
+        duplicateDetected = true;
+        finalLog = existing;
+        finalRemaining = curCount;
+        return latestStore;
+      }
+
+      if (isFreeSms && options.bypassQuota !== true && curCount <= 0) {
+        throw new Error('SMS_QUOTA_EXHAUSTED');
+      }
+
+      const nextCount = isFreeSms ? Math.max(0, curCount - 1) : curCount;
+      finalRemaining = nextCount;
+
+      return {
+        ...latestStore,
+        remainingSmsCount: nextCount,
+        tagadaLogs: [normalized, ...curLogs],
+      };
+    });
+
+    if (!mutateRes.success) {
+      if (mutateRes.error && String(mutateRes.error).includes('SMS_QUOTA_EXHAUSTED')) {
+        return { success: false, error: 'SMS_QUOTA_EXHAUSTED', remainingSmsCount: 0 };
+      }
+      return { success: false, error: mutateRes.error || 'MUTATION_FAILED', remainingSmsCount: 0 };
+    }
+
+    if (duplicateDetected) {
+      return {
+        success: true,
+        duplicate: true,
+        data: finalLog,
+        remainingSmsCount: finalRemaining,
+      };
+    }
+
+    if (this.telemetry && typeof this.telemetry.logEvent === 'function') {
+      try {
+        this.telemetry.logEvent(EVENT_TYPES.TAGADA_SENT, {
+          accountId: normalized.accountId,
+          businessId: normalized.businessId,
+          tagadaType: normalized.tagadaType,
+          creditAmount: normalized.creditAmount,
+          remainingSmsCount: finalRemaining,
+        });
+      } catch (_) {}
+    }
+
+    return {
+      success: true,
+      duplicate: false,
+      data: normalized,
+      remainingSmsCount: finalRemaining,
+    };
+  }
+
+  /**
+   * Retrieves current Tagada quota status.
+   * @param {string|number|null} [businessId=null]
+   * @returns {{ remainingSmsCount: number, tallyMessageBalance: number, maxSmsQuota: number }}
+   */
+  getTagadaQuota(businessId = null) {
+    const state = this.getAuthoritativeState() || this.currentStore || {};
+    const remaining = Number(state.remainingSmsCount !== undefined && state.remainingSmsCount !== null
+      ? state.remainingSmsCount
+      : 5);
+    const tallyMsg = Number(state.tallyMessageBalance !== undefined && state.tallyMessageBalance !== null
+      ? state.tallyMessageBalance
+      : 50);
+    return {
+      remainingSmsCount: Math.max(0, remaining),
+      tallyMessageBalance: Math.max(0, tallyMsg),
+      maxSmsQuota: 100,
+    };
+  }
+
+  /**
+   * Adjusts SMS quota with ceiling enforcement (0 <= remaining <= maxQuota).
+   * @param {number} delta Positive or negative delta
+   * @param {Object} [options={}] Optional parameters ({ maxQuota: 100 })
+   * @returns {Promise<{ success: boolean, remainingSmsCount: number, prevRemaining: number, error?: string }>} 
+   */
+  async adjustTagadaQuota(delta = 0, options = {}) {
+    const maxQuota = Math.max(1, Number(options.maxQuota || 100));
+    let prev = 0;
+    let next = 0;
+
+    const res = await this.mutateStore((latestStore) => {
+      prev = Number(latestStore.remainingSmsCount !== undefined && latestStore.remainingSmsCount !== null
+        ? latestStore.remainingSmsCount
+        : 5);
+      next = Math.min(maxQuota, Math.max(0, prev + Number(delta || 0)));
+      return {
+        ...latestStore,
+        remainingSmsCount: next,
+      };
+    });
+
+    return {
+      success: res.success,
+      remainingSmsCount: next,
+      prevRemaining: prev,
+      error: res.error,
+    };
+  }
+
+  /**
+   * Lists Tagada logs with multi-tenant business and account isolation.
+   * @param {string|number|null} [accountId=null]
+   * @param {string|number|null} [businessId=null]
+   * @param {Object} [options={}] Optional pagination and sorting
+   * @returns {{ tagadaLogs: Array, totalCount: number }}
+   */
+  listTagadaLogs(accountId = null, businessId = null, options = {}) {
+    const state = this.getAuthoritativeState() || this.currentStore || {};
+    const allLogs = Array.isArray(state.tagadaLogs) ? state.tagadaLogs : [];
+
+    const targetAccId = accountId !== null && accountId !== undefined ? String(accountId) : null;
+    const targetBizId = businessId !== null && businessId !== undefined ? String(businessId) : null;
+
+    let filtered = allLogs.filter((log) => {
+      if (!log) return false;
+      if (targetAccId !== null) {
+        const lAccId = String(log.accountId !== undefined && log.accountId !== null
+          ? log.accountId
+          : (log.account_id !== undefined && log.account_id !== null ? log.account_id : ''));
+        if (lAccId !== targetAccId) return false;
+      }
+      if (targetBizId !== null) {
+        const lBizId = String(log.businessId !== undefined && log.businessId !== null
+          ? log.businessId
+          : (log.business_id !== undefined && log.business_id !== null ? log.business_id : '1'));
+        if (lBizId !== targetBizId) return false;
+      }
+      return true;
+    });
+
+    const totalCount = filtered.length;
+    if (options && (options.offset > 0 || (options.limit !== undefined && options.limit !== null))) {
+      const offset = Math.max(0, Number(options.offset) || 0);
+      const limit = options.limit !== undefined && options.limit !== null ? Math.max(0, Number(options.limit)) : totalCount;
+      filtered = filtered.slice(offset, offset + limit);
+    }
+
+    return {
+      tagadaLogs: filtered,
+      totalCount,
+    };
+  }
+
+  /**
    * Calculates comprehensive storage resource metrics, byte allocations, and quota status.
    * @returns {Promise<{
    *   totalBytes: number,
@@ -2569,6 +2804,29 @@ const loadStore = async (repo = defaultRepository) => {
 };
 
 
+async function recordTagadaLog(rawLog, options = {}, repo = defaultRepository) {
+  return repo.recordTagadaLog(rawLog, options);
+}
+
+function getTagadaQuota(businessId = null, repo = defaultRepository) {
+  return repo.getTagadaQuota(businessId);
+}
+
+async function adjustTagadaQuota(delta = 0, options = {}, repo = defaultRepository) {
+  return repo.adjustTagadaQuota(delta, options);
+}
+
+function listTagadaLogs(accountId = null, businessId = null, options = {}, repo = defaultRepository) {
+  return repo.listTagadaLogs(accountId, businessId, options);
+}
+
+function generateAccountStatementRepo(accountOrId, journalsOrBizId, dateRange = 'all', options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.generateAccountStatement === 'function') {
+    return repo.generateAccountStatement(accountOrId, journalsOrBizId, dateRange, options);
+  }
+  return generateAccountStatement(accountOrId, journalsOrBizId, dateRange, options);
+}
+
 const repoExport = {
   StorageRepository,
   storageRepository: defaultRepository,
@@ -2581,6 +2839,13 @@ const repoExport = {
   queryJournalsByDateRange,
   clearJournalIndexCache,
   normalizeAccountFields,
+  normalizeTagadaLogFields,
+  resolveStatementDateRange,
+  generateAccountStatement: generateAccountStatementRepo,
+  recordTagadaLog,
+  getTagadaQuota,
+  adjustTagadaQuota,
+  listTagadaLogs,
   TelemetryService,
   telemetryService: defaultTelemetryService,
   EVENT_TYPES,
@@ -2603,6 +2868,13 @@ if (typeof exports !== 'undefined') {
   exports.queryJournalsByDateRange = queryJournalsByDateRange;
   exports.clearJournalIndexCache = clearJournalIndexCache;
   exports.normalizeAccountFields = normalizeAccountFields;
+  exports.normalizeTagadaLogFields = normalizeTagadaLogFields;
+  exports.resolveStatementDateRange = resolveStatementDateRange;
+  exports.generateAccountStatement = generateAccountStatementRepo;
+  exports.recordTagadaLog = recordTagadaLog;
+  exports.getTagadaQuota = getTagadaQuota;
+  exports.adjustTagadaQuota = adjustTagadaQuota;
+  exports.listTagadaLogs = listTagadaLogs;
   exports.TelemetryService = TelemetryService;
   exports.telemetryService = defaultTelemetryService;
   exports.EVENT_TYPES = EVENT_TYPES;

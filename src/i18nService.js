@@ -1461,6 +1461,17 @@ const STATIC_TRANSLATIONS = {
   "আসল গুগল ড্রাইভে টেস্ট ফাইল আপলোড, ডাউনলোড ও চেকসাম অডিট যাচাই": "Verify test file upload, download, and checksum audit on real Google Drive",
 };
 const APP_STATIC_TEXT_EN = {
+    "মেলেজ কপি করা ह৙eট্": "Message copied",
+  "মেসেজ কফভ": "Copy Message",
+  "ফোनের SMS": "Phone SMS",
+  "ডিডল": "All",
+  "মোট বাকি": "Total Due",
+  "দোঝ जম৏": "Total Deposit",
+  "জের": "Balance",
+  "এই সময়ের মধ্যে কোনো লেনদেন পাও৙eা য়াড়়াড়়": "No transactions found in this period",
+  "PDF / स্টেটমেন্ট শেয়াী": "Share PDF / Statement",
+  "঩ির্বাস্ত क্িপোট": "Customer Statement",
+
   ...STATIC_TRANSLATIONS,
   "নির্বাচিত ক্ষেত্র:": "Selected scope:",
   "গুগল ড্রাইভ থেকে ব্যাকআপ রিস্টোর করার পূর্বে বর্তমান ডাটার একটি লোকাল সেফটি কপি তৈরি করা হবে।\n\n• রিস্টোরের ক্ষেত্র:": "A local safety backup of current data will be created before restoring from Google Drive.\n\n• Restore scope:",

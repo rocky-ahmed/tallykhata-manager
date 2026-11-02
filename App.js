@@ -20,6 +20,7 @@ import {
   BackHandler,
   Appearance,
   AppState,
+  Clipboard,
 } from 'react-native';
 
 LogBox.ignoreAllLogs(true);
@@ -841,6 +842,8 @@ function TallyKhataApp() {
   const [modalAddStock, setModalAddStock] = useState(false);
   const [modalAdjustStock, setModalAdjustStock] = useState(false);
   const [modalTagada, setModalTagada] = useState(false);
+  const [modalCustomerStatement, setModalCustomerStatement] = useState(false);
+  const [statementDateFilter, setStatementDateFilter] = useState('all'); // 'all' | 'today' | 'this_month' | 'last_month'
   const [modalTallyMessage, setModalTallyMessage] = useState(false);
   const [tallyMessageBalance, setTallyMessageBalance] = useState(50);
   const [modalTxnLimit, setModalTxnLimit] = useState(false);
@@ -2100,6 +2103,7 @@ function TallyKhataApp() {
       if (modalAddMoney) { setModalAddMoney(false); return true; }
       if (modalMobileRecharge) { setModalMobileRecharge(false); return true; }
       if (modalTagada) { setModalTagada(false); return true; }
+      if (modalCustomerStatement) { setModalCustomerStatement(false); return true; }
       if (modalVoucher) { setModalVoucher(false); return true; }
       if (modalPinSetup) { setModalPinSetup(false); return true; }
       if (modalProfitLoss) { setModalProfitLoss(false); return true; }
@@ -2157,7 +2161,7 @@ function TallyKhataApp() {
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
     modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
-    modalMobileRecharge, modalTagada, modalVoucher, modalPinSetup, modalProfitLoss,
+    modalMobileRecharge, modalTagada, modalCustomerStatement, modalVoucher, modalPinSetup, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
     modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, modalNotifications, modalDataManagement, modalAbout, modalFilter, modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMWithdrawGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange, modalMMMonthPicker, currentScreen, activeTab
   ]);
@@ -4510,6 +4514,48 @@ function TallyKhataApp() {
     return { accountJournals: listWithBalance, totalGiven: given, totalReceived: received };
   }, [selectedAccount, journals]);
 
+  const filteredStatementJournals = useMemo(() => {
+    if (!accountJournals) return [];
+    if (statementDateFilter === 'all') return accountJournals;
+    const todayStr = getTodayDate();
+    const d = new Date();
+    const curYear = d.getFullYear();
+    const curMonth = String(d.getMonth() + 1).padStart(2, '0');
+    const curYM = curYear + '-' + curMonth;
+    const lastMonthDate = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    const lastYear = lastMonthDate.getFullYear();
+    const lastMonth = String(lastMonthDate.getMonth() + 1).padStart(2, '0');
+    const lastYM = lastYear + '-' + lastMonth;
+
+    return accountJournals.filter((j) => {
+      const dt = j.date || j.txn_date || '';
+      if (statementDateFilter === 'today') {
+        return dt === todayStr || j.isOpening;
+      }
+      if (statementDateFilter === 'this_month') {
+        return dt.startsWith(curYM) || j.isOpening;
+      }
+      if (statementDateFilter === 'last_month') {
+        return dt.startsWith(lastYM);
+      }
+      return true;
+    });
+  }, [accountJournals, statementDateFilter]);
+
+  const { statementGiven, statementReceived, statementBalance } = useMemo(() => {
+    let given = 0;
+    let received = 0;
+    for (let i = 0; i < filteredStatementJournals.length; i++) {
+      const j = filteredStatementJournals[i];
+      const amt = Number(j.amount || 0);
+      if (j.type === 'given') given += amt;
+      else if (j.type === 'received') received += amt;
+    }
+    const isCust = selectedAccount ? selectedAccount.type === 1 : true;
+    const bal = isCust ? (given - received) : (received - given);
+    return { statementGiven: given, statementReceived: received, statementBalance: bal };
+  }, [filteredStatementJournals, selectedAccount]);
+
   return (
     <ThemeContext.Provider value={themeContextValue}>
     <SafeAreaView style={[styles.container, isDark && { backgroundColor: currentTheme.screenBg }]}>
@@ -4629,18 +4675,11 @@ function TallyKhataApp() {
           <TouchableOpacity
             style={styles.quickActionItem}
             onPress={() => {
-              const fullStatement =
-                `=== ${businessName} ===\n` +
-                `${tStatic("হিসাব খাতা: ")}${selectedAccount.name}\n` +
-                `${tStatic("মোবাইল: ")}${selectedAccount.phone || tStatic("দেওয়া নেই")}\n` +
-                `${tStatic("বর্তমান বকেয়া: ৳ ")}${formatMoney(selectedAccount.balance)}\n` +
-                `${tStatic("মোট লেনদেন: ")}${accountJournals.length}${tStatic(" টি\n")}` +
-                `${tStatic("দিলাম মোট: ৳ ")}${formatMoney(totalGiven)}\n` +
-                `${tStatic("পেলাম মোট: ৳ ")}${formatMoney(totalReceived)}\n` +
-                `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
-              Share.share({ message: fullStatement });
+              setStatementDateFilter('all');
+              setModalCustomerStatement(true);
             }}
             activeOpacity={0.7}
+            hitSlop={STANDARD_TOUCH_HIT_SLOP}
           >
             <AppIcon source={require('./assets/icons/ic_pdf.png')} variant="purple" shape="rounded" size={24} containerSize={48} style={{ marginBottom: 6 }} />
             <Text style={[styles.quickActionLabel, isDark && tStyles.textSecondary]}>{t('ledger_share_statement')}</Text>
@@ -8809,6 +8848,41 @@ function TallyKhataApp() {
 
             <Text style={[styles.tagadaActionPrompt, isDark && tStyles.textSecondary]}>{tStatic("তাগাদা পাঠাতে ট্যাপ করুন।")}</Text>
 
+            {(() => {
+              const msg = generateTagadaMessage(tagadaCustomer || selectedAccount);
+              const msgLen = (msg || '').length;
+              const smsParts = msgLen <= 70 ? 1 : Math.ceil(msgLen / 67);
+              return (
+                <View style={styles.tagadaMetaBadgeRow}>
+                  <View style={[styles.tagadaCharBadge, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+                    <Text style={[styles.tagadaCharBadgeText, isDark && tStyles.textSecondary]}>
+                      {`${msgLen} অক্ষর • ${smsParts}টি SMS`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.tagadaCopyBtn, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}
+                    onPress={() => {
+                      if (Clipboard && Clipboard.setString) {
+                        Clipboard.setString(msg);
+                      }
+                      Alert.alert(tStatic("সফল"), tStatic("মেসেজ কপি করা হয়েছে"));
+                    }}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={tStatic("মেসেজ কপি করুন")}
+                  >
+                    <Image
+                      source={require('./assets/icons/ic_edit.png')}
+                      style={{ width: 14, height: 14, marginRight: 4, tintColor: isDark ? currentTheme.textSecondary : '#4B5563' }}
+                      resizeMode="contain"
+                    />
+                    <Text style={[styles.tagadaCopyBtnText, isDark && tStyles.textSecondary]}>{tStatic("মেসেজ কপি করুন")}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
+
             <View style={styles.tagadaDualBtnRow}>
               <TouchableOpacity
                 style={[styles.tagadaTallyMsgBtn, { borderRadius: 10, borderBottomWidth: 3, borderBottomColor: '#7F1D1D' }]}
@@ -8818,14 +8892,27 @@ function TallyKhataApp() {
               >
                 <Image
                   source={require('./assets/icons/ic_sms.png')}
-                  style={{ width: 22, height: 22, marginRight: 8, tintColor: '#FFFFFF' }}
+                  style={{ width: 20, height: 20, marginRight: 6, tintColor: '#FFFFFF' }}
                   resizeMode="contain"
                 />
                 <View>
-                  <Text style={styles.tagadaTallyMsgText}>{tStatic("টালি-মেসেজ পাঠাই")}</Text>
-                  <Text style={styles.tagadaTallyMsgSub}>{tStatic("অবশিষ্ট: ")}{remainingSmsCount < 10 ? tStatic("০") + remainingSmsCount : remainingSmsCount}
-                  </Text>
+                  <Text style={styles.tagadaTallyMsgText}>{tStatic("টালি-মেসেজ")}</Text>
+                  <Text style={styles.tagadaTallyMsgSub}>{tStatic("অবশিষ্ট: ")}{remainingSmsCount < 10 ? tStatic("০") + remainingSmsCount : remainingSmsCount}</Text>
                 </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.tagadaDirectSmsBtn, { borderRadius: 10, borderBottomWidth: 3, borderBottomColor: '#1E3A8A', backgroundColor: '#2563EB' }]}
+                onPress={() => handleSendTagadaSMS(tagadaCustomer || selectedAccount)}
+                activeOpacity={0.85}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Image
+                  source={require('./assets/icons/ic_sms.png')}
+                  style={{ width: 18, height: 18, marginRight: 6, tintColor: '#FFFFFF' }}
+                  resizeMode="contain"
+                />
+                <Text style={[styles.tagadaDirectSmsText, { color: '#FFFFFF', fontWeight: 'bold' }]}>{tStatic("ফোনের SMS")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -8836,10 +8923,10 @@ function TallyKhataApp() {
               >
                 <Image
                   source={require('./assets/icons/ic_share.png')}
-                  style={{ width: 20, height: 20, marginRight: 6, tintColor: '#FFFFFF' }}
+                  style={{ width: 18, height: 18, marginRight: 4, tintColor: '#FFFFFF' }}
                   resizeMode="contain"
                 />
-                <Text style={[styles.tagadaShareAppText, { color: '#FFFFFF', fontWeight: 'bold' }]}>{tStatic("WhatsApp শেয়ার")}</Text>
+                <Text style={[styles.tagadaShareAppText, { color: '#FFFFFF', fontWeight: 'bold' }]}>{tStatic("WhatsApp")}</Text>
               </TouchableOpacity>
             </View>
 
@@ -8852,6 +8939,199 @@ function TallyKhataApp() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: CUSTOMER & SUPPLIER STATEMENT PREVIEW (ITERATION 207)
+         =================================================================== */}
+      <Modal visible={modalCustomerStatement} animationType="slide" onRequestClose={() => setModalCustomerStatement(false)}>
+        <SafeAreaView style={[styles.reportContainer, isDark && tStyles.reportContainer]}>
+          <View style={[styles.reportHeader, isDark && tStyles.reportHeader]}>
+            <TouchableOpacity
+              onPress={() => setModalCustomerStatement(false)}
+              style={styles.reportHeaderBack}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Image
+                source={require('./assets/icons/arrow_left.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginHorizontal: 8 }}>
+              <Text style={styles.reportHeaderTitle}>{tStatic("কাস্টমার স্টেটমেন্ট")}</Text>
+              {selectedAccount ? (
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }} numberOfLines={1}>
+                  {selectedAccount.name}{selectedAccount.phone ? ` • ${selectedAccount.phone}` : ''}
+                </Text>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              style={styles.reportHeaderAction}
+              onPress={() => {
+                if (!selectedAccount) return;
+                const fullStatement =
+                  `=== ${businessName} ===\n` +
+                  `${tStatic("হিসাব খাতা: ")}${selectedAccount.name}\n` +
+                  `${tStatic("মোবাইল: ")}${selectedAccount.phone || tStatic("দেওয়া নেই")}\n` +
+                  `${tStatic("বর্তমান বকেয়া: ৳ ")}${formatMoney(selectedAccount.balance)}\n` +
+                  `${tStatic("মোট লেনদেন: ")}${filteredStatementJournals.length}${tStatic(" টি\n")}` +
+                  `${tStatic("দিলাম মোট: ৳ ")}${formatMoney(statementGiven)}\n` +
+                  `${tStatic("পেলাম মোট: ৳ ")}${formatMoney(statementReceived)}\n` +
+                  `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
+                Share.share({ message: fullStatement });
+              }}
+              activeOpacity={0.7}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            >
+              <Image
+                source={require('./assets/icons/ic_share.png')}
+                style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 4 }}
+                resizeMode="contain"
+              />
+              <Text style={styles.reportHeaderActionText}>{tStatic("শেয়ার")}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.statementFilterRow, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+            {[
+              { id: 'all', label: tStatic("সব") },
+              { id: 'today', label: tStatic("আজ") },
+              { id: 'this_month', label: tStatic("চলতি মাস") },
+              { id: 'last_month', label: tStatic("গত মাস") },
+            ].map((chip) => {
+              const active = statementDateFilter === chip.id;
+              return (
+                <TouchableOpacity
+                  key={chip.id}
+                  style={[
+                    styles.statementFilterChip,
+                    active && styles.statementFilterChipActive,
+                    isDark && { backgroundColor: active ? currentTheme.primary : currentTheme.surfaceContainer, borderColor: active ? currentTheme.primary : currentTheme.cardBorder }
+                  ]}
+                  onPress={() => setStatementDateFilter(chip.id)}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.statementFilterChipText,
+                    active && styles.statementFilterChipTextActive,
+                    isDark && { color: active ? '#111827' : currentTheme.textSecondary }
+                  ]}>
+                    {chip.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={[styles.statementSummaryBanner, isDark && tStyles.reportKpiCard]}>
+            <View style={styles.statementSummaryCol}>
+              <Text style={[styles.statementSummaryLabel, isDark && tStyles.textSecondary]}>{tStatic("মোট বাকি")}</Text>
+              <Text style={[styles.statementSummaryValue, { color: isDark ? currentTheme.danger : COLORS.red }]}>
+                {tStatic("৳ ")}{formatMoney(statementGiven)}
+              </Text>
+            </View>
+            <View style={styles.statementSummaryDivider} />
+            <View style={styles.statementSummaryCol}>
+              <Text style={[styles.statementSummaryLabel, isDark && tStyles.textSecondary]}>{tStatic("মোট জমা")}</Text>
+              <Text style={[styles.statementSummaryValue, { color: isDark ? currentTheme.success : COLORS.green }]}>
+                {tStatic("৳ ")}{formatMoney(statementReceived)}
+              </Text>
+            </View>
+            <View style={styles.statementSummaryDivider} />
+            <View style={styles.statementSummaryCol}>
+              <Text style={[styles.statementSummaryLabel, isDark && tStyles.textSecondary]}>{tStatic("জের")}</Text>
+              <Text style={[styles.statementSummaryValue, { color: statementBalance >= 0 ? (isDark ? '#F87171' : COLORS.red) : (isDark ? '#34D399' : COLORS.green), fontWeight: 'bold' }]}>
+                {tStatic("৳ ")}{formatMoney(Math.abs(statementBalance))}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.ledgerTableHeader, { marginHorizontal: 12, marginTop: 8 }, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+            <Text style={[styles.ledgerColHeader, isDark && tStyles.textSecondary, { flex: 1.6 }]}>{t("ledger_col_desc")}</Text>
+            <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: isDark ? currentTheme.danger : COLORS.red }]}>
+              {t('ledger_col_gave')}
+            </Text>
+            <Text style={[styles.ledgerColHeader, { flex: 1, textAlign: 'right', color: isDark ? currentTheme.success : COLORS.green }]}>
+              {t('ledger_col_got')}
+            </Text>
+          </View>
+
+          <FlatList
+            data={filteredStatementJournals}
+            keyExtractor={(item, index) => item.id || `stmt_${index}`}
+            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 110 }}
+            renderItem={({ item }) => {
+              const isCust = selectedAccount ? selectedAccount.type === 1 : true;
+              return (
+                <View style={[styles.ledgerRow, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}>
+                  <View style={{ flex: 1.6, paddingRight: 6 }}>
+                    <Text style={[styles.ledgerRowDate, isDark && tStyles.textSecondary]}>{item.date || ''}</Text>
+                    <Text style={[styles.ledgerRowDesc, isDark && tStyles.textPrimary]} numberOfLines={2}>
+                      {item.desc || item.note || (item.type === 'given' ? (isCust ? 'বাকি দেওয়া' : 'টাকা পরিশোধ') : (isCust ? 'টাকা নেওয়া' : 'মাল বাকি'))}
+                    </Text>
+                    {item.balance !== undefined ? (
+                      <Text style={[styles.ledgerRowBalance, isDark && { color: currentTheme.textSecondary }]}>
+                        {tStatic("জের: ৳ ")}{formatMoney(item.balance)}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                    <Text style={[styles.ledgerRowAmountGiven, isDark && { color: currentTheme.danger }]}>
+                      {item.type === 'given' ? `${tStatic("৳ ")}${formatMoney(item.amount)}` : '-'}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                    <Text style={[styles.ledgerRowAmountGot, isDark && { color: currentTheme.success }]}>
+                      {item.type === 'received' ? `${tStatic("৳ ")}${formatMoney(item.amount)}` : '-'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <Text style={[{ color: '#6B7280', fontSize: 14 }, isDark && tStyles.textSecondary]}>
+                  {tStatic("এই সময়ের মধ্যে কোনো লেনদেন পাওয়া যায়নি")}
+                </Text>
+              </View>
+            }
+          />
+
+          <View style={[styles.statementBottomBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
+            <TouchableOpacity
+              style={[styles.statementPdfBtn, { minHeight: 48, borderRadius: 10 }]}
+              onPress={() => {
+                if (!selectedAccount) return;
+                const fullStatement =
+                  `=== ${businessName} ===\n` +
+                  `${tStatic("হিসাব খাতা: ")}${selectedAccount.name}\n` +
+                  `${tStatic("মোবাইল: ")}${selectedAccount.phone || tStatic("দেওয়া নেই")}\n` +
+                  `${tStatic("বর্তমান বকেয়া: ৳ ")}${formatMoney(selectedAccount.balance)}\n` +
+                  `${tStatic("মোট লেনদেন: ")}${filteredStatementJournals.length}${tStatic(" টি\n")}` +
+                  `${tStatic("দিলাম মোট: ৳ ")}${formatMoney(statementGiven)}\n` +
+                  `${tStatic("পেলাম মোট: ৳ ")}${formatMoney(statementReceived)}\n` +
+                  `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
+                Share.share({ message: fullStatement });
+              }}
+              activeOpacity={0.85}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            >
+              <Image
+                source={require('./assets/icons/ic_pdf.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF', marginRight: 8 }}
+                resizeMode="contain"
+              />
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
+                {tStatic("PDF / স্টেটমেন্ট শেয়ার")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </Modal>
 
       {/* ===================================================================
@@ -18277,6 +18557,140 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     fontSize: 13,
     fontWeight: 'bold',
+  },
+  tagadaMetaBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  tagadaCharBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  tagadaCharBadgeText: {
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '600',
+  },
+  tagadaCopyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minHeight: 32,
+  },
+  tagadaCopyBtnText: {
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '600',
+  },
+  tagadaDirectSmsBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    minHeight: 48,
+  },
+  tagadaDirectSmsText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  statementFilterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  statementFilterChip: {
+    flex: 1,
+    paddingVertical: 8,
+    marginHorizontal: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+  },
+  statementFilterChipActive: {
+    backgroundColor: '#B81414',
+    borderColor: '#B81414',
+  },
+  statementFilterChipText: {
+    fontSize: 13,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  statementFilterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  statementSummaryBanner: {
+    flexDirection: 'row',
+    marginHorizontal: 12,
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    elevation: 2,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statementSummaryCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statementSummaryLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  statementSummaryValue: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  statementSummaryDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E5E7EB',
+  },
+  statementBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    paddingBottom: Platform.OS === 'android' ? 46 : 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    elevation: 8,
+  },
+  statementPdfBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7C3AED',
+    paddingVertical: 12,
   },
 
 

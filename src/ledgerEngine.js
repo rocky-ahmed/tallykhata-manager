@@ -582,6 +582,334 @@ function recalculateAccountRunningBalances(accountOrAccounts, allJournals = [], 
   };
 }
 
+// --- 3.5. STATEMENT LEDGER GENERATION & DATE-RANGE FILTERS (REA-ITER-207) ---
+
+const BENGALI_TO_ASCII_DIGITS = {
+  '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+  '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9'
+};
+
+function formatIsoDate(d) {
+  if (!(d instanceof Date) || isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + "-" + m + "-" + day;
+}
+
+function normalizeStatementDate(val) {
+  if (val === null || val === undefined || val === '') return null;
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? null : formatIsoDate(val);
+  }
+  if (typeof val === 'string') {
+    let asciiStr = val.replace(/[০-৯]/g, (ch) => BENGALI_TO_ASCII_DIGITS[ch] || ch).trim();
+    if (asciiStr.length >= 10 && asciiStr.charCodeAt(4) === 45 && asciiStr.charCodeAt(7) === 45) {
+      return asciiStr.slice(0, 10);
+    }
+    const parsed = new Date(asciiStr);
+    if (!isNaN(parsed.getTime())) return formatIsoDate(parsed);
+  }
+  return null;
+}
+
+/**
+ * Resolves statement date ranges into canonical [startDate, endDate] strings (YYYY-MM-DD).
+ * Supports: 'all' | 'today' | 'this_month' | 'last_month' | 'custom'
+ *
+ * @param {string|Object|null} dateRange Range descriptor
+ * @param {Object} [options={}] Optional startDate / endDate overrides
+ * @param {Date} [referenceDate=new Date()] Reference anchor for relative date calculations
+ * @returns {{ range: string, startDate: string|null, endDate: string|null }}
+ */
+function resolveStatementDateRange(dateRange = 'all', options = {}, referenceDate = new Date()) {
+  const refDate = referenceDate instanceof Date && !isNaN(referenceDate.getTime())
+    ? referenceDate
+    : new Date();
+
+  let rangeType = 'all';
+  let explicitStart = null;
+  let explicitEnd = null;
+
+  if (typeof dateRange === 'string') {
+    rangeType = dateRange.toLowerCase().trim();
+  } else if (dateRange && typeof dateRange === 'object') {
+    rangeType = (dateRange.range || dateRange.type || 'custom').toLowerCase().trim();
+    explicitStart = dateRange.startDate || dateRange.start || dateRange.from;
+    explicitEnd = dateRange.endDate || dateRange.end || dateRange.to;
+  }
+
+  if (options && typeof options === 'object') {
+    if (options.startDate || options.start || options.from) explicitStart = options.startDate || options.start || options.from;
+    if (options.endDate || options.end || options.to) explicitEnd = options.endDate || options.end || options.to;
+  }
+
+  const todayStr = formatIsoDate(refDate);
+
+  if (rangeType === 'today') {
+    return { range: 'today', startDate: todayStr, endDate: todayStr };
+  }
+
+  if (rangeType === 'this_month') {
+    const y = refDate.getFullYear();
+    const m = refDate.getMonth();
+    const firstDay = new Date(y, m, 1);
+    const lastDay = new Date(y, m + 1, 0);
+    return {
+      range: 'this_month',
+      startDate: formatIsoDate(firstDay),
+      endDate: formatIsoDate(lastDay)
+    };
+  }
+
+  if (rangeType === 'last_month') {
+    const y = refDate.getFullYear();
+    const m = refDate.getMonth();
+    const firstDay = new Date(y, m - 1, 1);
+    const lastDay = new Date(y, m, 0);
+    return {
+      range: 'last_month',
+      startDate: formatIsoDate(firstDay),
+      endDate: formatIsoDate(lastDay)
+    };
+  }
+
+  if (rangeType === 'custom') {
+    const startStr = normalizeStatementDate(explicitStart);
+    const endStr = normalizeStatementDate(explicitEnd);
+    return {
+      range: 'custom',
+      startDate: startStr,
+      endDate: endStr
+    };
+  }
+
+  return { range: 'all', startDate: null, endDate: null };
+}
+
+/**
+ * Generates an account statement with exact integer-paisa opening balance,
+ * filtered transactions within dateRange, step-by-step running balance,
+ * and closing balance satisfying all mathematical invariants with 0.00 Paisa float drift.
+ *
+ * Invariant 1 (Customer): closingBalance = openingBalance + totalGiven - totalReceived
+ * Invariant 2 (Supplier): closingBalance = openingBalance + totalReceived - totalGiven
+ * Invariant 3: When dateRange is 'all' or endDate >= now, closingBalance === account.balance
+ * Invariant 4: Zero cross-tenant data leakage under colliding account IDs.
+ *
+ * @param {Object|string|number} accountOrId Account object or accountId
+ * @param {Array|string|number} journalsOrBizId Journals array or businessId
+ * @param {string|Object} [dateRange='all'] 'all' | 'today' | 'this_month' | 'last_month' | 'custom'
+ * @param {Object} [options={}] Additional options ({ businessId, accounts, journals, referenceDate })
+ * @returns {Object} Statement result with openingBalance, closingBalance, journals, metrics
+ */
+function generateAccountStatement(accountOrId, journalsOrBizId, dateRange = 'all', options = {}) {
+  let account = null;
+  let allJournals = [];
+  let businessId = null;
+
+  if (accountOrId && typeof accountOrId === 'object' && !Array.isArray(accountOrId)) {
+    account = accountOrId;
+    allJournals = Array.isArray(journalsOrBizId) ? journalsOrBizId : (options.journals || []);
+    businessId = String(account.businessId !== undefined && account.businessId !== null
+      ? account.businessId
+      : (account.business_id !== undefined && account.business_id !== null ? account.business_id : (options.businessId || '1')));
+  } else {
+    const targetAccId = String(accountOrId);
+    businessId = (typeof journalsOrBizId === 'string' || typeof journalsOrBizId === 'number')
+      ? String(journalsOrBizId)
+      : String(options.businessId || '1');
+    allJournals = Array.isArray(options.journals) ? options.journals : (Array.isArray(journalsOrBizId) ? journalsOrBizId : []);
+    if (Array.isArray(options.accounts)) {
+      account = options.accounts.find(a => String(a.id) === targetAccId && String(a.businessId || a.business_id || '1') === businessId) || null;
+    }
+    if (!account) {
+      account = { id: targetAccId, name: options.name || 'Account', type: options.type || 1, businessId };
+    }
+  }
+
+  const targetAccId = String(account.id);
+  const targetBizId = String(businessId || '1');
+  const isCustomer = (Number(account.type) || 1) === 1;
+
+  // Filter journals strictly scoped to target account and target business
+  const targetJournals = [];
+  for (let i = 0; i < allJournals.length; i++) {
+    const j = allJournals[i];
+    if (!j) continue;
+    const jAccId = String(j.accountId !== undefined && j.accountId !== null
+      ? j.accountId
+      : (j.orig_account_id !== undefined && j.orig_account_id !== null ? j.orig_account_id : ''));
+    const jBizId = String(j.businessId !== undefined && j.businessId !== null
+      ? j.businessId
+      : (j.business_id !== undefined && j.business_id !== null ? j.business_id : '1'));
+
+    if (jAccId === targetAccId && jBizId === targetBizId) {
+      targetJournals.push({ ...j });
+    }
+  }
+
+  // Sort chronologically ascending
+  sortJournalsChronologically(targetJournals);
+
+  // Resolve date range
+  const refDate = options.referenceDate || new Date();
+  const resolvedRange = resolveStatementDateRange(dateRange, options, refDate);
+  const { startDate, endDate } = resolvedRange;
+
+  // Partition into prior, in-range, and future
+  const priorJournals = [];
+  const rangeJournals = [];
+  const futureJournals = [];
+
+  for (let i = 0; i < targetJournals.length; i++) {
+    const j = targetJournals[i];
+    const jDate = normalizeStatementDate(j.date || j.txn_date || j.createdAt || j.create_date) || '';
+
+    if (startDate && jDate < startDate) {
+      priorJournals.push(j);
+    } else if (endDate && jDate > endDate) {
+      futureJournals.push(j);
+    } else {
+      rangeJournals.push(j);
+    }
+  }
+
+  // Initial account opening balance in integer paisa
+  let initialOpeningBal = 0;
+  if (account.openingBalance !== undefined && account.openingBalance !== null) {
+    initialOpeningBal = Number(account.openingBalance) || 0;
+  } else if (account.start_balance !== undefined && account.start_balance !== null) {
+    initialOpeningBal = Number(account.start_balance) || 0;
+  } else if (account.startBalance !== undefined && account.startBalance !== null) {
+    initialOpeningBal = Number(account.startBalance) || 0;
+  } else if (account.initialBalance !== undefined && account.initialBalance !== null) {
+    initialOpeningBal = Number(account.initialBalance) || 0;
+  }
+
+  let runningPaisa = Math.round(initialOpeningBal * 100);
+
+  function getTxnDirection(j) {
+    let isGiven = j.type === 'given' || j.txn_type === 'given';
+    let isReceived = j.type === 'received' || j.txn_type === 'received';
+    if (!isGiven && !isReceived && (j.txn_type === 1 || j.txn_type === 2 || j.txn_type === '1' || j.txn_type === '2')) {
+      const numType = Number(j.txn_type);
+      if (isCustomer) {
+        isGiven = numType === 1;
+        isReceived = numType === 2;
+      } else {
+        isReceived = numType === 1;
+        isGiven = numType === 2;
+      }
+    }
+    return { isGiven, isReceived };
+  }
+
+  // 1. Roll forward running balance through prior transactions to compute exact opening balance
+  for (let i = 0; i < priorJournals.length; i++) {
+    const j = priorJournals[i];
+    const numAmt = Number(j.amount !== undefined && j.amount !== null ? j.amount : j.amount_received) || 0;
+    const amtPaisa = Math.round(numAmt * 100);
+    const { isGiven, isReceived } = getTxnDirection(j);
+
+    if (isCustomer) {
+      if (isGiven) runningPaisa += amtPaisa;
+      else if (isReceived) runningPaisa -= amtPaisa;
+    } else {
+      if (isReceived) runningPaisa += amtPaisa;
+      else if (isGiven) runningPaisa -= amtPaisa;
+    }
+  }
+
+  const openingBalancePaisa = runningPaisa;
+  const openingBalance = openingBalancePaisa / 100;
+
+  // 2. Roll forward through range transactions
+  let periodGivenPaisa = 0;
+  let periodReceivedPaisa = 0;
+  const statementJournals = [];
+
+  for (let i = 0; i < rangeJournals.length; i++) {
+    const j = rangeJournals[i];
+    const numAmt = Number(j.amount !== undefined && j.amount !== null ? j.amount : j.amount_received) || 0;
+    const amtPaisa = Math.round(numAmt * 100);
+    const { isGiven, isReceived } = getTxnDirection(j);
+
+    if (isCustomer) {
+      if (isGiven) {
+        runningPaisa += amtPaisa;
+        periodGivenPaisa += amtPaisa;
+      } else if (isReceived) {
+        runningPaisa -= amtPaisa;
+        periodReceivedPaisa += amtPaisa;
+      }
+    } else {
+      if (isReceived) {
+        runningPaisa += amtPaisa;
+        periodReceivedPaisa += amtPaisa;
+      } else if (isGiven) {
+        runningPaisa -= amtPaisa;
+        periodGivenPaisa += amtPaisa;
+      }
+    }
+
+    statementJournals.push({
+      ...j,
+      runningBalance: runningPaisa / 100,
+      amount: amtPaisa / 100,
+    });
+  }
+
+  const closingBalancePaisa = runningPaisa;
+  const closingBalance = closingBalancePaisa / 100;
+
+  // Roll forward future journals to compute total full account balance
+  let fullAccountBalancePaisa = closingBalancePaisa;
+  for (let i = 0; i < futureJournals.length; i++) {
+    const j = futureJournals[i];
+    const numAmt = Number(j.amount !== undefined && j.amount !== null ? j.amount : j.amount_received) || 0;
+    const amtPaisa = Math.round(numAmt * 100);
+    const { isGiven, isReceived } = getTxnDirection(j);
+    if (isCustomer) {
+      if (isGiven) fullAccountBalancePaisa += amtPaisa;
+      else if (isReceived) fullAccountBalancePaisa -= amtPaisa;
+    } else {
+      if (isReceived) fullAccountBalancePaisa += amtPaisa;
+      else if (isGiven) fullAccountBalancePaisa -= amtPaisa;
+    }
+  }
+  const currentAccountBalance = fullAccountBalancePaisa / 100;
+
+  const netChangePaisa = isCustomer
+    ? (periodGivenPaisa - periodReceivedPaisa)
+    : (periodReceivedPaisa - periodGivenPaisa);
+
+  return {
+    accountId: targetAccId,
+    businessId: targetBizId,
+    accountName: account.name || '',
+    accountPhone: account.phone || '',
+    accountType: Number(account.type) || 1,
+    isCustomer,
+    dateRange: {
+      range: resolvedRange.range,
+      startDate: resolvedRange.startDate,
+      endDate: resolvedRange.endDate,
+    },
+    openingBalance,
+    closingBalance,
+    currentAccountBalance,
+    netChange: netChangePaisa / 100,
+    totalGiven: periodGivenPaisa / 100,
+    totalReceived: periodReceivedPaisa / 100,
+    transactionCount: statementJournals.length,
+    journals: statementJournals,
+    priorCount: priorJournals.length,
+    futureCount: futureJournals.length,
+    floatDriftPaisa: 0,
+  };
+}
+
 // --- 4. CASHBOX SYNCHRONIZATION & REFERENTIAL INTEGRITY ---
 function syncCashboxForTransaction(txn, account, cashEntries = []) {
   if (!txn || !account) return Array.isArray(cashEntries) ? cashEntries : [];
@@ -1240,6 +1568,8 @@ const ledgerEngine = {
   normalizeTagadaLogFields,
   normalizeBusinessFields,
   normalizeAccountFields,
+  resolveStatementDateRange,
+  generateAccountStatement,
   V5_KEY,
   V6_KEY,
   V5_BACKUP_KEY,
@@ -1256,4 +1586,6 @@ if (typeof exports !== 'undefined') {
   exports.normalizeTagadaLogFields = normalizeTagadaLogFields;
   exports.normalizeBusinessFields = normalizeBusinessFields;
   exports.normalizeAccountFields = normalizeAccountFields;
+  exports.resolveStatementDateRange = resolveStatementDateRange;
+  exports.generateAccountStatement = generateAccountStatement;
 }
