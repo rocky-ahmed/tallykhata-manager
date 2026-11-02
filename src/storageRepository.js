@@ -229,6 +229,7 @@ class StorageRepository {
     this.currentStore = null;
     this.writeQueue = Promise.resolve();
     this._pendingWrites = 0;
+    this.telemetry = defaultTelemetryService;
   }
 
   getPendingWritesCount() {
@@ -2419,6 +2420,135 @@ function queryJournalsByDateRange(journals, startDate, endDate, options = {}) {
   };
 }
 
+
+// ============================================================================
+// PRIVACY-PRESERVING OPERATIONAL TELEMETRY & EVENT LOGGING (BL-018)
+// ============================================================================
+
+const MAX_EVENT_QUEUE_SIZE = 500;
+
+const EVENT_TYPES = Object.freeze({
+  CUSTOMER_CREATED: 'customer_created',
+  CUSTOMER_UPDATED: 'customer_updated',
+  TRANSACTION_RECORDED: 'transaction_recorded',
+  CASHBOX_UPDATED: 'cashbox_updated',
+  TAGADA_SENT: 'tagada_sent',
+  BACKUP_INITIATED: 'backup_initiated',
+  BACKUP_COMPLETED: 'backup_completed',
+  BACKUP_FAILED: 'backup_failed',
+  RESTORE_COMPLETED: 'restore_completed',
+  PREFERENCES_UPDATED: 'preferences_updated',
+});
+
+class TelemetryService {
+  constructor(options = {}) {
+    this.maxQueueSize = options.maxQueueSize || MAX_EVENT_QUEUE_SIZE;
+    this.enabled = options.enabled !== false;
+    this.eventQueue = [];
+    this._sequenceId = 0;
+  }
+
+  isTelemetryEnabled() {
+    return this.enabled;
+  }
+
+  setTelemetryEnabled(isEnabled) {
+    this.enabled = Boolean(isEnabled);
+    if (!this.enabled) {
+      this.clearEvents();
+    }
+  }
+
+  sanitizePayload(rawPayload = {}) {
+    if (!rawPayload || typeof rawPayload !== 'object') return {};
+
+    const sanitized = {};
+    const piiKeys = new Set([
+      'name', 'customerName', 'customer_name',
+      'mobile', 'phone', 'contact', 'address',
+      'pin', 'password', 'token', 'accessToken',
+      'notes', 'desc', 'description', 'message',
+    ]);
+
+    for (const [key, value] of Object.entries(rawPayload)) {
+      if (piiKeys.has(key)) continue;
+      if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string') {
+        sanitized[key] = value;
+      }
+    }
+
+    return sanitized;
+  }
+
+  recordEvent(eventType, payload = {}) {
+    if (!this.enabled) return null;
+
+    this._sequenceId++;
+    const nowIso = new Date().toISOString();
+
+    const eventEnvelope = {
+      id: `evt_${Date.now()}_${this._sequenceId}`,
+      type: String(eventType || 'unknown_event'),
+      timestamp: nowIso,
+      data: this.sanitizePayload(payload),
+    };
+
+    this.eventQueue.push(eventEnvelope);
+
+    if (this.eventQueue.length > this.maxQueueSize) {
+      this.eventQueue.splice(0, this.eventQueue.length - this.maxQueueSize);
+    }
+
+    return eventEnvelope;
+  }
+
+  getEvents(options = {}) {
+    let result = [...this.eventQueue];
+
+    if (options.type) {
+      result = result.filter((e) => e.type === options.type);
+    }
+
+    const limit = options.limit !== undefined ? Math.max(0, Number(options.limit)) : 50;
+    if (limit > 0 && result.length > limit) {
+      result = result.slice(result.length - limit);
+    }
+
+    return result;
+  }
+
+  getEventCountsByType() {
+    const counts = {};
+    for (const type of Object.values(EVENT_TYPES)) {
+      counts[type] = 0;
+    }
+
+    for (const evt of this.eventQueue) {
+      if (evt && evt.type) {
+        counts[evt.type] = (counts[evt.type] || 0) + 1;
+      }
+    }
+
+    return counts;
+  }
+
+  exportTelemetrySnapshot() {
+    return {
+      enabled: this.enabled,
+      totalEventsLogged: this.eventQueue.length,
+      maxQueueSize: this.maxQueueSize,
+      countsByType: this.getEventCountsByType(),
+      latestEventTimestamp: this.eventQueue.length > 0 ? this.eventQueue[this.eventQueue.length - 1].timestamp : null,
+    };
+  }
+
+  clearEvents() {
+    this.eventQueue = [];
+    this._sequenceId = 0;
+  }
+}
+
+const defaultTelemetryService = new TelemetryService();
 // Singleton repository instance for production and test suites
 const defaultRepository = new StorageRepository();
 
@@ -2442,6 +2572,10 @@ const repoExport = {
   queryJournalsByDateRange,
   clearJournalIndexCache,
   normalizeAccountFields,
+  TelemetryService,
+  telemetryService: defaultTelemetryService,
+  EVENT_TYPES,
+  MAX_EVENT_QUEUE_SIZE,
   default: defaultRepository,
 };
 
@@ -2460,5 +2594,9 @@ if (typeof exports !== 'undefined') {
   exports.queryJournalsByDateRange = queryJournalsByDateRange;
   exports.clearJournalIndexCache = clearJournalIndexCache;
   exports.normalizeAccountFields = normalizeAccountFields;
+  exports.TelemetryService = TelemetryService;
+  exports.telemetryService = defaultTelemetryService;
+  exports.EVENT_TYPES = EVENT_TYPES;
+  exports.MAX_EVENT_QUEUE_SIZE = MAX_EVENT_QUEUE_SIZE;
   exports.default = defaultRepository;
 }
