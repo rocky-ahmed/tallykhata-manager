@@ -785,6 +785,10 @@ function resetCache() {
 }
 
 function calculateAggregateMetrics(accounts = [], journals = [], businessId = null) {
+  if (typeof journals === 'string' && businessId === null) {
+    businessId = journals;
+    journals = [];
+  }
   if (Array.isArray(accounts)) {
     let bizCache = _aggregateMetricsCache.get(accounts);
     const key = String(businessId || 'all');

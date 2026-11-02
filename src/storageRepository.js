@@ -2547,6 +2547,7 @@ class TelemetryService {
       maxQueueSize: this.maxQueueSize,
       countsByType: this.getEventCountsByType(),
       latestEventTimestamp: this.eventQueue.length > 0 ? this.eventQueue[this.eventQueue.length - 1].timestamp : null,
+      eventQueue: [...this.eventQueue],
     };
   }
 
