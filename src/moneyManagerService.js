@@ -263,26 +263,29 @@ function sanitizeState(parsed, defaultState) {
 }
 
 function calculateNetWorth(accountsOrState) {
-  const state = !Array.isArray(accountsOrState) && accountsOrState && typeof accountsOrState === "object"
-    ? accountsOrState
-    : null;
+  if (!accountsOrState) return 0;
 
-  if (state && _netWorthCache.has(state)) {
-    const entry = _netWorthCache.get(state);
-    const accLen = Array.isArray(state.accounts) ? state.accounts.length : 0;
-    const goalLen = Array.isArray(state.goals) ? state.goals.length : 0;
-    if (entry && entry.__accLen === accLen && entry.__goalLen === goalLen) {
-      return entry.result;
+  if (accountsOrState.accounts !== undefined) {
+    const entry = _netWorthCache.get(accountsOrState);
+    if (entry) {
+      const accs = accountsOrState.accounts;
+      const goals = accountsOrState.goals;
+      const accLen = accs ? accs.length : 0;
+      const goalLen = goals ? goals.length : 0;
+      if (entry.__accLen === accLen && entry.__goalLen === goalLen) {
+        return entry.result;
+      }
     }
-  }
-  if (Array.isArray(accountsOrState) && _netWorthCache.has(accountsOrState)) {
+  } else if (Array.isArray(accountsOrState)) {
     const entry = _netWorthCache.get(accountsOrState);
     if (entry && entry.__len === accountsOrState.length) {
       return entry.result;
     }
   }
 
-  const accounts = Array.isArray(accountsOrState)
+  const isArr = Array.isArray(accountsOrState);
+  const state = !isArr && typeof accountsOrState === "object" ? accountsOrState : null;
+  const accounts = isArr
     ? accountsOrState
     : state && Array.isArray(state.accounts)
     ? state.accounts
@@ -301,10 +304,12 @@ function calculateNetWorth(accountsOrState) {
   const result = roundCurrency(accountNetWorth + allocatedGoalFunds);
 
   if (state) {
-    const accLen = Array.isArray(state.accounts) ? state.accounts.length : 0;
-    const goalLen = Array.isArray(state.goals) ? state.goals.length : 0;
+    const accs = state.accounts;
+    const goals = state.goals;
+    const accLen = accs ? accs.length : 0;
+    const goalLen = goals ? goals.length : 0;
     _netWorthCache.set(state, { result, __accLen: accLen, __goalLen: goalLen });
-  } else if (Array.isArray(accountsOrState)) {
+  } else if (isArr) {
     _netWorthCache.set(accountsOrState, { result, __len: accountsOrState.length });
   }
   return result;
