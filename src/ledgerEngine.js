@@ -130,6 +130,13 @@ function normalizeJournalFields(journal, account = null) {
   if (!res.desc && res.description) res.desc = res.description;
   if (!res.description && res.desc) res.description = res.desc;
 
+  // 7. Sync status normalization (Room DB: 0 = pending sync, 1 = synced)
+  if (res.synced === undefined || res.synced === null) {
+    res.synced = (res.is_synced === true || res.is_synced === 1) ? 1 : 0;
+  } else {
+    res.synced = (Number(res.synced) === 1 || res.synced === true) ? 1 : 0;
+  }
+
   return res;
 }
 

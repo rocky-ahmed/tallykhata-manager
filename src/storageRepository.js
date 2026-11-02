@@ -2045,6 +2045,70 @@ class StorageRepository {
       recommendedAction: isNearQuota || collectionCounts.journals > 5000 ? 'compactStorage' : 'none',
     };
   }
+
+  /**
+   * Retrieves all unsynced records (synced === 0) for a specific collection or across all collections.
+   * Aligns with reference Room DB DAO queries: SELECT * FROM <table> WHERE synced = 0
+   * @param {string} [collectionName] - Optional specific collection (e.g., 'accounts', 'journals', 'businesses')
+   * @returns {Array|Object}
+   */
+  getUnsyncedRecords(collectionName = null) {
+    if (!this.currentStore) return collectionName ? [] : {};
+
+    const targetCols = collectionName
+      ? [collectionName]
+      : ['accounts', 'journals', 'cashEntries', 'businesses', 'inventory', 'stock', 'tagadaLogs'];
+
+    const result = {};
+    for (const col of targetCols) {
+      if (Array.isArray(this.currentStore[col])) {
+        result[col] = this.currentStore[col].filter((item) => item && (item.synced === 0 || item.synced === false || item.synced === undefined));
+      } else {
+        result[col] = [];
+      }
+    }
+
+    return collectionName ? (result[collectionName] || []) : result;
+  }
+
+  /**
+   * Marks specified record IDs as synchronized (synced = 1) in a collection.
+   * Aligns with reference Room DB DAO updates: UPDATE <table> SET synced = 1 WHERE id IN (...)
+   * @param {string} collectionName
+   * @param {Array<string|number>} ids
+   * @returns {Promise<{success: boolean, updatedCount: number}>}
+   */
+  async markRecordsSynced(collectionName, ids = []) {
+    if (!collectionName || !VALID_COLLECTIONS.has(collectionName) || !Array.isArray(ids) || ids.length === 0) {
+      return { success: true, updatedCount: 0 };
+    }
+
+    const idSet = new Set(ids.map(String));
+    let updatedCount = 0;
+
+    const res = await this.mutateCollection(collectionName, (list) => {
+      return list.map((item) => {
+        if (item && item.id && idSet.has(String(item.id))) {
+          updatedCount++;
+          const nowIso = new Date().toISOString();
+          return {
+            ...item,
+            synced: 1,
+            is_synced: 1,
+            syncedDate: nowIso,
+            synced_date: nowIso,
+          };
+        }
+        return item;
+      });
+    });
+
+    return {
+      success: res.success,
+      updatedCount,
+      error: res.error,
+    };
+  }
 }
 
 // ============================================================================
