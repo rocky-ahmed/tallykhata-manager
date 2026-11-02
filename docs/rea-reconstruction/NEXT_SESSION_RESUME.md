@@ -1,10 +1,10 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-208` (Bulk Tagada Multi-Customer Dispatch, Statement Document Generator & Live Device UI QA)
-**Next Iteration Target:** `REA-ITER-209` (PDF Document Canvas Rendering / Export Pipeline & In-Field Release Cadence)
+**Current Iteration Completed:** `REA-ITER-209` (PDF Document Canvas Rendering, HTML5 Print Engine, Multi-Page Pagination & Export Pipeline)
+**Next Iteration Target:** `REA-ITER-210` (Consolidated In-Field Report Download Builders, Stock Movement Statements & Release Cadence)
 **System Status:** ACTIVE — PRODUCTION READY & VERIFIED  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
-**Test Baseline:** 259 / 259 test suites passing (100% green, 4,974+ discrete assertions, 0 regressions)
+**Test Baseline:** 262 / 262 test suites passing (100% green, 5,042+ discrete assertions, 0 regressions)
 
 ---
 
@@ -20,11 +20,11 @@ The system operates with exactly THREE persistent Subagent workers (DO NOT spawn
 
 ---
 
-## 2. Immediate Resume Action Plan (Iteration 209)
-1. **Gibbs (Worker 1):** Reverse-engineer PDF Canvas rendering pipeline, `android.graphics.pdf.PdfDocument`, and statement export mechanics from reference APK.
-2. **Averroes (Worker 2):** Implement print and export formatters, PDF layout generation service, and multi-tenant PDF document export verification.
-3. **Ohm (Worker 3):** Physical device UI verification of PDF export workflow, print preview dialogs, and touch interaction latency on Redmi Note 9.
-4. **Main Orchestrator:** Maintain 100% green status across all 259 test suites and verify zero regressions.
+## 2. Immediate Resume Action Plan (Iteration 210)
+1. **Gibbs (Worker 1):** Reverse-engineer `CustomerListReportBuilderActivity`, `MonthlyExpensePdfBuilderActivity`, and inventory stock movement statement layouts from reference APK.
+2. **Averroes (Worker 2):** Implement consolidated multi-period debtor summaries, expense breakdown export structures, and stock ledger statement generators in `src/ledgerEngine.js`.
+3. **Ohm (Worker 3):** Physical device UI verification of Reports Screen PDF download triggers, in-app share sheet invocations, and touch interaction latency on Redmi Note 9.
+4. **Main Orchestrator:** Maintain 100% green status across all 262 test suites and ensure continuous delivery readiness.
 
 ---
 

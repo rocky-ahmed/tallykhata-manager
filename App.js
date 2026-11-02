@@ -844,6 +844,8 @@ function TallyKhataApp() {
   const [modalTagada, setModalTagada] = useState(false);
   const [modalCustomerStatement, setModalCustomerStatement] = useState(false);
   const [statementDateFilter, setStatementDateFilter] = useState('all'); // 'all' | 'today' | 'this_month' | 'last_month'
+  const [modalStatementExport, setModalStatementExport] = useState(false);
+  const [modalPrintPreview, setModalPrintPreview] = useState(false);
   const [modalBulkTagada, setModalBulkTagada] = useState(false);
   const [selectedBulkCustomerIds, setSelectedBulkCustomerIds] = useState({});
   const [modalTallyMessage, setModalTallyMessage] = useState(false);
@@ -2105,6 +2107,8 @@ function TallyKhataApp() {
       if (modalAddMoney) { setModalAddMoney(false); return true; }
       if (modalMobileRecharge) { setModalMobileRecharge(false); return true; }
       if (modalTagada) { setModalTagada(false); return true; }
+      if (modalPrintPreview) { setModalPrintPreview(false); return true; }
+      if (modalStatementExport) { setModalStatementExport(false); return true; }
       if (modalCustomerStatement) { setModalCustomerStatement(false); return true; }
       if (modalBulkTagada) { setModalBulkTagada(false); return true; }
       if (modalVoucher) { setModalVoucher(false); return true; }
@@ -2164,7 +2168,7 @@ function TallyKhataApp() {
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
     modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
-    modalMobileRecharge, modalTagada, modalCustomerStatement, modalBulkTagada, modalVoucher, modalPinSetup, modalProfitLoss,
+    modalMobileRecharge, modalTagada, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucher, modalPinSetup, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
     modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, modalNotifications, modalDataManagement, modalAbout, modalFilter, modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMWithdrawGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange, modalMMMonthPicker, currentScreen, activeTab
   ]);
@@ -4617,6 +4621,20 @@ function TallyKhataApp() {
     const bal = isCust ? (given - received) : (received - given);
     return { statementGiven: given, statementReceived: received, statementBalance: bal };
   }, [filteredStatementJournals, selectedAccount]);
+
+  const getFullStatementText = () => {
+    if (!selectedAccount) return '';
+    const fullStatement =
+      `=== ${businessName} ===\n` +
+      `${tStatic("হিসাব খাতা: ")}${selectedAccount.name}\n` +
+      `${tStatic("মোবাইল: ")}${selectedAccount.phone || tStatic("দেওয়া নেই")}\n` +
+      `${tStatic("বর্তমান বকেয়া: ৳ ")}${formatMoney(selectedAccount.balance)}\n` +
+      `${tStatic("মোট লেনদেন: ")}${filteredStatementJournals.length}${tStatic(" টি\n")}` +
+      `${tStatic("দিলাম মোট: ৳ ")}${formatMoney(statementGiven)}\n` +
+      `${tStatic("পেলাম মোট: ৳ ")}${formatMoney(statementReceived)}\n` +
+      `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
+    return fullStatement;
+  };
 
   return (
     <ThemeContext.Provider value={themeContextValue}>
@@ -9035,15 +9053,7 @@ function TallyKhataApp() {
               style={styles.reportHeaderAction}
               onPress={() => {
                 if (!selectedAccount) return;
-                const fullStatement =
-                  `=== ${businessName} ===\n` +
-                  `${tStatic("হিসাব খাতা: ")}${selectedAccount.name}\n` +
-                  `${tStatic("মোবাইল: ")}${selectedAccount.phone || tStatic("দেওয়া নেই")}\n` +
-                  `${tStatic("বর্তমান বকেয়া: ৳ ")}${formatMoney(selectedAccount.balance)}\n` +
-                  `${tStatic("মোট লেনদেন: ")}${filteredStatementJournals.length}${tStatic(" টি\n")}` +
-                  `${tStatic("দিলাম মোট: ৳ ")}${formatMoney(statementGiven)}\n` +
-                  `${tStatic("পেলাম মোট: ৳ ")}${formatMoney(statementReceived)}\n` +
-                  `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
+                const fullStatement = getFullStatementText();
                 Share.share({ message: fullStatement });
               }}
               activeOpacity={0.7}
@@ -9164,24 +9174,14 @@ function TallyKhataApp() {
             }
           />
 
-          <View style={[styles.statementBottomBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
+<View style={[styles.statementBottomBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
             <TouchableOpacity
               style={[styles.statementPdfBtn, { minHeight: 48, borderRadius: 10 }]}
-              onPress={() => {
-                if (!selectedAccount) return;
-                const fullStatement =
-                  `=== ${businessName} ===\n` +
-                  `${tStatic("হিসাব খাতা: ")}${selectedAccount.name}\n` +
-                  `${tStatic("মোবাইল: ")}${selectedAccount.phone || tStatic("দেওয়া নেই")}\n` +
-                  `${tStatic("বর্তমান বকেয়া: ৳ ")}${formatMoney(selectedAccount.balance)}\n` +
-                  `${tStatic("মোট লেনদেন: ")}${filteredStatementJournals.length}${tStatic(" টি\n")}` +
-                  `${tStatic("দিলাম মোট: ৳ ")}${formatMoney(statementGiven)}\n` +
-                  `${tStatic("পেলাম মোট: ৳ ")}${formatMoney(statementReceived)}\n` +
-                  `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
-                Share.share({ message: fullStatement });
-              }}
+              onPress={() => setModalStatementExport(true)}
               activeOpacity={0.85}
               hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("PDF / স্টেটমেন্ট শেয়ার")}
             >
               <Image
                 source={require('./assets/icons/ic_pdf.png')}
@@ -9190,6 +9190,376 @@ function TallyKhataApp() {
               />
               <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
                 {tStatic("PDF / স্টেটমেন্ট শেয়ার")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: STATEMENT EXPORT & PRINT ACTIONS (ITERATION 209)
+         =================================================================== */}
+      <Modal visible={modalStatementExport} animationType="fade" transparent onRequestClose={() => setModalStatementExport(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { padding: 18, elevation: 12, backgroundColor: '#FFFFFF' }, isDark && tStyles.modalSurface]}>
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>{tStatic("স্টেটমেন্ট এক্সপোর্ট ও শেয়ার")}</Text>
+                {selectedAccount ? (
+                  <Text style={[{ fontSize: 12, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]} numberOfLines={1}>
+                    {selectedAccount.name}{selectedAccount.phone ? ` • ${selectedAccount.phone}` : ''}
+                  </Text>
+                ) : null}
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalStatementExport(false)}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("বন্ধ করুন")}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginTop: 14 }}>
+              {/* Option 1: PDF View / Print */}
+              <TouchableOpacity
+                style={[styles.exportActionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}
+                onPress={() => {
+                  setModalStatementExport(false);
+                  setModalPrintPreview(true);
+                }}
+                activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("পিডিএফ ভিউ / প্রিন্ট")}
+              >
+                <View style={[styles.exportActionIconWrap, { backgroundColor: isDark ? '#312E81' : '#EEF2FF', borderColor: isDark ? '#6366F1' : '#C7D2FE' }]}>
+                  <Image
+                    source={require('./assets/icons/ic_pdf.png')}
+                    style={{ width: 22, height: 22, tintColor: isDark ? '#A5B4FC' : '#4F46E5' }}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.exportActionTitle, isDark && tStyles.textPrimary]}>{tStatic("পিডিএফ ভিউ / প্রিন্ট")}</Text>
+                  <Text style={[styles.exportActionSubtitle, isDark && tStyles.textSecondary]}>{tStatic("A4 পেপারে সম্পূর্ণ হিসাব বিবরণী দেখুন ও প্রিন্ট করুন")}</Text>
+                </View>
+                <Image
+                  source={require('./assets/icons/arrow_right_red.png')}
+                  style={{ width: 14, height: 14, tintColor: isDark ? currentTheme.textSecondary : '#94A3B8' }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+
+              {/* Option 2: WhatsApp Share */}
+              <TouchableOpacity
+                style={[styles.exportActionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}
+                onPress={async () => {
+                  if (!selectedAccount) return;
+                  const text = getFullStatementText();
+                  let phone = (selectedAccount.phone || '').replace(/[^0-9]/g, '');
+                  if (phone.length === 11 && phone.startsWith('01')) {
+                    phone = '88' + phone;
+                  }
+                  const url = phone
+                    ? `whatsapp://send?phone=${phone}&text=${encodeURIComponent(text)}`
+                    : `whatsapp://send?text=${encodeURIComponent(text)}`;
+                  try {
+                    const supported = await Linking.canOpenURL(url);
+                    if (supported) {
+                      await Linking.openURL(url);
+                    } else {
+                      const webUrl = phone
+                        ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+                        : `https://wa.me/?text=${encodeURIComponent(text)}`;
+                      const webSupported = await Linking.canOpenURL(webUrl);
+                      if (webSupported) {
+                        await Linking.openURL(webUrl);
+                      } else {
+                        Share.share({ message: text });
+                      }
+                    }
+                  } catch (e) {
+                    Share.share({ message: text });
+                  }
+                  setModalStatementExport(false);
+                }}
+                activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("হোয়াটসঅ্যাপে পাঠান")}
+              >
+                <View style={[styles.exportActionIconWrap, { backgroundColor: isDark ? '#064E3B' : '#ECFDF5', borderColor: isDark ? '#10B981' : '#A7F3D0' }]}>
+                  <Image
+                    source={require('./assets/icons/ic_whatsapp.png')}
+                    style={{ width: 22, height: 22, tintColor: isDark ? '#34D399' : '#059669' }}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.exportActionTitle, isDark && tStyles.textPrimary]}>{tStatic("হোয়াটসঅ্যাপে পাঠান")}</Text>
+                  <Text style={[styles.exportActionSubtitle, isDark && tStyles.textSecondary]}>{tStatic("কাস্টমারকে সরাসরি হোয়াটসঅ্যাপ মেসেজে পাঠান")}</Text>
+                </View>
+                <Image
+                  source={require('./assets/icons/arrow_right_red.png')}
+                  style={{ width: 14, height: 14, tintColor: isDark ? currentTheme.textSecondary : '#94A3B8' }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+
+              {/* Option 3: Copy SMS Text */}
+              <TouchableOpacity
+                style={[styles.exportActionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}
+                onPress={() => {
+                  if (!selectedAccount) return;
+                  const text = getFullStatementText();
+                  if (Clipboard && Clipboard.setString) {
+                    Clipboard.setString(text);
+                  }
+                  Alert.alert(tStatic("সফল"), tStatic("স্টেটমেন্ট মেসেজ কপি করা হয়েছে"));
+                  setModalStatementExport(false);
+                }}
+                activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("এসএমএস কপি করুন")}
+              >
+                <View style={[styles.exportActionIconWrap, { backgroundColor: isDark ? '#78350F' : '#FEF3C7', borderColor: isDark ? '#F59E0B' : '#FDE68A' }]}>
+                  <Image
+                    source={require('./assets/icons/ic_sms.png')}
+                    style={{ width: 20, height: 20, tintColor: isDark ? '#FBBF24' : '#D97706' }}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.exportActionTitle, isDark && tStyles.textPrimary]}>{tStatic("এসএমএস কপি করুন")}</Text>
+                  <Text style={[styles.exportActionSubtitle, isDark && tStyles.textSecondary]}>{tStatic("স্টেটমেন্টের সামারি টেক্সট ক্লিপবোর্ডে কপি করুন")}</Text>
+                </View>
+                <Image
+                  source={require('./assets/icons/arrow_right_red.png')}
+                  style={{ width: 14, height: 14, tintColor: isDark ? currentTheme.textSecondary : '#94A3B8' }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.exportCancelBtn, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}
+              onPress={() => setModalStatementExport(false)}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.exportCancelBtnText, isDark && tStyles.textSecondary]}>{tStatic("বাতিল করুন")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: PRINTABLE A4 STATEMENT PREVIEW (ITERATION 209)
+         =================================================================== */}
+      <Modal visible={modalPrintPreview} animationType="slide" onRequestClose={() => setModalPrintPreview(false)}>
+        <SafeAreaView style={[styles.reportContainer, isDark && tStyles.reportContainer]}>
+          <View style={[styles.reportHeader, isDark && tStyles.reportHeader]}>
+            <TouchableOpacity
+              onPress={() => setModalPrintPreview(false)}
+              style={styles.reportHeaderBack}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Image
+                source={require('./assets/icons/arrow_left.png')}
+                style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginHorizontal: 8 }}>
+              <Text style={styles.reportHeaderTitle}>{tStatic("পিডিএফ ভিউ / প্রিন্ট")}</Text>
+              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }} numberOfLines={1}>
+                {tStatic("A4 পেপার প্রিভিউ")}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.reportHeaderAction}
+              onPress={() => {
+                if (!selectedAccount) return;
+                const fullText = getFullStatementText();
+                Share.share({ message: fullText, title: `${tStatic("হিসাব বিবরণী")} - ${selectedAccount.name}` });
+              }}
+              activeOpacity={0.7}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            >
+              <Image
+                source={require('./assets/icons/ic_share.png')}
+                style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 4 }}
+                resizeMode="contain"
+              />
+              <Text style={styles.reportHeaderActionText}>{tStatic("শেয়ার")}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 12, paddingBottom: 110 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* A4 Paper Sheet Simulation */}
+            <View style={[styles.statementA4Paper, isDark && { borderColor: '#475569' }]}>
+              {/* Shop Header */}
+              <View style={styles.printShopHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.printShopTitle}>{businessName || tStatic("টালিখাতা ডিজিটাল")}</Text>
+                  {ownerPhone ? (
+                    <Text style={styles.printShopSubtitle}>{tStatic("মোবাইল: ")}{ownerPhone}</Text>
+                  ) : null}
+                  <Text style={styles.printShopSubtitle}>{tStatic("ঠিকানা: বাংলাদেশ")}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <View style={styles.printDocBadge}>
+                    <Text style={styles.printDocBadgeText}>
+                      {selectedAccount && selectedAccount.type === 2 ? tStatic("দেনা হিসাব বিবরণী") : tStatic("বকেয়া হিসাব বিবরণী")}
+                    </Text>
+                  </View>
+                  <Text style={styles.printMetaDate}>{tStatic("তারিখ: ")}{getTodayDate()}</Text>
+                </View>
+              </View>
+
+              <View style={styles.printDivider} />
+
+              {/* Debtor / Account Summary Card */}
+              {selectedAccount ? (
+                <View style={styles.printAccountCard}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.printAccountName}>{selectedAccount.name}</Text>
+                      <Text style={styles.printAccountPhone}>{selectedAccount.phone || tStatic("মোবাইল নম্বর দেওয়া নেই")}</Text>
+                      <Text style={styles.printRangeBadge}>
+                        {tStatic("সময়কাল: ")}{
+                          statementDateFilter === 'today' ? tStatic("আজকের লেনদেন") :
+                          statementDateFilter === 'this_month' ? tStatic("চলতি মাসের লেনদেন") :
+                          statementDateFilter === 'last_month' ? tStatic("গত মাসের লেনদেন") :
+                          tStatic("সকল লেনদেন")
+                        }
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.printClosingLabel}>
+                        {selectedAccount.type === 2 ? tStatic("বর্তমান দেনা") : tStatic("বর্তমান বকেয়া")}
+                      </Text>
+                      <Text style={[styles.printClosingAmount, { color: statementBalance > 0 ? '#B91C1C' : '#047857' }]}>
+                        {tStatic("৳ ")}{formatMoney(statementBalance)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* 3 Metric Pills */}
+                  <View style={styles.printMetricRow}>
+                    <View style={styles.printMetricCol}>
+                      <Text style={styles.printMetricLabel}>{tStatic("দিলাম মোট (+)")}</Text>
+                      <Text style={[styles.printMetricVal, { color: '#B91C1C' }]}>{tStatic("৳ ")}{formatMoney(statementGiven)}</Text>
+                    </View>
+                    <View style={styles.printMetricDivider} />
+                    <View style={styles.printMetricCol}>
+                      <Text style={styles.printMetricLabel}>{tStatic("পেলাম মোট (-)")}</Text>
+                      <Text style={[styles.printMetricVal, { color: '#047857' }]}>{tStatic("৳ ")}{formatMoney(statementReceived)}</Text>
+                    </View>
+                    <View style={styles.printMetricDivider} />
+                    <View style={styles.printMetricCol}>
+                      <Text style={styles.printMetricLabel}>{tStatic("মোট লেনদেন")}</Text>
+                      <Text style={styles.printMetricVal}>{filteredStatementJournals.length}{tStatic(" টি")}</Text>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Itemized 3-Column Table */}
+              <View style={styles.printTableWrap}>
+                <View style={styles.printTableHeader}>
+                  <Text style={[styles.printTh, { flex: 1.6 }]}>{tStatic("তারিখ ও বিবরণ")}</Text>
+                  <Text style={[styles.printTh, { flex: 1, textAlign: 'right', color: '#B91C1C' }]}>{tStatic("দিলাম (+)")}</Text>
+                  <Text style={[styles.printTh, { flex: 1, textAlign: 'right', color: '#047857' }]}>{tStatic("পেলাম (-)")}</Text>
+                </View>
+
+                {filteredStatementJournals.length > 0 ? (
+                  filteredStatementJournals.map((item, index) => {
+                    const isCust = selectedAccount ? selectedAccount.type === 1 : true;
+                    return (
+                      <View key={item.id || `print_${index}`} style={styles.printTableRow}>
+                        <View style={{ flex: 1.6, paddingRight: 4 }}>
+                          <Text style={styles.printTdDate}>{item.date || ''}</Text>
+                          <Text style={styles.printTdDesc} numberOfLines={2}>
+                            {item.desc || item.note || (item.type === 'given' ? (isCust ? 'বাকি দেওয়া' : 'পাওনা শোধ') : (isCust ? 'টাকা নেওয়া' : 'মাল বাকি'))}
+                          </Text>
+                          {item.balance !== undefined ? (
+                            <Text style={styles.printTdBal}>{tStatic("জের: ৳ ")}{formatMoney(item.balance)}</Text>
+                          ) : null}
+                        </View>
+                        <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                          <Text style={[styles.printTdAmount, { color: '#B91C1C' }]}>
+                            {item.type === 'given' ? `${tStatic("৳ ")}${formatMoney(item.amount)}` : '-'}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                          <Text style={[styles.printTdAmount, { color: '#047857' }]}>
+                            {item.type === 'received' ? `${tStatic("৳ ")}${formatMoney(item.amount)}` : '-'}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={{ padding: 24, alignItems: 'center' }}>
+                    <Text style={{ color: '#64748B', fontSize: 13 }}>
+                      {tStatic("এই সময়ের মধ্যে কোনো লেনদেন পাওয়া যায়নি")}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Document Footer */}
+              <View style={styles.printFooterWrap}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.printFooterText}>{tStatic("সফটওয়্যার পার্টনার: টালিখাতা ডিজিটাল")}</Text>
+                  <Text style={styles.printFooterText}>{tStatic("প্রিন্ট সময়: ")}{new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', minWidth: 100 }}>
+                  <View style={{ width: 100, borderBottomWidth: 1, borderColor: '#94A3B8', marginBottom: 4 }} />
+                  <Text style={styles.printFooterText}>{tStatic("স্বাক্ষর")}</Text>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Sticky Bottom Action Bar with 46dp safe padding */}
+          <View style={[styles.printPreviewBottomBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
+            <TouchableOpacity
+              style={[styles.printShareBtn, { minHeight: 48, borderRadius: 10 }]}
+              onPress={() => {
+                if (!selectedAccount) return;
+                const fullText = getFullStatementText();
+                Share.share({ message: fullText, title: `${tStatic("হিসাব বিবরণী")} - ${selectedAccount.name}` });
+              }}
+              activeOpacity={0.85}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("প্রিন্ট / স্টেটমেন্ট শেয়ার")}
+            >
+              <Image
+                source={require('./assets/icons/ic_share.png')}
+                style={{ width: 20, height: 20, tintColor: '#FFFFFF', marginRight: 8 }}
+                resizeMode="contain"
+              />
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
+                {tStatic("প্রিন্ট / স্টেটমেন্ট শেয়ার")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -18900,6 +19270,242 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#7C3AED',
+    paddingVertical: 12,
+  },
+
+// --- STATEMENT EXPORT & PRINT PREVIEW UI (ITERATION 209) ---
+  exportActionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+    minHeight: 56,
+  },
+  exportActionIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exportActionTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  exportActionSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  exportCancelBtn: {
+    marginTop: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    minHeight: 48,
+  },
+  exportCancelBtnText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#475569',
+  },
+  statementA4Paper: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    padding: 16,
+    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  printShopHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  printShopTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  printShopSubtitle: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 2,
+  },
+  printDocBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 4,
+  },
+  printDocBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#B81414',
+  },
+  printMetaDate: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  printDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 12,
+  },
+  printAccountCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    marginBottom: 12,
+  },
+  printAccountName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  printAccountPhone: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 1,
+  },
+  printRangeBadge: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 4,
+  },
+  printClosingLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  printClosingAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  printMetricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  printMetricCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  printMetricDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: '#CBD5E1',
+  },
+  printMetricLabel: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  printMetricVal: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginTop: 2,
+  },
+  printTableWrap: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  printTableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#CBD5E1',
+  },
+  printTh: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#334155',
+  },
+  printTableRow: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+  },
+  printTdDate: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  printTdDesc: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginTop: 1,
+  },
+  printTdBal: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  printTdAmount: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  printFooterWrap: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingTop: 10,
+    marginTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  printFooterText: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  printPreviewBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    paddingBottom: Platform.OS === 'android' ? 46 : 14,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    elevation: 8,
+  },
+  printShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#B81414',
     paddingVertical: 12,
   },
 

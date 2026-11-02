@@ -38,6 +38,16 @@ const {
   getBulkTagadaEligibleCustomers,
   prepareBulkTagadaBatch,
   generateStatementDocumentPayload,
+  REPORT_TYPES,
+  escapeHtml,
+  generatePrintableHtmlStatement,
+  generateConsolidatedReportDocument,
+  generatePrintableHtmlReport,
+  REPORT_PREFIXES,
+  toBengaliNumeral,
+  paginateStatementDocument,
+  paginateConsolidatedReportDocument,
+  generatePdfShareIntentPayload,
 } = require('./ledgerEngine');
 
 const VALID_COLLECTIONS = new Set([
@@ -2492,14 +2502,16 @@ class StorageRepository {
     // Resolve business info if missing in options
     const state = this.getAuthoritativeState() || this.currentStore || {};
     let businessName = options.businessName;
+    let businessOwner = options.businessOwner;
     let businessPhone = options.businessPhone;
     let businessAddress = options.businessAddress;
 
-    if (!businessName || !businessPhone || !businessAddress) {
+    if (!businessName || !businessPhone || !businessAddress || !businessOwner) {
       const bizList = Array.isArray(state.businesses) ? state.businesses : [];
       const currentBiz = bizList.find(b => String(b.id || b.business_id) === String(businessId || '1')) || null;
       if (currentBiz) {
         if (!businessName) businessName = currentBiz.name || currentBiz.business_name || currentBiz.businessName;
+        if (!businessOwner) businessOwner = currentBiz.owner;
         if (!businessPhone) businessPhone = currentBiz.phone;
         if (!businessAddress) businessAddress = currentBiz.address || currentBiz.business_address || currentBiz.businessAddress;
       }
@@ -2509,9 +2521,96 @@ class StorageRepository {
       ...options,
       businessId,
       businessName,
+      businessOwner,
       businessPhone,
       businessAddress,
     });
+  }
+
+  /**
+   * Generates a printable, standalone HTML5 statement styled to standard A4 (794px x 1123px / 210mm x 297mm).
+   *
+   * @param {Object|string} statementPayload Statement document payload, or account object / accountId
+   * @param {Object} [options={}] Additional formatting and override options
+   * @returns {string} Standalone HTML5 document
+   */
+  generatePrintableHtmlStatement(statementPayload, options = {}) {
+    if (statementPayload && (statementPayload.docType === 'ACCOUNT_STATEMENT' || statementPayload.docType === 'CONSOLIDATED_REPORT')) {
+      return generatePrintableHtmlStatement(statementPayload, options);
+    }
+    const stmtPayload = this.generateStatementDocumentPayload(statementPayload, options.journals || null, options.dateRange || 'all', options);
+    return generatePrintableHtmlStatement(stmtPayload, options);
+  }
+
+  /**
+   * Generates structured document payload for consolidated business reports:
+   * - REPORT_TYPES.DAILY_BAKI
+   * - REPORT_TYPES.MONTHLY_BAKI
+   * - REPORT_TYPES.CASHBOX_SUMMARY
+   * - REPORT_TYPES.BECHA_KENA_SUMMARY
+   *
+   * @param {string} reportType One of REPORT_TYPES
+   * @param {string|Object} [dateRange='all'] Date range ('today', 'this_month', 'last_month', 'all', 'custom')
+   * @param {Object} [options={}] Additional filter and presentation options
+   * @returns {Object} Structured report document payload with embedded print-ready HTML
+   */
+  generateConsolidatedReportDocument(reportType, dateRange = 'all', options = {}) {
+    const store = this.currentStore || this.getAuthoritativeState() || {};
+    const businessId = String(options.businessId || this.getActiveBusinessId() || '1');
+    const businesses = Array.isArray(store.businesses) ? store.businesses : [];
+    const currentBiz = businesses.find(b => String(b.id || b.business_id) === businessId) || null;
+
+    const mergedOptions = {
+      accounts: Array.isArray(options.accounts) ? options.accounts : (store.accounts || []),
+      journals: Array.isArray(options.journals) ? options.journals : (store.journals || []),
+      cashEntries: Array.isArray(options.cashEntries) ? options.cashEntries : (store.cashEntries || []),
+      inventory: Array.isArray(options.inventory) ? options.inventory : (store.inventory || store.stock || []),
+      stock: Array.isArray(options.stock) ? options.stock : (store.stock || store.inventory || []),
+      businessId,
+      business: currentBiz || options.business,
+      businessName: options.businessName || (currentBiz ? (currentBiz.name || currentBiz.business_name || currentBiz.businessName) : 'টালিখাতা ডিজিটাল'),
+      businessPhone: options.businessPhone || (currentBiz ? currentBiz.phone : ''),
+      businessAddress: options.businessAddress || (currentBiz ? (currentBiz.address || currentBiz.business_address || currentBiz.businessAddress) : ''),
+      businessOwner: options.businessOwner || (currentBiz ? currentBiz.owner : ''),
+      ...options,
+    };
+
+    return generateConsolidatedReportDocument(reportType, dateRange, mergedOptions);
+  }
+
+  /**
+   * Generates a printable, standalone HTML5 report styled to standard A4 (794px x 1123px / 210mm x 297mm).
+   *
+   * @param {Object} reportPayload Consolidated report document payload
+   * @param {Object} [options={}] Formatting and presentation overrides
+   * @returns {string} Standalone HTML5 document
+   */
+  generatePrintableHtmlReport(reportPayload, options = {}) {
+    return generatePrintableHtmlReport(reportPayload, options);
+  }
+
+  paginateStatementDocument(statementPayload, options = {}) {
+    if (statementPayload && (statementPayload.docType === 'ACCOUNT_STATEMENT' || statementPayload.docType === 'PAGINATED_ACCOUNT_STATEMENT')) {
+      return paginateStatementDocument(statementPayload, options);
+    }
+    const stmtPayload = this.generateStatementDocumentPayload(statementPayload, options.journals || null, options.dateRange || 'all', options);
+    return paginateStatementDocument(stmtPayload, options);
+  }
+
+  generatePdfShareIntentPayload(documentPayload, options = {}) {
+    if (documentPayload && (documentPayload.docType === 'ACCOUNT_STATEMENT' || documentPayload.docType === 'CONSOLIDATED_REPORT' || documentPayload.docType === 'PAGINATED_ACCOUNT_STATEMENT' || documentPayload.docType === 'PAGINATED_CONSOLIDATED_REPORT')) {
+      return generatePdfShareIntentPayload(documentPayload, options);
+    }
+    const stmtPayload = this.generateStatementDocumentPayload(documentPayload, options.journals || null, options.dateRange || 'all', options);
+    return generatePdfShareIntentPayload(stmtPayload, options);
+  }
+
+  paginateConsolidatedReportDocument(reportPayload, options = {}) {
+    if (reportPayload && (reportPayload.docType === 'CONSOLIDATED_REPORT' || reportPayload.docType === 'PAGINATED_CONSOLIDATED_REPORT' || reportPayload.reportType)) {
+      return paginateConsolidatedReportDocument(reportPayload, options);
+    }
+    const repPayload = this.generateConsolidatedReportDocument(options.reportType || REPORT_TYPES.DAILY_BAKI, options.dateRange || 'all', options);
+    return paginateConsolidatedReportDocument(repPayload, options);
   }
 
   async getStorageMetrics() {
@@ -3123,6 +3222,48 @@ function generateStatementDocumentPayloadRepo(accountOrId, journalsOrBizId = nul
   return generateStatementDocumentPayload(accountOrId, journalsOrBizId, dateRange, options);
 }
 
+function generatePrintableHtmlStatementRepo(statementPayload, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.generatePrintableHtmlStatement === 'function') {
+    return repo.generatePrintableHtmlStatement(statementPayload, options);
+  }
+  return generatePrintableHtmlStatement(statementPayload, options);
+}
+
+function generateConsolidatedReportDocumentRepo(reportType, dateRange = 'all', options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.generateConsolidatedReportDocument === 'function') {
+    return repo.generateConsolidatedReportDocument(reportType, dateRange, options);
+  }
+  return generateConsolidatedReportDocument(reportType, dateRange, options);
+}
+
+function generatePrintableHtmlReportRepo(reportPayload, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.generatePrintableHtmlReport === 'function') {
+    return repo.generatePrintableHtmlReport(reportPayload, options);
+  }
+  return generatePrintableHtmlReport(reportPayload, options);
+}
+
+function paginateStatementDocumentRepo(statementPayload, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.paginateStatementDocument === 'function') {
+    return repo.paginateStatementDocument(statementPayload, options);
+  }
+  return paginateStatementDocument(statementPayload, options);
+}
+
+function generatePdfShareIntentPayloadRepo(documentPayload, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.generatePdfShareIntentPayload === 'function') {
+    return repo.generatePdfShareIntentPayload(documentPayload, options);
+  }
+  return generatePdfShareIntentPayload(documentPayload, options);
+}
+
+function paginateConsolidatedReportDocumentRepo(reportPayload, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.paginateConsolidatedReportDocument === 'function') {
+    return repo.paginateConsolidatedReportDocument(reportPayload, options);
+  }
+  return paginateConsolidatedReportDocument(reportPayload, options);
+}
+
 function generateAccountStatementRepo(accountOrId, journalsOrBizId, dateRange = 'all', options = {}, repo = defaultRepository) {
   if (repo && typeof repo.generateAccountStatement === 'function') {
     return repo.generateAccountStatement(accountOrId, journalsOrBizId, dateRange, options);
@@ -3154,6 +3295,16 @@ const repoExport = {
   prepareBulkTagadaBatch: prepareBulkTagadaBatchRepo,
   dispatchBulkTagadaBatch: dispatchBulkTagadaBatchRepo,
   generateStatementDocumentPayload: generateStatementDocumentPayloadRepo,
+  REPORT_TYPES,
+  escapeHtml,
+  generatePrintableHtmlStatement: generatePrintableHtmlStatementRepo,
+  generateConsolidatedReportDocument: generateConsolidatedReportDocumentRepo,
+  generatePrintableHtmlReport: generatePrintableHtmlReportRepo,
+  REPORT_PREFIXES,
+  toBengaliNumeral,
+  paginateStatementDocument: paginateStatementDocumentRepo,
+  paginateConsolidatedReportDocument: paginateConsolidatedReportDocumentRepo,
+  generatePdfShareIntentPayload: generatePdfShareIntentPayloadRepo,
   TelemetryService,
   telemetryService: defaultTelemetryService,
   EVENT_TYPES,
@@ -3188,6 +3339,16 @@ if (typeof exports !== 'undefined') {
   exports.prepareBulkTagadaBatch = prepareBulkTagadaBatchRepo;
   exports.dispatchBulkTagadaBatch = dispatchBulkTagadaBatchRepo;
   exports.generateStatementDocumentPayload = generateStatementDocumentPayloadRepo;
+  exports.REPORT_TYPES = REPORT_TYPES;
+  exports.escapeHtml = escapeHtml;
+  exports.generatePrintableHtmlStatement = generatePrintableHtmlStatementRepo;
+  exports.generateConsolidatedReportDocument = generateConsolidatedReportDocumentRepo;
+  exports.generatePrintableHtmlReport = generatePrintableHtmlReportRepo;
+  exports.REPORT_PREFIXES = REPORT_PREFIXES;
+  exports.toBengaliNumeral = toBengaliNumeral;
+  exports.paginateStatementDocument = paginateStatementDocumentRepo;
+  exports.paginateConsolidatedReportDocument = paginateConsolidatedReportDocumentRepo;
+  exports.generatePdfShareIntentPayload = generatePdfShareIntentPayloadRepo;
   exports.TelemetryService = TelemetryService;
   exports.telemetryService = defaultTelemetryService;
   exports.EVENT_TYPES = EVENT_TYPES;
