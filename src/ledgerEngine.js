@@ -27,10 +27,11 @@ function validateTransaction(amount, type, desc = '') {
   if (isNaN(num)) {
     return { valid: false, error: 'টাকার পরিমাণ সঠিক সংখ্যা নয়।' };
   }
-  if (!isFinite(num) || num <= 0) {
+  const cleanAmount = Math.round(num * 100) / 100;
+  if (!isFinite(num) || cleanAmount <= 0) {
     return { valid: false, error: 'টাকার পরিমাণ অবশ্যই শূন্য (০) থেকে বড় হতে হবে।' };
   }
-  if (num > 100000000) {
+  if (cleanAmount > 100000000) {
     return { valid: false, error: 'টাকার পরিমাণ অস্বাভাবিক বেশি (সর্বোচ্চ সীমা ১০ কোটির বেশি অনুমোদিত নয়)।' };
   }
 
@@ -41,7 +42,7 @@ function validateTransaction(amount, type, desc = '') {
   if (normalizedType !== 'given' && normalizedType !== 'received') {
     return { valid: false, error: 'লেনদেনের ধরন সঠিক নয় (দিলাম অথবা পেলাম হতে হবে)।' };
   }
-  return { valid: true, amount: Math.round(num * 100) / 100 };
+  return { valid: true, amount: cleanAmount };
 }
 
 /**

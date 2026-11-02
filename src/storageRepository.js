@@ -728,11 +728,17 @@ class StorageRepository {
           for (const item of store[col]) {
             if (item && item.id) {
               const strId = String(item.id);
-              if (seen.has(strId)) {
+              const bizId = col === 'businesses'
+                ? ''
+                : String(item.businessId !== undefined && item.businessId !== null
+                  ? item.businessId
+                  : (item.business_id !== undefined && item.business_id !== null ? item.business_id : '1'));
+              const dedupeKey = col === 'businesses' ? strId : (bizId + ':' + strId);
+              if (seen.has(dedupeKey)) {
                 deduplicatedRecords++;
                 continue;
               }
-              seen.add(strId);
+              seen.add(dedupeKey);
             }
             deduped.push(item);
           }
