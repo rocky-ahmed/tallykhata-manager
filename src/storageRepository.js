@@ -2219,7 +2219,9 @@ function compareJournals(a, b) {
   const numA = Number(a?.id);
   const numB = Number(b?.id);
   if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-  return String(a?.id || '').localeCompare(String(b?.id || ''));
+  const idA = String(a?.id || '');
+  const idB = String(b?.id || '');
+  return idA < idB ? -1 : (idA > idB ? 1 : 0);
 }
 
 /**
