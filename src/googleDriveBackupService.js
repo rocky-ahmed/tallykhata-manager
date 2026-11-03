@@ -11,11 +11,17 @@ const SCHEMA_VERSION = 6;
 const APP_VERSION = '4.0.0';
 
 let nodeZlib = null;
+let audioNoteService = null;
 if (typeof require !== 'undefined') {
   try {
     nodeZlib = require('zlib');
   } catch (_) {
     nodeZlib = null;
+  }
+  try {
+    audioNoteService = require('./audioNoteService');
+  } catch (_) {
+    audioNoteService = null;
   }
 }
 
@@ -165,6 +171,14 @@ function buildBackupPayload(authoritativeState, userProfile, options = {}) {
     pinEnabled: false,
     appPin: '', // Privacy: Plaintext app PIN is never exported or backed up
     tagadaLogs: Array.isArray(authoritativeState.tagadaLogs) ? authoritativeState.tagadaLogs : [],
+    audioNotes: Array.isArray(authoritativeState.audioNotes)
+      ? (audioNoteService && typeof audioNoteService.sanitizeAudioNotesForBackup === 'function'
+          ? audioNoteService.sanitizeAudioNotesForBackup(authoritativeState.audioNotes)
+          : authoritativeState.audioNotes.map((a) => {
+              const { audioBlob, base64Data, data, rawBytes, blob, buffer, ...rest } = a || {};
+              return { ...rest, fileUri: null, sanitized: true, backupExcludedBinary: true };
+            }))
+      : [],
   };
 
   // Include Money Manager if present
@@ -190,6 +204,7 @@ function buildBackupPayload(authoritativeState, userProfile, options = {}) {
     stock: stock.length,
     notes: notes.length,
     businesses: businesses.length,
+    audioNotes: Array.isArray(rawData.audioNotes) ? rawData.audioNotes.length : 0,
   };
 
   const dataDomains = ['business'];
@@ -2971,6 +2986,7 @@ module.exports = {
   buildBackupPayload,
   normalizeBackupPayload,
   validateBackupIntegrity,
+  audioNoteService,
   previewBackup,
   toBengaliNumber,
   verifyUploadedBackupMatches,

@@ -42,6 +42,8 @@ import { Card3D, Button3D, SquircleBadge } from './src/components';
 import hapticFeedbackService from './src/hapticFeedbackService';
 import * as biometricAuthModule from './src/biometricAuthService';
 const biometricAuthService = biometricAuthModule.biometricAuthService || biometricAuthModule.default || biometricAuthModule;
+import * as audioNoteModule from './src/audioNoteService';
+const audioNoteService = audioNoteModule.audioNoteService || audioNoteModule.default || audioNoteModule;
 
 export const ThemeContext = React.createContext({
   theme: themeService.LIGHT_THEME,
@@ -803,6 +805,28 @@ function TallyKhataApp() {
   const [changePinError, setChangePinError] = useState('');
 
   const [pinRecoveryPhone, setPinRecoveryPhone] = useState('');
+
+  // --- ITERATION 216: AUDIO / VOICE NOTE & TAGADA MESSAGING STATES ---
+  const [modalAudioRecord, setModalAudioRecord] = useState(false);
+  const [voiceTarget, setVoiceTarget] = useState(null);
+  const [audioRecordingState, setAudioRecordingState] = useState({
+    isRecording: false,
+    isPaused: false,
+    durationSec: 0,
+    uri: null,
+    waveform: audioNoteService.generateWaveformSamples ? audioNoteService.generateWaveformSamples(20, 0.2) : [0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9],
+  });
+  const [audioPlaybackState, setAudioPlaybackState] = useState({
+    isPlaying: false,
+    currentSec: 0,
+    totalSec: 0,
+    activeNoteId: null,
+    activeTargetId: null,
+  });
+  const [voiceNotes, setVoiceNotes] = useState({});
+  const voiceRecordTimerRef = useRef(null);
+  const voicePlaybackTimerRef = useRef(null);
+  const waveformAnim = useRef(new Animated.Value(0.3)).current;
   const [pinRecoveryStep, setPinRecoveryStep] = useState('options'); // 'options' | 'phone_verify'
   const [pinRecoveryError, setPinRecoveryError] = useState('');
 
@@ -2176,6 +2200,7 @@ function TallyKhataApp() {
       if (modalAddBusiness) { setModalAddBusiness(false); return true; }
       if (modalAddMoney) { setModalAddMoney(false); return true; }
       if (modalMobileRecharge) { setModalMobileRecharge(false); return true; }
+      if (modalAudioRecord) { handleCloseAudioRecordModal(); return true; }
       if (modalTagada) { setModalTagada(false); return true; }
       if (modalPrintPreview) { setModalPrintPreview(false); return true; }
       if (modalStatementExport) { setModalStatementExport(false); return true; }
@@ -2240,7 +2265,7 @@ function TallyKhataApp() {
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
     modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
-    modalMobileRecharge, modalTagada, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
+    modalMobileRecharge, modalAudioRecord, modalTagada, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
     modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, modalNotifications, modalDataManagement, modalAbout, modalFilter, modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMWithdrawGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange, modalMMMonthPicker, currentScreen, activeTab
   ]);
@@ -2297,6 +2322,9 @@ function TallyKhataApp() {
         }
         if (d.biometricEnabled !== undefined) {
           setBiometricEnabled(Boolean(d.biometricEnabled));
+        }
+        if (d.voiceNotes && typeof d.voiceNotes === 'object') {
+          setVoiceNotes(d.voiceNotes);
         }
       } else {
         console.warn('Failed to load initial data from storageRepository:', res.error);
@@ -3274,6 +3302,299 @@ function TallyKhataApp() {
     });
   };
 
+  // =========================================================================
+  // ITERATION 216: AUDIO / VOICE NOTE & TAGADA MESSAGING HANDLERS
+  // =========================================================================
+
+  // Animated waveform pulsation during live recording
+  useEffect(() => {
+    let animLoop = null;
+    if (audioRecordingState.isRecording && !audioRecordingState.isPaused) {
+      animLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(waveformAnim, {
+            toValue: 1.0,
+            duration: 400,
+            useNativeDriver: false,
+          }),
+          Animated.timing(waveformAnim, {
+            toValue: 0.3,
+            duration: 400,
+            useNativeDriver: false,
+          }),
+        ])
+      );
+      animLoop.start();
+    } else {
+      waveformAnim.setValue(0.3);
+    }
+    return () => {
+      if (animLoop) animLoop.stop();
+    };
+  }, [audioRecordingState.isRecording, audioRecordingState.isPaused]);
+
+  const handleOpenAudioRecordModal = (target = null) => {
+    handleStopAudioPlayback();
+    const resolvedTarget = target || selectedAccount || null;
+    setVoiceTarget(resolvedTarget);
+    setAudioRecordingState({
+      isRecording: false,
+      isPaused: false,
+      durationSec: 0,
+      uri: null,
+      waveform: audioNoteService.generateWaveformSamples ? audioNoteService.generateWaveformSamples(20, 0.2) : [0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9],
+    });
+    setModalAudioRecord(true);
+    try { hapticFeedbackService.selection(); } catch (e) {}
+  };
+
+  const handleCloseAudioRecordModal = () => {
+    if (voiceRecordTimerRef.current) {
+      clearInterval(voiceRecordTimerRef.current);
+      voiceRecordTimerRef.current = null;
+    }
+    handleStopAudioPlayback();
+    setAudioRecordingState({
+      isRecording: false,
+      isPaused: false,
+      durationSec: 0,
+      uri: null,
+      waveform: audioNoteService.generateWaveformSamples ? audioNoteService.generateWaveformSamples(20, 0.2) : [0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9],
+    });
+    setModalAudioRecord(false);
+  };
+
+  const handleStartAudioRecording = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    if (voiceRecordTimerRef.current) {
+      clearInterval(voiceRecordTimerRef.current);
+      voiceRecordTimerRef.current = null;
+    }
+    const mockUri = `file:///data/user/0/com.tallykhata/voice_notes/vn_${Date.now()}.m4a`;
+    const initialWaveform = audioNoteService.generateWaveformSamples ? audioNoteService.generateWaveformSamples(20, 0.5) : [0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9];
+    
+    setAudioRecordingState({
+      isRecording: true,
+      isPaused: false,
+      durationSec: 0,
+      uri: mockUri,
+      waveform: initialWaveform,
+    });
+
+    voiceRecordTimerRef.current = setInterval(() => {
+      setAudioRecordingState(prev => {
+        if (!prev.isRecording || prev.isPaused) return prev;
+        const nextSec = prev.durationSec + 1;
+        if (nextSec >= 120) {
+          if (voiceRecordTimerRef.current) {
+            clearInterval(voiceRecordTimerRef.current);
+            voiceRecordTimerRef.current = null;
+          }
+          try { hapticFeedbackService.impactMedium(); } catch (e) {}
+          Alert.alert(t('voice_note_title'), t('voice_limit_reached'));
+          return {
+            ...prev,
+            isRecording: false,
+            isPaused: false,
+            durationSec: 120,
+            waveform: audioNoteService.generateWaveformSamples ? audioNoteService.generateWaveformSamples(20, 1.0) : prev.waveform,
+          };
+        }
+        return {
+          ...prev,
+          durationSec: nextSec,
+          waveform: audioNoteService.generateWaveformSamples ? audioNoteService.generateWaveformSamples(20, ((nextSec * 7) % 10) / 10) : prev.waveform,
+        };
+      });
+    }, 1000);
+  };
+
+  const handlePauseAudioRecording = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setAudioRecordingState(prev => ({
+      ...prev,
+      isPaused: true,
+    }));
+  };
+
+  const handleResumeAudioRecording = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setAudioRecordingState(prev => ({
+      ...prev,
+      isPaused: false,
+    }));
+  };
+
+  const handleStopAudioRecording = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    if (voiceRecordTimerRef.current) {
+      clearInterval(voiceRecordTimerRef.current);
+      voiceRecordTimerRef.current = null;
+    }
+    setAudioRecordingState(prev => ({
+      ...prev,
+      isRecording: false,
+      isPaused: false,
+    }));
+  };
+
+  const handleDiscardAudioRecording = () => {
+    try { hapticFeedbackService.onError(); } catch (e) {}
+    if (voiceRecordTimerRef.current) {
+      clearInterval(voiceRecordTimerRef.current);
+      voiceRecordTimerRef.current = null;
+    }
+    handleStopAudioPlayback();
+    setAudioRecordingState({
+      isRecording: false,
+      isPaused: false,
+      durationSec: 0,
+      uri: null,
+      waveform: audioNoteService.generateWaveformSamples ? audioNoteService.generateWaveformSamples(20, 0.2) : [0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9, 0.6, 0.3, 0.5, 0.8, 0.4, 0.7, 0.9],
+    });
+  };
+
+  const handleSaveAudioRecording = async () => {
+    if (audioRecordingState.durationSec <= 0) {
+      Alert.alert(t('voice_note_title'), t('voice_record_start_hint'));
+      return;
+    }
+    if (voiceRecordTimerRef.current) {
+      clearInterval(voiceRecordTimerRef.current);
+      voiceRecordTimerRef.current = null;
+    }
+    handleStopAudioPlayback();
+
+    const targetId = voiceTarget?.id || selectedAccount?.id || 'general';
+    const targetType = voiceTarget?.type || (selectedAccount ? (isCustomer ? 'customer' : 'supplier') : 'tagada');
+
+    const noteRecord = audioNoteService.createVoiceNoteRecord ? audioNoteService.createVoiceNoteRecord({
+      targetId,
+      targetType,
+      durationSec: audioRecordingState.durationSec,
+      uri: audioRecordingState.uri,
+      waveform: audioRecordingState.waveform,
+    }) : {
+      id: 'vn_' + Date.now(),
+      targetId,
+      targetType,
+      durationSec: audioRecordingState.durationSec,
+      uri: audioRecordingState.uri,
+      waveform: audioRecordingState.waveform,
+      createdAt: new Date().toISOString(),
+      status: 'saved',
+    };
+
+    const nextVoiceNotes = {
+      ...voiceNotes,
+      [targetId]: noteRecord,
+    };
+    setVoiceNotes(nextVoiceNotes);
+    await persistData({ voiceNotes: nextVoiceNotes });
+
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    setModalAudioRecord(false);
+    Alert.alert(t('voice_note_title'), t('voice_saved_toast'));
+  };
+
+  const handleTogglePlayAudio = (note, targetId = null) => {
+    if (!note || !note.durationSec) return;
+    try { hapticFeedbackService.selection(); } catch (e) {}
+
+    // If currently playing this exact note -> Pause
+    if (audioPlaybackState.isPlaying && audioPlaybackState.activeNoteId === note.id) {
+      if (voicePlaybackTimerRef.current) {
+        clearInterval(voicePlaybackTimerRef.current);
+        voicePlaybackTimerRef.current = null;
+      }
+      setAudioPlaybackState(prev => ({
+        ...prev,
+        isPlaying: false,
+      }));
+      return;
+    }
+
+    // Otherwise start playing
+    if (voicePlaybackTimerRef.current) {
+      clearInterval(voicePlaybackTimerRef.current);
+      voicePlaybackTimerRef.current = null;
+    }
+
+    const startSec = (audioPlaybackState.activeNoteId === note.id && audioPlaybackState.currentSec < note.durationSec)
+      ? audioPlaybackState.currentSec
+      : 0;
+
+    setAudioPlaybackState({
+      isPlaying: true,
+      currentSec: startSec,
+      totalSec: note.durationSec,
+      activeNoteId: note.id,
+      activeTargetId: targetId || note.targetId || null,
+    });
+
+    voicePlaybackTimerRef.current = setInterval(() => {
+      setAudioPlaybackState(prev => {
+        if (!prev.isPlaying) return prev;
+        const next = prev.currentSec + 1;
+        if (next >= prev.totalSec) {
+          if (voicePlaybackTimerRef.current) {
+            clearInterval(voicePlaybackTimerRef.current);
+            voicePlaybackTimerRef.current = null;
+          }
+          return {
+            ...prev,
+            isPlaying: false,
+            currentSec: 0,
+          };
+        }
+        return {
+          ...prev,
+          currentSec: next,
+        };
+      });
+    }, 1000);
+  };
+
+  const handleStopAudioPlayback = () => {
+    if (voicePlaybackTimerRef.current) {
+      clearInterval(voicePlaybackTimerRef.current);
+      voicePlaybackTimerRef.current = null;
+    }
+    setAudioPlaybackState({
+      isPlaying: false,
+      currentSec: 0,
+      totalSec: 0,
+      activeNoteId: null,
+      activeTargetId: null,
+    });
+  };
+
+  const handleDeleteVoiceNote = (targetId) => {
+    if (!targetId || !voiceNotes[targetId]) return;
+    Alert.alert(
+      t('voice_note_title'),
+      t('voice_discard') + '?',
+      [
+        { text: tStatic("বাতিল"), style: 'cancel' },
+        {
+          text: tStatic("মুছে ফেলুন"),
+          style: 'destructive',
+          onPress: async () => {
+            try { hapticFeedbackService.onError(); } catch (e) {}
+            const next = { ...voiceNotes };
+            delete next[targetId];
+            setVoiceNotes(next);
+            await persistData({ voiceNotes: next });
+            if (audioPlaybackState.activeTargetId === targetId) {
+              handleStopAudioPlayback();
+            }
+            Alert.alert(t('voice_note_title'), t('voice_deleted_toast'));
+          },
+        },
+      ]
+    );
+  };
+
   const initGoogleSignIn = async () => {
     try {
       const mod = require('@react-native-google-signin/google-signin');
@@ -4044,6 +4365,30 @@ function TallyKhataApp() {
       setModalChangePin,
       modalPinRecovery,
       setModalPinRecovery,
+    };
+
+    global.__VOICE_NOTE_TEST_HOOKS__ = {
+      modalAudioRecord,
+      setModalAudioRecord,
+      voiceTarget,
+      setVoiceTarget,
+      audioRecordingState,
+      setAudioRecordingState,
+      audioPlaybackState,
+      setAudioPlaybackState,
+      voiceNotes,
+      setVoiceNotes,
+      handleOpenAudioRecordModal,
+      handleCloseAudioRecordModal,
+      handleStartAudioRecording,
+      handlePauseAudioRecording,
+      handleResumeAudioRecording,
+      handleStopAudioRecording,
+      handleDiscardAudioRecording,
+      handleSaveAudioRecording,
+      handleTogglePlayAudio,
+      handleStopAudioPlayback,
+      handleDeleteVoiceNote,
     };
   }
 
@@ -5549,6 +5894,156 @@ function TallyKhataApp() {
           </View>
         </Card3D>
 
+        {/* Iteration 216: Attached Voice Note Player Card */}
+        {voiceNotes[selectedAccount.id] && (() => {
+          const note = voiceNotes[selectedAccount.id];
+          const isThisPlaying = audioPlaybackState.isPlaying && audioPlaybackState.activeNoteId === note.id;
+          const progressPercent = note.durationSec > 0
+            ? Math.min(100, Math.round(((isThisPlaying ? audioPlaybackState.currentSec : 0) / note.durationSec) * 100))
+            : 0;
+
+          return (
+            <View style={[{
+              backgroundColor: isDark ? currentTheme.surfaceContainer || '#1E293B' : '#F0FDF4',
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: isDark ? '#065F46' : '#BBF7D0',
+              borderBottomWidth: 3,
+              borderBottomColor: isDark ? '#064E3B' : '#86EFAC',
+              padding: 12,
+              marginHorizontal: 16,
+              marginTop: 10,
+              elevation: 2,
+            }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <TouchableOpacity
+                  onPress={() => handleTogglePlayAudio(note, selectedAccount.id)}
+                  style={[{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: isDark ? '#059669' : '#0D6E5C',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderBottomWidth: 2,
+                    borderBottomColor: isDark ? '#047857' : '#064E3B',
+                  }]}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={isThisPlaying ? t('voice_pause') : t('voice_play')}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }}>
+                    {isThisPlaying ? '⏸' : '▶'}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={{ flex: 1, marginHorizontal: 12 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#A7F3D0' : '#064E3B', marginRight: 6 }}>
+                        {t('voice_tagada_badge')}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: isDark ? '#94A3B8' : '#6B7280' }}>
+                        {isThisPlaying ? t('voice_playing') : tStatic("সংরক্ষিত")}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#F8FAFC' : '#1E293B' }}>
+                      {isThisPlaying
+                        ? `${audioNoteService.formatAudioDuration(audioPlaybackState.currentSec, effectiveLanguage)} / ${audioNoteService.formatAudioDuration(note.durationSec, effectiveLanguage)}`
+                        : audioNoteService.formatAudioDuration(note.durationSec, effectiveLanguage)}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => handleTogglePlayAudio(note, selectedAccount.id)}
+                    style={{ flexDirection: 'row', alignItems: 'center', height: 20, gap: 3 }}
+                  >
+                    {(note.waveform || (audioNoteService.generateWaveformSamples ? audioNoteService.generateWaveformSamples(16, 0.5) : [])).slice(0, 16).map((barH, bIdx) => {
+                      const barRatio = bIdx / 16;
+                      const isPast = isThisPlaying && ((audioPlaybackState.currentSec / note.durationSec) >= barRatio);
+                      return (
+                        <View
+                          key={bIdx}
+                          style={{
+                            flex: 1,
+                            height: Math.max(6, Math.round(barH * 18)),
+                            backgroundColor: isPast
+                              ? (isDark ? '#34D399' : '#059669')
+                              : (isDark ? '#334155' : '#D1D5DB'),
+                            borderRadius: 2,
+                          }}
+                        />
+                      );
+                    })}
+                  </TouchableOpacity>
+
+                  <View style={{
+                    height: 3,
+                    backgroundColor: isDark ? '#334155' : '#E5E7EB',
+                    borderRadius: 1.5,
+                    marginTop: 4,
+                    overflow: 'hidden',
+                  }}>
+                    <View style={{
+                      height: '100%',
+                      width: `${progressPercent}%`,
+                      backgroundColor: isDark ? '#34D399' : '#059669',
+                    }} />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <TouchableOpacity
+                    onPress={() => handleOpenAudioRecordModal(selectedAccount)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: isDark ? '#1E293B' : '#E0F2FE',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: isDark ? '#0284C7' : '#BAE6FD',
+                    }}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('voice_rerecord')}
+                  >
+                    <Text style={{ fontSize: 16 }}>🎙️</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handleDeleteVoiceNote(selectedAccount.id)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: isDark ? '#450A0A' : '#FEE2E2',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: isDark ? '#7F1D1D' : '#FECACA',
+                    }}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('voice_discard')}
+                  >
+                    <Image
+                      source={require('./assets/icons/ic_delete.png')}
+                      style={{ width: 16, height: 16, tintColor: isDark ? '#FCA5A5' : '#DC2626' }}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
+
         {/* Quick Action Chips: তাগাদা পাঠান, কল করুন, স্টেটমেন্ট শেয়ার */}
         <View style={[styles.ledgerQuickActions, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder, borderBottomColor: isDark ? currentTheme.outline : '#E2E8F0' }]}>
           {isCustomer ? (
@@ -5582,6 +6077,31 @@ function TallyKhataApp() {
           >
             <AppIcon source={require('./assets/icons/ic_pdf.png')} variant="purple" shape="rounded" size={24} containerSize={48} style={{ marginBottom: 6 }} />
             <Text style={[styles.quickActionLabel, isDark && tStyles.textSecondary]}>{t('ledger_share_statement')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            onPress={() => handleOpenAudioRecordModal(selectedAccount)}
+            activeOpacity={0.7}
+            hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={voiceNotes[selectedAccount.id] ? t('voice_rerecord') : t('voice_customer_attach')}
+          >
+            <View style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: voiceNotes[selectedAccount.id] ? (isDark ? '#064E3B' : '#DCFCE7') : (isDark ? '#450A0A' : '#FEE2E2'),
+              borderWidth: 1,
+              borderColor: voiceNotes[selectedAccount.id] ? (isDark ? '#065F46' : '#BBF7D0') : (isDark ? '#7F1D1D' : '#FECACA'),
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 6,
+            }}>
+              <Text style={{ fontSize: 22 }}>🎙️</Text>
+            </View>
+            <Text style={[styles.quickActionLabel, isDark && tStyles.textSecondary]}>
+              {voiceNotes[selectedAccount.id] ? t('voice_attached_badge') : t('voice_record_btn')}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -7020,8 +7540,66 @@ accessibilityLabel={
                       <Text style={[styles.tagadaCustName, isDark && tStyles.tagadaCustName]}>{item.name}</Text>
                       <Text style={[styles.tagadaCustPhone, isDark && tStyles.tagadaCustPhone]}>{item.phone || tStatic("মোবাইল নম্বর নেই")}</Text>
                       <Text style={[styles.tagadaCustDue, isDark && tStyles.tagadaCustDue]}>{tStatic("বকেয়া বাকি: ৳ ")}{formatMoney(item.balance)}</Text>
+                      {voiceNotes[item.id] && (() => {
+                        const note = voiceNotes[item.id];
+                        const isThisPlaying = audioPlaybackState.isPlaying && audioPlaybackState.activeNoteId === note.id;
+                        return (
+                          <TouchableOpacity
+                            onPress={() => handleTogglePlayAudio(note, item.id)}
+                            style={[{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDark ? '#064E3B' : '#DCFCE7',
+                              borderRadius: 12,
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              marginTop: 4,
+                              alignSelf: 'flex-start',
+                              borderWidth: 1,
+                              borderColor: isDark ? '#065F46' : '#BBF7D0',
+                            }]}
+                            hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                            activeOpacity={0.8}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('voice_tagada_play')}
+                          >
+                            <Text style={{ fontSize: 11, marginRight: 4 }}>{isThisPlaying ? '⏸' : '▶'}</Text>
+                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#A7F3D0' : '#064E3B' }}>
+                              {t('voice_tagada_badge')} ({audioNoteService.formatAudioDuration(note.durationSec, effectiveLanguage)})
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })()}
                     </View>
                     <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                      <TouchableOpacity
+                        style={[styles.tagadaActionBtn, {
+                          backgroundColor: voiceNotes[item.id] ? (isDark ? '#065F46' : '#0D6E5C') : (isDark ? '#1E293B' : '#F1F5F9'),
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: voiceNotes[item.id] ? (isDark ? '#047857' : '#064E3B') : (isDark ? '#334155' : '#CBD5E1'),
+                          borderBottomWidth: 2,
+                          borderBottomColor: voiceNotes[item.id] ? (isDark ? '#064E3B' : '#047857') : (isDark ? '#0F172A' : '#94A3B8'),
+                          paddingHorizontal: 8,
+                          paddingVertical: 8,
+                          minHeight: 38,
+                        }]}
+                        hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                        onPress={() => {
+                          if (voiceNotes[item.id]) {
+                            handleTogglePlayAudio(voiceNotes[item.id], item.id);
+                          } else {
+                            handleOpenAudioRecordModal(item);
+                          }
+                        }}
+                        activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityLabel={voiceNotes[item.id] ? t('voice_tagada_play') : t('voice_customer_attach')}
+                      >
+                        <Text style={{ fontSize: 14 }}>
+                          {voiceNotes[item.id] ? (audioPlaybackState.isPlaying && audioPlaybackState.activeNoteId === voiceNotes[item.id]?.id ? '⏸' : '▶') : '🎙️'}
+                        </Text>
+                      </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.tagadaActionBtn, {
                           backgroundColor: '#B81414',
@@ -10228,6 +10806,97 @@ accessibilityLabel={
               </View>
             ) : null}
 
+            {/* Iteration 216: Voice Tagada Attachment in Tagada Modal */}
+            {(() => {
+              const targetCust = tagadaCustomer || selectedAccount;
+              const note = targetCust ? voiceNotes[targetCust.id] : null;
+              if (note) {
+                const isPlaying = audioPlaybackState.isPlaying && audioPlaybackState.activeNoteId === note.id;
+                return (
+                  <View style={[{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: isDark ? '#064E3B' : '#DCFCE7',
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: isDark ? '#065F46' : '#BBF7D0',
+                    padding: 8,
+                    marginTop: 10,
+                  }]}>
+                    <TouchableOpacity
+                      onPress={() => handleTogglePlayAudio(note, targetCust.id)}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        backgroundColor: isDark ? '#059669' : '#0D6E5C',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 8,
+                      }}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={isPlaying ? t('voice_pause') : t('voice_play')}
+                    >
+                      <Text style={{ color: '#FFFFFF', fontSize: 14 }}>{isPlaying ? '⏸' : '▶'}</Text>
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? '#A7F3D0' : '#064E3B' }}>
+                        {t('voice_tagada_badge')} ({audioNoteService.formatAudioDuration(note.durationSec, effectiveLanguage)})
+                      </Text>
+                      <Text style={{ fontSize: 10, color: isDark ? '#A7F3D0' : '#047857' }}>
+                        {tStatic("তাগাদা এসএমএস এর সাথে সংযুক্ত ভয়েস")}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setModalTagada(false);
+                        handleOpenAudioRecordModal(targetCust);
+                      }}
+                      style={{ padding: 4 }}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('voice_rerecord')}
+                    >
+                      <Text style={{ fontSize: 16 }}>🎙️</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              } else if (targetCust) {
+                return (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setModalTagada(false);
+                      handleOpenAudioRecordModal(targetCust);
+                    }}
+                    style={[{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: isDark ? '#334155' : '#E2E8F0',
+                      padding: 10,
+                      marginTop: 10,
+                    }]}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('voice_customer_attach')}
+                  >
+                    <Text style={{ fontSize: 18, marginRight: 8 }}>🎙️</Text>
+                    <Text style={[{ fontSize: 12, fontWeight: '600', color: '#1E293B', flex: 1 }, isDark && tStyles.textPrimary]}>
+                      {t('voice_attach_hint')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: 'bold' }}>
+                      {t('voice_record_btn')}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }
+              return null;
+            })()}
+
             <View style={[styles.tagadaDottedBox, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
               <Text style={[styles.tagadaMessageContent, isDark && tStyles.textPrimary]}>
                 {generateTagadaMessage(tagadaCustomer || selectedAccount)}
@@ -10325,6 +10994,365 @@ accessibilityLabel={
             >
               <Text style={[styles.modalBtnCancelText, isDark && tStyles.bizArchiveBtnText]}>{tStatic("বাতিল")}</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: AUDIO / VOICE NOTE & TAGADA MESSAGING (Iteration 216)
+         =================================================================== */}
+      <Modal
+        visible={modalAudioRecord}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseAudioRecordModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[
+            styles.audioRecordModalCard,
+            {
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 20,
+              paddingBottom: 34,
+              width: '100%',
+              maxWidth: 480,
+              alignSelf: 'center',
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              elevation: 16,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+            },
+            isDark && {
+              backgroundColor: currentTheme.surfaceContainer || '#1E293B',
+              borderColor: currentTheme.cardBorder || '#334155',
+            }
+          ]}>
+            {/* Modal Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: isDark ? '#450A0A' : '#FEE2E2',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#7F1D1D' : '#FECACA',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 10,
+                }}>
+                  <Text style={{ fontSize: 18 }}>🎙️</Text>
+                </View>
+                <View>
+                  <Text style={[{ fontSize: 17, fontWeight: 'bold', color: '#111827' }, isDark && tStyles.textPrimary]}>
+                    {t('voice_note_title')}
+                  </Text>
+                  <Text style={[{ fontSize: 11, color: '#6B7280', marginTop: 1 }, isDark && tStyles.textSecondary]}>
+                    {t('voice_max_limit')}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={handleCloseAudioRecordModal}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("বন্ধ করুন")}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Target Entity Context Banner (if customer/supplier/tagada) */}
+            {(voiceTarget || selectedAccount) ? (
+              <View style={[{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: isDark ? '#334155' : '#E2E8F0',
+                padding: 10,
+                marginBottom: 16,
+              }]}>
+                <View style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  backgroundColor: isDark ? '#1E293B' : '#E0F2FE',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#0284C7' : '#BAE6FD',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: isDark ? '#38BDF8' : '#0369A1' }}>
+                    {((voiceTarget || selectedAccount).name || 'ক')[0]}
+                  </Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: '#1E293B' }, isDark && tStyles.textPrimary]} numberOfLines={1}>
+                    {(voiceTarget || selectedAccount).name}
+                  </Text>
+                  <Text style={[{ fontSize: 11, color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {(voiceTarget || selectedAccount).phone || tStatic("মোবাইল নম্বর নেই")}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[{ fontSize: 10, color: '#94A3B8' }]}>{tStatic("বকেয়া")}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: COLORS.primary }}>
+                    ৳ {formatMoney((voiceTarget || selectedAccount).balance || 0)}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            {/* Waveform Visualizer */}
+            <View style={[{
+              backgroundColor: isDark ? '#0F172A' : '#F1F5F9',
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: isDark ? '#334155' : '#E2E8F0',
+              paddingVertical: 20,
+              paddingHorizontal: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+              minHeight: 110,
+            }]}>
+              {/* Waveform Bars Container */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 60, width: '100%', gap: 4 }}>
+                {(audioRecordingState.waveform || (audioNoteService.generateWaveformSamples ? audioNoteService.generateWaveformSamples(20, 0.5) : [])).map((h, idx) => {
+                  const isRecording = audioRecordingState.isRecording && !audioRecordingState.isPaused;
+                  const isPreviewPlaying = audioPlaybackState.isPlaying && audioPlaybackState.activeNoteId === 'record_preview';
+                  const playbackProgressRatio = audioPlaybackState.totalSec > 0 ? (audioPlaybackState.currentSec / audioPlaybackState.totalSec) : 0;
+                  const barProgressRatio = idx / 20;
+                  const isPlayed = isPreviewPlaying && barProgressRatio <= playbackProgressRatio;
+
+                  const barHeight = isRecording
+                    ? Math.max(8, Math.min(56, Math.round(h * 56 * (0.5 + Math.sin(idx * 0.4 + (audioRecordingState.durationSec % 5)) * 0.4))))
+                    : Math.max(8, Math.round(h * 48));
+
+                  const barColor = isRecording
+                    ? '#EF4444'
+                    : (isPlayed
+                        ? (isDark ? '#10B981' : '#0D6E5C')
+                        : (isDark ? '#475569' : '#CBD5E1')
+                      );
+
+                  return (
+                    <View
+                      key={idx}
+                      style={{
+                        width: 5,
+                        height: barHeight,
+                        backgroundColor: barColor,
+                        borderRadius: 3,
+                      }}
+                    />
+                  );
+                })}
+              </View>
+
+              {/* Status Pill Badge */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                {audioRecordingState.isRecording && !audioRecordingState.isPaused && (
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 6 }} />
+                )}
+                {audioRecordingState.isPaused && (
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F59E0B', marginRight: 6 }} />
+                )}
+                <Text style={[{
+                  fontSize: 12,
+                  fontWeight: '600',
+                  color: audioRecordingState.isRecording
+                    ? (audioRecordingState.isPaused ? '#D97706' : '#DC2626')
+                    : (audioRecordingState.durationSec > 0 ? '#059669' : (isDark ? '#94A3B8' : '#6B7280'))
+                }]}>
+                  {audioRecordingState.isRecording
+                    ? (audioRecordingState.isPaused ? t('voice_paused') : t('voice_recording'))
+                    : (audioRecordingState.durationSec > 0 ? (audioPlaybackState.isPlaying ? t('voice_playing') : tStatic("রেকর্ড সম্পন্ন")) : t('voice_record_start_hint'))}
+                </Text>
+              </View>
+            </View>
+
+            {/* Live Duration Counter & 2-Minute Progress Bar */}
+            <View style={{ marginBottom: 20 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={[{ fontSize: 11, color: '#64748B', fontWeight: '500' }, isDark && tStyles.textSecondary]}>
+                  {t('voice_note_title')}
+                </Text>
+                <Text style={[{
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                  color: audioRecordingState.isRecording ? '#DC2626' : (isDark ? '#F8FAFC' : '#1E293B'),
+                  letterSpacing: 0.5,
+                }]}>
+                  {audioNoteService.formatTimerRatio(
+                    audioPlaybackState.isPlaying && audioPlaybackState.activeNoteId === 'record_preview'
+                      ? audioPlaybackState.currentSec
+                      : audioRecordingState.durationSec,
+                    120,
+                    effectiveLanguage
+                  )}
+                </Text>
+              </View>
+
+              {/* Progress Track */}
+              <View style={{
+                height: 6,
+                backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                borderRadius: 3,
+                overflow: 'hidden',
+                width: '100%',
+              }}>
+                <View style={{
+                  height: '100%',
+                  width: `${Math.min(100, Math.round(((audioPlaybackState.isPlaying && audioPlaybackState.activeNoteId === 'record_preview' ? audioPlaybackState.currentSec : audioRecordingState.durationSec) / 120) * 100))}%`,
+                  backgroundColor: audioRecordingState.isRecording ? '#EF4444' : (isDark ? '#10B981' : '#0D6E5C'),
+                  borderRadius: 3,
+                }} />
+              </View>
+            </View>
+
+            {/* Tactile 3D Action Controls */}
+            {/* STATE 1: IDLE */}
+            {!audioRecordingState.isRecording && audioRecordingState.durationSec === 0 && (
+              <View style={{ alignItems: 'center' }}>
+                <TouchableOpacity
+                  style={[{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36,
+                    backgroundColor: '#DC2626',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2,
+                    borderColor: '#EF4444',
+                    borderBottomWidth: 4,
+                    borderBottomColor: '#991B1B',
+                    elevation: 6,
+                    shadowColor: '#DC2626',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 8,
+                  }]}
+                  onPress={handleStartAudioRecording}
+                  activeOpacity={0.8}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('voice_record_btn')}
+                >
+                  <Text style={{ fontSize: 30 }}>🎙️</Text>
+                </TouchableOpacity>
+                <Text style={[{ fontSize: 13, fontWeight: 'bold', color: '#1E293B', marginTop: 10 }, isDark && tStyles.textPrimary]}>
+                  {t('voice_record_btn')}
+                </Text>
+                <Text style={[{ fontSize: 11, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                  {t('voice_attach_hint')}
+                </Text>
+              </View>
+            )}
+
+            {/* STATE 2: RECORDING (Active or Paused) */}
+            {audioRecordingState.isRecording && (
+              <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center' }}>
+                {audioRecordingState.isPaused ? (
+                  <Button3D
+                    title={t('voice_resume')}
+                    variant="info"
+                    size="md"
+                    onPress={handleResumeAudioRecording}
+                    isDark={isDark}
+                    style={{ flex: 1, minHeight: 48 }}
+                    accessibilityLabel={t('voice_resume')}
+                  />
+                ) : (
+                  <Button3D
+                    title={t('voice_pause')}
+                    variant="warning"
+                    size="md"
+                    onPress={handlePauseAudioRecording}
+                    isDark={isDark}
+                    style={{ flex: 1, minHeight: 48 }}
+                    accessibilityLabel={t('voice_pause')}
+                  />
+                )}
+
+                <Button3D
+                  title={t('voice_stop')}
+                  variant="success"
+                  size="md"
+                  onPress={handleStopAudioRecording}
+                  isDark={isDark}
+                  style={{ flex: 1.2, minHeight: 48 }}
+                  accessibilityLabel={t('voice_stop')}
+                />
+
+                <Button3D
+                  title={t('voice_discard')}
+                  variant="destructive"
+                  size="md"
+                  onPress={handleDiscardAudioRecording}
+                  isDark={isDark}
+                  style={{ flex: 1, minHeight: 48 }}
+                  accessibilityLabel={t('voice_discard')}
+                />
+              </View>
+            )}
+
+            {/* STATE 3: RECORDED / STOPPED */}
+            {!audioRecordingState.isRecording && audioRecordingState.durationSec > 0 && (
+              <View style={{ flexDirection: 'column', gap: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <Button3D
+                    title={audioPlaybackState.isPlaying && audioPlaybackState.activeNoteId === 'record_preview' ? t('voice_pause') : t('voice_play')}
+                    variant="info"
+                    size="md"
+                    onPress={() => {
+                      const mockNote = {
+                        id: 'record_preview',
+                        durationSec: audioRecordingState.durationSec,
+                        uri: audioRecordingState.uri,
+                      };
+                      handleTogglePlayAudio(mockNote, 'record_preview');
+                    }}
+                    isDark={isDark}
+                    style={{ flex: 1, minHeight: 48 }}
+                    accessibilityLabel={t('voice_play')}
+                  />
+
+                  <Button3D
+                    title={t('voice_rerecord')}
+                    variant="secondary"
+                    size="md"
+                    onPress={handleDiscardAudioRecording}
+                    isDark={isDark}
+                    style={{ flex: 1, minHeight: 48 }}
+                    accessibilityLabel={t('voice_rerecord')}
+                  />
+                </View>
+
+                <Button3D
+                  title={t('voice_save')}
+                  variant="success"
+                  size="lg"
+                  onPress={handleSaveAudioRecording}
+                  isDark={isDark}
+                  style={{ width: '100%', minHeight: 52 }}
+                  accessibilityLabel={t('voice_save')}
+                />
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -12079,7 +13107,7 @@ accessibilityLabel={
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                           <ActivityIndicator size="small" color="#059669" style={{ marginRight: 10 }} />
                           <View style={{ flex: 1 }}>
-                            <Text style={[styles.backupProgressTitle, { color: isDark ? '#6EE7B7' : '#065F46' }]}>
+                            <Text style={[styles.backupProgressTitle, { color: isDark ? '#A7F3D0' : '#064E3B' }]}>
                               {cloudBackupStatus === 'compressing'
                                 ? tStatic("কম্প্রেস হচ্ছে...")
                                 : cloudBackupStatus === 'uploading'
@@ -12118,7 +13146,7 @@ accessibilityLabel={
 
                         {/* Progress Metrics: Percentage & Chunked Transfer */}
                         <View style={styles.backupProgressMetricsRow}>
-                          <Text style={[styles.backupProgressPercentText, { color: isDark ? '#6EE7B7' : '#065F46' }]}>
+                          <Text style={[styles.backupProgressPercentText, { color: isDark ? '#A7F3D0' : '#064E3B' }]}>
                             {toBengaliNumber(backupProgressState.percent || (cloudBackupStatus === 'verifying' ? 85 : cloudBackupStatus === 'uploading' ? 50 : 25))}% {tStatic("সম্পন্ন")}
                           </Text>
                           <Text style={[styles.backupProgressBytesText, { color: isDark ? '#A7F3D0' : '#047857' }]}>
@@ -12142,7 +13170,7 @@ accessibilityLabel={
                               },
                             ]}
                           >
-                            <Text style={[styles.backupSavingsBadgeText, { color: isDark ? '#6EE7B7' : '#065F46' }]}>
+                            <Text style={[styles.backupSavingsBadgeText, { color: isDark ? '#A7F3D0' : '#064E3B' }]}>
                               সংকুচিত ব্যাকআপ: {toBengaliNumber(backupProgressState.savingsPercent || 72)}% সাশ্রয়
                             </Text>
                           </View>

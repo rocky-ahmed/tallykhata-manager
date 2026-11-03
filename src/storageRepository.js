@@ -26,6 +26,25 @@ try {
   securityService = require('./securityService');
 } catch (e) {}
 
+let audioNoteService = null;
+try {
+  audioNoteService = require('./audioNoteService');
+} catch (e) {}
+
+const {
+  createAudioNoteMetadata,
+  validateAudioNote,
+  sanitizeAudioNotesForBackup,
+  calculateAudioStorageUsage,
+  deleteAudioFile,
+  cleanOrphanedAudioFiles,
+  formatDuration,
+  parseDuration,
+  formatFileSize,
+  AudioRecorderStateMachine,
+  AudioPlayerStateMachine,
+} = audioNoteService || {};
+
 const {
   createDefaultSecurityConfig,
   normalizeSecurityConfig,
@@ -78,6 +97,7 @@ const VALID_COLLECTIONS = new Set([
   'walletTxns',
   'businesses',
   'tagadaLogs',
+  'audioNotes',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -273,6 +293,7 @@ function createDefaultState() {
           version: 1,
         },
     tagadaLogs: [],
+    audioNotes: [],
     version: 6,
   };
 }
@@ -1251,6 +1272,15 @@ class StorageRepository {
       authoritative.securityConfig = securityService.createDefaultSecurityConfig();
     }
 
+    if (authoritative.audioNotes && Array.isArray(authoritative.audioNotes)) {
+      authoritative.audioNotes = audioNoteService && typeof audioNoteService.sanitizeAudioNotesForBackup === 'function'
+        ? audioNoteService.sanitizeAudioNotesForBackup(authoritative.audioNotes)
+        : authoritative.audioNotes.map((a) => {
+            const { audioBlob, base64Data, data, rawBytes, blob, buffer, ...rest } = a || {};
+            return { ...rest, fileUri: null, sanitized: true, backupExcludedBinary: true };
+          });
+    }
+
     const domains = (extraState && Array.isArray(extraState.domains) && extraState.domains.length > 0)
       ? extraState.domains
       : ['all'];
@@ -1753,6 +1783,19 @@ class StorageRepository {
       const notes = (prevStore.notes || []).filter((n) => getBizId(n) !== targetId);
       const walletTxns = (prevStore.walletTxns || []).filter((w) => getBizId(w) !== targetId);
       const tagadaLogs = (prevStore.tagadaLogs || []).filter((t) => getBizId(t) !== targetId);
+      const audioNotesToPurge = (prevStore.audioNotes || []).filter((a) => getBizId(a) === targetId);
+      const audioNotes = (prevStore.audioNotes || []).filter((a) => getBizId(a) !== targetId);
+
+      // Clean up physical audio files of deleted business
+      if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
+        for (const note of audioNotesToPurge) {
+          if (note && note.fileUri) {
+            try {
+              audioNoteService.deleteAudioFile(note.fileUri);
+            } catch (_) {}
+          }
+        }
+      }
 
       const remainingBusinesses = list.filter((b) => String(b.id) !== targetId);
 
@@ -1793,6 +1836,7 @@ class StorageRepository {
         notes,
         walletTxns,
         tagadaLogs,
+        audioNotes,
         cashReconciliation,
       };
     });
@@ -1929,12 +1973,14 @@ class StorageRepository {
         const importedCash = (data.cashEntries || []).filter(c => String(c.businessId || '1') === selectedBizId);
         const importedStock = ((data.stock || data.inventory) || []).filter(s => String(s.businessId || '1') === selectedBizId);
         const importedNotes = (data.notes || []).filter(n => String(n.businessId || '1') === selectedBizId);
+        const importedAudio = (data.audioNotes || []).filter(a => String(a.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
         const keptCash = (prevStore.cashEntries || []).filter(c => String(c.businessId || '1') !== selectedBizId);
         const keptStock = ((prevStore.stock || prevStore.inventory) || []).filter(s => String(s.businessId || '1') !== selectedBizId);
         const keptNotes = (prevStore.notes || []).filter(n => String(n.businessId || '1') !== selectedBizId);
+        const keptAudio = (prevStore.audioNotes || []).filter(a => String(a.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -1951,6 +1997,7 @@ class StorageRepository {
           stock: [...keptStock, ...importedStock],
           inventory: [...keptStock, ...importedStock],
           notes: [...keptNotes, ...importedNotes],
+          audioNotes: [...keptAudio, ...importedAudio],
           version: 6,
           lastRestoredAt: new Date().toISOString(),
           restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -2242,6 +2289,7 @@ class StorageRepository {
           journals: (fullState.journals || []).length,
           cashEntries: (fullState.cashEntries || []).length,
           businesses: (fullState.businesses || []).length,
+          audioNotes: (fullState.audioNotes || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -3785,6 +3833,311 @@ class StorageRepository {
     }
     return { isLockedOut: false, remainingSeconds: 0, remainingAttempts: 5 };
   }
+
+  /**
+   * Attaches an audio note metadata record to an entity (customer, supplier, tagada, transaction, general).
+   * Persists atomically in the 'audioNotes' collection under writeQueue mutex.
+   *
+   * @param {object} audioNote - Audio note metadata parameters
+   * @param {object} [options] - Options (businessId, etc.)
+   * @returns {Promise<{ success: boolean, audioNote?: object, error?: any }>}
+   */
+  async attachAudioNote(audioNote, options = {}) {
+    if (!audioNote || typeof audioNote !== 'object') {
+      return { success: false, error: new Error('Audio note must be an object') };
+    }
+
+    const bizId = options.businessId || audioNote.businessId || this.currentStore?.activeBusinessId || '1';
+    let normalizedNote;
+    try {
+      if (audioNoteService && typeof audioNoteService.createAudioNoteMetadata === 'function') {
+        normalizedNote = audioNoteService.createAudioNoteMetadata({
+          ...audioNote,
+          businessId: bizId,
+        });
+      } else {
+        normalizedNote = {
+          ...audioNote,
+          id: audioNote.id || `audio_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+          businessId: String(bizId),
+          createdAt: audioNote.createdAt || new Date().toISOString(),
+        };
+      }
+    } catch (validationErr) {
+      return { success: false, error: validationErr };
+    }
+
+    const res = await this.mutateCollection('audioNotes', (list) => {
+      const existingIndex = list.findIndex((n) => n.id === normalizedNote.id);
+      if (existingIndex >= 0) {
+        const updated = [...list];
+        updated[existingIndex] = normalizedNote;
+        return updated;
+      }
+      return [...list, normalizedNote];
+    });
+
+    if (!res.success) {
+      return { success: false, error: res.error };
+    }
+
+    return { success: true, audioNote: normalizedNote };
+  }
+
+  /**
+   * Retrieves all audio notes attached to a specific entity for the current or specified business.
+   *
+   * @param {string} entityType - 'customer' | 'supplier' | 'tagada' | 'transaction' | 'general'
+   * @param {string|number} entityId - Entity identifier
+   * @param {string|number} [businessId=null] - Scoped business ID
+   * @returns {Array<object>} Matching audio notes
+   */
+  getAudioNotesForEntity(entityType, entityId, businessId = null) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.audioNotes) ? store.audioNotes : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const cleanType = String(entityType || '').toLowerCase();
+    const cleanId = String(entityId || '');
+
+    return list.filter((note) => {
+      if (!note) return false;
+      const noteBizId = String(note.businessId || '1');
+      return noteBizId === targetBizId &&
+             String(note.entityType).toLowerCase() === cleanType &&
+             String(note.entityId) === cleanId;
+    });
+  }
+
+  /**
+   * Retrieves all audio notes scoped to a specific business.
+   *
+   * @param {string|number} [businessId=null] - Business ID
+   * @returns {Array<object>} All audio notes for the business
+   */
+  getAudioNotesForBusiness(businessId = null) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.audioNotes) ? store.audioNotes : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    return list.filter((note) => {
+      if (!note) return false;
+      const noteBizId = String(note.businessId || '1');
+      return noteBizId === targetBizId;
+    });
+  }
+
+  /**
+   * Deletes an audio note by ID and safely unlinks its underlying audio file.
+   *
+   * @param {string} audioNoteId - ID of the audio note to delete
+   * @param {object} [options] - Options (deleteFile: boolean, fileSystemAdapter)
+   * @returns {Promise<{ success: boolean, deletedNote?: object, fileDeleted?: boolean, error?: any }>}
+   */
+  async deleteAudioNote(audioNoteId, options = {}) {
+    if (!audioNoteId) {
+      return { success: false, error: new Error('audioNoteId is required') };
+    }
+
+    let deletedNote = null;
+    const res = await this.mutateCollection('audioNotes', (list) => {
+      const target = list.find((n) => n.id === audioNoteId);
+      if (target) {
+        deletedNote = target;
+        return list.filter((n) => n.id !== audioNoteId);
+      }
+      return list;
+    });
+
+    if (!res.success) {
+      return { success: false, error: res.error };
+    }
+
+    let fileDeleted = false;
+    if (deletedNote && options.deleteFile !== false && deletedNote.fileUri) {
+      if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
+        const delRes = await audioNoteService.deleteAudioFile(deletedNote.fileUri, options.fileSystemAdapter);
+        fileDeleted = Boolean(delRes.deleted);
+      }
+    }
+
+    return {
+      success: true,
+      deletedNote,
+      fileDeleted,
+    };
+  }
+
+  /**
+   * Deletes all audio notes associated with an entity and unlinks their files.
+   *
+   * @param {string} entityType - 'customer' | 'supplier' | 'tagada' | 'transaction'
+   * @param {string|number} entityId - Target entity identifier
+   * @param {string|number} [businessId=null] - Scoped business ID
+   * @param {object} [options] - Options (deleteFile, fileSystemAdapter)
+   * @returns {Promise<{ success: boolean, deletedCount: number, deletedNotes: Array<object> }>}
+   */
+  async deleteAudioNotesForEntity(entityType, entityId, businessId = null, options = {}) {
+    const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+    const cleanType = String(entityType || '').toLowerCase();
+    const cleanId = String(entityId || '');
+
+    let deletedNotes = [];
+    const res = await this.mutateCollection('audioNotes', (list) => {
+      const remaining = [];
+      for (const note of list) {
+        const noteBizId = String(note?.businessId || '1');
+        if (noteBizId === targetBizId &&
+            String(note?.entityType).toLowerCase() === cleanType &&
+            String(note?.entityId) === cleanId) {
+          deletedNotes.push(note);
+        } else {
+          remaining.push(note);
+        }
+      }
+      return remaining;
+    });
+
+    if (!res.success) {
+      return { success: false, deletedCount: 0, deletedNotes: [], error: res.error };
+    }
+
+    if (options.deleteFile !== false && audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
+      for (const note of deletedNotes) {
+        if (note && note.fileUri) {
+          try {
+            await audioNoteService.deleteAudioFile(note.fileUri, options.fileSystemAdapter);
+          } catch (_) {}
+        }
+      }
+    }
+
+    return {
+      success: true,
+      deletedCount: deletedNotes.length,
+      deletedNotes,
+    };
+  }
+
+  /**
+   * Cascades customer/account deletion: purges account, journals, cash entries, and associated audio notes.
+   *
+   * @param {string|number} accountId - ID of account to delete
+   * @param {string|number} [businessId=null] - Scoped business ID
+   * @param {object} [options] - Options (deleteFile: boolean, fileSystemAdapter)
+   * @returns {Promise<{ success: boolean, deletedAccountId?: string, deletedJournalsCount?: number, deletedAudioNotesCount?: number, error?: any }>}
+   */
+  async deleteAccountCascade(accountId, businessId = null, options = {}) {
+    if (!accountId) return { success: false, error: new Error('accountId is required') };
+    const targetAccId = String(accountId);
+    const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+
+    let purgedAudioNotes = [];
+    let purgedJournalsCount = 0;
+
+    const res = await this.mutateStore((latestStore) => {
+      const getBizId = (item) => String(item?.businessId !== undefined && item?.businessId !== null ? item.businessId : (item?.business_id !== undefined && item?.business_id !== null ? item.business_id : '1'));
+
+      const curAccounts = latestStore.accounts || [];
+      const curJournals = latestStore.journals || [];
+      const curCash = latestStore.cashEntries || [];
+      const curAudio = latestStore.audioNotes || [];
+
+      // Find journals to remove
+      const accTxnIds = curJournals
+        .filter((j) => String(j.accountId) === targetAccId && getBizId(j) === targetBizId)
+        .map((j) => String(j.id));
+      purgedJournalsCount = accTxnIds.length;
+
+      // Find audio notes to remove (customers, suppliers, or tagada logs for this account)
+      purgedAudioNotes = curAudio.filter((a) => {
+        const biz = getBizId(a);
+        const isEntityMatch = (a.entityType === 'customer' || a.entityType === 'supplier' || a.entityType === 'tagada') &&
+                              String(a.entityId) === targetAccId;
+        return biz === targetBizId && isEntityMatch;
+      });
+
+      const updatedAccounts = curAccounts.filter((a) => !(String(a.id) === targetAccId && getBizId(a) === targetBizId));
+      const updatedJournals = curJournals.filter((j) => !(String(j.accountId) === targetAccId && getBizId(j) === targetBizId));
+      const updatedCash = curCash.filter((c) => !accTxnIds.includes(String(c.transactionId || c.txnId || c.id)));
+      const updatedAudio = curAudio.filter((a) => !purgedAudioNotes.some((p) => p.id === a.id));
+
+      return {
+        ...latestStore,
+        accounts: updatedAccounts,
+        journals: updatedJournals,
+        cashEntries: updatedCash,
+        audioNotes: updatedAudio,
+      };
+    });
+
+    if (!res.success) {
+      return { success: false, error: res.error };
+    }
+
+    // Clean up audio files on disk
+    if (options.deleteFile !== false && audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
+      for (const note of purgedAudioNotes) {
+        if (note && note.fileUri) {
+          try {
+            await audioNoteService.deleteAudioFile(note.fileUri, options.fileSystemAdapter);
+          } catch (_) {}
+        }
+      }
+    }
+
+    return {
+      success: true,
+      deletedAccountId: targetAccId,
+      deletedJournalsCount: purgedJournalsCount,
+      deletedAudioNotesCount: purgedAudioNotes.length,
+    };
+  }
+
+  /**
+   * Scans audio directory and cleans up orphaned audio files not referenced by current store.
+   *
+   * @param {string} [directoryPath=null] - Directory path
+   * @param {object} [fileSystemAdapter=null] - Filesystem adapter
+   * @returns {Promise<object>} Garbage collection summary report
+   */
+  async cleanOrphanedAudioFiles(directoryPath = null, fileSystemAdapter = null) {
+    const allNotes = Array.isArray(this.currentStore?.audioNotes) ? this.currentStore.audioNotes : [];
+    if (audioNoteService && typeof audioNoteService.cleanOrphanedAudioFiles === 'function') {
+      return audioNoteService.cleanOrphanedAudioFiles(allNotes, directoryPath, fileSystemAdapter);
+    }
+    return {
+      scannedCount: 0,
+      referencedCount: allNotes.length,
+      orphanedCount: 0,
+      deletedCount: 0,
+      bytesReclaimed: 0,
+      errors: [],
+    };
+  }
+
+  /**
+   * Returns aggregate audio storage statistics for the business.
+   *
+   * @param {string|number} [businessId=null]
+   * @param {object} [options]
+   * @returns {object}
+   */
+  getAudioStorageMetrics(businessId = null, options = {}) {
+    const list = this.getAudioNotesForBusiness(businessId);
+    if (audioNoteService && typeof audioNoteService.calculateAudioStorageUsage === 'function') {
+      return audioNoteService.calculateAudioStorageUsage(list, options);
+    }
+    const totalBytes = list.reduce((sum, n) => sum + (Number(n?.fileSizeBytes) || 0), 0);
+    const totalDurationMs = list.reduce((sum, n) => sum + (Number(n?.durationMs) || 0), 0);
+    return {
+      totalCount: list.length,
+      totalBytes,
+      totalDurationMs,
+      formattedBytes: `${totalBytes} B`,
+      formattedDurationBn: '০০:০০',
+      formattedDurationEn: '00:00',
+    };
+  }
 }
 
 // ============================================================================
@@ -4458,6 +4811,62 @@ function getAppLockoutStatusRepo(now = Date.now(), repo = defaultRepository) {
   return { isLockedOut: false, remainingSeconds: 0, remainingAttempts: 5 };
 }
 
+async function attachAudioNoteRepo(audioNote, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.attachAudioNote === 'function') {
+    return repo.attachAudioNote(audioNote, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getAudioNotesForEntityRepo(entityType, entityId, businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getAudioNotesForEntity === 'function') {
+    return repo.getAudioNotesForEntity(entityType, entityId, businessId);
+  }
+  return [];
+}
+
+function getAudioNotesForBusinessRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getAudioNotesForBusiness === 'function') {
+    return repo.getAudioNotesForBusiness(businessId);
+  }
+  return [];
+}
+
+async function deleteAudioNoteRepo(audioNoteId, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.deleteAudioNote === 'function') {
+    return repo.deleteAudioNote(audioNoteId, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function deleteAudioNotesForEntityRepo(entityType, entityId, businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.deleteAudioNotesForEntity === 'function') {
+    return repo.deleteAudioNotesForEntity(entityType, entityId, businessId, options);
+  }
+  return { success: false, deletedCount: 0, deletedNotes: [], error: 'NO_REPOSITORY' };
+}
+
+async function deleteAccountCascadeRepo(accountId, businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.deleteAccountCascade === 'function') {
+    return repo.deleteAccountCascade(accountId, businessId, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function cleanOrphanedAudioFilesRepo(directoryPath = null, fileSystemAdapter = null, repo = defaultRepository) {
+  if (repo && typeof repo.cleanOrphanedAudioFiles === 'function') {
+    return repo.cleanOrphanedAudioFiles(directoryPath, fileSystemAdapter);
+  }
+  return { scannedCount: 0, referencedCount: 0, orphanedCount: 0, deletedCount: 0, bytesReclaimed: 0, errors: [] };
+}
+
+function getAudioStorageMetricsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getAudioStorageMetrics === 'function') {
+    return repo.getAudioStorageMetrics(businessId, options);
+  }
+  return { totalCount: 0, totalBytes: 0, totalDurationMs: 0 };
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -4520,6 +4929,15 @@ const repoExport = {
   unlockAppWithBiometrics: unlockAppWithBiometricsRepo,
   getAppLockoutStatus: getAppLockoutStatusRepo,
   securityService,
+  audioNoteService,
+  attachAudioNote: attachAudioNoteRepo,
+  getAudioNotesForEntity: getAudioNotesForEntityRepo,
+  getAudioNotesForBusiness: getAudioNotesForBusinessRepo,
+  deleteAudioNote: deleteAudioNoteRepo,
+  deleteAudioNotesForEntity: deleteAudioNotesForEntityRepo,
+  deleteAccountCascade: deleteAccountCascadeRepo,
+  cleanOrphanedAudioFiles: cleanOrphanedAudioFilesRepo,
+  getAudioStorageMetrics: getAudioStorageMetricsRepo,
   default: defaultRepository,
 };
 
@@ -4588,5 +5006,14 @@ if (typeof exports !== 'undefined') {
   exports.unlockAppWithBiometrics = unlockAppWithBiometricsRepo;
   exports.getAppLockoutStatus = getAppLockoutStatusRepo;
   exports.securityService = securityService;
+  exports.audioNoteService = audioNoteService;
+  exports.attachAudioNote = attachAudioNoteRepo;
+  exports.getAudioNotesForEntity = getAudioNotesForEntityRepo;
+  exports.getAudioNotesForBusiness = getAudioNotesForBusinessRepo;
+  exports.deleteAudioNote = deleteAudioNoteRepo;
+  exports.deleteAudioNotesForEntity = deleteAudioNotesForEntityRepo;
+  exports.deleteAccountCascade = deleteAccountCascadeRepo;
+  exports.cleanOrphanedAudioFiles = cleanOrphanedAudioFilesRepo;
+  exports.getAudioStorageMetrics = getAudioStorageMetricsRepo;
   exports.default = defaultRepository;
 }

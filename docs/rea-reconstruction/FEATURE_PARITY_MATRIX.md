@@ -1,7 +1,7 @@
 ﻿# REA RECONSTRUCTION — FEATURE PARITY MATRIX
 **Reference Target:** `TallyKhata-Demo.apk` (`REF-001`)  
 **Maintained by:** Main Engineering Orchestrator  
-**Last Updated:** 2026-11-02  
+**Last Updated:** 2026-11-03  
 
 ---
 
@@ -24,10 +24,11 @@
 | **FEAT-013** | Offline Sync & Conflict Resolution | Room DB dirty flags, WorkManager D2S, LWW reconciliation | `src/storageRepository.js` `simulateSyncBatch`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-014** | Cloud Backup Compression & Resumable Streaming | GZIP / Deflate streaming chunked upload, network retry | `src/googleDriveBackupService.js`, `storageRepository.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-015** | Biometric AppLock & Crypto PIN Authentication | PBKDF2/SHA-256 salted PIN, brute-force lockout, 3D keypad, biometrics | `src/securityService.js`, `src/biometricAuthService.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
+| **FEAT-016** | Audio Notes & Tagada Voice Messaging | Room DB journal_media/account_media, MediaRecorder, voice tagada, SQR voice push | `src/audioNoteService.js`, `storageRepository.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 
 ---
 
 ## 2. Verification Standards & Methodology
 1. **Integer Paisa Precision:** All monetary amounts calculate in exact integer paisa ($1\text{ Taka} = 100\text{ Paisa}$) with zero floating-point drift up to ৳100,000,000 single transactions.
 2. **Domain Isolation:** Strict separation between Business Accounting (`@tallykhata_state_v6`) and Personal Money Manager (`@tallykhata_personal_money_manager_v2`).
-3. **Automated Regression Suite:** 278 automated test suites (5,590+ passing assertions) verifying every parity dimension, including storage metrics, pagination, compaction, atomic rollback, packaging, and milestone synthesis (FEAT-001 through FEAT-015).
+3. **Automated Regression Suite:** 281 automated test suites (5,720+ passing assertions) verifying every parity dimension, including storage metrics, pagination, compaction, atomic rollback, packaging, and milestone synthesis (FEAT-001 through FEAT-016).

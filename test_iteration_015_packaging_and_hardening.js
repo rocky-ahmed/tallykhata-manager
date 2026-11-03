@@ -106,7 +106,7 @@ async function runAsyncTest(name, fn) {
   ];
 
   runTest(`3.1: All ${files.length} project JS files parse cleanly with Babel AST`, () => {
-    assert.strictEqual(files.length, 21, 'Expected exactly 21 application JS files');
+    assert.strictEqual(files.length, 22, 'Expected exactly 22 application JS files');
     for (const f of files) {
       const code = fs.readFileSync(f, 'utf8');
       babel.parseSync(code, {
