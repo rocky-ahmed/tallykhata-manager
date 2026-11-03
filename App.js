@@ -54,6 +54,37 @@ import * as tallyPayModule from './src/tallyPayService';
 const tallyPayService = tallyPayModule.tallyPayService || tallyPayModule.default || tallyPayModule;
 import * as soundboxModule from './src/soundboxService';
 const soundboxService = soundboxModule.soundboxService || soundboxModule.default || soundboxModule;
+const {
+  soundboxDeviceManager = soundboxModule.soundboxDeviceManager,
+  CONNECTION_STATES = soundboxModule.CONNECTION_STATES,
+  BATTERY_THRESHOLDS = soundboxModule.BATTERY_THRESHOLDS,
+  ROUTING_TARGETS = soundboxModule.ROUTING_TARGETS,
+  convertSoftwareVolumeToHardware = soundboxModule.convertSoftwareVolumeToHardware,
+  convertHardwareVolumeToSoftware = soundboxModule.convertHardwareVolumeToSoftware,
+  resolveAudioFeedbackSink = soundboxModule.resolveAudioFeedbackSink,
+  generateSoundboxPrompt = soundboxModule.generateSoundboxPrompt,
+} = soundboxModule;
+import * as digitalAnalyticsModule from './src/digitalAnalyticsService';
+const digitalAnalyticsService = digitalAnalyticsModule.digitalAnalyticsService || digitalAnalyticsModule.default || digitalAnalyticsModule;
+const {
+  PERIOD_TYPES = digitalAnalyticsModule.PERIOD_TYPES,
+  PERIOD_LABELS_BN = digitalAnalyticsModule.PERIOD_LABELS_BN,
+  PERIOD_LABELS_EN = digitalAnalyticsModule.PERIOD_LABELS_EN,
+  SUPPORTED_CHANNELS = digitalAnalyticsModule.SUPPORTED_CHANNELS,
+  calculateDigitalInflowAnalytics = digitalAnalyticsModule.calculateDigitalInflowAnalytics,
+  formatCurrencyBn = digitalAnalyticsModule.formatCurrencyBn,
+  formatCurrencyEn = digitalAnalyticsModule.formatCurrencyEn,
+  toBengaliNumeral = digitalAnalyticsModule.toBengaliNumeral,
+} = digitalAnalyticsModule;
+
+const ANALYTICS_BRAND_COLORS = {
+  bkash: '#E2136E',
+  nagad: '#F7941D',
+  rocket: '#8C3494',
+  upay: '#005696',
+  bangla_qr: '#0D6E5C',
+  card: '#1A1F71',
+};
 
 export const ThemeContext = React.createContext({
   theme: themeService.LIGHT_THEME,
@@ -972,6 +1003,22 @@ function TallyKhataApp() {
   const [modalProfitLoss, setModalProfitLoss] = useState(false);
   const [modalFullReport, setModalFullReport] = useState(false);
   const [modalSettings, setModalSettings] = useState(false);
+  // --- ITERATION 223: SOUNDBOX BLE & BATTERY TELEMETRY STATE ---
+  const [modalSoundboxSettings, setModalSoundboxSettings] = useState(false);
+  const [soundboxBleState, setSoundboxBleState] = useState('DISCONNECTED'); // 'DISCONNECTED' | 'SCANNING' | 'CONNECTING' | 'CONNECTED' | 'ERROR'
+  const [soundboxBatteryLevel, setSoundboxBatteryLevel] = useState(85);
+  const [soundboxIsCharging, setSoundboxIsCharging] = useState(false);
+  const [soundboxHardwareVolume, setSoundboxHardwareVolume] = useState(10); // 0-15 steps
+  const [soundboxSoftwareVolume, setSoundboxSoftwareVolume] = useState(3); // 1-5 levels
+  const [soundboxDeviceName, setSoundboxDeviceName] = useState('TallyKhata Soundbox Pro');
+  const [soundboxDeviceMac, setSoundboxDeviceMac] = useState('C4:4F:33:0A:12:8E');
+  const [soundboxRssi, setSoundboxRssi] = useState(-58);
+  const [soundboxIsPlayingTest, setSoundboxIsPlayingTest] = useState(false);
+  const [soundboxLastFeedbackSink, setSoundboxLastFeedbackSink] = useState('HARDWARE_BLE_SOUNDBOX');
+  // --- ITERATION 224: MERCHANT DIGITAL ANALYTICS DASHBOARD ---
+  const [modalDigitalAnalytics, setModalDigitalAnalytics] = useState(false);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('TODAY'); // 'TODAY' | 'THIS_WEEK' | 'THIS_MONTH' | 'ALL_TIME'
+  const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0);
   const [modalBackupRestore, setModalBackupRestore] = useState(false);
   const [modalInbox, setModalInbox] = useState(false);
   const [modalSupport, setModalSupport] = useState(false);
@@ -2244,6 +2291,8 @@ function TallyKhataApp() {
       if (superQrSuccessModal) { setSuperQrSuccessModal(false); return true; }
         if (modalBanglaQR) { setModalBanglaQR(false); return true; }
       if (modalTallyMessage) { setModalTallyMessage(false); return true; }
+      if (modalSoundboxSettings) { setModalSoundboxSettings(false); return true; }
+      if (modalDigitalAnalytics) { setModalDigitalAnalytics(false); return true; }
       if (modalSettings) { setModalSettings(false); return true; }
       if (modalSupport) { setModalSupport(false); return true; }
       if (modalInbox) { setModalInbox(false); return true; }
@@ -2315,7 +2364,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -2347,6 +2396,20 @@ function TallyKhataApp() {
         if (d.googleUser) setGoogleUser(d.googleUser);
         if (d.autoBackupEnabled !== undefined) setAutoBackupEnabled(Boolean(d.autoBackupEnabled));
         if (d.cloudBackupMetadata) setCloudBackupMetadata(d.cloudBackupMetadata);
+        try {
+          if (storageRepository && typeof storageRepository.getSoundboxDeviceSettings === 'function') {
+            const sb = storageRepository.getSoundboxDeviceSettings(d.activeBusinessId);
+            if (sb) {
+              if (sb.connectionState) setSoundboxBleState(sb.connectionState);
+              if (sb.batteryLevel !== undefined) setSoundboxBatteryLevel(Number(sb.batteryLevel));
+              if (sb.isCharging !== undefined) setSoundboxIsCharging(Boolean(sb.isCharging));
+              if (sb.hardwareVolume !== undefined) setSoundboxHardwareVolume(Number(sb.hardwareVolume));
+              if (sb.softwareVolume !== undefined) setSoundboxSoftwareVolume(Number(sb.softwareVolume));
+              if (sb.deviceName) setSoundboxDeviceName(sb.deviceName);
+              if (sb.deviceMac) setSoundboxDeviceMac(sb.deviceMac);
+            }
+          }
+        } catch (e) {}
         if (d.openingBalance !== undefined) setOpeningBalance(Number(d.openingBalance));
         try {
           const initialUn = storageRepository.getUnsyncedRecords();
@@ -3935,6 +3998,208 @@ function TallyKhataApp() {
     }
   };
 
+  // =========================================================================
+  // DIGITAL ANALYTICS DASHBOARD HANDLERS (Iteration 224)
+  // =========================================================================
+  const getActiveDigitalInflowTransactions = () => {
+    try {
+      if (storageRepository && typeof storageRepository.getDigitalInflowTransactions === 'function') {
+        return storageRepository.getDigitalInflowTransactions(activeBusinessId || '1') || [];
+      }
+    } catch (e) {}
+    return [];
+  };
+
+  const digitalAnalytics = useMemo(() => {
+    const txList = getActiveDigitalInflowTransactions();
+    if (typeof calculateDigitalInflowAnalytics === 'function') {
+      return calculateDigitalInflowAnalytics(txList, {
+        period: analyticsPeriod,
+        businessId: activeBusinessId || '1',
+      });
+    }
+    return {
+      periodKey: analyticsPeriod,
+      periodLabelBn: 'আজকে',
+      periodLabelEn: 'Today',
+      totalInflowPaisa: 0,
+      totalInflowTaka: 0,
+      grossInflowBdt: 0,
+      netInflowBdt: 0,
+      totalTxnCount: 0,
+      averageTicketTaka: 0,
+      formattedTotalInflowBn: '৳ ০.০০',
+      formattedTotalInflowEn: '৳ 0.00',
+      formattedNetInflowBn: '৳ ০.০০',
+      formattedAverageTicketBn: '৳ ০.০০',
+      formattedAverageTicketEn: '৳ 0.00',
+      formattedTxnCountBn: '০',
+      channelBreakdown: [],
+      growthRatePct: 0,
+      growthDirection: 'NEUTRAL',
+      formattedGrowthBn: '০.০০%',
+    };
+  }, [activeBusinessId, analyticsPeriod, analyticsRefreshKey, journals, walletTxns, superQrLastPayment]);
+
+  const handleOpenDigitalAnalytics = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setAnalyticsRefreshKey((k) => k + 1);
+    setModalDigitalAnalytics(true);
+  };
+
+  const handleCloseDigitalAnalytics = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalDigitalAnalytics(false);
+  };
+
+  const handleSelectAnalyticsPeriod = (periodKey) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setAnalyticsPeriod(periodKey);
+  };
+
+  const handleRefreshAnalytics = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    setAnalyticsRefreshKey((k) => k + 1);
+  };
+
+  // =========================================================================
+  // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
+  // =========================================================================
+  const handleOpenSoundboxSettings = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    if (soundboxDeviceManager) {
+      setSoundboxBleState(soundboxDeviceManager.getConnectionState());
+      setSoundboxBatteryLevel(soundboxDeviceManager.getBatteryLevel());
+      setSoundboxIsCharging(soundboxDeviceManager.isCharging());
+      const hw = soundboxDeviceManager.getVolume();
+      setSoundboxHardwareVolume(hw);
+      setSoundboxSoftwareVolume(convertHardwareVolumeToSoftware ? convertHardwareVolumeToSoftware(hw) : Math.ceil(hw / 3));
+    }
+    setModalSoundboxSettings(true);
+  };
+
+  const handleToggleSoundboxBleScan = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    if (soundboxBleState === 'CONNECTED') {
+      if (soundboxDeviceManager) soundboxDeviceManager.disconnect();
+      setSoundboxBleState('DISCONNECTED');
+    } else {
+      if (soundboxDeviceManager) soundboxDeviceManager.startScan();
+      setSoundboxBleState('SCANNING');
+      setTimeout(() => {
+        setSoundboxBleState('CONNECTING');
+        setTimeout(() => {
+          if (soundboxDeviceManager) {
+            soundboxDeviceManager.connect({
+              id: 'TK-Soundbox-S1',
+              name: 'TallyKhata Soundbox Pro',
+              mac: 'C4:4F:33:0A:12:8E',
+              rssi: -58,
+            });
+          }
+          setSoundboxBleState('CONNECTED');
+          setSoundboxDeviceName('TallyKhata Soundbox Pro');
+          setSoundboxDeviceMac('C4:4F:33:0A:12:8E');
+          setSoundboxRssi(-58);
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+        }, 300);
+      }, 500);
+    }
+  };
+
+  const handleSetSoundboxBattery = (level) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(Number(level) || 0)));
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSoundboxBatteryLevel(clamped);
+    if (soundboxDeviceManager) {
+      soundboxDeviceManager.updateBatteryTelemetry(clamped, soundboxIsCharging);
+    }
+  };
+
+  const handleToggleSoundboxCharging = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const nextCharging = !soundboxIsCharging;
+    setSoundboxIsCharging(nextCharging);
+    if (soundboxDeviceManager) {
+      soundboxDeviceManager.updateBatteryTelemetry(soundboxBatteryLevel, nextCharging);
+    }
+  };
+
+  const handleSetSoundboxHardwareVolume = (step) => {
+    const clamped = Math.max(0, Math.min(15, Math.round(Number(step) || 0)));
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const sw = convertHardwareVolumeToSoftware ? convertHardwareVolumeToSoftware(clamped) : Math.ceil(clamped / 3);
+    setSoundboxHardwareVolume(clamped);
+    setSoundboxSoftwareVolume(sw);
+    if (soundboxDeviceManager) {
+      soundboxDeviceManager.syncHardwareVolume(clamped);
+    }
+  };
+
+  const handleSetSoundboxSoftwareVolume = (level) => {
+    const clamped = Math.max(1, Math.min(5, Math.round(Number(level) || 1)));
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const hw = convertSoftwareVolumeToHardware ? convertSoftwareVolumeToHardware(clamped) : (clamped * 3);
+    setSoundboxSoftwareVolume(clamped);
+    setSoundboxHardwareVolume(hw);
+    if (soundboxDeviceManager) {
+      soundboxDeviceManager.syncSoftwareVolume(clamped);
+    }
+  };
+
+  const handleTestSoundboxAnnouncement = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    setSoundboxIsPlayingTest(true);
+    const mockTxn = {
+      amount: 500,
+      customerName: 'করিম স্টোর',
+      typeName: 'ক্যাশ গ্রহণ',
+      channelId: 0x06,
+    };
+    let routeResult = null;
+    if (soundboxDeviceManager && typeof soundboxDeviceManager.routeAudioNotification === 'function') {
+      routeResult = soundboxDeviceManager.routeAudioNotification(mockTxn, {
+        isConnected: soundboxBleState === 'CONNECTED',
+        batteryLevel: soundboxBatteryLevel,
+        ttsEnabled: true,
+      });
+      if (routeResult && routeResult.target) {
+        setSoundboxLastFeedbackSink(routeResult.target);
+      }
+    }
+    if (storageRepository && typeof storageRepository.logSoundboxNotification === 'function') {
+      try {
+        storageRepository.logSoundboxNotification(routeResult || { mock: true }, { businessId: activeBusinessId });
+      } catch (e) {}
+    }
+    setTimeout(() => {
+      setSoundboxIsPlayingTest(false);
+      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+      Alert.alert(
+        t('soundbox_settings_title'),
+        `${t('soundbox_test_success')}!\n${routeResult && routeResult.target === 'HARDWARE_BLE_SOUNDBOX' ? t('soundbox_routing_hardware') : t('soundbox_routing_software')}`
+      );
+    }, 800);
+  };
+
+  const handleCloseSoundboxSettings = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    if (storageRepository && typeof storageRepository.saveSoundboxDeviceSettings === 'function') {
+      try {
+        storageRepository.saveSoundboxDeviceSettings({
+          connectionState: soundboxBleState,
+          batteryLevel: soundboxBatteryLevel,
+          isCharging: soundboxIsCharging,
+          hardwareVolume: soundboxHardwareVolume,
+          softwareVolume: soundboxSoftwareVolume,
+          deviceName: soundboxDeviceName,
+          deviceMac: soundboxDeviceMac,
+        }, { businessId: activeBusinessId });
+      } catch (e) {}
+    }
+    setModalSoundboxSettings(false);
+  };
+
   const handleDeleteVoiceNote = (targetId) => {
     if (!targetId || !voiceNotes[targetId]) return;
     Alert.alert(
@@ -4834,6 +5099,59 @@ function TallyKhataApp() {
       selectedAccount,
       setSelectedAccount,
       renderVoucherText,
+    };
+
+    global.__DIGITAL_ANALYTICS_TEST_HOOKS__ = {
+      modalDigitalAnalytics,
+      setModalDigitalAnalytics,
+      analyticsPeriod,
+      setAnalyticsPeriod,
+      digitalAnalytics,
+      handleOpenDigitalAnalytics,
+      handleCloseDigitalAnalytics,
+      handleSelectAnalyticsPeriod,
+      handleRefreshAnalytics,
+      ANALYTICS_BRAND_COLORS,
+      PERIOD_TYPES,
+      SUPPORTED_CHANNELS,
+      calculateDigitalInflowAnalytics,
+      getActiveDigitalInflowTransactions,
+      digitalAnalyticsService,
+    };
+
+    global.__SOUNDBOX_BLE_TEST_HOOKS__ = {
+      modalSoundboxSettings,
+      setModalSoundboxSettings,
+      soundboxBleState,
+      setSoundboxBleState,
+      soundboxBatteryLevel,
+      setSoundboxBatteryLevel,
+      soundboxIsCharging,
+      setSoundboxIsCharging,
+      soundboxHardwareVolume,
+      setSoundboxHardwareVolume,
+      soundboxSoftwareVolume,
+      setSoundboxSoftwareVolume,
+      soundboxDeviceName,
+      setSoundboxDeviceName,
+      soundboxDeviceMac,
+      setSoundboxDeviceMac,
+      soundboxRssi,
+      setSoundboxRssi,
+      soundboxIsPlayingTest,
+      setIsPlayingTest: setSoundboxIsPlayingTest,
+      soundboxLastFeedbackSink,
+      setSoundboxLastFeedbackSink,
+      handleOpenSoundboxSettings,
+      handleToggleSoundboxBleScan,
+      handleSetSoundboxBattery,
+      handleToggleSoundboxCharging,
+      handleSetSoundboxHardwareVolume,
+      handleSetSoundboxSoftwareVolume,
+      handleTestSoundboxAnnouncement,
+      handleCloseSoundboxSettings,
+      soundboxDeviceManager,
+      soundboxService,
     };
   }
 
@@ -8235,6 +8553,36 @@ accessibilityLabel={
               </TouchableOpacity>
             </View>
 
+            {/* Quick Action: Digital Analytics Banner (Iteration 224) */}
+            <TouchableOpacity
+              style={[styles.analyticsTallypayBanner, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+              onPress={handleOpenDigitalAnalytics}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('digital_analytics_title')}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: isDark ? '#064E3B' : '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  <Text style={{ fontSize: 18 }}>📊</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('digital_analytics_title')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    {t('digital_analytics_desc')}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#A7F3D0' : '#0D6E5C', marginRight: 4 }}>
+                  {tStatic("দেখুন")}
+                </Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 12, height: 12, tintColor: isDark ? '#A7F3D0' : '#0D6E5C' }} resizeMode="contain" />
+              </View>
+            </TouchableOpacity>
+
             {/* Wallet Transaction History */}
             <View style={{ paddingHorizontal: 12, marginTop: 16 }}>
               <SectionHeader title={tStatic("সাম্প্রতিক ওয়ালেট লেনদেন")} count={walletTxns.length} />
@@ -8513,6 +8861,76 @@ accessibilityLabel={
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
 
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenDigitalAnalytics}
+                activeOpacity={0.7}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('digital_analytics_title')}
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_report.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('digital_analytics_title')}</Text>
+                    <View style={{
+                      marginLeft: 8,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 8,
+                      backgroundColor: isDark ? '#064E3B' : '#DCFCE7',
+                    }}>
+                      <Text style={{
+                        fontSize: 10,
+                        fontWeight: '700',
+                        color: isDark ? '#A7F3D0' : '#064E3B',
+                      }}>
+                        {tStatic("রিয়েল-টাইম")}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('digital_analytics_desc')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenSoundboxSettings}
+                activeOpacity={0.7}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('soundbox_settings_title')}
+              >
+                <AppIcon source={require('./assets/icons/ic_notification.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('soundbox_settings_title')}</Text>
+                    <View style={{
+                      marginLeft: 8,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 8,
+                      backgroundColor: soundboxBleState === 'CONNECTED'
+                        ? (isDark ? '#064E3B' : '#DCFCE7')
+                        : (isDark ? '#451A03' : '#FEF3C7'),
+                    }}>
+                      <Text style={{
+                        fontSize: 10,
+                        fontWeight: '700',
+                        color: soundboxBleState === 'CONNECTED'
+                          ? (isDark ? '#A7F3D0' : '#064E3B')
+                          : (isDark ? '#FDE68A' : '#92400E'),
+                      }}>
+                        {soundboxBleState === 'CONNECTED' ? t('soundbox_state_connected') : t('soundbox_state_disconnected')}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('soundbox_settings_desc')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.menuListItem, isDark && tStyles.menuListItem]}
@@ -10671,6 +11089,730 @@ accessibilityLabel={
       </Modal>
 
       {/* ===================================================================
+          MODAL: SOUNDBOX BLE & BATTERY TELEMETRY (Iteration 223)
+         =================================================================== */}
+      <Modal
+        visible={modalSoundboxSettings}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseSoundboxSettings}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', paddingBottom: 24 }]}>
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, marginRight: 8 }}>🔊</Text>
+                  <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>
+                    {t('soundbox_settings_title')}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                  {t('soundbox_settings_desc')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleCloseSoundboxSettings}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("বন্ধ করুন")}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingVertical: 10, paddingBottom: 46 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* SECTION 1: BLE Device Pairing & Status Card */}
+              <View style={[styles.soundboxSectionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                      {soundboxDeviceName}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                      MAC: {soundboxDeviceMac} • {t('soundbox_device_rssi')}: {soundboxRssi} dBm
+                    </Text>
+                  </View>
+                  {/* Dynamic Pairing State Badge */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 14,
+                      backgroundColor: soundboxBleState === 'CONNECTED'
+                        ? (isDark ? '#064E3B' : '#DCFCE7')
+                        : soundboxBleState === 'SCANNING'
+                          ? (isDark ? '#451A03' : '#FEF3C7')
+                          : soundboxBleState === 'CONNECTING'
+                            ? (isDark ? '#1E3A8A' : '#DBEAFE')
+                            : (isDark ? '#7F1D1D' : '#FEE2E2'),
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        marginRight: 6,
+                        backgroundColor: soundboxBleState === 'CONNECTED'
+                          ? '#10B981'
+                          : soundboxBleState === 'SCANNING'
+                            ? '#F59E0B'
+                            : soundboxBleState === 'CONNECTING'
+                              ? '#3B82F6'
+                              : '#EF4444',
+                      }}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '700',
+                        color: soundboxBleState === 'CONNECTED'
+                          ? (isDark ? '#A7F3D0' : '#064E3B')
+                          : soundboxBleState === 'SCANNING'
+                            ? (isDark ? '#FDE68A' : '#92400E')
+                            : soundboxBleState === 'CONNECTING'
+                              ? (isDark ? '#BFDBFE' : '#1E40AF')
+                              : (isDark ? '#FEE2E2' : '#991B1B'),
+                      }}
+                    >
+                      {soundboxBleState === 'CONNECTED'
+                        ? t('soundbox_state_connected')
+                        : soundboxBleState === 'SCANNING'
+                          ? t('soundbox_state_scanning')
+                          : soundboxBleState === 'CONNECTING'
+                            ? t('soundbox_state_connecting')
+                            : t('soundbox_state_disconnected')}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Scan / Disconnect Button */}
+                <Button3D
+                  title={soundboxBleState === 'CONNECTED' ? t('soundbox_action_disconnect') : t('soundbox_action_scan')}
+                  variant={soundboxBleState === 'CONNECTED' ? 'neutral' : 'primary'}
+                  size="md"
+                  isDark={isDark}
+                  onPress={handleToggleSoundboxBleScan}
+                  style={{ width: '100%', minHeight: 48 }}
+                />
+              </View>
+
+              {/* SECTION 2: Battery Telemetry Indicator */}
+              <View style={[styles.soundboxSectionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('soundbox_battery_title')}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={handleToggleSoundboxCharging}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 12,
+                      backgroundColor: soundboxIsCharging ? (isDark ? '#064E3B' : '#DCFCE7') : (isDark ? '#334155' : '#F1F5F9'),
+                    }}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    accessibilityRole="button"
+                  >
+                    <Text style={{ fontSize: 13, marginRight: 4 }}>{soundboxIsCharging ? '⚡' : '🔋'}</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: soundboxIsCharging ? (isDark ? '#A7F3D0' : '#064E3B') : (isDark ? '#CBD5E1' : '#475569') }}>
+                      {soundboxIsCharging ? t('soundbox_battery_charging') : t('soundbox_battery_discharging')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Battery Bar & Percentage */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <View style={{ flex: 1, height: 12, borderRadius: 6, backgroundColor: isDark ? '#1E293B' : '#E2E8F0', overflow: 'hidden', marginRight: 10 }}>
+                    <View
+                      style={{
+                        width: `${soundboxBatteryLevel}%`,
+                        height: '100%',
+                        borderRadius: 6,
+                        backgroundColor: soundboxBatteryLevel <= 15
+                          ? '#EF4444'
+                          : soundboxBatteryLevel <= 30
+                            ? '#F59E0B'
+                            : '#10B981',
+                      }}
+                    />
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: soundboxBatteryLevel <= 15 ? '#EF4444' : (isDark ? currentTheme.textPrimary : '#1E293B'), width: 45, textAlign: 'right' }}>
+                    {soundboxBatteryLevel}%
+                  </Text>
+                </View>
+
+                {/* Low Battery Warning Badge (<= 15%) */}
+                {soundboxBatteryLevel <= 15 && (
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 8,
+                    borderRadius: 8,
+                    backgroundColor: isDark ? '#451A03' : '#FEF3C7',
+                    borderWidth: 1,
+                    borderColor: isDark ? '#B45309' : '#FCD34D',
+                    marginBottom: 8,
+                  }}>
+                    <Text style={{ fontSize: 16, marginRight: 6 }}>⚠️</Text>
+                    <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: isDark ? '#FDE68A' : '#92400E' }}>
+                      {soundboxBatteryLevel < 10
+                        ? t('soundbox_battery_critical_alert')
+                        : t('soundbox_battery_low_warning')}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Quick Simulation Chips */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                  {[100, 50, 15, 8].map((lvl) => (
+                    <TouchableOpacity
+                      key={lvl}
+                      style={{
+                        paddingVertical: 6,
+                        paddingHorizontal: 12,
+                        borderRadius: 8,
+                        backgroundColor: soundboxBatteryLevel === lvl ? '#0D6E5C' : (isDark ? '#334155' : '#F1F5F9'),
+                        minHeight: 44,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                      onPress={() => handleSetSoundboxBattery(lvl)}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: soundboxBatteryLevel === lvl ? '#FFFFFF' : (isDark ? '#E2E8F0' : '#475569') }}>
+                        {lvl}%
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* SECTION 3: Hardware Volume Level Controls */}
+              <View style={[styles.soundboxSectionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('soundbox_volume_title')}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    {t('soundbox_volume_hardware_step', { step: soundboxHardwareVolume })}
+                  </Text>
+                </View>
+
+                {/* Stepper controls for Hardware Volume (0-15) */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <TouchableOpacity
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 10,
+                      backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => handleSetSoundboxHardwareVolume(soundboxHardwareVolume - 1)}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    accessibilityRole="button"
+                    accessibilityLabel={tStatic("কমান")}
+                  >
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? '#F8FAFC' : '#1E293B' }}>-</Text>
+                  </TouchableOpacity>
+
+                  <View style={{ flex: 1, marginHorizontal: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: isDark ? currentTheme.primary : '#0D6E5C' }}>
+                      {soundboxHardwareVolume} / 15
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                      {t('soundbox_volume_software_level', { level: soundboxSoftwareVolume })}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 10,
+                      backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => handleSetSoundboxHardwareVolume(soundboxHardwareVolume + 1)}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    accessibilityRole="button"
+                    accessibilityLabel={tStatic("বাড়ান")}
+                  >
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? '#F8FAFC' : '#1E293B' }}>+</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Synchronized Software Volume Level (1-5 pills) */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <TouchableOpacity
+                      key={level}
+                      style={{
+                        flex: 1,
+                        marginHorizontal: 3,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        backgroundColor: soundboxSoftwareVolume === level
+                          ? '#0D6E5C'
+                          : (isDark ? '#334155' : '#F1F5F9'),
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 44,
+                      }}
+                      onPress={() => handleSetSoundboxSoftwareVolume(level)}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                    >
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: soundboxSoftwareVolume === level ? '#FFFFFF' : (isDark ? '#E2E8F0' : '#334155'),
+                      }}>
+                        {level}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* SECTION 4: Dual Audio Routing Status Indicator */}
+              <View style={[styles.soundboxSectionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 10 }}>
+                  {t('soundbox_routing_title')}
+                </Text>
+
+                {soundboxBleState === 'CONNECTED' && soundboxBatteryLevel >= 10 ? (
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 12,
+                    borderRadius: 10,
+                    backgroundColor: isDark ? '#064E3B' : '#DCFCE7',
+                    borderWidth: 1,
+                    borderColor: isDark ? '#065F46' : '#86EFAC',
+                  }}>
+                    <Text style={{ fontSize: 24, marginRight: 10 }}>🔊</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? '#A7F3D0' : '#064E3B' }}>
+                        {t('soundbox_routing_hardware')}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: isDark ? '#BBF7D0' : '#166534', marginTop: 2 }}>
+                        ব্লুটুথ কানেকশনের মাধ্যমে সরাসরি সাউন্ডবক্সে অডিও সম্প্রচারিত হবে
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 12,
+                    borderRadius: 10,
+                    backgroundColor: isDark ? '#451A03' : '#FEF3C7',
+                    borderWidth: 1,
+                    borderColor: isDark ? '#B45309' : '#FCD34D',
+                  }}>
+                    <Text style={{ fontSize: 24, marginRight: 10 }}>📱</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? '#FDE68A' : '#92400E' }}>
+                        {t('soundbox_routing_software')}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: isDark ? '#FDE68A' : '#92400E', marginTop: 2 }}>
+                        {t('soundbox_routing_fallback_reason', {
+                          reason: soundboxBleState !== 'CONNECTED'
+                            ? t('soundbox_routing_fallback_disconnected')
+                            : t('soundbox_routing_fallback_low_battery'),
+                        })}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* SECTION 5: Test Announcement Action */}
+              <View style={[styles.soundboxSectionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+                <Text style={{ fontSize: 13, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 10 }}>
+                  নমুনা অডিও: "{t('soundbox_test_sample_prompt')}"
+                </Text>
+                <Button3D
+                  title={soundboxIsPlayingTest ? t('soundbox_test_playing') : t('soundbox_test_btn')}
+                  variant="primary"
+                  size="md"
+                  isDark={isDark}
+                  onPress={handleTestSoundboxAnnouncement}
+                  style={{ width: '100%', minHeight: 48 }}
+                />
+              </View>
+
+              {/* SECTION 6: Close / Save Button */}
+              <Button3D
+                title={tStatic("ঠিক আছে")}
+                variant="neutral"
+                size="md"
+                isDark={isDark}
+                onPress={handleCloseSoundboxSettings}
+                style={{ width: '100%', marginTop: 8 }}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: MERCHANT DIGITAL ANALYTICS DASHBOARD (Iteration 224)
+         =================================================================== */}
+      <Modal
+        visible={modalDigitalAnalytics}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseDigitalAnalytics}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '94%', paddingBottom: 24 }]}>
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 22, marginRight: 8 }}>📊</Text>
+                  <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>
+                    {t('digital_analytics_title')}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                  {t('digital_analytics_desc')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleRefreshAnalytics}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle, { marginRight: 8 }]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('analytics_refresh')}
+              >
+                <Text style={{ fontSize: 16 }}>🔄</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleCloseDigitalAnalytics}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("বন্ধ করুন")}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingVertical: 10, paddingBottom: 46 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* SECTION 1: Period Selector Chips */}
+              <View style={{ marginBottom: 16 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 2, gap: 8 }}>
+                  {[
+                    { key: 'TODAY', label: t('analytics_period_today') },
+                    { key: 'THIS_WEEK', label: t('analytics_period_this_week') },
+                    { key: 'THIS_MONTH', label: t('analytics_period_this_month') },
+                    { key: 'ALL_TIME', label: t('analytics_period_all_time') },
+                  ].map((p) => {
+                    const isSelected = analyticsPeriod === p.key;
+                    return (
+                      <TouchableOpacity
+                        key={p.key}
+                        onPress={() => handleSelectAnalyticsPeriod(p.key)}
+                        activeOpacity={0.75}
+                        hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                        accessibilityRole="button"
+                        accessibilityLabel={p.label}
+                        accessibilityState={{ selected: isSelected }}
+                        style={{
+                          minHeight: 38,
+                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                          borderRadius: 20,
+                          backgroundColor: isSelected
+                            ? '#0D6E5C'
+                            : (isDark ? currentTheme.surfaceContainer : '#F1F5F9'),
+                          borderWidth: 1,
+                          borderColor: isSelected
+                            ? '#0A594A'
+                            : (isDark ? currentTheme.cardBorder : '#E2E8F0'),
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: isSelected ? '700' : '600',
+                            color: isSelected
+                              ? '#FFFFFF'
+                              : (isDark ? currentTheme.textSecondary : '#475569'),
+                          }}
+                        >
+                          {p.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* SECTION 2: 3 Prominent KPI Summary Cards */}
+              {/* Hero Card: মোট কালেকশন (Total Digital Collection) */}
+              <View
+                style={[
+                  styles.soundboxSectionCard,
+                  isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder },
+                  {
+                    backgroundColor: isDark ? '#064E3B' : '#ECFDF5',
+                    borderColor: isDark ? '#065F46' : '#A7F3D0',
+                    borderWidth: 1.5,
+                    marginBottom: 12,
+                  },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#A7F3D0' : '#065F46' }}>
+                      {t('analytics_total_collection')} ({effectiveLanguage === 'en' ? digitalAnalytics.periodLabelEn : digitalAnalytics.periodLabelBn})
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 26,
+                        fontWeight: '800',
+                        color: isDark ? '#F0FDF4' : '#064E3B',
+                        marginTop: 4,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {effectiveLanguage === 'en' ? digitalAnalytics.formattedTotalInflowEn : digitalAnalytics.formattedTotalInflowBn}
+                    </Text>
+                  </View>
+
+                  {/* Growth Indicator Badge */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 12,
+                      backgroundColor: digitalAnalytics.growthDirection === 'POSITIVE'
+                        ? (isDark ? '#065F46' : '#DCFCE7')
+                        : digitalAnalytics.growthDirection === 'NEGATIVE'
+                          ? (isDark ? '#7F1D1D' : '#FEE2E2')
+                          : (isDark ? '#334155' : '#F1F5F9'),
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '700',
+                        color: digitalAnalytics.growthDirection === 'POSITIVE'
+                          ? (isDark ? '#A7F3D0' : '#15803D')
+                          : digitalAnalytics.growthDirection === 'NEGATIVE'
+                            ? (isDark ? '#FCA5A5' : '#B91C1C')
+                            : (isDark ? '#CBD5E1' : '#475569'),
+                      }}
+                    >
+                      {digitalAnalytics.growthDirection === 'POSITIVE' ? '▲ ' : digitalAnalytics.growthDirection === 'NEGATIVE' ? '▼ ' : '● '}
+                      {digitalAnalytics.formattedGrowthBn}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Subtext: Net Inflow */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, paddingTop: 8, borderTopWidth: 1, borderTopColor: isDark ? '#047857' : '#D1FAE5' }}>
+                  <Text style={{ fontSize: 11, color: isDark ? '#6EE7B7' : '#047857' }}>
+                    {t('analytics_net_collection')}: {digitalAnalytics.formattedNetInflowBn}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? '#6EE7B7' : '#047857' }}>
+                    {t('analytics_kpi_card_hint')}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Row 2: Total Transactions + Average Ticket Cards */}
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                {/* Card 2: মোট লেনদেন */}
+                <View
+                  style={[
+                    styles.soundboxSectionCard,
+                    isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder },
+                    { flex: 1, marginBottom: 0 },
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 16, marginRight: 6 }}>🧾</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                      {t('analytics_total_txns')}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {digitalAnalytics.formattedTxnCountBn} {tStatic("টি")}
+                  </Text>
+                </View>
+
+                {/* Card 3: গড় লেনদেন */}
+                <View
+                  style={[
+                    styles.soundboxSectionCard,
+                    isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder },
+                    { flex: 1, marginBottom: 0 },
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 16, marginRight: 6 }}>🎯</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                      {t('analytics_avg_ticket')}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {effectiveLanguage === 'en' ? digitalAnalytics.formattedAverageTicketEn : digitalAnalytics.formattedAverageTicketBn}
+                  </Text>
+                </View>
+              </View>
+
+              {/* SECTION 3: Channel Distribution Progress Bars */}
+              <View
+                style={[
+                  styles.soundboxSectionCard,
+                  isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder },
+                  { marginBottom: 16 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('analytics_channel_distribution')}
+                  </Text>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    {t('analytics_channel_share')}
+                  </Text>
+                </View>
+
+                {digitalAnalytics.channelBreakdown && digitalAnalytics.channelBreakdown.length > 0 ? (
+                  digitalAnalytics.channelBreakdown.map((ch) => {
+                    const brandColor = ANALYTICS_BRAND_COLORS[ch.channelId] || ch.color || '#3B82F6';
+                    const chName = effectiveLanguage === 'en' ? ch.channelNameEn : ch.channelNameBn;
+                    const pctFormatted = toBengaliNumeral(ch.percentage.toFixed(1)) + '%';
+                    const amtFormatted = formatCurrencyBn(ch.amountTaka);
+
+                    return (
+                      <View key={ch.channelId} style={{ marginBottom: 12 }}>
+                        {/* Channel Header Line */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: 5,
+                                backgroundColor: brandColor,
+                                marginRight: 8,
+                              }}
+                            />
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                              {chName}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#94A3B8', marginLeft: 6 }}>
+                              ({toBengaliNumeral(ch.txnCount)} {tStatic("টি")})
+                            </Text>
+                          </View>
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                              {amtFormatted}
+                            </Text>
+                            <View
+                              style={{
+                                minWidth: 44,
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 8,
+                                backgroundColor: isDark ? '#334155' : '#F1F5F9',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#334155' }}>
+                                {pctFormatted}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* Progress Bar Track */}
+                        <View
+                          style={{
+                            height: 8,
+                            width: '100%',
+                            backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                            borderRadius: 4,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <View
+                            style={{
+                              height: '100%',
+                              width: Math.max(ch.percentage, ch.amountTaka > 0 ? 3 : 0) + '%',
+                              backgroundColor: brandColor,
+                              borderRadius: 4,
+                            }}
+                          />
+                        </View>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                      {t('analytics_no_transactions')}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Close Button */}
+              <Button3D
+                title={tStatic("বন্ধ করুন")}
+                variant="primary"
+                size="md"
+                isDark={isDark}
+                onPress={handleCloseDigitalAnalytics}
+                style={{ width: '100%', minHeight: 48 }}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
           MODAL: EDIT ACCOUNT (CUSTOMER / SUPPLIER)
          =================================================================== */}
       <Modal visible={modalEditAccount} animationType="slide" transparent onRequestClose={() => setModalEditAccount(false)}>
@@ -11328,29 +12470,41 @@ accessibilityLabel={
             </View>
 
             {/* Merchant QR Soundbox Voice Announcement Banner */}
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: isDark ? '#14532D' : '#DCFCE7',
-              borderColor: isDark ? '#15803D' : '#86EFAC',
-              borderWidth: 1,
-              borderRadius: 8,
-              paddingVertical: 8,
-              paddingHorizontal: 10,
-              marginTop: 10,
-              marginBottom: 10,
-              width: '100%',
-            }}>
+            <TouchableOpacity
+              onPress={handleOpenSoundboxSettings}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('soundbox_settings_title')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isDark ? '#14532D' : '#DCFCE7',
+                borderColor: isDark ? '#15803D' : '#86EFAC',
+                borderWidth: 1,
+                borderRadius: 8,
+                paddingVertical: 8,
+                paddingHorizontal: 10,
+                marginTop: 10,
+                marginBottom: 10,
+                width: '100%',
+              }}
+            >
               <Text style={{ fontSize: 18, marginRight: 8 }}>🔊</Text>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#86EFAC' : '#15803D' }}>
-                  {t("soundbox_voice_banner_title") || "সাউন্ডবক্স অডিও ঘোষণা:"}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#86EFAC' : '#15803D' }}>
+                    {t("soundbox_voice_banner_title") || "সাউন্ডবক্স অডিও ঘোষণা:"}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: isDark ? '#A7F3D0' : '#15803D', fontWeight: '600' }}>
+                    ⚙️ {t('soundbox_settings_title')}
+                  </Text>
+                </View>
                 <Text style={{ fontSize: 11, color: isDark ? '#BBF7D0' : '#166534', marginTop: 1 }}>
                   {`"${superQrLastPayment?.typeName || 'পেমেন্ট'} ${t("soundbox_voice_received_prefix") || 'থেকে টাকা সফলভাবে জমা হয়েছে'}"`}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
             <Button3D
               title={tStatic("ঠিক আছে")}
@@ -25056,6 +26210,27 @@ const styles = StyleSheet.create({
   },
 
 // --- STATEMENT EXPORT & PRINT PREVIEW UI (ITERATION 209) ---
+  analyticsTallypayBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginHorizontal: 12,
+    marginTop: 12,
+    elevation: 1,
+  },
+  soundboxSectionCard: {
+    padding: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+  },
   exportActionCard: {
     flexDirection: 'row',
     alignItems: 'center',

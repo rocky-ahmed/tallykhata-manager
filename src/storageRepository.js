@@ -61,6 +61,11 @@ try {
   thermalPrintService = require('./thermalPrintService');
 } catch (e) {}
 
+let digitalAnalyticsService = null;
+try {
+  digitalAnalyticsService = require('./digitalAnalyticsService');
+} catch (e) {}
+
 const {
   createReceiptImageMetadata,
   validateReceiptImage,
@@ -351,6 +356,8 @@ function createDefaultState() {
     banglaQrTransactions: [],
     tallyPayAddMoneyTxns: [],
     soundboxLogs: [],
+    soundboxSettings: {},
+    soundboxDeviceSettings: {},
     version: 6,
   };
 }
@@ -1370,9 +1377,20 @@ class StorageRepository {
 
     if (authoritative.soundboxLogs && Array.isArray(authoritative.soundboxLogs)) {
       authoritative.soundboxLogs = authoritative.soundboxLogs.map((s) => {
-        const { audioBuffer, rawBytes, audioBlob, ...rest } = s || {};
+        const { audioBuffer, rawBytes, audioBlob, connectionToken, socketHandle, ...rest } = s || {};
         return rest;
       });
+    }
+
+    if (authoritative.soundboxSettings && typeof authoritative.soundboxSettings === 'object') {
+      const sanitizedSettings = {};
+      for (const [bId, conf] of Object.entries(authoritative.soundboxSettings)) {
+        if (!conf || typeof conf !== 'object') continue;
+        const { connectionToken, token, socket, socketHandle, rssi, sessionToken, ...rest } = conf;
+        sanitizedSettings[bId] = { ...rest, isConnected: false, connectionState: 'DISCONNECTED' };
+      }
+      authoritative.soundboxSettings = sanitizedSettings;
+      authoritative.soundboxDeviceSettings = sanitizedSettings;
     }
 
     if (authoritative.voucherPrintLogs && Array.isArray(authoritative.voucherPrintLogs)) {
@@ -1892,6 +1910,10 @@ class StorageRepository {
         const banglaQrTransactions = (prevStore.banglaQrTransactions || []).filter((b) => getBizId(b) !== targetId);
         const tallyPayAddMoneyTxns = (prevStore.tallyPayAddMoneyTxns || []).filter((t) => getBizId(t) !== targetId);
         const soundboxLogs = (prevStore.soundboxLogs || []).filter((s) => getBizId(s) !== targetId);
+        const soundboxSettings = { ...(prevStore.soundboxSettings || {}) };
+        delete soundboxSettings[targetId];
+        const soundboxDeviceSettings = { ...(prevStore.soundboxDeviceSettings || {}) };
+        delete soundboxDeviceSettings[targetId];
 
       // Clean up physical audio files of deleted business
       if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
@@ -1959,6 +1981,8 @@ class StorageRepository {
         banglaQrTransactions,
         tallyPayAddMoneyTxns,
         soundboxLogs,
+        soundboxSettings,
+        soundboxDeviceSettings,
         cashReconciliation,
       };
     });
@@ -4835,6 +4859,324 @@ class StorageRepository {
       return eBiz === targetBizId;
     });
   }
+
+  /**
+   * Persists BLE Soundbox device configuration for a specific business under writeQueue mutex.
+   *
+   * @param {object} settings - Device settings (id, macAddress, name, volumeLevel, etc.)
+   * @param {object} [options={}] - Options (businessId)
+   * @returns {Promise<{ success: boolean, settings?: object, error?: string }>}
+   */
+  async saveSoundboxDeviceSettings(settings, options = {}) {
+    if (!settings || typeof settings !== 'object') {
+      return { success: false, error: 'INVALID_SETTINGS_PAYLOAD' };
+    }
+    const businessId = String(options.businessId || settings.businessId || settings.business_id || this.currentStore?.activeBusinessId || '1');
+    const nowIso = new Date().toISOString();
+
+    const normalizedSettings = {
+      ...settings,
+      businessId,
+      business_id: businessId,
+      updatedAt: nowIso,
+    };
+
+    const res = await this.mutateStore((prevStore) => {
+      const prevMap = prevStore.soundboxSettings || prevStore.soundboxDeviceSettings || {};
+      const updatedMap = {
+        ...prevMap,
+        [businessId]: normalizedSettings,
+      };
+      return {
+        ...prevStore,
+        soundboxSettings: updatedMap,
+        soundboxDeviceSettings: updatedMap,
+      };
+    });
+
+    if (res && res.success !== false) {
+      return { success: true, settings: normalizedSettings };
+    }
+    return { success: false, error: res?.error || 'MUTATION_FAILED' };
+  }
+
+  /**
+   * Retrieves persisted BLE Soundbox device configuration for a given business.
+   *
+   * @param {string|null} [businessId=null]
+   * @returns {object|null}
+   */
+  getSoundboxDeviceSettings(businessId = null) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const settingsMap = store.soundboxSettings || store.soundboxDeviceSettings || {};
+    return settingsMap[targetBizId] || null;
+  }
+
+  /**
+   * Logs a Soundbox telemetry event (battery status, charging, RSSI, disconnects).
+   *
+   * @param {object} telemetryEvent - Telemetry payload
+   * @param {object} [options={}] - Options (businessId)
+   * @returns {Promise<{ success: boolean, event?: object, error?: string }>}
+   */
+  async logSoundboxTelemetry(telemetryEvent, options = {}) {
+    if (!telemetryEvent || typeof telemetryEvent !== 'object') {
+      return { success: false, error: 'INVALID_TELEMETRY_PAYLOAD' };
+    }
+    const businessId = String(options.businessId || telemetryEvent.businessId || telemetryEvent.business_id || this.currentStore?.activeBusinessId || '1');
+    const id = telemetryEvent.id || ('sbt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8));
+    const nowIso = telemetryEvent.timestamp || telemetryEvent.createdAt || new Date().toISOString();
+
+    const normalizedEvent = {
+      ...telemetryEvent,
+      id,
+      businessId,
+      business_id: businessId,
+      type: telemetryEvent.type || 'telemetry',
+      timestamp: nowIso,
+      createdAt: nowIso,
+    };
+
+    const res = await this.mutateCollection('soundboxLogs', (list) => {
+      return [normalizedEvent, ...list];
+    });
+
+    if (res.success) {
+      return { success: true, event: normalizedEvent };
+    }
+    return { success: false, error: res.error };
+  }
+
+  /**
+   * Retrieves Soundbox telemetry history for a given business.
+   *
+   * @param {string|null} [businessId=null]
+   * @returns {Array<object>}
+   */
+  getSoundboxTelemetry(businessId = null) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.soundboxLogs) ? store.soundboxLogs : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    return list.filter((e) => {
+      if (!e) return false;
+      const eBiz = String(e.businessId || e.business_id || '1');
+      const isTelemetry = e.batteryLevel !== undefined || e.type === 'telemetry' || (e.id && String(e.id).startsWith('sbt_'));
+      return eBiz === targetBizId && isTelemetry;
+    });
+  }
+
+  /**
+   * Aggregates and retrieves digital inflow transactions across Bangla QR, TallyPay Add Money,
+   * and digital journal entries for a given business with multi-tenant isolation.
+   *
+   * @param {string|number} [businessId=null] - Target business ID
+   * @param {object} [filterOptions={}] - Optional filters (startDate, endDate, period, channelId, status, limit)
+   * @returns {Array<object>} Unified array of normalized digital inflow transactions sorted descending by date/time
+   */
+  getDigitalInflowTransactions(businessId = null, filterOptions = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    const results = [];
+    const seenTxnIds = new Set();
+
+    // 1. Bangla QR Transactions
+    const banglaQrList = Array.isArray(store.banglaQrTransactions) ? store.banglaQrTransactions : [];
+    for (const bTx of banglaQrList) {
+      if (!bTx) continue;
+      const bBiz = String(bTx.businessId || bTx.business_id || '1');
+      if (bBiz !== targetBizId) continue;
+
+      const numAmt = Number(bTx.amount !== undefined && bTx.amount !== null ? bTx.amount : (bTx.amountPaisa ? bTx.amountPaisa / 100 : 0));
+      const paisa = bTx.amountPaisa !== undefined && bTx.amountPaisa !== null
+        ? Math.round(Number(bTx.amountPaisa))
+        : Math.round(numAmt * 100);
+      const feePaisa = bTx.feePaisa !== undefined && bTx.feePaisa !== null
+        ? Math.round(Number(bTx.feePaisa))
+        : Math.round(Number(bTx.fee || 0) * 100);
+
+      const ts = extractRecordTimestamp(bTx) || Date.now();
+      const isoDate = (bTx.date && typeof bTx.date === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(bTx.date.trim()))
+        ? bTx.date.trim()
+        : (new Date(ts).toISOString().slice(0, 10));
+
+      const normTx = {
+        id: String(bTx.id || ('bqr_' + ts + '_' + Math.random().toString(36).substring(2, 7))),
+        source: 'bangla_qr',
+        channelId: bTx.channelId || bTx.appId || 'bangla_qr',
+        channel: bTx.channelId || bTx.appId || 'bangla_qr',
+        amount: numAmt,
+        amountPaisa: paisa,
+        fee: feePaisa / 100,
+        feePaisa,
+        type: 'CREDIT',
+        status: bTx.status || 'SUCCESS',
+        timestamp: ts,
+        date: isoDate,
+        createdAt: bTx.createdAt || new Date(ts).toISOString(),
+        businessId: targetBizId,
+        fromName: bTx.fromName || bTx.customerName || '',
+        fromPhone: bTx.fromPhone || bTx.customerPhone || '',
+        transactionNumber: bTx.transactionNumber || bTx.invoiceNo || '',
+        ref: bTx.reference || bTx.ref || '',
+      };
+
+      results.push(normTx);
+      if (normTx.id) seenTxnIds.add(normTx.id);
+      if (bTx.transactionNumber) seenTxnIds.add(bTx.transactionNumber);
+    }
+
+    // 2. TallyPay Add Money Transactions
+    const addMoneyList = Array.isArray(store.tallyPayAddMoneyTxns) ? store.tallyPayAddMoneyTxns : [];
+    for (const aTx of addMoneyList) {
+      if (!aTx) continue;
+      const aBiz = String(aTx.businessId || aTx.business_id || '1');
+      if (aBiz !== targetBizId) continue;
+
+      const numAmt = Number(aTx.amount !== undefined && aTx.amount !== null ? aTx.amount : (aTx.amountPaisa ? aTx.amountPaisa / 100 : 0));
+      const paisa = aTx.amountPaisa !== undefined && aTx.amountPaisa !== null
+        ? Math.round(Number(aTx.amountPaisa))
+        : Math.round(numAmt * 100);
+      const feePaisa = aTx.feePaisa !== undefined && aTx.feePaisa !== null
+        ? Math.round(Number(aTx.feePaisa))
+        : Math.round(Number(aTx.fee || 0) * 100);
+
+      const ts = extractRecordTimestamp(aTx) || Date.now();
+      const isoDate = (aTx.date && typeof aTx.date === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(aTx.date.trim()))
+        ? aTx.date.trim()
+        : (new Date(ts).toISOString().slice(0, 10));
+
+      const normTx = {
+        id: String(aTx.id || ('tp_add_' + ts + '_' + Math.random().toString(36).substring(2, 7))),
+        source: 'tallypay_add_money',
+        channelId: aTx.channelId || aTx.provider || 'tallypay',
+        channel: aTx.channelId || aTx.provider || 'tallypay',
+        amount: numAmt,
+        amountPaisa: paisa,
+        fee: feePaisa / 100,
+        feePaisa,
+        type: 'CREDIT',
+        status: aTx.status || 'SUCCESS',
+        timestamp: ts,
+        date: isoDate,
+        createdAt: aTx.createdAt || new Date(ts).toISOString(),
+        businessId: targetBizId,
+        fromName: aTx.fromName || '',
+        fromPhone: aTx.fromPhone || '',
+        transactionNumber: aTx.transactionNumber || '',
+        ref: aTx.reference || '',
+      };
+
+      results.push(normTx);
+      if (normTx.id) seenTxnIds.add(normTx.id);
+      if (aTx.transactionNumber) seenTxnIds.add(aTx.transactionNumber);
+    }
+
+    // 3. Digital Journal Entries
+    const journalList = Array.isArray(store.journals) ? store.journals : [];
+    for (const j of journalList) {
+      if (!j) continue;
+      const jBiz = String(j.businessId || j.business_id || '1');
+      if (jBiz !== targetBizId) continue;
+
+      if (j.id && seenTxnIds.has(String(j.id))) continue;
+      if (j.banglaQrId && seenTxnIds.has(String(j.banglaQrId))) continue;
+      if (j.transactionNumber && seenTxnIds.has(String(j.transactionNumber))) continue;
+      if (j.externalId && seenTxnIds.has(String(j.externalId))) continue;
+
+      const isDigital = j.isDigital === true ||
+                        j.txn_mode === 2 ||
+                        j.txn_mode === '2' ||
+                        j.txn_mode === 'digital' ||
+                        j.txn_mode === 'bank' ||
+                        j.txn_mode === 'mfs';
+      if (!isDigital) continue;
+
+      const isReceived = j.type === 'received' || j.txn_type === 2 || j.txn_type === 'received' || j.type === 'deposit';
+      const numAmt = Number(j.amount !== undefined && j.amount !== null ? j.amount : (j.amount_received || 0));
+      if (!isReceived && numAmt <= 0) continue;
+
+      const paisa = Math.round(numAmt * 100);
+      const ts = extractRecordTimestamp(j) || Date.now();
+      const isoDate = (j.date && typeof j.date === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(j.date.trim()))
+        ? j.date.trim()
+        : (new Date(ts).toISOString().slice(0, 10));
+
+      let resolvedCh = j.channelId || j.channel || j.paymentMethod || null;
+      if (!resolvedCh) {
+        const descLower = String(j.desc || j.description || '').toLowerCase();
+        if (descLower.includes('bkash') || descLower.includes('বিকাশ')) resolvedCh = 'bkash';
+        else if (descLower.includes('nagad') || descLower.includes('নগদ')) resolvedCh = 'nagad';
+        else if (descLower.includes('rocket') || descLower.includes('রকেট')) resolvedCh = 'rocket';
+        else if (descLower.includes('upay') || descLower.includes('উপায়')) resolvedCh = 'upay';
+        else if (descLower.includes('card') || descLower.includes('কার্ড') || descLower.includes('visa')) resolvedCh = 'card';
+        else resolvedCh = 'bangla_qr';
+      }
+
+      const normTx = {
+        id: String(j.id || ('j_dig_' + ts + '_' + Math.random().toString(36).substring(2, 7))),
+        source: 'journal_digital',
+        channelId: resolvedCh,
+        channel: resolvedCh,
+        amount: numAmt,
+        amountPaisa: paisa,
+        fee: 0,
+        feePaisa: 0,
+        type: 'CREDIT',
+        status: (j.status !== undefined && j.status !== null) ? j.status : 'SUCCESS',
+        timestamp: ts,
+        date: isoDate,
+        createdAt: j.createdAt || new Date(ts).toISOString(),
+        businessId: targetBizId,
+        accountId: j.accountId || j.orig_account_id || null,
+        desc: j.desc || j.description || '',
+      };
+
+      results.push(normTx);
+    }
+
+    let filtered = results;
+
+    if (filterOptions.channelId) {
+      const targetCh = String(filterOptions.channelId).toLowerCase();
+      filtered = filtered.filter((t) => String(t.channelId || t.channel).toLowerCase() === targetCh);
+    }
+
+    if (filterOptions.status) {
+      const targetStatus = String(filterOptions.status).toUpperCase();
+      filtered = filtered.filter((t) => String(t.status || 'SUCCESS').toUpperCase() === targetStatus);
+    }
+
+    if (filterOptions.source) {
+      filtered = filtered.filter((t) => t.source === filterOptions.source);
+    }
+
+    if (filterOptions.startDate || filterOptions.endDate) {
+      if (digitalAnalyticsService && typeof digitalAnalyticsService.filterTransactionsByDateRange === 'function') {
+        filtered = digitalAnalyticsService.filterTransactionsByDateRange(filtered, filterOptions.startDate, filterOptions.endDate);
+      } else {
+        const start = filterOptions.startDate ? String(filterOptions.startDate).slice(0, 10) : null;
+        const end = filterOptions.endDate ? String(filterOptions.endDate).slice(0, 10) : null;
+        filtered = filtered.filter((tx) => {
+          const d = tx.date;
+          if (!d) return true;
+          if (start && d < start) return false;
+          if (end && d > end) return false;
+          return true;
+        });
+      }
+    }
+
+    filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    if (typeof filterOptions.limit === 'number' && filterOptions.limit > 0) {
+      return filtered.slice(0, filterOptions.limit);
+    }
+
+    return filtered;
+  }
 }
 
 // ============================================================================
@@ -5679,6 +6021,41 @@ function getSoundboxNotificationsRepo(businessId = null, repo = defaultRepositor
   return [];
 }
 
+function saveSoundboxDeviceSettingsRepo(settings, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveSoundboxDeviceSettings === 'function') {
+    return repo.saveSoundboxDeviceSettings(settings, options);
+  }
+  return Promise.resolve({ success: false, error: 'NO_REPOSITORY' });
+}
+
+function getSoundboxDeviceSettingsRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getSoundboxDeviceSettings === 'function') {
+    return repo.getSoundboxDeviceSettings(businessId);
+  }
+  return null;
+}
+
+function logSoundboxTelemetryRepo(telemetryEvent, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.logSoundboxTelemetry === 'function') {
+    return repo.logSoundboxTelemetry(telemetryEvent, options);
+  }
+  return Promise.resolve({ success: false, error: 'NO_REPOSITORY' });
+}
+
+function getSoundboxTelemetryRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getSoundboxTelemetry === 'function') {
+    return repo.getSoundboxTelemetry(businessId);
+  }
+  return [];
+}
+
+function getDigitalInflowTransactionsRepo(businessId = null, filterOptions = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getDigitalInflowTransactions === 'function') {
+    return repo.getDigitalInflowTransactions(businessId, filterOptions);
+  }
+  return [];
+}
+
 function getVoucherPrintLogsRepo(voucherNoOrJournalId, businessId = null, repo = defaultRepository) {
   if (repo && typeof repo.getVoucherPrintLogs === 'function') {
     return repo.getVoucherPrintLogs(voucherNoOrJournalId, businessId);
@@ -5801,6 +6178,12 @@ const repoExport = {
   getAddMoneyTransactions: getAddMoneyTransactionsRepo,
   logSoundboxNotification: logSoundboxNotificationRepo,
   getSoundboxNotifications: getSoundboxNotificationsRepo,
+  saveSoundboxDeviceSettings: saveSoundboxDeviceSettingsRepo,
+  getSoundboxDeviceSettings: getSoundboxDeviceSettingsRepo,
+  logSoundboxTelemetry: logSoundboxTelemetryRepo,
+  getSoundboxTelemetry: getSoundboxTelemetryRepo,
+  digitalAnalyticsService,
+  getDigitalInflowTransactions: getDigitalInflowTransactionsRepo,
   default: defaultRepository,
 };
 
@@ -5908,5 +6291,11 @@ if (typeof exports !== 'undefined') {
   exports.getAddMoneyTransactions = getAddMoneyTransactionsRepo;
   exports.logSoundboxNotification = logSoundboxNotificationRepo;
   exports.getSoundboxNotifications = getSoundboxNotificationsRepo;
+  exports.saveSoundboxDeviceSettings = saveSoundboxDeviceSettingsRepo;
+  exports.getSoundboxDeviceSettings = getSoundboxDeviceSettingsRepo;
+  exports.logSoundboxTelemetry = logSoundboxTelemetryRepo;
+  exports.getSoundboxTelemetry = getSoundboxTelemetryRepo;
+  exports.digitalAnalyticsService = digitalAnalyticsService;
+  exports.getDigitalInflowTransactions = getDigitalInflowTransactionsRepo;
   exports.default = defaultRepository;
 }
