@@ -21,6 +21,21 @@ try {
   preferencesService = require('./preferencesService');
 } catch (e) {}
 
+let securityService = null;
+try {
+  securityService = require('./securityService');
+} catch (e) {}
+
+const {
+  createDefaultSecurityConfig,
+  normalizeSecurityConfig,
+  validatePinFormat,
+  generateSalt,
+  hashPin,
+  verifyPinHash,
+  migratePlaintextPin,
+} = securityService || {};
+
 const MM_STORAGE_KEY = (moneyManagerService && moneyManagerService.MM_STORAGE_KEY) || '@tallykhata_personal_money_manager_v2';
 const PREFERENCES_STORAGE_KEY = (preferencesService && preferencesService.PREFERENCES_STORAGE_KEY) || '@tallykhata_app_preferences_v1';
 
@@ -238,6 +253,25 @@ function createDefaultState() {
     openingBalance: 3000,
     pinEnabled: false,
     appPin: '',
+    securityConfig: (securityService && typeof securityService.createDefaultSecurityConfig === 'function')
+      ? securityService.createDefaultSecurityConfig()
+      : {
+          pinEnabled: false,
+          pinHash: '',
+          salt: '',
+          iterations: 10000,
+          failedAttempts: 0,
+          lockoutUntil: null,
+          lockoutLevel: 0,
+          isLocked: false,
+          lastActiveTimestamp: Date.now(),
+          appBackgroundedTimestamp: null,
+          autoLockTimeoutMs: 180000,
+          biometricsEnabled: false,
+          biometricsSupported: true,
+          biometricKeySignature: null,
+          version: 1,
+        },
     tagadaLogs: [],
     version: 6,
   };
@@ -583,6 +617,46 @@ class StorageRepository {
           parsed.businesses = DEFAULT_BUSINESSES;
           parsed.activeBusinessId = '1';
         }
+        // Security & PIN normalization with smooth legacy migration
+        if (parsed.appPin && parsed.pinEnabled && (!parsed.securityConfig || !parsed.securityConfig.pinHash)) {
+          if (securityService && typeof securityService.migratePlaintextPin === 'function') {
+            try {
+              const mig = securityService.migratePlaintextPin(parsed.appPin);
+              parsed.securityConfig = {
+                ...securityService.createDefaultSecurityConfig(),
+                pinEnabled: true,
+                pinHash: mig.pinHash,
+                salt: mig.salt,
+                iterations: mig.iterations,
+              };
+              parsed.appPin = '';
+              storeNeedsSave = true;
+            } catch (_) {}
+          }
+        }
+        if (securityService && typeof securityService.normalizeSecurityConfig === 'function') {
+          parsed.securityConfig = securityService.normalizeSecurityConfig(parsed.securityConfig || { pinEnabled: parsed.pinEnabled });
+          parsed.pinEnabled = Boolean(parsed.securityConfig.pinEnabled);
+        } else if (!parsed.securityConfig) {
+          parsed.securityConfig = {
+            pinEnabled: Boolean(parsed.pinEnabled),
+            pinHash: '',
+            salt: '',
+            iterations: 10000,
+            failedAttempts: 0,
+            lockoutUntil: null,
+            lockoutLevel: 0,
+            isLocked: false,
+            lastActiveTimestamp: Date.now(),
+            appBackgroundedTimestamp: null,
+            autoLockTimeoutMs: 180000,
+            biometricsEnabled: false,
+            biometricsSupported: true,
+            biometricKeySignature: null,
+            version: 1,
+          };
+        }
+
         if (storeNeedsSave) {
           try {
             await this.adapter.setItem(V6_KEY, JSON.stringify(parsed));
@@ -1173,6 +1247,9 @@ class StorageRepository {
     const authoritative = { ...this.getAuthoritativeState() };
     authoritative.pinEnabled = false;
     authoritative.appPin = '';
+    if (authoritative.securityConfig && securityService && typeof securityService.createDefaultSecurityConfig === 'function') {
+      authoritative.securityConfig = securityService.createDefaultSecurityConfig();
+    }
 
     const domains = (extraState && Array.isArray(extraState.domains) && extraState.domains.length > 0)
       ? extraState.domains
@@ -1891,6 +1968,9 @@ class StorageRepository {
         stock: restoredInventory,
         pinEnabled: false,
         appPin: '', // Restored backup always resets PIN lock to safe default for security
+        securityConfig: securityService && typeof securityService.createDefaultSecurityConfig === 'function'
+          ? securityService.createDefaultSecurityConfig()
+          : undefined,
         version: 6,
         lastRestoredAt: new Date().toISOString(),
         restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -3483,6 +3563,228 @@ class StorageRepository {
       conflictDetails,
     };
   }
+
+  // ============================================================================
+  // REA-ITER-215: CRYPTOGRAPHIC PIN SECURITY & AUTO-LOCK INTEGRATION
+  // ============================================================================
+
+  /**
+   * Returns the normalized security configuration from the authoritative store.
+   * @returns {Object}
+   */
+  getSecurityConfig() {
+    const store = this.getAuthoritativeState();
+    if (securityService && typeof securityService.normalizeSecurityConfig === 'function') {
+      return securityService.normalizeSecurityConfig(store?.securityConfig || { pinEnabled: store?.pinEnabled });
+    }
+    return store?.securityConfig || { pinEnabled: false, pinHash: '', salt: '' };
+  }
+
+  /**
+   * Verifies an entered PIN against the stored cryptographic PBKDF2 hash.
+   * Enforces progressive brute-force rate-limiting and persists attempt metrics.
+   * @param {string} pin
+   * @param {number} [now=Date.now()]
+   * @returns {Promise<Object>}
+   */
+  async verifyAppPin(pin, now = Date.now()) {
+    const currentCfg = this.getSecurityConfig();
+    if (!securityService || typeof securityService.verifyPin !== 'function') {
+      return { success: true, verified: true };
+    }
+    const result = securityService.verifyPin(pin, currentCfg, now);
+    if (result.updatedConfig) {
+      await this.mutateStore((latestStore) => ({
+        ...latestStore,
+        securityConfig: result.updatedConfig,
+        pinEnabled: Boolean(result.updatedConfig.pinEnabled),
+      }));
+    }
+    return result;
+  }
+
+  /**
+   * Securely sets up or updates the application PIN with a fresh 16-byte random salt.
+   * Plaintext PIN is never stored.
+   * @param {string} pin
+   * @param {Object} [options={}]
+   * @returns {Promise<Object>}
+   */
+  async setAppPinSecure(pin, options = {}) {
+    const currentCfg = this.getSecurityConfig();
+    if (!securityService || typeof securityService.setupPin !== 'function') {
+      return { success: false, error: 'SECURITY_SERVICE_UNAVAILABLE' };
+    }
+    const result = securityService.setupPin(currentCfg, pin, options);
+    if (result.success && result.updatedConfig) {
+      const mutateRes = await this.mutateStore((latestStore) => ({
+        ...latestStore,
+        appPin: '', // Always scrub plaintext PIN
+        pinEnabled: true,
+        securityConfig: result.updatedConfig,
+      }));
+      return { success: mutateRes.success, updatedConfig: result.updatedConfig, error: mutateRes.error };
+    }
+    return result;
+  }
+
+  /**
+   * Changes the application PIN after verifying current credentials.
+   * @param {string} currentPin
+   * @param {string} newPin
+   * @param {Object} [options={}]
+   * @returns {Promise<Object>}
+   */
+  async changeAppPinSecure(currentPin, newPin, options = {}) {
+    const currentCfg = this.getSecurityConfig();
+    if (!securityService || typeof securityService.changePin !== 'function') {
+      return { success: false, error: 'SECURITY_SERVICE_UNAVAILABLE' };
+    }
+    const result = securityService.changePin(currentCfg, currentPin, newPin, options);
+    if (result.updatedConfig) {
+      await this.mutateStore((latestStore) => ({
+        ...latestStore,
+        appPin: '',
+        pinEnabled: Boolean(result.updatedConfig.pinEnabled),
+        securityConfig: result.updatedConfig,
+      }));
+    }
+    return result;
+  }
+
+  /**
+   * Disables PIN protection after verifying current credentials.
+   * @param {string} currentPin
+   * @returns {Promise<Object>}
+   */
+  async disableAppPinSecure(currentPin) {
+    const currentCfg = this.getSecurityConfig();
+    if (!securityService || typeof securityService.disablePin !== 'function') {
+      return { success: false, error: 'SECURITY_SERVICE_UNAVAILABLE' };
+    }
+    const result = securityService.disablePin(currentCfg, currentPin);
+    if (result.updatedConfig) {
+      await this.mutateStore((latestStore) => ({
+        ...latestStore,
+        appPin: '',
+        pinEnabled: false,
+        securityConfig: result.updatedConfig,
+      }));
+    }
+    return result;
+  }
+
+  /**
+   * Records user activity to refresh auto-lock timer.
+   * @param {number} [now=Date.now()]
+   * @returns {Promise<Object>}
+   */
+  async recordAppActivity(now = Date.now()) {
+    const currentCfg = this.getSecurityConfig();
+    if (securityService && typeof securityService.recordActivity === 'function') {
+      const updated = securityService.recordActivity(currentCfg, now);
+      if (this.currentStore) {
+        this.currentStore.securityConfig = updated;
+      }
+      return updated;
+    }
+    return currentCfg;
+  }
+
+  /**
+   * Records app backgrounding timestamp.
+   * @param {number} [now=Date.now()]
+   * @returns {Promise<Object>}
+   */
+  async recordAppBackgrounded(now = Date.now()) {
+    const currentCfg = this.getSecurityConfig();
+    if (securityService && typeof securityService.recordAppBackgrounded === 'function') {
+      const updated = securityService.recordAppBackgrounded(currentCfg, now);
+      if (this.currentStore) {
+        this.currentStore.securityConfig = updated;
+      }
+      return updated;
+    }
+    return currentCfg;
+  }
+
+  /**
+   * Evaluates auto-lock condition when app returns to foreground.
+   * @param {number} [now=Date.now()]
+   * @returns {Promise<Object>}
+   */
+  async recordAppForegrounded(now = Date.now()) {
+    const currentCfg = this.getSecurityConfig();
+    if (!securityService || typeof securityService.recordAppForegrounded !== 'function') {
+      return { didAutoLock: false, updatedConfig: currentCfg };
+    }
+    const res = securityService.recordAppForegrounded(currentCfg, now);
+    if (res.updatedConfig) {
+      if (this.currentStore) {
+        this.currentStore.securityConfig = res.updatedConfig;
+      }
+      if (res.didAutoLock) {
+        await this.mutateStore((latestStore) => ({
+          ...latestStore,
+          securityConfig: res.updatedConfig,
+        }));
+      }
+    }
+    return res;
+  }
+
+  /**
+   * Unlocks the app using a verified PIN.
+   * @param {string} pin
+   * @param {number} [now=Date.now()]
+   * @returns {Promise<Object>}
+   */
+  async unlockAppWithPin(pin, now = Date.now()) {
+    const verifyRes = await this.verifyAppPin(pin, now);
+    if (verifyRes.verified) {
+      const currentCfg = this.getSecurityConfig();
+      const unlocked = securityService ? securityService.unlockApp(currentCfg, now) : { ...currentCfg, isLocked: false };
+      await this.mutateStore((latestStore) => ({
+        ...latestStore,
+        securityConfig: unlocked,
+      }));
+      return { success: true, verified: true, isLocked: false };
+    }
+    return verifyRes;
+  }
+
+  /**
+   * Unlocks the app using biometrics.
+   * @param {string|null} [signature=null]
+   * @returns {Promise<Object>}
+   */
+  async unlockAppWithBiometrics(signature = null) {
+    const currentCfg = this.getSecurityConfig();
+    if (!securityService || typeof securityService.authenticateWithBiometrics !== 'function') {
+      return { success: false, verified: false, error: 'SECURITY_SERVICE_UNAVAILABLE' };
+    }
+    const authRes = securityService.authenticateWithBiometrics(currentCfg, signature);
+    if (authRes.verified && authRes.updatedConfig) {
+      await this.mutateStore((latestStore) => ({
+        ...latestStore,
+        securityConfig: authRes.updatedConfig,
+      }));
+    }
+    return authRes;
+  }
+
+  /**
+   * Gets current lockout status from store.
+   * @param {number} [now=Date.now()]
+   * @returns {Object}
+   */
+  getAppLockoutStatus(now = Date.now()) {
+    const currentCfg = this.getSecurityConfig();
+    if (securityService && typeof securityService.getLockoutStatus === 'function') {
+      return securityService.getLockoutStatus(currentCfg, now);
+    }
+    return { isLockedOut: false, remainingSeconds: 0, remainingAttempts: 5 };
+  }
 }
 
 // ============================================================================
@@ -4079,6 +4381,83 @@ async function importCompressedBackupRepo(compressedPayload, options = {}, repo 
   return null;
 }
 
+async function getSecurityConfigRepo(repo = defaultRepository) {
+  if (repo && typeof repo.getSecurityConfig === 'function') {
+    return repo.getSecurityConfig();
+  }
+  return securityService ? securityService.createDefaultSecurityConfig() : null;
+}
+
+async function verifyAppPinRepo(pin, now = Date.now(), repo = defaultRepository) {
+  if (repo && typeof repo.verifyAppPin === 'function') {
+    return repo.verifyAppPin(pin, now);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function setAppPinSecureRepo(pin, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.setAppPinSecure === 'function') {
+    return repo.setAppPinSecure(pin, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function changeAppPinSecureRepo(currentPin, newPin, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.changeAppPinSecure === 'function') {
+    return repo.changeAppPinSecure(currentPin, newPin, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function disableAppPinSecureRepo(currentPin, repo = defaultRepository) {
+  if (repo && typeof repo.disableAppPinSecure === 'function') {
+    return repo.disableAppPinSecure(currentPin);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function recordAppActivityRepo(now = Date.now(), repo = defaultRepository) {
+  if (repo && typeof repo.recordAppActivity === 'function') {
+    return repo.recordAppActivity(now);
+  }
+  return null;
+}
+
+async function recordAppBackgroundedRepo(now = Date.now(), repo = defaultRepository) {
+  if (repo && typeof repo.recordAppBackgrounded === 'function') {
+    return repo.recordAppBackgrounded(now);
+  }
+  return null;
+}
+
+async function recordAppForegroundedRepo(now = Date.now(), repo = defaultRepository) {
+  if (repo && typeof repo.recordAppForegrounded === 'function') {
+    return repo.recordAppForegrounded(now);
+  }
+  return null;
+}
+
+async function unlockAppWithPinRepo(pin, now = Date.now(), repo = defaultRepository) {
+  if (repo && typeof repo.unlockAppWithPin === 'function') {
+    return repo.unlockAppWithPin(pin, now);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function unlockAppWithBiometricsRepo(signature = null, repo = defaultRepository) {
+  if (repo && typeof repo.unlockAppWithBiometrics === 'function') {
+    return repo.unlockAppWithBiometrics(signature);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getAppLockoutStatusRepo(now = Date.now(), repo = defaultRepository) {
+  if (repo && typeof repo.getAppLockoutStatus === 'function') {
+    return repo.getAppLockoutStatus(now);
+  }
+  return { isLockedOut: false, remainingSeconds: 0, remainingAttempts: 5 };
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -4129,6 +4508,18 @@ const repoExport = {
   telemetryService: defaultTelemetryService,
   EVENT_TYPES,
   MAX_EVENT_QUEUE_SIZE,
+  getSecurityConfig: getSecurityConfigRepo,
+  verifyAppPin: verifyAppPinRepo,
+  setAppPinSecure: setAppPinSecureRepo,
+  changeAppPinSecure: changeAppPinSecureRepo,
+  disableAppPinSecure: disableAppPinSecureRepo,
+  recordAppActivity: recordAppActivityRepo,
+  recordAppBackgrounded: recordAppBackgroundedRepo,
+  recordAppForegrounded: recordAppForegroundedRepo,
+  unlockAppWithPin: unlockAppWithPinRepo,
+  unlockAppWithBiometrics: unlockAppWithBiometricsRepo,
+  getAppLockoutStatus: getAppLockoutStatusRepo,
+  securityService,
   default: defaultRepository,
 };
 
@@ -4185,5 +4576,17 @@ if (typeof exports !== 'undefined') {
   exports.telemetryService = defaultTelemetryService;
   exports.EVENT_TYPES = EVENT_TYPES;
   exports.MAX_EVENT_QUEUE_SIZE = MAX_EVENT_QUEUE_SIZE;
+  exports.getSecurityConfig = getSecurityConfigRepo;
+  exports.verifyAppPin = verifyAppPinRepo;
+  exports.setAppPinSecure = setAppPinSecureRepo;
+  exports.changeAppPinSecure = changeAppPinSecureRepo;
+  exports.disableAppPinSecure = disableAppPinSecureRepo;
+  exports.recordAppActivity = recordAppActivityRepo;
+  exports.recordAppBackgrounded = recordAppBackgroundedRepo;
+  exports.recordAppForegrounded = recordAppForegroundedRepo;
+  exports.unlockAppWithPin = unlockAppWithPinRepo;
+  exports.unlockAppWithBiometrics = unlockAppWithBiometricsRepo;
+  exports.getAppLockoutStatus = getAppLockoutStatusRepo;
+  exports.securityService = securityService;
   exports.default = defaultRepository;
 }

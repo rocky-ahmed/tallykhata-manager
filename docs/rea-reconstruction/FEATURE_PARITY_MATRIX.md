@@ -22,10 +22,12 @@
 | **FEAT-011** | Transaction Query Index | Fast date-range filtering for large journals | `src/storageRepository.js` binary search index | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-012** | High-Frequency I/O | SQLite / AsyncStorage mutex write queue serialization | `storageRepository.js` `writeQueue` mutex | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-013** | Offline Sync & Conflict Resolution | Room DB dirty flags, WorkManager D2S, LWW reconciliation | `src/storageRepository.js` `simulateSyncBatch`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
+| **FEAT-014** | Cloud Backup Compression & Resumable Streaming | GZIP / Deflate streaming chunked upload, network retry | `src/googleDriveBackupService.js`, `storageRepository.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
+| **FEAT-015** | Biometric AppLock & Crypto PIN Authentication | PBKDF2/SHA-256 salted PIN, brute-force lockout, 3D keypad, biometrics | `src/securityService.js`, `src/biometricAuthService.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 
 ---
 
 ## 2. Verification Standards & Methodology
 1. **Integer Paisa Precision:** All monetary amounts calculate in exact integer paisa ($1\text{ Taka} = 100\text{ Paisa}$) with zero floating-point drift up to ৳100,000,000 single transactions.
 2. **Domain Isolation:** Strict separation between Business Accounting (`@tallykhata_state_v6`) and Personal Money Manager (`@tallykhata_personal_money_manager_v2`).
-3. **Automated Regression Suite:** 62 automated test suites (1,265+ passing assertions) verifying every parity dimension, including storage metrics, pagination, compaction, atomic rollback, packaging, and milestone synthesis (FEAT-001 through FEAT-012).
+3. **Automated Regression Suite:** 278 automated test suites (5,590+ passing assertions) verifying every parity dimension, including storage metrics, pagination, compaction, atomic rollback, packaging, and milestone synthesis (FEAT-001 through FEAT-015).

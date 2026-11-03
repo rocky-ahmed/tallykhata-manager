@@ -170,8 +170,8 @@ runTest("All 53 Modals in App.js implement onRequestClose for Android back navig
   const appSrc = fs.readFileSync("App.js", "utf8");
   const modalMatches = appSrc.match(/<Modal\b/g) || [];
   const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-  assert.strictEqual(modalMatches.length, 57, "Expected 57 modals in App.js");
-  assert.strictEqual(reqCloseMatches.length, 57, "All 57 modals must implement onRequestClose");
+  assert.strictEqual(modalMatches.length, 59, "Expected 59 modals in App.js");
+  assert.strictEqual(reqCloseMatches.length, 59, "All 57 modals must implement onRequestClose");
 });
 
 console.log("\n--- PART 8: FORM USABILITY & KEYBOARD PERSISTENCE ---");
