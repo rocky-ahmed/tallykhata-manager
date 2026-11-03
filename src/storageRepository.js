@@ -41,6 +41,11 @@ try {
   voucherPdfService = require('./voucherPdfService');
 } catch (e) {}
 
+let banglaQrService = null;
+try {
+  banglaQrService = require('./banglaQrService');
+} catch (e) {}
+
 let thermalPrintService = null;
 try {
   thermalPrintService = require('./thermalPrintService');
@@ -132,6 +137,7 @@ const VALID_COLLECTIONS = new Set([
   'audioNotes',
   'receiptImages',
   'voucherPrintLogs',
+  'banglaQrTransactions',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -330,6 +336,7 @@ function createDefaultState() {
     audioNotes: [],
     receiptImages: [],
     voucherPrintLogs: [],
+    banglaQrTransactions: [],
     version: 6,
   };
 }
@@ -1340,6 +1347,13 @@ class StorageRepository {
           });
     }
 
+        if (authoritative.banglaQrTransactions && Array.isArray(authoritative.banglaQrTransactions)) {
+      authoritative.banglaQrTransactions = authoritative.banglaQrTransactions.map((tx) => {
+        const { qrMatrix, rawPayload, ...rest } = tx || {};
+        return rest;
+      });
+    }
+
     if (authoritative.voucherPrintLogs && Array.isArray(authoritative.voucherPrintLogs)) {
       authoritative.voucherPrintLogs = authoritative.voucherPrintLogs.map((v) => {
         const { buffer, rawBytes, data, ...rest } = v || {};
@@ -1854,6 +1868,7 @@ class StorageRepository {
       const receiptsToPurge = (prevStore.receiptImages || []).filter((r) => getBizId(r) === targetId);
       const receiptImages = (prevStore.receiptImages || []).filter((r) => getBizId(r) !== targetId);
       const voucherPrintLogs = (prevStore.voucherPrintLogs || []).filter((v) => getBizId(v) !== targetId);
+        const banglaQrTransactions = (prevStore.banglaQrTransactions || []).filter((b) => getBizId(b) !== targetId);
 
       // Clean up physical audio files of deleted business
       if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
@@ -1918,6 +1933,7 @@ class StorageRepository {
         audioNotes,
         receiptImages,
         voucherPrintLogs,
+        banglaQrTransactions,
         cashReconciliation,
       };
     });
@@ -2057,6 +2073,7 @@ class StorageRepository {
         const importedAudio = (data.audioNotes || []).filter(a => String(a.businessId || '1') === selectedBizId);
         const importedReceipts = (data.receiptImages || []).filter(r => String(r.businessId || '1') === selectedBizId);
         const importedVouchers = (data.voucherPrintLogs || []).filter(v => String(v.businessId || '1') === selectedBizId);
+          const importedBanglaQr = (data.banglaQrTransactions || []).filter(b => String(b.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -2066,6 +2083,7 @@ class StorageRepository {
         const keptAudio = (prevStore.audioNotes || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptReceipts = (prevStore.receiptImages || []).filter(r => String(r.businessId || '1') !== selectedBizId);
         const keptVouchers = (prevStore.voucherPrintLogs || []).filter(v => String(v.businessId || '1') !== selectedBizId);
+          const keptBanglaQr = (prevStore.banglaQrTransactions || []).filter(b => String(b.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2085,6 +2103,7 @@ class StorageRepository {
           audioNotes: [...keptAudio, ...importedAudio],
           receiptImages: [...keptReceipts, ...importedReceipts],
           voucherPrintLogs: [...keptVouchers, ...importedVouchers],
+            banglaQrTransactions: [...keptBanglaQr, ...importedBanglaQr],
           version: 6,
           lastRestoredAt: new Date().toISOString(),
           restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -4160,7 +4179,15 @@ class StorageRepository {
       });
 
       // Find voucher print logs to remove (attached to any of the purged journals or this account)
-      const curVouchers = latestStore.voucherPrintLogs || [];
+      const curBanglaQr = latestStore.banglaQrTransactions || [];
+        const purgedBanglaQr = curBanglaQr.filter((tx) => {
+          const biz = getBizId(tx);
+          const matchesAccount = tx.accountId && String(tx.accountId) === targetAccId;
+          return biz === targetBizId && matchesAccount;
+        });
+        const updatedBanglaQr = curBanglaQr.filter((tx) => !purgedBanglaQr.includes(tx));
+
+        const curVouchers = latestStore.voucherPrintLogs || [];
       const purgedVoucherLogs = curVouchers.filter((v) => {
         const biz = getBizId(v);
         const matchesJournal = v.journalId && accTxnIds.includes(String(v.journalId));
@@ -4183,6 +4210,7 @@ class StorageRepository {
         audioNotes: updatedAudio,
         receiptImages: updatedReceipts,
         voucherPrintLogs: updatedVouchers,
+        banglaQrTransactions: updatedBanglaQr,
       };
     });
 
@@ -4605,6 +4633,78 @@ class StorageRepository {
     }
 
     return { success: true, deletedLog };
+  }
+  /**
+   * Logs a Bangla QR / Super QR payment transaction.
+   * Persists atomically in the 'banglaQrTransactions' collection under writeQueue mutex.
+   *
+   * @param {object} txnData - QR payment transaction data
+   * @param {object} [options] - Options (businessId, etc.)
+   * @returns {Promise<{ success: boolean, transaction?: object, error?: any }>}
+   */
+  async logBanglaQrTransaction(txnData, options = {}) {
+    if (!txnData || typeof txnData !== 'object') {
+      return { success: false, error: 'INVALID_TRANSACTION_PAYLOAD' };
+    }
+
+    const businessId = String(options.businessId || txnData.businessId || this.currentStore?.activeBusinessId || '1');
+    const id = txnData.id || ('bqr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8));
+    const nowIso = txnData.createdAt || txnData.txnTime || new Date().toISOString();
+
+    const normalizedTxn = {
+      ...txnData,
+      id,
+      businessId,
+      business_id: businessId,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    const res = await this.mutateCollection('banglaQrTransactions', (list) => {
+      const existingIndex = list.findIndex((l) => l.id === normalizedTxn.id);
+      if (existingIndex >= 0) {
+        const updated = [...list];
+        updated[existingIndex] = normalizedTxn;
+        return updated;
+      }
+      return [normalizedTxn, ...list];
+    });
+
+    if (res.success) {
+      return { success: true, transaction: normalizedTxn };
+    }
+    return { success: false, error: res.error };
+  }
+
+  /**
+   * Retrieves all Bangla QR transactions for a given business.
+   *
+   * @param {string|number} [businessId=null] - Business ID
+   * @returns {Array<object>} All Bangla QR transactions for the business
+   */
+  getBanglaQrTransactions(businessId = null) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.banglaQrTransactions) ? store.banglaQrTransactions : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    return list.filter((tx) => {
+      if (!tx) return false;
+      const txBiz = String(tx.businessId || tx.business_id || '1');
+      return txBiz === targetBizId;
+    });
+  }
+
+  /**
+   * Retrieves a single Bangla QR transaction by its transaction number or ID.
+   *
+   * @param {string} txnNumberOrId - Transaction number or ID
+   * @param {string|number} [businessId=null] - Business ID
+   * @returns {object|null} Matching transaction or null
+   */
+  getBanglaQrTransactionByTxnNumber(txnNumberOrId, businessId = null) {
+    const list = this.getBanglaQrTransactions(businessId);
+    const target = String(txnNumberOrId || '');
+    return list.find((tx) => tx && (tx.id === target || tx.transactionNumber === target || tx.invoiceNo === target)) || null;
   }
 }
 
@@ -5401,6 +5501,27 @@ async function logVoucherPrintExportRepo(printEvent, options = {}, repo = defaul
   return { success: false, error: 'NO_REPOSITORY' };
 }
 
+function logBanglaQrTransactionRepo(txnData, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.logBanglaQrTransaction === 'function') {
+    return repo.logBanglaQrTransaction(txnData, options);
+  }
+  return Promise.resolve({ success: false, error: 'NO_REPOSITORY' });
+}
+
+function getBanglaQrTransactionsRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getBanglaQrTransactions === 'function') {
+    return repo.getBanglaQrTransactions(businessId);
+  }
+  return [];
+}
+
+function getBanglaQrTransactionByTxnNumberRepo(txnNumberOrId, businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getBanglaQrTransactionByTxnNumber === 'function') {
+    return repo.getBanglaQrTransactionByTxnNumber(txnNumberOrId, businessId);
+  }
+  return null;
+}
+
 function getVoucherPrintLogsRepo(voucherNoOrJournalId, businessId = null, repo = defaultRepository) {
   if (repo && typeof repo.getVoucherPrintLogs === 'function') {
     return repo.getVoucherPrintLogs(voucherNoOrJournalId, businessId);
@@ -5513,6 +5634,10 @@ const repoExport = {
   getVoucherPrintLogs: getVoucherPrintLogsRepo,
   getVoucherPrintLogsForBusiness: getVoucherPrintLogsForBusinessRepo,
   deleteVoucherPrintLog: deleteVoucherPrintLogRepo,
+  banglaQrService,
+  logBanglaQrTransaction: logBanglaQrTransactionRepo,
+  getBanglaQrTransactions: getBanglaQrTransactionsRepo,
+  getBanglaQrTransactionByTxnNumber: getBanglaQrTransactionByTxnNumberRepo,
   default: defaultRepository,
 };
 
@@ -5610,5 +5735,9 @@ if (typeof exports !== 'undefined') {
   exports.getVoucherPrintLogs = getVoucherPrintLogsRepo;
   exports.getVoucherPrintLogsForBusiness = getVoucherPrintLogsForBusinessRepo;
   exports.deleteVoucherPrintLog = deleteVoucherPrintLogRepo;
+  exports.banglaQrService = banglaQrService;
+  exports.logBanglaQrTransaction = logBanglaQrTransactionRepo;
+  exports.getBanglaQrTransactions = getBanglaQrTransactionsRepo;
+  exports.getBanglaQrTransactionByTxnNumber = getBanglaQrTransactionByTxnNumberRepo;
   exports.default = defaultRepository;
 }

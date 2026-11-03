@@ -48,6 +48,8 @@ import * as receiptImageModule from './src/receiptImageService';
 const receiptImageService = receiptImageModule.receiptImageService || receiptImageModule.default || receiptImageModule;
 import * as receiptScannerModule from './src/receiptScannerService';
 const receiptScannerService = receiptScannerModule.receiptScannerService || receiptScannerModule.default || receiptScannerModule;
+import * as banglaQrModule from './src/banglaQrService';
+const banglaQrService = banglaQrModule.banglaQrService || banglaQrModule.default || banglaQrModule;
 
 export const ThemeContext = React.createContext({
   theme: themeService.LIGHT_THEME,
@@ -951,6 +953,10 @@ function TallyKhataApp() {
   const [modalTxnLimit, setModalTxnLimit] = useState(false);
   const [txnLimitTab, setTxnLimitTab] = useState('limits'); // 'limits' | 'charges'
   const [modalBanglaQR, setModalBanglaQR] = useState(false);
+  const [superQrMode, setSuperQrMode] = useState('static'); // 'static' | 'dynamic'
+  const [superQrAmount, setSuperQrAmount] = useState('');
+  const [superQrSuccessModal, setSuperQrSuccessModal] = useState(false);
+  const [superQrLastPayment, setSuperQrLastPayment] = useState(null);
   const [modalAddMoney, setModalAddMoney] = useState(false);
   const [modalMobileRecharge, setModalMobileRecharge] = useState(false);
   const [modalNotes, setModalNotes] = useState(false);
@@ -2231,7 +2237,8 @@ function TallyKhataApp() {
       if (modalNotes) { setModalNotes(false); return true; }
       if (modalAddStock) { setModalAddStock(false); return true; }
       if (modalAdjustStock) { setModalAdjustStock(false); return true; }
-      if (modalBanglaQR) { setModalBanglaQR(false); return true; }
+      if (superQrSuccessModal) { setSuperQrSuccessModal(false); return true; }
+        if (modalBanglaQR) { setModalBanglaQR(false); return true; }
       if (modalTallyMessage) { setModalTallyMessage(false); return true; }
       if (modalSettings) { setModalSettings(false); return true; }
       if (modalSupport) { setModalSupport(false); return true; }
@@ -11037,67 +11044,272 @@ accessibilityLabel={
       </Modal>
 
       {/* ===================================================================
-          MODAL: BANGLA QR (বাংলা কিউআর)
+          MODAL: SUPER QR & BANGLA QR (বাংলা কিউআর হাব)
          =================================================================== */}
       <Modal visible={modalBanglaQR} animationType="slide" transparent onRequestClose={() => setModalBanglaQR(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { alignItems: 'center' }, isDark && tStyles.modalSurface]}>
+          <View style={[styles.modalCard, { alignItems: 'center', maxHeight: '92%' }, isDark && tStyles.modalSurface]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalCardTitle, isDark && tStyles.text]}>{tStatic("বাংলা QR কোড")}</Text>
+              <View>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.text]}>{t("super_qr_title")}</Text>
+                <Text style={[{ fontSize: 11, color: COLORS.textMuted }, isDark && tStyles.textSecondary]}>{t("super_qr_subtitle")}</Text>
+              </View>
               <TouchableOpacity
                 onPress={() => setModalBanglaQR(false)}
                 style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
                 activeOpacity={0.7}
               >
                 <Image
-                source={require('./assets/icons/ic_close.png')}
-                style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
-                resizeMode="contain"
-              />
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.primary, marginTop: 8 }}>
+            {/* Mode Toggle: Static vs Dynamic */}
+            <View style={[styles.superQrModeContainer, isDark && { backgroundColor: currentTheme?.surfaceContainer || '#262626' }]}>
+              <TouchableOpacity
+                style={[styles.superQrModeTab, superQrMode === 'static' && styles.superQrModeTabActive]}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setSuperQrMode('static');
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.superQrModeTabText, superQrMode === 'static' && styles.superQrModeTabTextActive]}>
+                  {t("super_qr_mode_static")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.superQrModeTab, superQrMode === 'dynamic' && styles.superQrModeTabActive]}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setSuperQrMode('dynamic');
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.superQrModeTabText, superQrMode === 'dynamic' && styles.superQrModeTabTextActive]}>
+                  {t("super_qr_mode_dynamic")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Dynamic Amount Input & Quick-Select Chips */}
+            {superQrMode === 'dynamic' && (
+              <View style={{ width: '100%', marginVertical: 4 }}>
+                <View style={[styles.superQrAmountInputRow, isDark && { borderColor: currentTheme?.cardBorder || '#444' }]}>
+                  <Text style={[{ fontSize: 16, fontWeight: 'bold', color: COLORS.primary, marginRight: 6 }, isDark && tStyles.textPrimary]}>৳</Text>
+                  <TextInput
+                    style={[styles.superQrAmountInput, isDark && { color: currentTheme?.text || '#FFF' }]}
+                    placeholder={t("super_qr_enter_amount")}
+                    placeholderTextColor={isDark ? '#888' : '#9CA3AF'}
+                    keyboardType="numeric"
+                    value={superQrAmount}
+                    onChangeText={setSuperQrAmount}
+                  />
+                  {superQrAmount ? (
+                    <TouchableOpacity onPress={() => setSuperQrAmount('')} hitSlop={STANDARD_TOUCH_HIT_SLOP}>
+                      <Text style={{ fontSize: 14, color: COLORS.textMuted, paddingHorizontal: 6 }}>✕</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {/* Quick Select Chips */}
+                <View style={styles.superQrChipsRow}>
+                  {[
+                    { label: t("super_qr_quick_100"), val: '100' },
+                    { label: t("super_qr_quick_500"), val: '500' },
+                    { label: t("super_qr_quick_1000"), val: '1000' },
+                    { label: t("super_qr_quick_2000"), val: '2000' },
+                  ].map((chip) => (
+                    <TouchableOpacity
+                      key={chip.val}
+                      style={[
+                        styles.superQrChip,
+                        superQrAmount === chip.val && styles.superQrChipActive,
+                        isDark && { backgroundColor: currentTheme?.surfaceContainer || '#2A2A2A', borderColor: currentTheme?.cardBorder || '#444' },
+                        isDark && superQrAmount === chip.val && { backgroundColor: '#451A1A', borderColor: COLORS.primary }
+                      ]}
+                      onPress={() => {
+                        try { hapticFeedbackService.selection(); } catch (e) {}
+                        setSuperQrAmount(chip.val);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[
+                        styles.superQrChipText,
+                        superQrAmount === chip.val && styles.superQrChipTextActive,
+                        isDark && { color: currentTheme?.textSecondary || '#BBB' },
+                        isDark && superQrAmount === chip.val && { color: '#FCA5A5' }
+                      ]}>
+                        {chip.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.primary, marginTop: 4 }}>
               {businessName}
             </Text>
-            <Text style={[{ fontSize: 12, color: COLORS.textMuted, marginBottom: 16 }, isDark && tStyles.textSecondary]}>{tStatic("মার্চেন্ট আইডি: TP-               মার্চেন্ট আইডি: TP-")}{ownerPhone}
+            <Text style={[{ fontSize: 11, color: COLORS.textMuted, marginBottom: 8 }, isDark && tStyles.textSecondary]}>
+              {t("super_qr_merchant_id")}{ownerPhone} • {t("super_qr_counter_id")}
             </Text>
 
             {/* QR Visual Card */}
-            <View style={styles.qrDisplayContainer}>
+            <View style={[styles.qrDisplayContainer, isDark && { backgroundColor: currentTheme?.surfaceContainer || '#1F1F1F', borderColor: currentTheme?.cardBorder || '#333' }]}>
               <Image
                 source={require('./assets/ic_bangla_qr.png')}
-                style={{ width: 170, height: 170 }}
+                style={{ width: 160, height: 160 }}
                 resizeMode="contain"
               />
               <Text style={styles.qrCenterBadge}>{tStatic("বাংলা QR • ")}{businessName}</Text>
+              {superQrMode === 'dynamic' && superQrAmount && parseFloat(superQrAmount) > 0 ? (
+                <View style={{ marginTop: 8, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, backgroundColor: '#DCFCE7' }}>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#15803D' }}>
+                    {t("super_qr_fixed_amount")}: ৳ {parseFloat(superQrAmount).toFixed(2)}
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
-            <Text style={[{ fontSize: 12, color: COLORS.textMuted, textAlign: 'center', marginTop: 12, lineHeight: 18 }, isDark && tStyles.textSecondary]}>{tStatic("কাস্টমার তার বিকাশ, নগদ, রকেট বা যেকোনো ব্যাংক অ্যাপ দিয়ে এই কিউআর স্ক্যান করে সরাসরি পেমেন্ট করতে পারবেন।               কাস্টমার তার বিকাশ, নগদ, রকেট বা যেকোনো ব্যাংক অ্যাপ দিয়ে এই কিউআর স্ক্যান করে সরাসরি পেমেন্ট করতে পারবেন।")}</Text>
+            {/* Interoperable Payment App Badges */}
+            <View style={styles.superQrBadgeStrip}>
+              {['বিকাশ', 'নগদ', 'রকেট', 'উপায়', 'সেলফিন', 'ভিসা', 'মাস্টারকার্ড'].map((b) => (
+                <View key={b} style={[styles.superQrBadge, isDark && { backgroundColor: currentTheme?.surfaceContainer || '#262626' }]}>
+                  <Text style={[styles.superQrBadgeText, isDark && { color: '#A5B4FC' }]}>{b}</Text>
+                </View>
+              ))}
+            </View>
 
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, width: '100%' }}>
+            <Text style={[{ fontSize: 11, color: COLORS.textMuted, textAlign: 'center', marginTop: 10, lineHeight: 16 }, isDark && tStyles.textSecondary]}>
+              {t("super_qr_universal_desc")}
+            </Text>
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 6, marginTop: 14, width: '100%' }}>
               <Button3D
-                title={tStatic("শেয়ার কিউআর")}
+                title={t("super_qr_share_btn")}
                 variant="info"
-                size="md"
+                size="sm"
                 isDark={isDark}
                 onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  const isDynamic = superQrMode === 'dynamic' && superQrAmount && parseFloat(superQrAmount) > 0;
+                  const amtSuffix = isDynamic ? `\n${t("super_qr_fixed_amount")}: ৳ ${parseFloat(superQrAmount).toFixed(2)}` : '';
                   Share.share({
-                    message: `=== ${businessName}${tStatic(" (বাংলা QR) ===\nমার্চেন্ট আইডি: TP-")}${ownerPhone}${tStatic("\nবিকাশ/নগদ/রকেট বা ব্যাংক দিয়ে পেমেন্ট করুন।")}`,
+                    message: `=== ${businessName} (${t("super_qr_title")}) ===\n${t("super_qr_merchant_id")}${ownerPhone}${amtSuffix}\n${t("super_qr_universal_desc")}`,
                   });
                 }}
-                style={{ flex: 1, marginRight: 8 }}
-              />
-              <Button3D
-                title={tStatic("বন্ধ করুন")}
-                variant="secondary"
-                size="md"
-                isDark={isDark}
-                onPress={() => setModalBanglaQR(false)}
                 style={{ flex: 1 }}
               />
+              <Button3D
+                title={t("super_qr_download_btn")}
+                variant="secondary"
+                size="sm"
+                isDark={isDark}
+                onPress={() => {
+                  try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+                  Alert.alert(t("super_qr_title"), t("super_qr_download_success"));
+                }}
+                style={{ flex: 1 }}
+              />
+              <Button3D
+                title={t("super_qr_simulate_pay_btn")}
+                variant="success"
+                size="sm"
+                isDark={isDark}
+                onPress={async () => {
+                  try {
+                    const payAmt = (superQrMode === 'dynamic' && superQrAmount && parseFloat(superQrAmount) > 0)
+                      ? parseFloat(superQrAmount)
+                      : 500.00;
+                    const sim = banglaQrService.simulateCustomerPayment(
+                      { merchantName: businessName, accountNo: ownerPhone, currentBalance: 10000.00 },
+                      { amount: payAmt, app: 'bkash' }
+                    );
+                    if (sim && sim.responseDto) {
+                      await storageRepository.logBanglaQrTransaction({
+                        ...sim.responseDto,
+                        businessId: activeBusinessId || '1',
+                      }, { businessId: activeBusinessId || '1' });
+
+                      setSuperQrLastPayment(sim.responseDto);
+                      setSuperQrSuccessModal(true);
+                      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+                    }
+                  } catch (err) {
+                    Alert.alert(t("mm_alert_error"), err.message || 'Payment simulation failed');
+                  }
+                }}
+                style={{ flex: 1.2 }}
+              />
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: SUPER QR SUCCESS (পেমেন্ট নিশ্চিতকরণ স্ক্রিন)
+         =================================================================== */}
+      <Modal visible={superQrSuccessModal} animationType="fade" transparent onRequestClose={() => setSuperQrSuccessModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, styles.superQrSuccessCard, isDark && tStyles.modalSurface]}>
+            <View style={styles.superQrSuccessBadge}>
+              <Text style={{ fontSize: 28, color: '#16A34A' }}>✓</Text>
+            </View>
+            <Text style={[styles.modalCardTitle, { color: '#16A34A', marginBottom: 2 }, isDark && { color: '#4ADE80' }]}>
+              {t("super_qr_payment_success")}
+            </Text>
+            <Text style={[{ fontSize: 13, color: COLORS.textMuted, marginBottom: 12 }, isDark && tStyles.textSecondary]}>
+              {t("super_qr_payment_received")}
+            </Text>
+
+            <Text style={[styles.superQrSuccessAmount, isDark && { color: '#4ADE80' }]}>
+              ৳ {superQrLastPayment?.amount ? Number(superQrLastPayment.amount).toFixed(2) : '০.০০'}
+            </Text>
+
+            <View style={[styles.superQrSuccessDetailBox, isDark && { backgroundColor: currentTheme?.surfaceContainer || '#1F1F1F' }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={[{ fontSize: 12, color: COLORS.textMuted }, isDark && tStyles.textSecondary]}>গ্রাহক:</Text>
+                <Text style={[{ fontSize: 12, fontWeight: 'bold', color: COLORS.text }, isDark && tStyles.textPrimary]}>
+                  {superQrLastPayment?.fromName || 'সাধারণ কাস্টমার'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={[{ fontSize: 12, color: COLORS.textMuted }, isDark && tStyles.textSecondary]}>ওয়ালেট:</Text>
+                <Text style={[{ fontSize: 12, color: COLORS.text }, isDark && tStyles.textPrimary]}>
+                  {superQrLastPayment?.fromWallet || '০১৭১১০০০০০০'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={[{ fontSize: 12, color: COLORS.textMuted }, isDark && tStyles.textSecondary]}>মাধ্যম:</Text>
+                <Text style={[{ fontSize: 12, fontWeight: 'bold', color: '#B81414' }, isDark && { color: '#F87171' }]}>
+                  {superQrLastPayment?.typeName || 'bKash Payment'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={[{ fontSize: 11, color: COLORS.textMuted }, isDark && tStyles.textSecondary]}>ট্রানজ্যাকশন নং:</Text>
+                <Text style={[{ fontSize: 11, color: COLORS.textMuted, fontFamily: 'monospace' }, isDark && tStyles.textSecondary]}>
+                  {superQrLastPayment?.transactionNumber || 'BQR-000000'}
+                </Text>
+              </View>
+            </View>
+
+            <Button3D
+              title={tStatic("ঠিক আছে")}
+              variant="primary"
+              size="md"
+              isDark={isDark}
+              onPress={() => {
+                setSuperQrSuccessModal(false);
+                setModalBanglaQR(false);
+              }}
+              style={{ width: '100%', marginTop: 8 }}
+            />
           </View>
         </View>
       </Modal>
@@ -23663,7 +23875,127 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
 
-  // --- BANGLA QR MODAL ---
+  // --- BANGLA QR & SUPER QR MODAL ---
+  superQrModeContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 3,
+    marginVertical: 8,
+  },
+  superQrModeTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  superQrModeTabActive: {
+    backgroundColor: '#B81414',
+  },
+  superQrModeTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  superQrModeTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  superQrChipsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginVertical: 4,
+    justifyContent: 'center',
+  },
+  superQrChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    minHeight: 36,
+    justifyContent: 'center',
+  },
+  superQrChipActive: {
+    borderColor: '#B81414',
+    backgroundColor: '#FEF2F2',
+  },
+  superQrChipText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+  superQrChipTextActive: {
+    color: '#B81414',
+  },
+  superQrAmountInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    marginVertical: 4,
+    width: '100%',
+    minHeight: 44,
+  },
+  superQrAmountInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
+    paddingVertical: 6,
+  },
+  superQrBadgeStrip: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  superQrBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#EEF2FF',
+  },
+  superQrBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#3730A3',
+  },
+  superQrSuccessCard: {
+    alignItems: 'center',
+    padding: 20,
+    width: '100%',
+  },
+  superQrSuccessBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  superQrSuccessAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#15803D',
+    marginBottom: 4,
+  },
+  superQrSuccessDetailBox: {
+    width: '100%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 10,
+  },
   qrDisplayContainer: {
     alignItems: 'center',
     paddingVertical: 20,
