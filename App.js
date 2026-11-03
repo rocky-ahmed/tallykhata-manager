@@ -44,6 +44,8 @@ import * as biometricAuthModule from './src/biometricAuthService';
 const biometricAuthService = biometricAuthModule.biometricAuthService || biometricAuthModule.default || biometricAuthModule;
 import * as audioNoteModule from './src/audioNoteService';
 const audioNoteService = audioNoteModule.audioNoteService || audioNoteModule.default || audioNoteModule;
+import * as receiptImageModule from './src/receiptImageService';
+const receiptImageService = receiptImageModule.receiptImageService || receiptImageModule.default || receiptImageModule;
 import * as receiptScannerModule from './src/receiptScannerService';
 const receiptScannerService = receiptScannerModule.receiptScannerService || receiptScannerModule.default || receiptScannerModule;
 
@@ -823,6 +825,17 @@ function TallyKhataApp() {
   const [viewerRotation, setViewerRotation] = useState(0);
   const [currentDraftReceipt, setCurrentDraftReceipt] = useState(null);
   const [attachedReceipts, setAttachedReceipts] = useState({});
+
+  // --- ITERATION 218: OCR AUTO-FILL TRANSACTION FORM & CONFIDENCE STATES ---
+  const [detectedOcrData, setDetectedOcrData] = useState(null);
+  const [ocrSelectedFields, setOcrSelectedFields] = useState({
+    amount: true,
+    date: true,
+    voucher: true,
+    party: true,
+  });
+  const [txnAmount, setTxnAmount] = useState('');
+  const [txnNote, setTxnNote] = useState('');
 
   // --- ITERATION 216: AUDIO / VOICE NOTE & TAGADA MESSAGING STATES ---
   const [modalAudioRecord, setModalAudioRecord] = useState(false);
@@ -3607,18 +3620,35 @@ function TallyKhataApp() {
     setModalReceiptScanner(true);
   };
 
-  const handleCaptureReceiptPhoto = () => {
+  const handleCaptureReceiptPhoto = (customOcrText = null) => {
     try { hapticFeedbackService.impactMedium(); } catch (e) {}
     const mockUri = 'file:///storage/emulated/0/DCIM/Camera/RECEIPT_' + Date.now() + '.jpg';
     setScannerPhotoUri(mockUri);
     setScannerState('CAPTURED');
+
+    // Run OCR Inference on captured receipt
+    const defaultSampleOcr = 'মেসার্স করিম ট্রেডার্স\nক্যাশ মেমো নং: VCH-' + Math.floor(1000 + Math.random() * 9000) + '\nতারিখ: ০৩/১১/২০২৬\nমোট টাকা: ৳ ৫,০০০\nধন্যবাদ আবার আসবেন';
+    const textToInfer = typeof customOcrText === 'string' ? customOcrText : defaultSampleOcr;
+    const inferred = (receiptImageService && typeof receiptImageService.inferVoucherFields === 'function'
+      ? receiptImageService.inferVoucherFields(textToInfer)
+      : receiptScannerService.inferVoucherFields(textToInfer));
+    setDetectedOcrData(inferred);
+    setOcrSelectedFields({ amount: true, date: true, voucher: true, party: true });
   };
 
-  const handlePickReceiptGallery = () => {
+  const handlePickReceiptGallery = (customOcrText = null) => {
     try { hapticFeedbackService.selection(); } catch (e) {}
     const mockUri = 'file:///storage/emulated/0/DCIM/Gallery/RECEIPT_PICK_' + Date.now() + '.jpg';
     setScannerPhotoUri(mockUri);
     setScannerState('CAPTURED');
+
+    const defaultSampleOcr = 'মেসার্স আলম ব্রাদার্স\nরসিদ নং: MEMO-8812\nতারিখ: ০২/১১/২০২৬\nমোট টাকা: ৳ ৩,৫০০';
+    const textToInfer = typeof customOcrText === 'string' ? customOcrText : defaultSampleOcr;
+    const inferred = (receiptImageService && typeof receiptImageService.inferVoucherFields === 'function'
+      ? receiptImageService.inferVoucherFields(textToInfer)
+      : receiptScannerService.inferVoucherFields(textToInfer));
+    setDetectedOcrData(inferred);
+    setOcrSelectedFields({ amount: true, date: true, voucher: true, party: true });
   };
 
   const handleRotateReceipt = () => {
@@ -3632,6 +3662,69 @@ function TallyKhataApp() {
     setScannerPhotoUri(null);
     setScannerRotation(0);
     setScannerCropRect({ x: 0.05, y: 0.05, width: 0.9, height: 0.9 });
+    setDetectedOcrData(null);
+  };
+
+  const handleToggleOcrField = (fieldKey) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setOcrSelectedFields((prev) => Object.assign({}, prev, { [fieldKey]: !prev[fieldKey] }));
+  };
+
+  const handleApplyOcrToTransaction = () => {
+    if (!detectedOcrData) return;
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+
+    // 1. Populate Amount
+    if (detectedOcrData.amount !== null && ocrSelectedFields.amount) {
+      const amtStr = String(detectedOcrData.amount);
+      setTxnAmount(amtStr);
+      setCalcExpr(amtStr);
+      setCalcDisplay(formatMoney(detectedOcrData.amount));
+      setMoneyOutAmount(amtStr);
+    }
+
+    // 2. Populate Date
+    if (detectedOcrData.date && ocrSelectedFields.date) {
+      setTxnDate(detectedOcrData.date);
+    }
+
+    // 3. Populate Note / Description with Voucher & Party
+    const noteParts = [];
+    if (detectedOcrData.voucherNo && ocrSelectedFields.voucher) {
+      noteParts.push('মেমো: ' + detectedOcrData.voucherNo);
+    }
+    if (detectedOcrData.partyName && ocrSelectedFields.party) {
+      noteParts.push('পক্ষ: ' + detectedOcrData.partyName);
+    }
+    if (noteParts.length > 0) {
+      const finalNote = noteParts.join(' | ');
+      setTxnNote(finalNote);
+      setTxnDesc(finalNote);
+    }
+
+    // 4. Attach receipt to draft if in scanner
+    if (scannerPhotoUri) {
+      const newReceipt = receiptScannerService.createReceiptRecord({
+        uri: scannerPhotoUri,
+        rotation: scannerRotation,
+        cropRect: scannerCropRect,
+        txnId: scannerTargetTxn ? scannerTargetTxn.id : null,
+        accountId: selectedAccount ? selectedAccount.id : null,
+        businessId: currentBusinessId || 'biz_default',
+        fileSize: 245760,
+        ocrText: detectedOcrData.rawText,
+      });
+
+      if (scannerTargetTxn && scannerTargetTxn.id) {
+        setAttachedReceipts((prev) => Object.assign({}, prev, { [scannerTargetTxn.id]: newReceipt }));
+      } else {
+        setCurrentDraftReceipt(newReceipt);
+      }
+    }
+
+    setModalReceiptScanner(false);
+    setModalReceiptViewer(false);
+    Alert.alert(t('ocr_card_title'), t('ocr_amount_applied_toast'));
   };
 
   const handleSaveReceipt = () => {
@@ -3662,6 +3755,15 @@ function TallyKhataApp() {
     setActiveReceipt(receipt);
     setViewerZoom(1.0);
     setViewerRotation(receipt.rotation || 0);
+
+    const rawOcr = receipt.ocrText || (receipt.ocrData && receipt.ocrData.rawText) || receipt.rawText || (
+      'মেসার্স করিম ট্রেডার্স\nক্যাশ মেমো নং: ' + (receipt.id || 'VCH-101') + '\nতারিখ: ০৩/১১/২০২৬\nমোট টাকা: ৳ ৫,০০০'
+    );
+    const inferred = (receiptImageService && typeof receiptImageService.inferVoucherFields === 'function'
+      ? receiptImageService.inferVoucherFields(rawOcr)
+      : receiptScannerService.inferVoucherFields(rawOcr));
+    setDetectedOcrData(inferred);
+    setOcrSelectedFields({ amount: true, date: true, voucher: true, party: true });
     setModalReceiptViewer(true);
   };
 
@@ -4553,6 +4655,22 @@ function TallyKhataApp() {
       handleSaveReceipt,
       handleOpenReceiptViewer,
       handleDeleteReceipt,
+      // --- ITERATION 218: OCR AUTO-FILL HOOKS ---
+      detectedOcrData,
+      setDetectedOcrData,
+      ocrSelectedFields,
+      setOcrSelectedFields,
+      handleApplyOcrToTransaction,
+      handleToggleOcrField,
+      txnAmount,
+      setTxnAmount,
+      txnNote,
+      setTxnNote,
+      txnDate,
+      setTxnDate,
+      calcExpr,
+      calcDisplay,
+      txnDesc,
     };
   }
 
@@ -11729,34 +11847,198 @@ accessibilityLabel={
             overflow: 'hidden',
           }}>
             {scannerState === 'CAPTURED' || scannerState === 'CROPPING' ? (
-              <View style={{ width: '85%', height: '80%', alignItems: 'center', justifyContent: 'center' }}>
-                <View style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: 16,
-                  borderWidth: 2,
-                  borderColor: '#10B981',
-                  backgroundColor: '#1E293B',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  transform: [{ rotate: scannerRotation + 'deg' }],
-                }}>
-                  <Text style={{ fontSize: 48, marginBottom: 12 }}>🧾</Text>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC', textAlign: 'center', paddingHorizontal: 20 }}>
-                    {t('receipt_ocr_detect')}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
-                    {scannerPhotoUri ? scannerPhotoUri.split('/').pop() : ''}
-                  </Text>
+              <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={{ alignItems: 'center', paddingVertical: 12 }}>
+                <View style={{ width: '85%', height: 200, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                  <View style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: 16,
+                    borderWidth: 2,
+                    borderColor: '#10B981',
+                    backgroundColor: '#1E293B',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    transform: [{ rotate: scannerRotation + 'deg' }],
+                  }}>
+                    <Text style={{ fontSize: 42, marginBottom: 8 }}>🧾</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC', textAlign: 'center', paddingHorizontal: 20 }}>
+                      {t('receipt_ocr_detect')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>
+                      {scannerPhotoUri ? scannerPhotoUri.split('/').pop() : ''}
+                    </Text>
+                  </View>
+
+                  {/* 4 Crop Corner Handles Overlay */}
+                  <View style={{ position: 'absolute', top: 0, left: 0, width: 24, height: 24, borderTopWidth: 4, borderLeftWidth: 4, borderColor: '#34D399' }} />
+                  <View style={{ position: 'absolute', top: 0, right: 0, width: 24, height: 24, borderTopWidth: 4, borderRightWidth: 4, borderColor: '#34D399' }} />
+                  <View style={{ position: 'absolute', bottom: 0, left: 0, width: 24, height: 24, borderBottomWidth: 4, borderLeftWidth: 4, borderColor: '#34D399' }} />
+                  <View style={{ position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderBottomWidth: 4, borderRightWidth: 4, borderColor: '#34D399' }} />
                 </View>
 
-                {/* 4 Crop Corner Handles Overlay */}
-                <View style={{ position: 'absolute', top: 0, left: 0, width: 24, height: 24, borderTopWidth: 4, borderLeftWidth: 4, borderColor: '#34D399' }} />
-                <View style={{ position: 'absolute', top: 0, right: 0, width: 24, height: 24, borderTopWidth: 4, borderRightWidth: 4, borderColor: '#34D399' }} />
-                <View style={{ position: 'absolute', bottom: 0, left: 0, width: 24, height: 24, borderBottomWidth: 4, borderLeftWidth: 4, borderColor: '#34D399' }} />
-                <View style={{ position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderBottomWidth: 4, borderRightWidth: 4, borderColor: '#34D399' }} />
-              </View>
+                {/* OCR AUTO-DETECTED DATA CARD (ITERATION 218) */}
+                {detectedOcrData && (
+                  <View style={{
+                    width: '90%',
+                    backgroundColor: '#1E293B',
+                    borderRadius: 14,
+                    padding: 14,
+                    borderWidth: 1,
+                    borderColor: '#334155',
+                    elevation: 3,
+                    marginBottom: 10,
+                  }}>
+                    {/* Header with Title & Confidence Badge */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 16, marginRight: 6 }}>✨</Text>
+                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#F8FAFC' }}>
+                          {t('ocr_card_title')}
+                        </Text>
+                      </View>
+                      <View style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        backgroundColor: detectedOcrData.confidenceTier === 'high' ? '#064E3B' : (detectedOcrData.confidenceTier === 'medium' ? '#451A03' : '#334155'),
+                        borderColor: detectedOcrData.confidenceTier === 'high' ? '#10B981' : (detectedOcrData.confidenceTier === 'medium' ? '#F59E0B' : '#64748B'),
+                      }}>
+                        <Text style={{
+                          fontSize: 11,
+                          fontWeight: 'bold',
+                          color: detectedOcrData.confidenceTier === 'high' ? '#A7F3D0' : (detectedOcrData.confidenceTier === 'medium' ? '#FDE68A' : '#CBD5E1'),
+                        }}>
+                          {detectedOcrData.confidenceTier === 'high' ? t('ocr_confidence_high') :
+                           (detectedOcrData.confidenceTier === 'medium' ? t('ocr_confidence_med') : t('ocr_confidence_low'))}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* 4 Interactive Tap-to-Correct Chips */}
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                      {/* 1. Amount Chip */}
+                      <TouchableOpacity
+                        style={{
+                          width: '48%',
+                          backgroundColor: ocrSelectedFields.amount ? '#064E3B33' : '#0F172A',
+                          borderRadius: 10,
+                          paddingVertical: 8,
+                          paddingHorizontal: 10,
+                          marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor: ocrSelectedFields.amount ? '#10B981' : '#334155',
+                          minHeight: 48,
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => handleToggleOcrField('amount')}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('ocr_field_amount') + ': ' + detectedOcrData.amountFormatted}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontSize: 10, color: ocrSelectedFields.amount ? '#6EE7B7' : '#94A3B8', fontWeight: '600', marginBottom: 2 }}>
+                          {t('ocr_field_amount')} {ocrSelectedFields.amount ? '✓' : ''}
+                        </Text>
+                        <Text style={{ fontSize: 15, color: '#34D399', fontWeight: 'bold' }}>
+                          {detectedOcrData.amountFormatted || '—'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* 2. Date Chip */}
+                      <TouchableOpacity
+                        style={{
+                          width: '48%',
+                          backgroundColor: ocrSelectedFields.date ? '#064E3B33' : '#0F172A',
+                          borderRadius: 10,
+                          paddingVertical: 8,
+                          paddingHorizontal: 10,
+                          marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor: ocrSelectedFields.date ? '#10B981' : '#334155',
+                          minHeight: 48,
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => handleToggleOcrField('date')}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('ocr_field_date') + ': ' + (detectedOcrData.dateBn || detectedOcrData.date)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontSize: 10, color: ocrSelectedFields.date ? '#6EE7B7' : '#94A3B8', fontWeight: '600', marginBottom: 2 }}>
+                          {t('ocr_field_date')} {ocrSelectedFields.date ? '✓' : ''}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#F8FAFC', fontWeight: 'bold' }}>
+                          {detectedOcrData.dateBn || detectedOcrData.date || '—'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* 3. Voucher No Chip */}
+                      <TouchableOpacity
+                        style={{
+                          width: '48%',
+                          backgroundColor: ocrSelectedFields.voucher ? '#064E3B33' : '#0F172A',
+                          borderRadius: 10,
+                          paddingVertical: 8,
+                          paddingHorizontal: 10,
+                          marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor: ocrSelectedFields.voucher ? '#10B981' : '#334155',
+                          minHeight: 48,
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => handleToggleOcrField('voucher')}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('ocr_field_voucher') + ': ' + detectedOcrData.voucherNo}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontSize: 10, color: ocrSelectedFields.voucher ? '#6EE7B7' : '#94A3B8', fontWeight: '600', marginBottom: 2 }}>
+                          {t('ocr_field_voucher')} {ocrSelectedFields.voucher ? '✓' : ''}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#F8FAFC', fontWeight: 'bold' }} numberOfLines={1}>
+                          {detectedOcrData.voucherNo || '—'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* 4. Party Name Chip */}
+                      <TouchableOpacity
+                        style={{
+                          width: '48%',
+                          backgroundColor: ocrSelectedFields.party ? '#064E3B33' : '#0F172A',
+                          borderRadius: 10,
+                          paddingVertical: 8,
+                          paddingHorizontal: 10,
+                          marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor: ocrSelectedFields.party ? '#10B981' : '#334155',
+                          minHeight: 48,
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => handleToggleOcrField('party')}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('ocr_field_party') + ': ' + detectedOcrData.partyName}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontSize: 10, color: ocrSelectedFields.party ? '#6EE7B7' : '#94A3B8', fontWeight: '600', marginBottom: 2 }}>
+                          {t('ocr_field_party')} {ocrSelectedFields.party ? '✓' : ''}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#F8FAFC', fontWeight: 'bold' }} numberOfLines={1}>
+                          {detectedOcrData.partyName || '—'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Auto-fill Button */}
+                    <Button3D
+                      title={t('ocr_auto_fill_btn')}
+                      variant="success"
+                      size="md"
+                      isDark={true}
+                      onPress={handleApplyOcrToTransaction}
+                      style={{ marginTop: 6, width: '100%' }}
+                    />
+                  </View>
+                )}
+              </ScrollView>
             ) : (
               <View style={{ width: '85%', height: '75%', alignItems: 'center', justifyContent: 'center' }}>
                 {/* Viewfinder Target Frame */}
@@ -12028,6 +12310,161 @@ accessibilityLabel={
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* OCR Auto-Detected Data Card in Viewer (Iteration 218) */}
+          {detectedOcrData && (
+            <View style={{
+              marginHorizontal: 16,
+              marginBottom: 8,
+              backgroundColor: '#1E293B',
+              borderRadius: 14,
+              padding: 12,
+              borderWidth: 1,
+              borderColor: '#334155',
+              elevation: 3,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 15, marginRight: 6 }}>✨</Text>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#F8FAFC' }}>
+                    {t('ocr_card_title')}
+                  </Text>
+                </View>
+                <View style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  backgroundColor: detectedOcrData.confidenceTier === 'high' ? '#064E3B' : (detectedOcrData.confidenceTier === 'medium' ? '#451A03' : '#334155'),
+                  borderColor: detectedOcrData.confidenceTier === 'high' ? '#10B981' : (detectedOcrData.confidenceTier === 'medium' ? '#F59E0B' : '#64748B'),
+                }}>
+                  <Text style={{
+                    fontSize: 10,
+                    fontWeight: 'bold',
+                    color: detectedOcrData.confidenceTier === 'high' ? '#A7F3D0' : (detectedOcrData.confidenceTier === 'medium' ? '#FDE68A' : '#CBD5E1'),
+                  }}>
+                    {detectedOcrData.confidenceTier === 'high' ? t('ocr_confidence_high') :
+                     (detectedOcrData.confidenceTier === 'medium' ? t('ocr_confidence_med') : t('ocr_confidence_low'))}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                <TouchableOpacity
+                  style={{
+                    width: '48%',
+                    backgroundColor: ocrSelectedFields.amount ? '#064E3B33' : '#0F172A',
+                    borderRadius: 8,
+                    paddingVertical: 6,
+                    paddingHorizontal: 8,
+                    marginBottom: 6,
+                    borderWidth: 1,
+                    borderColor: ocrSelectedFields.amount ? '#10B981' : '#334155',
+                    minHeight: 44,
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => handleToggleOcrField('amount')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('ocr_field_amount') + ': ' + detectedOcrData.amountFormatted}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={{ fontSize: 9, color: ocrSelectedFields.amount ? '#6EE7B7' : '#94A3B8', fontWeight: '600' }}>
+                    {t('ocr_field_amount')} {ocrSelectedFields.amount ? '✓' : ''}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: '#34D399', fontWeight: 'bold' }}>
+                    {detectedOcrData.amountFormatted || '—'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    width: '48%',
+                    backgroundColor: ocrSelectedFields.date ? '#064E3B33' : '#0F172A',
+                    borderRadius: 8,
+                    paddingVertical: 6,
+                    paddingHorizontal: 8,
+                    marginBottom: 6,
+                    borderWidth: 1,
+                    borderColor: ocrSelectedFields.date ? '#10B981' : '#334155',
+                    minHeight: 44,
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => handleToggleOcrField('date')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('ocr_field_date') + ': ' + (detectedOcrData.dateBn || detectedOcrData.date)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={{ fontSize: 9, color: ocrSelectedFields.date ? '#6EE7B7' : '#94A3B8', fontWeight: '600' }}>
+                    {t('ocr_field_date')} {ocrSelectedFields.date ? '✓' : ''}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#F8FAFC', fontWeight: 'bold' }}>
+                    {detectedOcrData.dateBn || detectedOcrData.date || '—'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    width: '48%',
+                    backgroundColor: ocrSelectedFields.voucher ? '#064E3B33' : '#0F172A',
+                    borderRadius: 8,
+                    paddingVertical: 6,
+                    paddingHorizontal: 8,
+                    marginBottom: 6,
+                    borderWidth: 1,
+                    borderColor: ocrSelectedFields.voucher ? '#10B981' : '#334155',
+                    minHeight: 44,
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => handleToggleOcrField('voucher')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('ocr_field_voucher') + ': ' + detectedOcrData.voucherNo}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={{ fontSize: 9, color: ocrSelectedFields.voucher ? '#6EE7B7' : '#94A3B8', fontWeight: '600' }}>
+                    {t('ocr_field_voucher')} {ocrSelectedFields.voucher ? '✓' : ''}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#F8FAFC', fontWeight: 'bold' }} numberOfLines={1}>
+                    {detectedOcrData.voucherNo || '—'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    width: '48%',
+                    backgroundColor: ocrSelectedFields.party ? '#064E3B33' : '#0F172A',
+                    borderRadius: 8,
+                    paddingVertical: 6,
+                    paddingHorizontal: 8,
+                    marginBottom: 6,
+                    borderWidth: 1,
+                    borderColor: ocrSelectedFields.party ? '#10B981' : '#334155',
+                    minHeight: 44,
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => handleToggleOcrField('party')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('ocr_field_party') + ': ' + detectedOcrData.partyName}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={{ fontSize: 9, color: ocrSelectedFields.party ? '#6EE7B7' : '#94A3B8', fontWeight: '600' }}>
+                    {t('ocr_field_party')} {ocrSelectedFields.party ? '✓' : ''}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#F8FAFC', fontWeight: 'bold' }} numberOfLines={1}>
+                    {detectedOcrData.partyName || '—'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Button3D
+                title={t('ocr_auto_fill_btn')}
+                variant="success"
+                size="md"
+                isDark={true}
+                onPress={handleApplyOcrToTransaction}
+                style={{ marginTop: 4, width: '100%' }}
+              />
+            </View>
+          )}
 
           {/* Bottom Metadata & Action Panel */}
           <View style={{

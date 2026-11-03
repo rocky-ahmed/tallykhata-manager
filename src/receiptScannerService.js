@@ -376,6 +376,187 @@ ReceiptViewerController.prototype.close = function() {
   this.rotation = 0;
 };
 
+
+/**
+ * Invariant-backed OCR Voucher Fields Inference Engine (Iteration 218)
+ * Extracts and scores amount, date, voucher/memo number, and party name
+ * from raw OCR text with confidence scoring and tier classification.
+ *
+ * @param {string|object} rawInput - Raw OCR text string or receipt object
+ * @param {object} [options] - Optional override preferences
+ * @returns {object} Inferred voucher fields with confidence metadata
+ */
+function inferVoucherFields(rawInput, options) {
+  options = options || {};
+  let text = '';
+  if (typeof rawInput === 'string') {
+    text = rawInput;
+  } else if (rawInput && typeof rawInput === 'object') {
+    text = rawInput.ocrText || rawInput.ocr_text || rawInput.rawText || (rawInput.ocrData && rawInput.ocrData.rawText) || '';
+  }
+
+  if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    return {
+      amount: null,
+      amountFormatted: '',
+      amountFormattedEn: '',
+      candidateAmounts: [],
+      date: null,
+      dateBn: '',
+      voucherNo: null,
+      voucherNoBn: '',
+      partyName: null,
+      confidence: 0,
+      confidenceTier: 'low',
+      fieldConfidences: { amount: 0, date: 0, voucher: 0, party: 0 },
+      rawText: '',
+      isAutoDetected: false,
+    };
+  }
+
+  const cleanText = text.trim();
+  const asciiText = toAsciiDigits(cleanText);
+
+  // 1. Detect candidate amounts & primary amount
+  const candidateAmounts = [];
+  const lines = asciiText.split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
+  const origLines = cleanText.split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
+
+  let primaryAmount = null;
+  let amountMatchQuality = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const totalMatch = line.match(/(?:\u09ae\u09cb\u099f|\u09b8\u09b0\u09cd\u09ac\u09ae\u09cb\u099f|\u099f\u09be\u0995\u09be|total|grand\s*total|net\s*amount|bill\s*amount|paid|cash)[\s:\u09f3Tk\.]*([0-9,]+(?:\.[0-9]{1,2})?)/i);
+    if (totalMatch && totalMatch[1]) {
+      const cleanNum = parseFloat(totalMatch[1].replace(/,/g, ''));
+      if (!isNaN(cleanNum) && cleanNum > 0 && candidateAmounts.indexOf(cleanNum) === -1) {
+        candidateAmounts.push(cleanNum);
+      }
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const symbolMatches = line.match(/(?:\u09f3|Tk|TK|TK\.)[\s]*([0-9,]+(?:\.[0-9]{1,2})?)/gi);
+    if (symbolMatches) {
+      for (let j = 0; j < symbolMatches.length; j++) {
+        const numPart = symbolMatches[j].replace(/[^0-9.]/g, '');
+        const val = parseFloat(numPart);
+        if (!isNaN(val) && val > 0 && candidateAmounts.indexOf(val) === -1) {
+          candidateAmounts.push(val);
+        }
+      }
+    }
+  }
+
+  if (candidateAmounts.length === 0) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/(?:\u09ae\u09cb\u099f|total|grand|net|\u099c\u09ae\u09be|\u09aa\u09b0\u09bf\u09b6\u09cb\u09a7|due|\u09ac\u09be\u0995\u09bf|\u099f\u09be\u0995\u09be)/i.test(line)) {
+        const matches = line.match(/([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/g);
+        if (matches) {
+          for (let j = 0; j < matches.length; j++) {
+            const val = parseFloat(matches[j].replace(/,/g, ''));
+            if (!isNaN(val) && val > 0 && (val < 1900 || val > 2100) && candidateAmounts.indexOf(val) === -1) {
+              candidateAmounts.push(val);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (candidateAmounts.length > 0) {
+    primaryAmount = candidateAmounts[0];
+    amountMatchQuality = /(?:\u09ae\u09cb\u099f|\u09b8\u09b0\u09cd\u09ac\u09ae\u09cb\u099f|total|grand)/i.test(cleanText) ? 0.95 : 0.85;
+  }
+
+  // 2. Detect Date
+  let detectedDate = null;
+  let dateMatchQuality = 0;
+  const dateMatch = asciiText.match(/\b([0-9]{1,4}[-/.]\b[0-9]{1,2}[-/.]\b[0-9]{2,4})\b/);
+  if (dateMatch) {
+    detectedDate = dateMatch[1];
+    dateMatchQuality = 0.90;
+  }
+
+  // 3. Detect Voucher / Memo Number
+  let memoNumber = null;
+  let voucherMatchQuality = 0;
+  const memoMatch = cleanText.match(/(?:\u09ae\u09c7\u09ae\u09cb|\u09b0\u09b8\u09bf\u09a6|\u09b0\u09b6\u09bf\u09a6|\u099a\u09be\u09b2\u09be\u09a8|\u09ad\u09be\u098projected\u0989\u099a\u09be\u09b0|\u09ad\u09be\u0989\u099a\u09be\u09b0|memo|receipt|voucher|invoice|bill)(?:\s*(?:\u09a8\u0982|\u09a8\u09ae\u09cd\u09ac\u09b0|no|number|num))?[\s#\u2116:.-]*([A-Za-z0-9_-]+)/i);
+  if (memoMatch && memoMatch[1] && memoMatch[1].length >= 2) {
+    memoNumber = memoMatch[1].trim();
+    voucherMatchQuality = 0.85;
+  }
+
+  // 4. Detect Party / Customer / Vendor Name
+  let partyName = null;
+  let partyMatchQuality = 0;
+  const partyKeywords = /(?:\u09ae\u09c7\u09b8\u09be\u09b0\u09cd\u09b8|\u099f\u09cd\u09b0\u09c7\u09a1\u09be\u09b0\u09cd\u09b8|\u099f\u09cd\u09b0\u09c7\u09a1\u09bf\u0982|\u09b8\u09cd\u099f\u09cb\u09b0|\u098f\u09a8\u09cd\u099f\u09be\u09b0\u09aa\u09cd\u09b0\u09be\u0987\u099c|\u09a6\u09cb\u0995\u09be\u09a8|\u0995\u09cb\u09ae\u09cd\u09aa\u09be\u09a8\u09c0|\u09ab\u09be\u09b0\u09cd\u09ae|\u09ad\u09c7\u09a8\u09cd\u09a1\u09b0|\u0997\u09cd\u09b0\u09be\u09b9\u0995|\u0995\u09be\u09b8\u09cd\u099f\u09ae\u09be\u09b0|M\/S|Traders|Store|Enterprise|Shop|Co|Company)/i;
+  for (let i = 0; i < origLines.length; i++) {
+    const line = origLines[i];
+    if (partyKeywords.test(line)) {
+      const cleaned = line.replace(/^(?:\u0995\u09be\u09b8\u09cd\u099f\u09ae\u09be\u09b0|\u0997\u09cd\u09b0\u09be\u09b9\u0995|\u09a8\u09be\u09ae|\u0995\u09cd\u09b0\u09c7\u09a4\u09be|\u09ac\u09bf\u0995\u09cd\u09b0\u09c7\u09a4\u09be|Customer|Name|Party)[:\s-]*/i, '').trim();
+      if (cleaned.length >= 3 && !/^(?:\u09ae\u09c7\u09ae\u09cb|\u0995\u09cd\u09af\u09be\u09b6|\u09b0\u09b8\u09bf\u09a6|\u09a4\u09be\u09b0\u09bf\u0996|Date|Memo)/i.test(cleaned)) {
+        partyName = cleaned;
+        partyMatchQuality = 0.85;
+        break;
+      }
+    }
+  }
+
+  if (!partyName && origLines.length > 0) {
+    const firstLine = origLines[0];
+    if (firstLine.length >= 4 && !/^(?:\u0995\u09cd\u09af\u09be\u09b6\s*\u09ae\u09c7\u09ae\u09cb|\u09b0\u09b8\u09bf\u09a6|\u09ad\u09be\u0989\u099a\u09be\u09b0|Voucher|Receipt|Bill|Cash\s*Memo|Date|\u09a4\u09be\u09b0\u09bf\u0996)/i.test(firstLine)) {
+      partyName = firstLine;
+      partyMatchQuality = 0.65;
+    }
+  }
+
+  // 5. Confidence calculation
+  let score = 0;
+  if (primaryAmount !== null) score += 0.50 * amountMatchQuality;
+  if (detectedDate !== null) score += 0.25 * dateMatchQuality;
+  if (memoNumber !== null) score += 0.15 * voucherMatchQuality;
+  if (partyName !== null) score += 0.10 * partyMatchQuality;
+
+  const confidence = Math.min(0.98, Math.round(score * 100) / 100);
+  let confidenceTier = 'low';
+  if (confidence >= 0.85) {
+    confidenceTier = 'high';
+  } else if (confidence >= 0.60) {
+    confidenceTier = 'medium';
+  }
+
+  const amountFormatted = primaryAmount !== null ? ('৳ ' + toBengaliNumeral(primaryAmount.toLocaleString('en-US'))) : '';
+  const amountFormattedEn = primaryAmount !== null ? ('৳ ' + primaryAmount.toLocaleString('en-US')) : '';
+  const dateBn = detectedDate ? toBengaliNumeral(detectedDate) : '';
+  const voucherNoBn = memoNumber ? toBengaliNumeral(memoNumber) : '';
+
+  return {
+    amount: primaryAmount,
+    amountFormatted: amountFormatted,
+    amountFormattedEn: amountFormattedEn,
+    candidateAmounts: candidateAmounts,
+    date: detectedDate,
+    dateBn: dateBn,
+    voucherNo: memoNumber,
+    voucherNoBn: voucherNoBn,
+    partyName: partyName,
+    confidence: confidence,
+    confidenceTier: confidenceTier,
+    fieldConfidences: {
+      amount: primaryAmount !== null ? amountMatchQuality : 0,
+      date: detectedDate !== null ? dateMatchQuality : 0,
+      voucher: memoNumber !== null ? voucherMatchQuality : 0,
+      party: partyName !== null ? partyMatchQuality : 0,
+    },
+    rawText: cleanText,
+    isAutoDetected: Boolean(primaryAmount !== null || detectedDate !== null || memoNumber !== null),
+  };
+}
+
 module.exports = {
   RECEIPT_SCHEMA_VERSION: RECEIPT_SCHEMA_VERSION,
   MAX_RECEIPT_FILE_SIZE: MAX_RECEIPT_FILE_SIZE,
@@ -401,4 +582,8 @@ module.exports = {
   generateMockReceipt: generateMockReceipt,
   ReceiptScannerController: ReceiptScannerController,
   ReceiptViewerController: ReceiptViewerController,
+  inferVoucherFields: inferVoucherFields,
 };
+
+module.exports.receiptScannerService = module.exports;
+module.exports.default = module.exports;

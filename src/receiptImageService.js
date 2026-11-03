@@ -19,6 +19,39 @@ const DEFAULT_RECEIPT_DIR = 'receipt_images';
 const RECEIPT_PREFIX = 'TK_RCP_';
 const THUMBNAIL_PREFIX = 'TK_RCP_THUMB_';
 
+const CONFIDENCE_HIGH = 0.85;
+const CONFIDENCE_MEDIUM = 0.60;
+
+const BENGALI_MONTHS = Object.freeze({
+  'জানুয়ারি': 1, 'জানুয়ারি': 1,
+  'ফেব্রুয়ারি': 2, 'ফেব্রুয়ারি': 2,
+  'মার্চ': 3,
+  'এপ্রিল': 4,
+  'মে': 5,
+  'জুন': 6,
+  'জুলাই': 7,
+  'আগস্ট': 8, 'আগষ্ট': 8,
+  'সেপ্টেম্বর': 9,
+  'অক্টোবর': 10,
+  'নভেম্বর': 11,
+  'ডিসেম্বর': 12,
+});
+
+const ENGLISH_MONTHS = Object.freeze({
+  'january': 1, 'jan': 1,
+  'february': 2, 'feb': 2,
+  'march': 3, 'mar': 3,
+  'april': 4, 'apr': 4,
+  'may': 5,
+  'june': 6, 'jun': 6,
+  'july': 7, 'jul': 7,
+  'august': 8, 'aug': 8,
+  'september': 9, 'sep': 9, 'sept': 9,
+  'october': 10, 'oct': 10,
+  'november': 11, 'nov': 11,
+  'december': 12, 'dec': 12,
+});
+
 const SUPPORTED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/jpg',
@@ -183,6 +216,14 @@ function createReceiptImageMetadata(props = {}) {
   const thumbnailUri = props.thumbnailUri !== undefined ? props.thumbnailUri : (props.thumbnail !== undefined ? props.thumbnail : null);
 
   const ocrText = props.ocrText !== undefined ? props.ocrText : (props.ocr_text !== undefined ? props.ocr_text : null);
+  let ocrInference = props.ocrInference !== undefined ? props.ocrInference : null;
+  if (!ocrInference && ocrText && typeof ocrText === 'string' && ocrText.trim() !== '') {
+    try {
+      ocrInference = inferVoucherFields(ocrText);
+    } catch (_) {
+      ocrInference = null;
+    }
+  }
   const isSynced = Boolean(props.isSynced !== undefined ? props.isSynced : props.is_synced);
   const createdAt = props.createdAt || new Date().toISOString();
   const metadata = props.metadata && typeof props.metadata === 'object' ? { ...props.metadata } : {};
@@ -200,6 +241,7 @@ function createReceiptImageMetadata(props = {}) {
     journalId,
     businessId,
     ocrText,
+    ocrInference,
     isSynced,
     metadata,
     // Ergonomic compatibility aliases
@@ -209,6 +251,7 @@ function createReceiptImageMetadata(props = {}) {
     journal_id: journalId,
     business_id: businessId,
     ocr_text: ocrText,
+    ocr_inference: ocrInference,
     is_synced: isSynced,
     version: RECEIPT_IMAGE_SCHEMA_VERSION,
   };
@@ -560,7 +603,8 @@ function extractVoucherDetails(ocrText) {
   // 3. Extract Dates (Bengali and ASCII)
   const dateRegex = /\b(\d{1,4}[-/.]\d{1,2}[-/.]\d{2,4})\b/g;
   let dMatch;
-  while ((dMatch = dateRegex.exec(text)) !== null) {
+  const normalizedDateText = toAsciiDigits(text);
+  while ((dMatch = dateRegex.exec(normalizedDateText)) !== null) {
     detectedDates.push(dMatch[1]);
   }
 
@@ -571,7 +615,7 @@ function extractVoucherDetails(ocrText) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (/মোট|total|grand|net|জমা|পরিশোধ|paid|cash|due|বাকি|টাকা/i.test(trimmed)) {
-      const matches = trimmed.match(/([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/g);
+      const matches = trimmed.match(/(?:[0-9]{1,3}(?:,[0-9]{2,3})+(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/g);
       if (matches) {
         for (const m of matches) {
           const cleanNum = parseFloat(m.replace(/,/g, ''));
@@ -584,7 +628,7 @@ function extractVoucherDetails(ocrText) {
   }
 
   if (detectedAmounts.length === 0) {
-    const globalMatches = normalizedText.match(/\b([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\b/g);
+    const globalMatches = normalizedText.match(/\b(?:[0-9]{1,3}(?:,[0-9]{2,3})+(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\b/g);
     if (globalMatches) {
       for (const m of globalMatches) {
         const cleanNum = parseFloat(m.replace(/,/g, ''));
@@ -605,6 +649,438 @@ function extractVoucherDetails(ocrText) {
     keywords,
     rawText: text,
   };
+}
+
+
+/**
+ * Invariant-backed OCR Voucher Fields Inference Engine (Iteration 218)
+ * Extracts and scores amount, integer paisa, date, voucher/memo number, party name,
+ * and transaction type from raw OCR text with multi-factor confidence scoring.
+ *
+ * @param {string|object} rawInput - Raw OCR text string or receipt object
+ * @param {object} [options] - Optional override preferences
+ * @returns {object} Inferred voucher fields with confidence metadata
+ */
+function inferVoucherFields(rawInput, options = {}) {
+  options = options || {};
+  let text = '';
+  if (typeof rawInput === 'string') {
+    text = rawInput;
+  } else if (rawInput && typeof rawInput === 'object') {
+    text = rawInput.ocrText || rawInput.ocr_text || rawInput.rawText || (rawInput.ocrData && rawInput.ocrData.rawText) || '';
+  }
+
+  if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    return {
+      amount: null,
+      amountPaisa: 0,
+      amountFormatted: '',
+      amountFormattedEn: '',
+      candidateAmounts: [],
+      date: null,
+      dateBn: '',
+      voucherNo: null,
+      voucherNoBn: '',
+      partyName: null,
+      transactionType: null,
+      confidence: 0,
+      overallConfidence: 0,
+      confidenceTier: 'low',
+      isHighConfidence: false,
+      isMediumConfidence: false,
+      fieldConfidences: {
+        amount: 0,
+        date: 0,
+        voucherNo: 0,
+        partyName: 0,
+        transactionType: 0,
+        voucher: 0,
+        party: 0,
+      },
+      rawText: String(text || ''),
+      isAutoDetected: false,
+      candidates: {
+        amounts: [],
+        dates: [],
+        voucherNumbers: [],
+        parties: [],
+      },
+    };
+  }
+
+  const cleanText = text.trim();
+  const asciiText = toAsciiDigits(cleanText);
+  const lines = cleanText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  // 1. EXTRACT AMOUNTS & INTEGER PAISA
+  const amountCandidates = [];
+  for (let idx = 0; idx < lines.length; idx++) {
+    const rawLine = lines[idx];
+    const isDateLine = /(?:তারিখ|তাং|Date|Dated|Dt)[\s:.\-=]/i.test(rawLine);
+    const isVoucherLine = /(?:মেমো|রসিদ|চালান|ভাউচার|Memo|Receipt|Invoice|Bill|Challan)\s*(?:নং|no)?[\s:.\-=]/i.test(rawLine);
+    const hasCurrency = /(?:৳|টাকা|Tk\.?|BDT|\/[-=])/i.test(rawLine);
+
+    if ((isDateLine || isVoucherLine) && !hasCurrency) {
+      continue;
+    }
+
+    const isGrandTotal = /(?:সর্বমোট|গ্র্যান্ড\s*টোটাল|grand\s*total|net\s*total|মোট\s*টাকা|মোট\s*বিল|মোট\s*বকেয়া|মোট\s*বকেয়া)/i.test(rawLine);
+    const isTotal = /(?:মোট|total|বিল\s*টাকা|টাকার\s*পরিমাণ|মোট\s*মূল্য|নিট\s*পরিশোধ|net\s*amount)/i.test(rawLine);
+    const isDueOrPaid = /(?:বাকি|বাকী|দেনা|জমা|পরিশোধ|নগদ|paid|due|cash)/i.test(rawLine);
+
+    const asciiLine = toAsciiDigits(rawLine);
+    const matches = asciiLine.matchAll(/(?:৳|Tk\.?|BDT)?\s*\b([0-9]{1,3}(?:,[0-9]{2,3})+(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\b\s*(?:\/[-=]|\s*টাকা|\s*Tk\.?|\s*৳)?/gi);
+
+    for (const m of matches) {
+      const cleanNum = m[1].replace(/,/g, '');
+      const val = parseFloat(cleanNum);
+      if (isNaN(val) || val <= 0) continue;
+
+      if (!hasCurrency && (val >= 1990 && val <= 2050) && !isGrandTotal && !isTotal) {
+        continue;
+      }
+      if (val > 100000000 && !isGrandTotal) {
+        continue;
+      }
+
+      let priority = 1;
+      let conf = 0.50;
+
+      if (isGrandTotal) {
+        priority = 5;
+        conf = 0.95;
+      } else if (isTotal) {
+        priority = 4;
+        conf = 0.90;
+      } else if (isDueOrPaid && hasCurrency) {
+        priority = 3;
+        conf = 0.85;
+      } else if (hasCurrency) {
+        priority = 2;
+        conf = 0.75;
+      } else {
+        priority = 1;
+        conf = 0.50;
+      }
+
+      amountCandidates.push({
+        raw: m[0].trim(),
+        value: Math.round(val * 100) / 100,
+        paisa: Math.round(val * 100),
+        priority,
+        confidence: conf,
+        lineIndex: idx,
+        line: rawLine,
+      });
+    }
+  }
+
+  amountCandidates.sort((a, b) => {
+    if (b.priority !== a.priority) return b.priority - a.priority;
+    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+    return b.value - a.value;
+  });
+
+  const primaryAmount = amountCandidates.length > 0 ? amountCandidates[0].value : null;
+  const primaryAmountPaisa = primaryAmount !== null ? Math.round(primaryAmount * 100) : 0;
+  const amountMatchQuality = amountCandidates.length > 0 ? amountCandidates[0].confidence : 0;
+  const candidateAmounts = amountCandidates.map(c => c.value);
+
+  // 2. EXTRACT DATES
+  const dateCandidates = [];
+
+  for (const [mName, mNum] of Object.entries(BENGALI_MONTHS)) {
+    const regex = new RegExp('([০-৯0-9]{1,2})\\s+' + mName + '(?:\\s*,?\\s*([০-৯0-9]{2,4}))?', 'i');
+    const m = cleanText.match(regex);
+    if (m) {
+      const day = parseInt(toAsciiDigits(m[1]), 10);
+      let year = m[2] ? parseInt(toAsciiDigits(m[2]), 10) : new Date().getFullYear();
+      if (year < 100) year += 2000;
+      if (day >= 1 && day <= 31 && year >= 2000 && year <= 2099) {
+        const iso = `${year}-${String(mNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        dateCandidates.push({ raw: m[0], iso, confidence: 0.95 });
+      }
+    }
+  }
+
+  for (const [mName, mNum] of Object.entries(ENGLISH_MONTHS)) {
+    const regex1 = new RegExp('\\b([0-9]{1,2})\\s+' + mName + '(?:\\s*,?\\s*([0-9]{2,4}))?\\b', 'i');
+    const m1 = asciiText.match(regex1);
+    if (m1) {
+      const day = parseInt(m1[1], 10);
+      let year = m1[2] ? parseInt(m1[2], 10) : new Date().getFullYear();
+      if (year < 100) year += 2000;
+      if (day >= 1 && day <= 31 && year >= 2000 && year <= 2099) {
+        const iso = `${year}-${String(mNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        dateCandidates.push({ raw: m1[0], iso, confidence: 0.95 });
+      }
+    }
+    const regex2 = new RegExp('\\b' + mName + '\\s+([0-9]{1,2})(?:\\s*,?\\s*([0-9]{2,4}))?\\b', 'i');
+    const m2 = asciiText.match(regex2);
+    if (m2) {
+      const day = parseInt(m2[1], 10);
+      let year = m2[2] ? parseInt(m2[2], 10) : new Date().getFullYear();
+      if (year < 100) year += 2000;
+      if (day >= 1 && day <= 31 && year >= 2000 && year <= 2099) {
+        const iso = `${year}-${String(mNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        dateCandidates.push({ raw: m2[0], iso, confidence: 0.95 });
+      }
+    }
+  }
+
+  for (const line of lines) {
+    const isDateAnchor = /(?:তারিখ|তাং|Date|Dated|Dt)[\s:.\-=]+/i.test(line);
+    const lineAscii = toAsciiDigits(line);
+
+    const dMatch = lineAscii.match(/(?:তারিখ|তাং|Date|Dated|Dt)?[\s:.\-=]*\b([0-3]?[0-9])[-/.]([0-1]?[0-9])[-/.](20[0-9]{2}|19[0-9]{2}|[0-9]{2})\b/i);
+    if (dMatch) {
+      let day = parseInt(dMatch[1], 10);
+      let month = parseInt(dMatch[2], 10);
+      let year = parseInt(dMatch[3], 10);
+      if (year < 100) year += 2000;
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 2000 && year <= 2099) {
+        const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        dateCandidates.push({ raw: dMatch[0].trim(), iso, confidence: isDateAnchor ? 0.95 : 0.85 });
+      }
+    }
+
+    const yMatch = lineAscii.match(/\b(20[0-9]{2})[-/.]([0-1]?[0-9])[-/.]([0-3]?[0-9])\b/);
+    if (yMatch) {
+      let year = parseInt(yMatch[1], 10);
+      let month = parseInt(yMatch[2], 10);
+      let day = parseInt(yMatch[3], 10);
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 2000 && year <= 2099) {
+        const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        dateCandidates.push({ raw: yMatch[0].trim(), iso, confidence: isDateAnchor ? 0.95 : 0.85 });
+      }
+    }
+  }
+
+  dateCandidates.sort((a, b) => b.confidence - a.confidence);
+  const detectedDate = dateCandidates.length > 0 ? dateCandidates[0].iso : null;
+  const dateMatchQuality = dateCandidates.length > 0 ? dateCandidates[0].confidence : 0;
+
+  // 3. EXTRACT VOUCHER / MEMO NUMBER
+  const voucherCandidates = [];
+  for (const line of lines) {
+    const vMatch1 = line.match(/(?:ক্যাশ\s*মেমো|মেমো|রসিদ|রশিদ|চালান|ভাউচার|বিল|ইনভয়েস|Cash\s*Memo|Memo|Receipt|Voucher|Invoice|Bill|Challan|Chalan)\s*(?:নং|নম্বর|no\.?|num\.?|number|#)?[\s#:.\-=]+([A-Za-z0-9০-৯_\-\/]+)/i);
+    if (vMatch1 && vMatch1[1]) {
+      const v = vMatch1[1].trim();
+      if (v.length >= 1 && !/^(টাকা|মোট|তারিখ|Date)$/i.test(v)) {
+        voucherCandidates.push({ raw: v, confidence: 0.90 });
+      }
+    }
+    const vMatch2 = line.match(/(?:নং|নম্বর|no\.?|num\.?|number|#)[\s#:.\-=]+([A-Za-z0-9০-৯_\-\/]+)/i);
+    if (vMatch2 && vMatch2[1]) {
+      const v = vMatch2[1].trim();
+      if (v.length >= 1 && !/^(টাকা|মোট|তারিখ|Date)$/i.test(v)) {
+        voucherCandidates.push({ raw: v, confidence: 0.70 });
+      }
+    }
+  }
+
+  voucherCandidates.sort((a, b) => b.confidence - a.confidence);
+  const memoNumber = voucherCandidates.length > 0 ? voucherCandidates[0].raw : null;
+  const voucherMatchQuality = voucherCandidates.length > 0 ? voucherCandidates[0].confidence : 0;
+
+  // 4. EXTRACT PARTY / CUSTOMER / VENDOR NAME
+  const partyCandidates = [];
+  const customerPattern = /(?:ক্রেতার\s*নাম|গ্রাহকের\s*নাম|পার্টির\s*নাম|প্রাপকের\s*নাম|প্রাপক|গ্রাহক|ক্রেতা|Customer\s*Name|Party\s*Name|Recipient|Customer|Client|Billed\s*To|Sold\s*To)\s*[:.\-=]+\s*([^\r\n,;|]+)/i;
+  for (const line of lines) {
+    const m = line.match(customerPattern);
+    if (m && m[1]) {
+      const clean = m[1].trim().replace(/^[:.\-\s]+|[:.\-\s]+$/g, '');
+      if (clean.length >= 2 && !/^(ক্যাশ\s*মেমো|চালান|রসিদ|ভাউচার|বিল)$/i.test(clean)) {
+        partyCandidates.push({ raw: clean, confidence: 0.90 });
+      }
+    }
+  }
+
+  const namePattern = /(?:^|\s)নাম\s*[:.\-=]+\s*([^\r\n,;|]+)/i;
+  for (const line of lines) {
+    const m = line.match(namePattern);
+    if (m && m[1]) {
+      const clean = m[1].trim().replace(/^[:.\-\s]+|[:.\-\s]+$/g, '');
+      if (clean.length >= 2 && !/^(ক্যাশ\s*মেমো|চালান|রসিদ|ভাউচার|বিল|বাকি|জমা)$/i.test(clean)) {
+        partyCandidates.push({ raw: clean, confidence: 0.80 });
+      }
+    }
+  }
+
+  const messrsPattern = /(?:মেসার্স|M\/S\.?|Messrs\.?)\s*[:.\-]?[\s]*([^\r\n,;|]+)/i;
+  for (const line of lines) {
+    const m = line.match(messrsPattern);
+    if (m && m[0]) {
+      const clean = m[0].trim().replace(/^[:.\-\s]+|[:.\-\s]+$/g, '');
+      if (clean.length >= 4) {
+        partyCandidates.push({ raw: clean, confidence: 0.75 });
+      }
+    }
+  }
+
+  if (partyCandidates.length === 0 && lines.length > 0) {
+    const firstLine = lines[0];
+    if (firstLine.length >= 4 && !/^(?:ক্যাশ\s*মেমো|রসিদ|ভাউচার|চালান|Voucher|Receipt|Bill|Cash\s*Memo|Date|তারিখ)/i.test(firstLine)) {
+      partyCandidates.push({ raw: firstLine, confidence: 0.65 });
+    }
+  }
+
+  partyCandidates.sort((a, b) => b.confidence - a.confidence);
+  const partyName = partyCandidates.length > 0 ? partyCandidates[0].raw : null;
+  const partyMatchQuality = partyCandidates.length > 0 ? partyCandidates[0].confidence : 0;
+
+  // 5. INFER TRANSACTION TYPE
+  let expenseScore = 0;
+  let creditScore = 0;
+  let debitScore = 0;
+
+  if (/দোকান\s*খরচ|ব্যয়\s*খাত|ব্যয়\s*খাত|খরচের\s*খাত/i.test(cleanText)) expenseScore += 4;
+  if (/বিদ্যুৎ\s*বিল|দোকান\s*ভাড়া|দোকান\s*ভাড়া|কর্মচারীর\s*বেতন|যাতায়াত\s*খরচ|যাতায়াত\s*খরচ/i.test(cleanText)) expenseScore += 3;
+  if (/খরচ|ব্যয়|ব্যয়|বিল|expense|utility|rent|salary/i.test(cleanText)) expenseScore += 2;
+
+  if (/বাকি\s*বিক্রি|বাকি\s*চালান|মাল\s*বাবদ\s*বাকি|মোট\s*বকেয়া|মোট\s*বকেয়া/i.test(cleanText)) creditScore += 4;
+  if (/বাকি|বাকী|দেনা|বকেয়া|বকেয়া|দিলাম|due\s*amount|due|credit|payable/i.test(cleanText)) creditScore += 2;
+
+  if (/নগদ\s*গ্রহণ|নগদ\s*মেমো|ক্যাশ\s*মেমো|আদায়|আদায়|পেলাম/i.test(cleanText)) debitScore += 3;
+  if (/জমা|নগদ|পরিশোধ|paid|received|cash\s*memo|cash/i.test(cleanText)) debitScore += 2;
+
+  const maxScore = Math.max(expenseScore, creditScore, debitScore);
+  let transactionType = null;
+  let typeConfidence = 0;
+
+  if (maxScore > 0) {
+    if (expenseScore === maxScore) transactionType = 'expense';
+    else if (creditScore === maxScore) transactionType = 'credit';
+    else transactionType = 'debit';
+
+    const totalScore = expenseScore + creditScore + debitScore;
+    const ratio = maxScore / totalScore;
+    typeConfidence = Math.min(0.95, Math.max(0.50, Math.round((0.50 + 0.45 * ratio) * 100) / 100));
+  }
+
+  // 6. CONFIDENCE AGGREGATION
+  const fieldConfidences = {
+    amount: amountMatchQuality,
+    date: dateMatchQuality,
+    voucherNo: voucherMatchQuality,
+    partyName: partyMatchQuality,
+    transactionType: typeConfidence,
+    voucher: voucherMatchQuality,
+    party: partyMatchQuality,
+  };
+
+  const overallConfidence = Math.min(1.0, Math.round((
+    amountMatchQuality * 0.35 +
+    dateMatchQuality * 0.25 +
+    partyMatchQuality * 0.15 +
+    voucherMatchQuality * 0.15 +
+    typeConfidence * 0.10
+  ) * 100) / 100);
+
+  let confidenceTier = 'low';
+  if (overallConfidence >= CONFIDENCE_HIGH) {
+    confidenceTier = 'high';
+  } else if (overallConfidence >= CONFIDENCE_MEDIUM) {
+    confidenceTier = 'medium';
+  }
+
+  const isHigh = overallConfidence >= CONFIDENCE_HIGH;
+  const isMedium = overallConfidence >= CONFIDENCE_MEDIUM;
+
+  const amountFormatted = primaryAmount !== null ? ('৳ ' + toBengaliNumeral(primaryAmount.toLocaleString('en-US'))) : '';
+  const amountFormattedEn = primaryAmount !== null ? ('৳ ' + primaryAmount.toLocaleString('en-US')) : '';
+  const dateBn = detectedDate ? toBengaliNumeral(detectedDate) : '';
+  const voucherNoBn = memoNumber ? toBengaliNumeral(memoNumber) : '';
+
+  return {
+    amount: primaryAmount,
+    amountPaisa: primaryAmountPaisa,
+    amountFormatted,
+    amountFormattedEn,
+    candidateAmounts,
+    date: detectedDate,
+    dateBn,
+    voucherNo: memoNumber,
+    voucherNoBn,
+    partyName,
+    transactionType,
+    confidence: overallConfidence,
+    overallConfidence,
+    confidenceTier,
+    isHighConfidence: isHigh,
+    isMediumConfidence: isMedium,
+    fieldConfidences,
+    rawText: cleanText,
+    isAutoDetected: Boolean(primaryAmount !== null || detectedDate !== null || memoNumber !== null),
+    candidates: {
+      amounts: amountCandidates,
+      dates: dateCandidates,
+      voucherNumbers: voucherCandidates,
+      parties: partyCandidates,
+    },
+  };
+}
+
+/**
+ * Evaluates whether an OCR inference result meets high confidence threshold (>= 0.85).
+ *
+ * @param {object} inferred - Result from inferVoucherFields
+ * @returns {boolean}
+ */
+function isHighConfidence(inferred) {
+  if (!inferred || typeof inferred !== 'object') return false;
+  return Number(inferred.overallConfidence !== undefined ? inferred.overallConfidence : inferred.confidence) >= CONFIDENCE_HIGH;
+}
+
+/**
+ * Evaluates whether an OCR inference result meets medium confidence threshold (>= 0.60).
+ *
+ * @param {object} inferred - Result from inferVoucherFields
+ * @returns {boolean}
+ */
+function isMediumConfidence(inferred) {
+  if (!inferred || typeof inferred !== 'object') return false;
+  return Number(inferred.overallConfidence !== undefined ? inferred.overallConfidence : inferred.confidence) >= CONFIDENCE_MEDIUM;
+}
+
+/**
+ * Formats a human-readable summary of inferred voucher fields in Bengali or English.
+ *
+ * @param {object} inferred - Result from inferVoucherFields
+ * @param {object} [options]
+ * @param {'bn'|'en'} [options.language='bn']
+ * @returns {string}
+ */
+function formatInferredSummary(inferred, options = {}) {
+  if (!inferred || typeof inferred !== 'object') return '';
+  const lang = (options && (options.language || options.locale)) === 'en' ? 'en' : 'bn';
+
+  const amountVal = inferred.amount !== null && inferred.amount !== undefined ? inferred.amount : null;
+  const amountStr = amountVal !== null
+    ? (lang === 'bn' ? `৳${toBengaliNumeral(amountVal.toLocaleString('en-IN'))}` : `৳${amountVal.toLocaleString('en-IN')}`)
+    : (lang === 'bn' ? 'অজানা' : 'Unknown');
+
+  const dateVal = inferred.date || (lang === 'bn' ? 'তারিখবিহীন' : 'No Date');
+  const voucherVal = inferred.voucherNo || (lang === 'bn' ? 'মেমোবিহীন' : 'No Memo');
+  const partyVal = inferred.partyName || (lang === 'bn' ? 'পক্ষবিহীন' : 'No Party');
+
+  let typeLabel = lang === 'bn' ? 'অনির্দিষ্ট' : 'unspecified';
+  if (inferred.transactionType === 'credit') {
+    typeLabel = lang === 'bn' ? 'বাকি' : 'credit';
+  } else if (inferred.transactionType === 'debit') {
+    typeLabel = lang === 'bn' ? 'জমা' : 'debit';
+  } else if (inferred.transactionType === 'expense') {
+    typeLabel = lang === 'bn' ? 'খরচ' : 'expense';
+  }
+
+  const confVal = Math.round((Number(inferred.overallConfidence !== undefined ? inferred.overallConfidence : inferred.confidence) || 0) * 100);
+  const confStr = lang === 'bn' ? `${toBengaliNumeral(confVal)}%` : `${confVal}%`;
+
+  if (lang === 'bn') {
+    return `ভাউচার সারাংশ: পরিমাণ ${amountStr}, তারিখ: ${toBengaliNumeral(dateVal)}, মেমো নং: ${toBengaliNumeral(voucherVal)}, পক্ষ: ${partyVal}, ধরন: ${typeLabel} (নির্ভরযোগ্যতা: ${confStr})`;
+  } else {
+    return `Voucher Summary: Amount ${amountStr}, Date: ${dateVal}, Memo: ${voucherVal}, Party: ${partyVal}, Type: ${typeLabel} (Confidence: ${confStr})`;
+  }
 }
 
 // --- SCANNER STATE MACHINE ---
@@ -693,6 +1169,10 @@ const receiptImageService = {
   THUMBNAIL_PREFIX,
   SUPPORTED_MIME_TYPES,
   SCANNER_STATES,
+  CONFIDENCE_HIGH,
+  CONFIDENCE_MEDIUM,
+  BENGALI_MONTHS,
+  ENGLISH_MONTHS,
   toBengaliNumeral,
   toBengaliDigits,
   toAsciiDigits,
@@ -710,12 +1190,18 @@ const receiptImageService = {
   sanitizeReceiptImagesForBackup,
   calculateReceiptStorageUsage,
   extractVoucherDetails,
+  inferVoucherFields,
+  isHighConfidence,
+  isMediumConfidence,
+  formatInferredSummary,
   ReceiptScannerStateMachine,
   // Cross-worker interoperability aliases
   RECEIPT_SCHEMA_VERSION: RECEIPT_IMAGE_SCHEMA_VERSION,
   createReceiptRecord: createReceiptImageMetadata,
   validateReceipt: validateReceiptImage,
   parseVoucherOcrText: extractVoucherDetails,
+  inferVoucher: inferVoucherFields,
+  parseVoucherOcr: inferVoucherFields,
   receiptImageService: null,
   default: null,
 };

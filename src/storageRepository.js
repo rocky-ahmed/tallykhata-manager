@@ -45,6 +45,12 @@ const {
   cleanOrphanedReceiptImages,
   calculateThumbnailBounds,
   extractVoucherDetails,
+  inferVoucherFields,
+  isHighConfidence,
+  isMediumConfidence,
+  formatInferredSummary,
+  CONFIDENCE_HIGH,
+  CONFIDENCE_MEDIUM,
 } = receiptImageService || {};
 
 const {
@@ -526,8 +532,10 @@ class StorageRepository {
   constructor(storageAdapter = null) {
     if (storageAdapter && typeof storageAdapter === 'object' && storageAdapter.customStore) {
       this.adapter = storageAdapter.customStore;
+    } else if (storageAdapter && typeof storageAdapter === 'object' && typeof storageAdapter.getItem === 'function') {
+      this.adapter = storageAdapter;
     } else {
-      this.adapter = storageAdapter || this.createInMemoryAdapter();
+      this.adapter = this.createInMemoryAdapter();
     }
     this.currentStore = null;
     this.writeQueue = Promise.resolve();
@@ -536,6 +544,10 @@ class StorageRepository {
   }
 
   async initialize() {
+    return this.loadStore();
+  }
+
+  async initStore() {
     return this.loadStore();
   }
 
@@ -5220,6 +5232,16 @@ function getReceiptStorageMetricsRepo(businessId = null, options = {}, repo = de
   return { totalCount: 0, totalBytes: 0, averageFileSizeBytes: 0 };
 }
 
+function inferVoucherFieldsRepo(ocrText, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.inferVoucherFields === 'function') {
+    return repo.inferVoucherFields(ocrText, options);
+  }
+  if (receiptImageService && typeof receiptImageService.inferVoucherFields === 'function') {
+    return receiptImageService.inferVoucherFields(ocrText, options);
+  }
+  return null;
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -5299,6 +5321,12 @@ const repoExport = {
   deleteReceiptImagesForJournal: deleteReceiptImagesForJournalRepo,
   cleanOrphanedReceiptImages: cleanOrphanedReceiptImagesRepo,
   getReceiptStorageMetrics: getReceiptStorageMetricsRepo,
+  inferVoucherFields: inferVoucherFieldsRepo,
+  isHighConfidence: isHighConfidence || (receiptImageService ? receiptImageService.isHighConfidence : null),
+  isMediumConfidence: isMediumConfidence || (receiptImageService ? receiptImageService.isMediumConfidence : null),
+  formatInferredSummary: formatInferredSummary || (receiptImageService ? receiptImageService.formatInferredSummary : null),
+  CONFIDENCE_HIGH: CONFIDENCE_HIGH || 0.85,
+  CONFIDENCE_MEDIUM: CONFIDENCE_MEDIUM || 0.60,
   default: defaultRepository,
 };
 
@@ -5384,5 +5412,11 @@ if (typeof exports !== 'undefined') {
   exports.deleteReceiptImagesForJournal = deleteReceiptImagesForJournalRepo;
   exports.cleanOrphanedReceiptImages = cleanOrphanedReceiptImagesRepo;
   exports.getReceiptStorageMetrics = getReceiptStorageMetricsRepo;
+  exports.inferVoucherFields = inferVoucherFieldsRepo;
+  exports.isHighConfidence = isHighConfidence || (receiptImageService ? receiptImageService.isHighConfidence : null);
+  exports.isMediumConfidence = isMediumConfidence || (receiptImageService ? receiptImageService.isMediumConfidence : null);
+  exports.formatInferredSummary = formatInferredSummary || (receiptImageService ? receiptImageService.formatInferredSummary : null);
+  exports.CONFIDENCE_HIGH = CONFIDENCE_HIGH || 0.85;
+  exports.CONFIDENCE_MEDIUM = CONFIDENCE_MEDIUM || 0.60;
   exports.default = defaultRepository;
 }
