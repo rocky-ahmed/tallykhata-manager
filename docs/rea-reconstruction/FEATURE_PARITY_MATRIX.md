@@ -29,10 +29,11 @@
 | **FEAT-018** | Bengali Receipt OCR Inference & Auto-Fill | ML Kit Vision / ZXing / OCR text parsing, integer paisa extraction, auto-fill form | `src/receiptImageService.js`, `src/receiptScannerService.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-019** | Voucher PDF Generation & Thermal POS Printing | 13 PDF Report Builders, PdfShareUtil, FileProvider, ESC/POS Bluetooth driver | `src/voucherPdfService.js`, `src/thermalPrintService.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-020** | Super QR & Bangla QR Interoperable Payment Subsystem | SuperQRActivity, BanglaQrCaptureActivity, BanglaQrPaymentDto/ResponseDto, EMVCo Tag 00-63, CRC16-CCITT, 25x25 matrix | `src/banglaQrService.js`, `src/storageRepository.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
+| **FEAT-021** | TallyPay Wallet Add Money, Transaction Limits & Merchant QR Soundbox Notification Pipeline | AddMoneyActivity, AddMoneyFromNagad/Card/RocketActivity, activity_transaction_limit.xml, Bengali voice synthesis ("টাকা পেয়েছেন"), FIFO SoundboxQueueManager | `src/tallyPayService.js`, `src/soundboxService.js`, `src/storageRepository.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 
 ---
 
 ## 2. Verification Standards & Methodology
 1. **Integer Paisa Precision:** All monetary amounts calculate in exact integer paisa ($1\text{ Taka} = 100\text{ Paisa}$) with zero floating-point drift up to ৳100,000,000 single transactions.
 2. **Domain Isolation:** Strict separation between Business Accounting (`@tallykhata_state_v6`) and Personal Money Manager (`@tallykhata_personal_money_manager_v2`).
-3. **Automated Regression Suite:** 293 automated test suites (6,200+ passing assertions) verifying every parity dimension, including storage metrics, pagination, compaction, atomic rollback, packaging, and milestone synthesis (FEAT-001 through FEAT-020).
+3. **Automated Regression Suite:** 296 automated test suites (6,200+ passing assertions) verifying every parity dimension, including storage metrics, pagination, compaction, atomic rollback, packaging, and milestone synthesis (FEAT-001 through FEAT-020).

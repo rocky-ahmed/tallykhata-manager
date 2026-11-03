@@ -50,6 +50,10 @@ import * as receiptScannerModule from './src/receiptScannerService';
 const receiptScannerService = receiptScannerModule.receiptScannerService || receiptScannerModule.default || receiptScannerModule;
 import * as banglaQrModule from './src/banglaQrService';
 const banglaQrService = banglaQrModule.banglaQrService || banglaQrModule.default || banglaQrModule;
+import * as tallyPayModule from './src/tallyPayService';
+const tallyPayService = tallyPayModule.tallyPayService || tallyPayModule.default || tallyPayModule;
+import * as soundboxModule from './src/soundboxService';
+const soundboxService = soundboxModule.soundboxService || soundboxModule.default || soundboxModule;
 
 export const ThemeContext = React.createContext({
   theme: themeService.LIGHT_THEME,
@@ -3233,22 +3237,46 @@ function TallyKhataApp() {
       Alert.alert(tStatic("সতর্কতা"), tStatic("টাকার পরিমাণ দিন"));
       return;
     }
+
+    let channelKey = 'bkash';
+    const lowerMethod = (addMoneyMethod || '').toLowerCase();
+    if (lowerMethod.includes('nagad')) channelKey = 'nagad';
+    else if (lowerMethod.includes('rocket')) channelKey = 'rocket';
+    else if (lowerMethod.includes('upay')) channelKey = 'upay';
+    else if (lowerMethod.includes('card') || lowerMethod.includes('visa') || lowerMethod.includes('master')) channelKey = 'visa';
+    else if (lowerMethod.includes('bank')) channelKey = 'internet_banking';
+
+    const curTxns = storageRepository.currentStore?.walletTxns || [];
+    const validation = tallyPayService && typeof tallyPayService.validateAddMoney === 'function'
+      ? tallyPayService.validateAddMoney(amt, channelKey, curTxns)
+      : { valid: amt >= 10 && amt <= 50000, error: amt < 10 ? 'সর্বনিম্ন অ্যাড মানি ৳ ১০' : amt > 50000 ? 'সর্বোচ্চ অ্যাড মানি ৳ ৫০,০০০' : null };
+
+    if (!validation.valid) {
+      Alert.alert(tStatic("সীমাবদ্ধতা"), validation.error || tStatic("টাকার পরিমাণ সঠিক সীমার মধ্যে নয়"));
+      return;
+    }
+
     const newTxn = {
       id: generateUniqueId('w_'),
+      transactionNumber: `TP-ADD-${Date.now().toString().slice(-8)}`,
       title: `অ্যাড মানি (${addMoneyMethod})`,
       amount: amt,
       type: 'in',
       date: getTodayDate(),
       time: getTimeString(),
+      channelId: channelKey,
+      status: 'SUCCESS',
     };
     setIsSaving(true);
     const saveRes = await storageRepository.mutateStore((latestStore) => {
       const curBal = Number(latestStore.walletBalance) || 0;
       const curTxns = latestStore.walletTxns || [];
+      const addMoneyList = latestStore.tallyPayAddMoneyTxns || [];
       return {
         ...latestStore,
         walletBalance: curBal + amt,
         walletTxns: [newTxn, ...curTxns],
+        tallyPayAddMoneyTxns: [newTxn, ...addMoneyList],
       };
     });
     setIsSaving(false);
@@ -11299,6 +11327,31 @@ accessibilityLabel={
               </View>
             </View>
 
+            {/* Merchant QR Soundbox Voice Announcement Banner */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isDark ? '#14532D' : '#DCFCE7',
+              borderColor: isDark ? '#15803D' : '#86EFAC',
+              borderWidth: 1,
+              borderRadius: 8,
+              paddingVertical: 8,
+              paddingHorizontal: 10,
+              marginTop: 10,
+              marginBottom: 10,
+              width: '100%',
+            }}>
+              <Text style={{ fontSize: 18, marginRight: 8 }}>🔊</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#86EFAC' : '#15803D' }}>
+                  {t("soundbox_voice_banner_title") || "সাউন্ডবক্স অডিও ঘোষণা:"}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? '#BBF7D0' : '#166534', marginTop: 1 }}>
+                  {`"${superQrLastPayment?.typeName || 'পেমেন্ট'} ${t("soundbox_voice_received_prefix") || 'থেকে টাকা সফলভাবে জমা হয়েছে'}"`}
+                </Text>
+              </View>
+            </View>
+
             <Button3D
               title={tStatic("ঠিক আছে")}
               variant="primary"
@@ -11336,9 +11389,19 @@ accessibilityLabel={
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 8 }}>{tStatic("পেমেন্ট মাধ্যম বেছে নিন:")}</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              {['bKash', 'Nagad', 'Rocket', 'Bank Card'].map((m) => (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={[{ fontSize: 12, color: COLORS.textMuted }, isDark && tStyles.textSecondary]}>
+                {t("tallypay_select_channel") || tStatic("পেমেন্ট মাধ্যম বেছে নিন:")}
+              </Text>
+              <View style={{ backgroundColor: isDark ? '#14532D' : '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: isDark ? '#86EFAC' : '#15803D' }}>
+                  {t("tallypay_zero_fee") || "১০০% ফ্রি"}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 10 }}>
+              {['bKash', 'Nagad', 'Rocket', 'Upay', 'Visa / Card', 'Bank'].map((m) => (
                 <TouchableOpacity
                   key={m}
                   style={[styles.paymentMethodChip, addMoneyMethod === m && styles.paymentMethodChipActive]}
@@ -11349,7 +11412,7 @@ accessibilityLabel={
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
 
             <TextInput
               style={[styles.modalBigInput, isDark && tStyles.input]}
@@ -11361,6 +11424,38 @@ accessibilityLabel={
               onChangeText={setAddMoneyAmount}
             />
 
+            {/* Bengali Quick Amount Chips */}
+            <View style={{ flexDirection: 'row', gap: 6, marginVertical: 8, justifyContent: 'space-between' }}>
+              {[
+                { label: '৳১০০', val: '100' },
+                { label: '৳৫০০', val: '500' },
+                { label: '৳১,০০০', val: '1000' },
+                { label: '৳৫,০০০', val: '5000' },
+              ].map((chip) => (
+                <TouchableOpacity
+                  key={chip.val}
+                  style={{
+                    flex: 1,
+                    backgroundColor: isDark ? '#262626' : '#F3F4F6',
+                    borderColor: addMoneyAmount === chip.val ? '#0F8A0F' : (isDark ? '#404040' : '#E5E7EB'),
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    paddingVertical: 6,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setAddMoneyAmount(chip.val)}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: addMoneyAmount === chip.val ? '#0F8A0F' : (isDark ? '#E5E7EB' : '#374151') }}>
+                    {chip.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[{ fontSize: 10, color: COLORS.textMuted, textAlign: 'center', marginBottom: 12 }, isDark && tStyles.textSecondary]}>
+              {t("tallypay_min_limit_hint") || "সর্বনিম্ন অ্যাড মানি: ৳ ১০ • সর্বোচ্চ: ৳ ৫০,০০০"}
+            </Text>
+
             <View style={styles.modalBtnRow}>
               <Button3D
                 title={tStatic("বাতিল")}
@@ -11371,7 +11466,7 @@ accessibilityLabel={
                 style={{ flex: 1, marginRight: 8 }}
               />
               <Button3D
-                title={tStatic("অ্যাড মানি করুন")}
+                title={t("tallypay_add_money_btn") || tStatic("অ্যাড মানি করুন")}
                 variant="success"
                 size="md"
                 isDark={isDark}
@@ -17090,14 +17185,14 @@ accessibilityLabel={
               onPress={() => setTxnLimitTab('limits')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.txnLimitTabLabel, txnLimitTab === 'limits' && styles.txnLimitTabLabelActive]}>{tStatic("লিমিট                 লিমিট")}</Text>
+              <Text style={[styles.txnLimitTabLabel, txnLimitTab === 'limits' && styles.txnLimitTabLabelActive]}>{tStatic("লিমিট")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.txnLimitTabBtn, txnLimitTab === 'charges' && styles.txnLimitTabBtnActive]}
               onPress={() => setTxnLimitTab('charges')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.txnLimitTabLabel, txnLimitTab === 'charges' && styles.txnLimitTabLabelActive]}>{tStatic("চার্জ                 চার্জ")}</Text>
+              <Text style={[styles.txnLimitTabLabel, txnLimitTab === 'charges' && styles.txnLimitTabLabelActive]}>{tStatic("চার্জ")}</Text>
             </TouchableOpacity>
           </View>
 
@@ -17113,8 +17208,8 @@ accessibilityLabel={
                       resizeMode="contain"
                     />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#111827' }}>{tStatic("স্ট্যান্ডার্ড একাউন্ট                         স্ট্যান্ডার্ড একাউন্ট")}</Text>
-                      <Text style={{ fontSize: 12, color: '#4B5563', marginTop: 2 }}>{tStatic("জাতীয় পরিচয়পত্র ও ফেস ভেরিফিকেশন সম্পন্ন                         জাতীয় পরিচয়পত্র ও ফেস ভেরিফিকেশন সম্পন্ন")}</Text>
+                      <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#111827' }}>{tStatic("স্ট্যান্ডার্ড একাউন্ট")}</Text>
+                      <Text style={{ fontSize: 12, color: '#4B5563', marginTop: 2 }}>{tStatic("জাতীয় পরিচয়পত্র ও ফেস ভেরিফিকেশন সম্পন্ন")}</Text>
                     </View>
                     <View style={styles.txnLimitVerifiedBadge}>
                       <Text style={styles.txnLimitVerifiedText}>{tStatic("ভেরিফাইড")}</Text>
