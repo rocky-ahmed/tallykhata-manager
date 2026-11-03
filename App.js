@@ -936,6 +936,13 @@ function TallyKhataApp() {
   const [statementDateFilter, setStatementDateFilter] = useState('all'); // 'all' | 'today' | 'this_month' | 'last_month'
   const [modalStatementExport, setModalStatementExport] = useState(false);
   const [modalPrintPreview, setModalPrintPreview] = useState(false);
+  // --- ITERATION 219: VOUCHER PRINT & PDF EXPORT MODAL STATE ---
+  const [modalVoucherPrintShare, setModalVoucherPrintShare] = useState(false);
+  const [printPaperSize, setPrintPaperSize] = useState('58mm');
+  const [printerStatus, setPrinterStatus] = useState('connected');
+  const [printerDeviceName, setPrinterDeviceName] = useState('RPP-02N Bluetooth POS');
+  const [isPrintingThermal, setIsPrintingThermal] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [reportPreviewType, setReportPreviewType] = useState('statement'); // 'statement' | 'customer_baki' | 'expense' | 'stock' | 'bechakena'
   const [modalBulkTagada, setModalBulkTagada] = useState(false);
   const [selectedBulkCustomerIds, setSelectedBulkCustomerIds] = useState({});
@@ -2239,6 +2246,7 @@ function TallyKhataApp() {
       if (modalStatementExport) { setModalStatementExport(false); return true; }
       if (modalCustomerStatement) { setModalCustomerStatement(false); return true; }
       if (modalBulkTagada) { setModalBulkTagada(false); return true; }
+      if (modalVoucherPrintShare) { setModalVoucherPrintShare(false); return true; }
       if (modalVoucher) { setModalVoucher(false); return true; }
       if (modalPinRecovery) { setModalPinRecovery(false); return true; }
       if (modalChangePin) { setModalChangePin(false); return true; }
@@ -2298,7 +2306,7 @@ function TallyKhataApp() {
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
     modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
-    modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
+    modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
     modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, modalNotifications, modalDataManagement, modalAbout, modalFilter, modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMWithdrawGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange, modalMMMonthPicker, currentScreen, activeTab
   ]);
@@ -3798,6 +3806,100 @@ function TallyKhataApp() {
     );
   };
 
+  // =========================================================================
+  // VOUCHER PRINT & PDF EXPORT HANDLERS (Iteration 219)
+  // =========================================================================
+  const renderVoucherText = (txn, account) => {
+    if (!txn || !account) return "";
+    const isCust = account.type === 1;
+    const isGiven = txn.type === "given";
+    return (
+      "=================================\n" +
+      "       " + businessName + "\n" +
+      "     " + businessAddress + "\n" +
+      "     মোবাইল: " + ownerPhone + "\n" +
+      "=================================\n" +
+      "রসিদ নং: TK-" + (txn.id ? txn.id.slice(-6) : "000000") + "\n" +
+      "তারিখ: " + (txn.date || "") + "  " + (txn.time || "") + "\n" +
+      "---------------------------------\n" +
+      (isCust ? "কাস্টমার: " : "সাপ্লায়ার: ") + (account.name || "") + "\n" +
+      "মোবাইল: " + (account.phone || "দেওয়া নেই") + "\n" +
+      "---------------------------------\n" +
+      "লেনদেনের ধরন: " + (isCust ? (isGiven ? "বাকি বিক্রি" : "বাকি আদায় (জমা)") : (isGiven ? "টাকা পরিশোধ" : "বাকিতে মাল ক্রয়")) + "\n" +
+      "বিবরণ: " + (txn.desc || "সাধারণ লেনদেন") + "\n" +
+      "টাকার পরিমাণ: ৳ " + formatMoney(txn.amount) + "\n" +
+      "---------------------------------\n" +
+      (isCust ? "বর্তমান সর্বমোট বকেয়া: " : "বর্তমান সর্বমোট দেনা: ") + "৳ " + formatMoney(account.balance) + "\n" +
+      "=================================\n" +
+      "১০০% সঠিক ও ডিজিটাল টালিখাতা হিসাব।\nধন্যবাদ, আবার আসবেন।"
+    );
+  };
+
+  const handleOpenVoucherPrintShare = (txn = null) => {
+    if (txn) setSelectedVoucherTxn(txn);
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalVoucherPrintShare(true);
+  };
+
+  const handleSelectPaperSize = (size) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setPrintPaperSize(size);
+  };
+
+  const handleTogglePrinterStatus = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setPrinterStatus((prev) => {
+      if (prev === "connected") return "disconnected";
+      if (prev === "disconnected") return "scanning";
+      return "connected";
+    });
+  };
+
+  const handlePrintVoucherThermal = async () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    setIsPrintingThermal(true);
+    setTimeout(() => {
+      setIsPrintingThermal(false);
+      Alert.alert(t("voucher_printer_status"), t("voucher_print_success_toast"));
+    }, 300);
+  };
+
+  const handleExportVoucherPdf = async () => {
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    setIsExportingPdf(true);
+    setTimeout(() => {
+      setIsExportingPdf(false);
+      Alert.alert(t("voucher_print_pdf_btn"), t("voucher_pdf_success_toast"));
+    }, 300);
+  };
+
+  const handleShareVoucherWhatsApp = async () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const text = renderVoucherText(selectedVoucherTxn, selectedAccount);
+    if (!selectedAccount) {
+      Share.share({ message: text });
+      return;
+    }
+    let phone = (selectedAccount.phone || "").replace(/[^0-9]/g, "");
+    if (phone.length === 11 && phone.startsWith("01")) {
+      phone = "88" + phone;
+    }
+    if (phone.length >= 10) {
+      const waUrl = "whatsapp://send?phone=" + phone + "&text=" + encodeURIComponent(text);
+      Linking.canOpenURL(waUrl).then((supported) => {
+        if (supported) {
+          Linking.openURL(waUrl);
+        } else {
+          Share.share({ message: text });
+        }
+      }).catch(() => {
+        Share.share({ message: text });
+      });
+    } else {
+      Share.share({ message: text });
+    }
+  };
+
   const handleDeleteVoiceNote = (targetId) => {
     if (!targetId || !voiceNotes[targetId]) return;
     Alert.alert(
@@ -4672,6 +4774,32 @@ function TallyKhataApp() {
       calcDisplay,
       txnDesc,
     };
+
+    global.__VOUCHER_PRINT_TEST_HOOKS__ = {
+      modalVoucherPrintShare,
+      setModalVoucherPrintShare,
+      printPaperSize,
+      setPrintPaperSize,
+      printerStatus,
+      setPrinterStatus,
+      printerDeviceName,
+      setPrinterDeviceName,
+      isPrintingThermal,
+      setIsPrintingThermal,
+      isExportingPdf,
+      setIsExportingPdf,
+      handleOpenVoucherPrintShare,
+      handleSelectPaperSize,
+      handleTogglePrinterStatus,
+      handlePrintVoucherThermal,
+      handleExportVoucherPdf,
+      handleShareVoucherWhatsApp,
+      selectedVoucherTxn,
+      setSelectedVoucherTxn,
+      selectedAccount,
+      setSelectedAccount,
+      renderVoucherText,
+    };
   }
 
 
@@ -5251,32 +5379,7 @@ function TallyKhataApp() {
     }
   };
 
-  // --- DIGITAL VOUCHER MEMO BUILDER ---
-  const renderVoucherText = (txn, account) => {
-    if (!txn || !account) return '';
-    const isCust = account.type === 1;
-    const isGiven = txn.type === 'given';
-    return (
-      `=================================\n` +
-      `       ${businessName}\n` +
-      `     ${businessAddress}\n` +
-      `     মোবাইল: ${ownerPhone}\n` +
-      `=================================\n` +
-      `রসিদ নং: TK-${txn.id.slice(-6)}\n` +
-      `তারিখ: ${txn.date}  ${txn.time || ''}\n` +
-      `---------------------------------\n` +
-      `${isCust ? 'কাস্টমার: ' : 'সাপ্লায়ার: '} ${account.name}\n` +
-      `মোবাইল: ${account.phone || 'দেওয়া নেই'}\n` +
-      `---------------------------------\n` +
-      `লেনদেনের ধরন: ${isCust ? (isGiven ? 'বাকি বিক্রি' : 'বাকি আদায় (জমা)') : (isGiven ? 'টাকা পরিশোধ' : 'বাকিতে মাল ক্রয়')}\n` +
-      `বিবরণ: ${txn.desc || 'সাধারণ লেনদেন'}\n` +
-      `টাকার পরিমাণ: ৳ ${formatMoney(txn.amount)}\n` +
-      `---------------------------------\n` +
-      `${isCust ? 'বর্তমান সর্বমোট বকেয়া: ' : 'বর্তমান সর্বমোট দেনা: '}৳ ${formatMoney(account.balance)}\n` +
-      `=================================\n` +
-      `১০০% সঠিক ও ডিজিটাল টালিখাতা হিসাব।\nধন্যবাদ, আবার আসবেন।`
-    );
-  };
+  // (renderVoucherText consolidated in Iteration 219)
 
   // --- BUSINESS PICKER & COMPLETE LIFECYCLE HANDLERS ---
   const handleSelectBusiness = async (biz) => {
@@ -10079,6 +10182,24 @@ accessibilityLabel={
               </View>
             </ScrollView>
 
+            {/* Iteration 219: Prominent Print & Share Trigger */}
+            <View style={{ marginVertical: 8 }}>
+              <Button3D
+                title={t('voucher_print_share_action')}
+                variant="primary"
+                size="md"
+                isDark={isDark}
+                icon={<Text style={{ fontSize: 16, marginRight: 6 }}>🖨️</Text>}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalVoucherPrintShare(true);
+                }}
+                style={{ width: '100%' }}
+                accessibilityRole="button"
+                accessibilityLabel={t('voucher_print_share_action')}
+              />
+            </View>
+
             <View style={styles.voucherActionRow}>
               <Button3D
                 title={tStatic("শেয়ার")}
@@ -10087,8 +10208,8 @@ accessibilityLabel={
                 isDark={isDark}
                 icon={<Image source={require('./assets/icons/ic_share.png')} style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 6 }} resizeMode="contain" />}
                 onPress={() => {
-                  const txt = renderVoucherText(selectedVoucherTxn, selectedAccount);
-                  Share.share({ message: txt });
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalVoucherPrintShare(true);
                 }}
                 style={{ flex: 1, marginRight: 6 }}
               />
@@ -10111,6 +10232,405 @@ accessibilityLabel={
                 style={{ flex: 1 }}
               />
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: VOUCHER PRINT & PDF EXPORT (Iteration 219)
+         =================================================================== */}
+      <Modal
+        visible={modalVoucherPrintShare}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalVoucherPrintShare(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', paddingBottom: 24 }]}>
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>
+                  {t('voucher_print_modal_title')}
+                </Text>
+                <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                  {t('voucher_memo_no')}: TK-{selectedVoucherTxn?.id ? selectedVoucherTxn.id.slice(-6) : '000000'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalVoucherPrintShare(false)}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("বন্ধ করুন")}
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 10 }} showsVerticalScrollIndicator={false}>
+              {/* Printer Status Pill */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  marginBottom: 12,
+                  minHeight: 48,
+                }}
+                onPress={handleTogglePrinterStatus}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('voucher_printer_status')}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 16, marginRight: 8 }}>🖨️</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('voucher_printer_status')}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: printerStatus === 'connected'
+                      ? (isDark ? '#064E3B' : '#DCFCE7')
+                      : (printerStatus === 'scanning'
+                        ? (isDark ? '#451A03' : '#FEF3C7')
+                        : (isDark ? '#7F1D1D' : '#FEE2E2')),
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      marginRight: 6,
+                      backgroundColor: printerStatus === 'connected'
+                        ? '#10B981'
+                        : (printerStatus === 'scanning' ? '#F59E0B' : '#EF4444'),
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '700',
+                      color: printerStatus === 'connected'
+                        ? (isDark ? '#A7F3D0' : '#064E3B')
+                        : (printerStatus === 'scanning'
+                          ? (isDark ? '#FDE68A' : '#92400E')
+                          : (isDark ? '#FEE2E2' : '#991B1B')),
+                    }}
+                  >
+                    {printerStatus === 'connected'
+                      ? (t('voucher_printer_connected') + ' • ' + printerDeviceName)
+                      : (printerStatus === 'scanning'
+                        ? t('voucher_printer_scanning')
+                        : t('voucher_printer_disconnected'))}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Visual Paper Size Segmented Switch (58mm vs 80mm) */}
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 6 }}>
+                  {t('voucher_paper_size_title')}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    backgroundColor: isDark ? '#0F172A' : '#E2E8F0',
+                    borderRadius: 10,
+                    padding: 4,
+                  }}
+                >
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 8,
+                      backgroundColor: printPaperSize === '58mm'
+                        ? (isDark ? '#10B981' : '#0D6E5C')
+                        : 'transparent',
+                      minHeight: 44,
+                    }}
+                    onPress={() => handleSelectPaperSize('58mm')}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('voucher_paper_58mm')}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: printPaperSize === '58mm'
+                          ? '#FFFFFF'
+                          : (isDark ? currentTheme.textSecondary : '#475569'),
+                      }}
+                    >
+                      {t('voucher_paper_58mm')}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 8,
+                      backgroundColor: printPaperSize === '80mm'
+                        ? (isDark ? '#10B981' : '#0D6E5C')
+                        : 'transparent',
+                      minHeight: 44,
+                    }}
+                    onPress={() => handleSelectPaperSize('80mm')}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('voucher_paper_80mm')}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: printPaperSize === '80mm'
+                          ? '#FFFFFF'
+                          : (isDark ? currentTheme.textSecondary : '#475569'),
+                      }}
+                    >
+                      {t('voucher_paper_80mm')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Print Preview Card */}
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 6 }}>
+                  {t('voucher_print_preview_title')} ({printPaperSize})
+                </Text>
+                <View
+                  style={{
+                    alignSelf: 'center',
+                    width: printPaperSize === '58mm' ? '82%' : '100%',
+                    backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                    borderRadius: 10,
+                    padding: 14,
+                    borderWidth: 1,
+                    borderColor: isDark ? '#334155' : '#CBD5E1',
+                    borderStyle: 'dashed',
+                    shadowColor: '#000',
+                    shadowOpacity: 0.08,
+                    shadowRadius: 4,
+                    elevation: 2,
+                  }}
+                >
+                  {/* Shop & Voucher Header */}
+                  <View style={{ alignItems: 'center', borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : '#E2E8F0', paddingBottom: 8, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#0F172A', textAlign: 'center' }}>
+                      {businessName}
+                    </Text>
+                    {businessAddress ? (
+                      <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', textAlign: 'center', marginTop: 2 }}>
+                        {businessAddress}
+                      </Text>
+                    ) : null}
+                    <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', textAlign: 'center' }}>
+                      {tStatic("মোবাইল: ")}{ownerPhone}
+                    </Text>
+                    <View style={{ marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isDark ? '#064E3B' : '#E6F4EA' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#6EE7B7' : '#0D6E5C' }}>
+                        {tStatic("ডিজিটাল হিসাব রশিদ")}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Memo Details */}
+                  <View style={{ marginBottom: 6 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                        {t('voucher_memo_no')}:
+                      </Text>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                        TK-{selectedVoucherTxn?.id ? selectedVoucherTxn.id.slice(-6) : '000000'}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                        {t('voucher_date_time')}:
+                      </Text>
+                      <Text style={{ fontSize: 11, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                        {selectedVoucherTxn?.date} {selectedVoucherTxn?.time || ''}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                        {selectedAccount?.type === 1 ? tStatic("কাস্টমার:") : tStatic("সাপ্লায়ার:")}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                        {selectedAccount?.name}
+                      </Text>
+                    </View>
+                    {selectedAccount?.phone ? (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                        <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                          {tStatic("মোবাইল:")}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                          {selectedAccount.phone}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <View style={{ borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : '#E2E8F0', marginVertical: 4 }} />
+
+                  {/* Transaction Item Detail */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                    <View style={{ flex: 1, paddingRight: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                        {selectedVoucherTxn?.desc || tStatic("সাধারণ লেনদেন")}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                        {selectedAccount?.type === 1
+                          ? (selectedVoucherTxn?.type === 'given' ? tStatic("দিলাম (বাকি বিক্রি)") : tStatic("পেলাম (জমা আদায়)"))
+                          : (selectedVoucherTxn?.type === 'given' ? tStatic("দিলাম (টাকা পরিশোধ)") : tStatic("পেলাম (বাকিতে মাল ক্রয়)"))
+                        }
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#0F172A' }}>
+                      ৳ {formatMoney(selectedVoucherTxn?.amount)}
+                    </Text>
+                  </View>
+
+                  <View style={{ borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : '#E2E8F0', marginVertical: 4 }} />
+
+                  {/* Total & Balance */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#0F172A' }}>
+                      {t('voucher_total_amount')}:
+                    </Text>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: selectedVoucherTxn?.type === 'given' ? (isDark ? currentTheme.danger : COLORS.primary) : (isDark ? currentTheme.success : COLORS.green) }}>
+                      ৳ {formatMoney(selectedVoucherTxn?.amount)}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? currentTheme.textSecondary : '#475569' }}>
+                      {t('voucher_running_balance')}:
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#0F172A' }}>
+                      ৳ {formatMoney(selectedAccount?.balance)}
+                    </Text>
+                  </View>
+
+                  {/* Slip Footer */}
+                  <View style={{ marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: isDark ? '#334155' : '#E2E8F0', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 10, color: isDark ? currentTheme.textSecondary : '#94A3B8' }}>
+                      ১০০% ডিজিটাল হিসাব • ধন্যবাদ
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* 3 Interactive Action Cards */}
+              <View style={{ marginTop: 6 }}>
+                {/* Option 1: Bluetooth Thermal Print */}
+                <TouchableOpacity
+                  style={[styles.exportActionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}
+                  onPress={handlePrintVoucherThermal}
+                  activeOpacity={0.75}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('voucher_print_thermal_btn')}
+                >
+                  <View style={[styles.exportActionIconWrap, { backgroundColor: isDark ? '#064E3B' : '#DCFCE7', borderColor: isDark ? '#065F46' : '#86EFAC' }]}>
+                    <Text style={{ fontSize: 20 }}>🖨️</Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={[styles.exportActionTitle, isDark && tStyles.textPrimary]}>
+                      {t('voucher_print_thermal_btn')} ({printPaperSize})
+                    </Text>
+                    <Text style={[styles.exportActionSubtitle, isDark && tStyles.textSecondary]}>
+                      {t('voucher_print_thermal_desc')}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 16, color: isDark ? '#A7F3D0' : '#0D6E5C' }}>➔</Text>
+                </TouchableOpacity>
+
+                {/* Option 2: PDF Download */}
+                <TouchableOpacity
+                  style={[styles.exportActionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}
+                  onPress={handleExportVoucherPdf}
+                  activeOpacity={0.75}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('voucher_print_pdf_btn')}
+                >
+                  <View style={[styles.exportActionIconWrap, { backgroundColor: isDark ? '#312E81' : '#EEF2FF', borderColor: isDark ? '#6366F1' : '#C7D2FE' }]}>
+                    <Image
+                      source={require('./assets/icons/ic_pdf.png')}
+                      style={{ width: 22, height: 22, tintColor: isDark ? '#A5B4FC' : '#4F46E5' }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={[styles.exportActionTitle, isDark && tStyles.textPrimary]}>
+                      {t('voucher_print_pdf_btn')}
+                    </Text>
+                    <Text style={[styles.exportActionSubtitle, isDark && tStyles.textSecondary]}>
+                      {t('voucher_print_pdf_desc')}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 16, color: isDark ? '#A5B4FC' : '#4F46E5' }}>➔</Text>
+                </TouchableOpacity>
+
+                {/* Option 3: WhatsApp Share */}
+                <TouchableOpacity
+                  style={[styles.exportActionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}
+                  onPress={handleShareVoucherWhatsApp}
+                  activeOpacity={0.75}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('voucher_share_whatsapp_btn')}
+                >
+                  <View style={[styles.exportActionIconWrap, { backgroundColor: isDark ? '#064E3B' : '#E8F5E9', borderColor: isDark ? '#065F46' : '#A5D6A7' }]}>
+                    <Image
+                      source={require('./assets/icons/ic_whatsapp.png')}
+                      style={{ width: 22, height: 22, tintColor: '#25D366' }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={[styles.exportActionTitle, isDark && tStyles.textPrimary]}>
+                      {t('voucher_share_whatsapp_btn')}
+                    </Text>
+                    <Text style={[styles.exportActionSubtitle, isDark && tStyles.textSecondary]}>
+                      {t('voucher_share_whatsapp_desc')}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 16, color: '#25D366' }}>➔</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

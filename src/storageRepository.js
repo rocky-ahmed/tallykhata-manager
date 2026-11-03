@@ -36,6 +36,16 @@ try {
   receiptImageService = require('./receiptImageService');
 } catch (e) {}
 
+let voucherPdfService = null;
+try {
+  voucherPdfService = require('./voucherPdfService');
+} catch (e) {}
+
+let thermalPrintService = null;
+try {
+  thermalPrintService = require('./thermalPrintService');
+} catch (e) {}
+
 const {
   createReceiptImageMetadata,
   validateReceiptImage,
@@ -121,6 +131,7 @@ const VALID_COLLECTIONS = new Set([
   'tagadaLogs',
   'audioNotes',
   'receiptImages',
+  'voucherPrintLogs',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -318,6 +329,7 @@ function createDefaultState() {
     tagadaLogs: [],
     audioNotes: [],
     receiptImages: [],
+    voucherPrintLogs: [],
     version: 6,
   };
 }
@@ -1328,6 +1340,13 @@ class StorageRepository {
           });
     }
 
+    if (authoritative.voucherPrintLogs && Array.isArray(authoritative.voucherPrintLogs)) {
+      authoritative.voucherPrintLogs = authoritative.voucherPrintLogs.map((v) => {
+        const { buffer, rawBytes, data, ...rest } = v || {};
+        return rest;
+      });
+    }
+
     const domains = (extraState && Array.isArray(extraState.domains) && extraState.domains.length > 0)
       ? extraState.domains
       : ['all'];
@@ -1834,6 +1853,7 @@ class StorageRepository {
       const audioNotes = (prevStore.audioNotes || []).filter((a) => getBizId(a) !== targetId);
       const receiptsToPurge = (prevStore.receiptImages || []).filter((r) => getBizId(r) === targetId);
       const receiptImages = (prevStore.receiptImages || []).filter((r) => getBizId(r) !== targetId);
+      const voucherPrintLogs = (prevStore.voucherPrintLogs || []).filter((v) => getBizId(v) !== targetId);
 
       // Clean up physical audio files of deleted business
       if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
@@ -1897,6 +1917,7 @@ class StorageRepository {
         tagadaLogs,
         audioNotes,
         receiptImages,
+        voucherPrintLogs,
         cashReconciliation,
       };
     });
@@ -2035,6 +2056,7 @@ class StorageRepository {
         const importedNotes = (data.notes || []).filter(n => String(n.businessId || '1') === selectedBizId);
         const importedAudio = (data.audioNotes || []).filter(a => String(a.businessId || '1') === selectedBizId);
         const importedReceipts = (data.receiptImages || []).filter(r => String(r.businessId || '1') === selectedBizId);
+        const importedVouchers = (data.voucherPrintLogs || []).filter(v => String(v.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -2043,6 +2065,7 @@ class StorageRepository {
         const keptNotes = (prevStore.notes || []).filter(n => String(n.businessId || '1') !== selectedBizId);
         const keptAudio = (prevStore.audioNotes || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptReceipts = (prevStore.receiptImages || []).filter(r => String(r.businessId || '1') !== selectedBizId);
+        const keptVouchers = (prevStore.voucherPrintLogs || []).filter(v => String(v.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2061,6 +2084,7 @@ class StorageRepository {
           notes: [...keptNotes, ...importedNotes],
           audioNotes: [...keptAudio, ...importedAudio],
           receiptImages: [...keptReceipts, ...importedReceipts],
+          voucherPrintLogs: [...keptVouchers, ...importedVouchers],
           version: 6,
           lastRestoredAt: new Date().toISOString(),
           restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -2371,6 +2395,10 @@ class StorageRepository {
   }
 
   async exportAllData(extraState = {}, options = {}) {
+    return this.createStorageBackup(extraState, options);
+  }
+
+  async exportBackupPayload(extraState = {}, options = {}) {
     return this.createStorageBackup(extraState, options);
   }
 
@@ -4131,6 +4159,16 @@ class StorageRepository {
         return biz === targetBizId && accTxnIds.includes(String(r.journalId));
       });
 
+      // Find voucher print logs to remove (attached to any of the purged journals or this account)
+      const curVouchers = latestStore.voucherPrintLogs || [];
+      const purgedVoucherLogs = curVouchers.filter((v) => {
+        const biz = getBizId(v);
+        const matchesJournal = v.journalId && accTxnIds.includes(String(v.journalId));
+        const matchesAccount = v.accountId && String(v.accountId) === targetAccId;
+        return biz === targetBizId && (matchesJournal || matchesAccount);
+      });
+      const updatedVouchers = curVouchers.filter((v) => !purgedVoucherLogs.some((p) => p.id === v.id));
+
       const updatedAccounts = curAccounts.filter((a) => !(String(a.id) === targetAccId && getBizId(a) === targetBizId));
       const updatedJournals = curJournals.filter((j) => !(String(j.accountId) === targetAccId && getBizId(j) === targetBizId));
       const updatedCash = curCash.filter((c) => !accTxnIds.includes(String(c.transactionId || c.txnId || c.id)));
@@ -4144,6 +4182,7 @@ class StorageRepository {
         cashEntries: updatedCash,
         audioNotes: updatedAudio,
         receiptImages: updatedReceipts,
+        voucherPrintLogs: updatedVouchers,
       };
     });
 
@@ -4453,6 +4492,119 @@ class StorageRepository {
       totalBytes,
       averageFileSizeBytes: list.length > 0 ? Math.round(totalBytes / list.length) : 0,
     };
+  }
+
+  /**
+   * Logs a voucher print, export, or share event.
+   * Persists atomically in the 'voucherPrintLogs' collection under writeQueue mutex.
+   *
+   * @param {object} printEvent - Voucher print/export event data
+   * @param {object} [options] - Options (businessId, etc.)
+   * @returns {Promise<{ success: boolean, log?: object, error?: any }>}
+   */
+  async logVoucherPrintExport(printEvent, options = {}) {
+    if (!printEvent || typeof printEvent !== 'object') {
+      return { success: false, error: new Error('Print event must be an object') };
+    }
+
+    const bizId = String(options.businessId || printEvent.businessId || printEvent.business_id || this.currentStore?.activeBusinessId || '1');
+    const normalizedLog = {
+      id: printEvent.id || `vpl_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      voucherNo: String(printEvent.voucherNo || printEvent.voucherNumber || 'VCH-001'),
+      voucherType: String(printEvent.voucherType || printEvent.type || 'CASH_MEMO'),
+      format: String(printEvent.format || 'pdf'),
+      destination: String(printEvent.destination || 'print'),
+      status: String(printEvent.status || 'success'),
+      timestamp: printEvent.timestamp || new Date().toISOString(),
+      businessId: bizId,
+      journalId: printEvent.journalId !== undefined && printEvent.journalId !== null ? String(printEvent.journalId) : null,
+      accountId: printEvent.accountId !== undefined && printEvent.accountId !== null ? String(printEvent.accountId) : null,
+      printBytes: Number(printEvent.printBytes || printEvent.byteLength || 0),
+      metadata: typeof printEvent.metadata === 'object' && printEvent.metadata !== null ? printEvent.metadata : {},
+    };
+
+    const res = await this.mutateCollection('voucherPrintLogs', (list) => {
+      const existingIndex = list.findIndex((l) => l.id === normalizedLog.id);
+      if (existingIndex >= 0) {
+        const updated = [...list];
+        updated[existingIndex] = normalizedLog;
+        return updated;
+      }
+      return [...list, normalizedLog];
+    });
+
+    if (!res.success) {
+      return { success: false, error: res.error };
+    }
+
+    return { success: true, log: normalizedLog };
+  }
+
+  /**
+   * Retrieves all voucher print logs matching a voucher number or journal ID for a business.
+   *
+   * @param {string|number} voucherNoOrJournalId - Voucher number or journal ID
+   * @param {string|number} [businessId=null] - Scoped business ID
+   * @returns {Array<object>} Matching voucher print logs
+   */
+  getVoucherPrintLogs(voucherNoOrJournalId, businessId = null) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.voucherPrintLogs) ? store.voucherPrintLogs : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const targetQuery = String(voucherNoOrJournalId !== undefined && voucherNoOrJournalId !== null ? voucherNoOrJournalId : '');
+
+    return list.filter((log) => {
+      if (!log) return false;
+      const logBiz = String(log.businessId || log.business_id || '1');
+      if (logBiz !== targetBizId) return false;
+      return String(log.voucherNo || '') === targetQuery || String(log.journalId || '') === targetQuery;
+    });
+  }
+
+  /**
+   * Retrieves all voucher print logs scoped to a specific business.
+   *
+   * @param {string|number} [businessId=null] - Business ID
+   * @returns {Array<object>} All voucher print logs for the business
+   */
+  getVoucherPrintLogsForBusiness(businessId = null) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.voucherPrintLogs) ? store.voucherPrintLogs : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    return list.filter((log) => {
+      if (!log) return false;
+      const logBiz = String(log.businessId || log.business_id || '1');
+      return logBiz === targetBizId;
+    });
+  }
+
+  /**
+   * Deletes a specific voucher print log by ID.
+   *
+   * @param {string} logId - Voucher print log ID
+   * @returns {Promise<{ success: boolean, deletedLog?: object, error?: any }>}
+   */
+  async deleteVoucherPrintLog(logId) {
+    if (!logId) {
+      return { success: false, error: new Error('logId is required') };
+    }
+
+    let deletedLog = null;
+    const res = await this.mutateCollection('voucherPrintLogs', (list) => {
+      const target = list.find((l) => l.id === logId);
+      if (target) {
+        deletedLog = target;
+        return list.filter((l) => l.id !== logId);
+      }
+      return list;
+    });
+
+    if (!res.success) {
+      return { success: false, error: res.error };
+    }
+
+    return { success: true, deletedLog };
   }
 }
 
@@ -5242,6 +5394,34 @@ function inferVoucherFieldsRepo(ocrText, options = {}, repo = defaultRepository)
   return null;
 }
 
+async function logVoucherPrintExportRepo(printEvent, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.logVoucherPrintExport === 'function') {
+    return repo.logVoucherPrintExport(printEvent, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getVoucherPrintLogsRepo(voucherNoOrJournalId, businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getVoucherPrintLogs === 'function') {
+    return repo.getVoucherPrintLogs(voucherNoOrJournalId, businessId);
+  }
+  return [];
+}
+
+function getVoucherPrintLogsForBusinessRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getVoucherPrintLogsForBusiness === 'function') {
+    return repo.getVoucherPrintLogsForBusiness(businessId);
+  }
+  return [];
+}
+
+async function deleteVoucherPrintLogRepo(logId, repo = defaultRepository) {
+  if (repo && typeof repo.deleteVoucherPrintLog === 'function') {
+    return repo.deleteVoucherPrintLog(logId);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -5327,6 +5507,12 @@ const repoExport = {
   formatInferredSummary: formatInferredSummary || (receiptImageService ? receiptImageService.formatInferredSummary : null),
   CONFIDENCE_HIGH: CONFIDENCE_HIGH || 0.85,
   CONFIDENCE_MEDIUM: CONFIDENCE_MEDIUM || 0.60,
+  voucherPdfService,
+  thermalPrintService,
+  logVoucherPrintExport: logVoucherPrintExportRepo,
+  getVoucherPrintLogs: getVoucherPrintLogsRepo,
+  getVoucherPrintLogsForBusiness: getVoucherPrintLogsForBusinessRepo,
+  deleteVoucherPrintLog: deleteVoucherPrintLogRepo,
   default: defaultRepository,
 };
 
@@ -5418,5 +5604,11 @@ if (typeof exports !== 'undefined') {
   exports.formatInferredSummary = formatInferredSummary || (receiptImageService ? receiptImageService.formatInferredSummary : null);
   exports.CONFIDENCE_HIGH = CONFIDENCE_HIGH || 0.85;
   exports.CONFIDENCE_MEDIUM = CONFIDENCE_MEDIUM || 0.60;
+  exports.voucherPdfService = voucherPdfService;
+  exports.thermalPrintService = thermalPrintService;
+  exports.logVoucherPrintExport = logVoucherPrintExportRepo;
+  exports.getVoucherPrintLogs = getVoucherPrintLogsRepo;
+  exports.getVoucherPrintLogsForBusiness = getVoucherPrintLogsForBusinessRepo;
+  exports.deleteVoucherPrintLog = deleteVoucherPrintLogRepo;
   exports.default = defaultRepository;
 }

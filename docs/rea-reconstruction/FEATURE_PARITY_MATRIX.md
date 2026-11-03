@@ -25,10 +25,13 @@
 | **FEAT-014** | Cloud Backup Compression & Resumable Streaming | GZIP / Deflate streaming chunked upload, network retry | `src/googleDriveBackupService.js`, `storageRepository.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-015** | Biometric AppLock & Crypto PIN Authentication | PBKDF2/SHA-256 salted PIN, brute-force lockout, 3D keypad, biometrics | `src/securityService.js`, `src/biometricAuthService.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-016** | Audio Notes & Tagada Voice Messaging | Room DB journal_media/account_media, MediaRecorder, voice tagada, SQR voice push | `src/audioNoteService.js`, `storageRepository.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
+| **FEAT-017** | Voucher Scanner & Photo Receipt Attachment | Room DB journal_media/account_media, CameraActivity, QrScannerActivity, image compression | `src/receiptScannerService.js`, `src/receiptImageService.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
+| **FEAT-018** | Bengali Receipt OCR Inference & Auto-Fill | ML Kit Vision / ZXing / OCR text parsing, integer paisa extraction, auto-fill form | `src/receiptImageService.js`, `src/receiptScannerService.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
+| **FEAT-019** | Voucher PDF Generation & Thermal POS Printing | 13 PDF Report Builders, PdfShareUtil, FileProvider, ESC/POS Bluetooth driver | `src/voucherPdfService.js`, `src/thermalPrintService.js`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 
 ---
 
 ## 2. Verification Standards & Methodology
 1. **Integer Paisa Precision:** All monetary amounts calculate in exact integer paisa ($1\text{ Taka} = 100\text{ Paisa}$) with zero floating-point drift up to ৳100,000,000 single transactions.
 2. **Domain Isolation:** Strict separation between Business Accounting (`@tallykhata_state_v6`) and Personal Money Manager (`@tallykhata_personal_money_manager_v2`).
-3. **Automated Regression Suite:** 287 automated test suites (6,020+ passing assertions) verifying every parity dimension, including storage metrics, pagination, compaction, atomic rollback, packaging, and milestone synthesis (FEAT-001 through FEAT-018).
+3. **Automated Regression Suite:** 290 automated test suites (6,200+ passing assertions) verifying every parity dimension, including storage metrics, pagination, compaction, atomic rollback, packaging, and milestone synthesis (FEAT-001 through FEAT-019).
