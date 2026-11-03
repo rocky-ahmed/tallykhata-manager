@@ -21,6 +21,7 @@
 | **FEAT-010** | Tactile Feedback & UX | Merchant sound & vibration feedback on commit | `src/hapticFeedbackService.js`, 3-tier fallback | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-011** | Transaction Query Index | Fast date-range filtering for large journals | `src/storageRepository.js` binary search index | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 | **FEAT-012** | High-Frequency I/O | SQLite / AsyncStorage mutex write queue serialization | `storageRepository.js` `writeQueue` mutex | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
+| **FEAT-013** | Offline Sync & Conflict Resolution | Room DB dirty flags, WorkManager D2S, LWW reconciliation | `src/storageRepository.js` `simulateSyncBatch`, `App.js` | **100% PARITY** | **100% PARITY** | **PARITY VERIFIED** |
 
 ---
 

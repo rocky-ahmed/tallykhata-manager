@@ -4,12 +4,18 @@
  * 100% Offline Double-Entry & Referential Integrity Engine
  */
 
+// --- 0. MONEY / PAISA PRECISION HELPER ---
+function roundMoney(val) {
+  return Math.round((Number(val) || 0) * 100) / 100;
+}
+
 // --- 0. UNIQUE ID GENERATION (COLLISION-FREE) ---
 let _idSequence = 0;
 function generateUniqueId(prefix = '') {
   _idSequence = (_idSequence + 1) % 1000000;
   return `${prefix}${Date.now()}_${_idSequence}_${Math.random().toString(36).substring(2, 7)}`;
 }
+
 
 // --- 1. VALIDATION HELPERS ---
 function validateTransaction(amount, type, desc = '') {
@@ -905,6 +911,10 @@ function generateAccountStatement(accountOrId, journalsOrBizId, dateRange = 'all
     netChange: netChangePaisa / 100,
     totalGiven: periodGivenPaisa / 100,
     totalReceived: periodReceivedPaisa / 100,
+    totalDebit: periodGivenPaisa / 100,
+    totalCredit: periodReceivedPaisa / 100,
+    debitTotal: periodGivenPaisa / 100,
+    creditTotal: periodReceivedPaisa / 100,
     transactionCount: statementJournals.length,
     journals: statementJournals,
     priorCount: priorJournals.length,
@@ -4499,6 +4509,7 @@ function generatePdfShareIntentPayload(documentPayload, options = {}) {
 }
 
 const ledgerEngine = {
+  roundMoney,
   generateUniqueId,
   validateTransaction,
   validateAccount,
@@ -4573,4 +4584,5 @@ if (typeof exports !== 'undefined') {
   exports.paginateStatementDocument = paginateStatementDocument;
   exports.paginateConsolidatedReportDocument = paginateConsolidatedReportDocument;
   exports.generatePdfShareIntentPayload = generatePdfShareIntentPayload;
+  exports.roundMoney = roundMoney;
 }

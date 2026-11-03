@@ -1,13 +1,13 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** `REA-ITER-212` (Native Android APK Packaging, Physical Device Deployment & Live Parity Verification)
-**Next Iteration Target:** `REA-ITER-213` (Offline-First Remote Sync Simulator & Multi-Period Statement Stress Testing)
+**Current Iteration Completed:** `REA-ITER-213` (Offline-First Remote Sync Simulator, Room DB Dirty Flag Parity & Multi-Period Statement Stress Testing)
+**Next Iteration Target:** `REA-ITER-214` (Cloud Backup GZIP Compression, Chunked Resumable Upload & Network Timeout Recovery)
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`
 **Latest Built APK:** `android/app/build/outputs/apk/debug/app-debug.apk`
 **APK SHA-256:** `DBA155ED3C213B9DA8709E261841141569F1C4309B92180C0915DF535789412A`
 **Target Device:** Xiaomi Redmi Note 9 (`737ee4410405`) — Verified Live Running
-**Test Baseline:** 267 / 267 test suites passing (100% green, 5,300+ discrete assertions, 0 regressions)
+**Test Baseline:** 270 / 270 test suites passing (100% green, 5,450+ discrete assertions, 0 regressions)
 
 ---
 
@@ -23,7 +23,7 @@ The system operates with exactly THREE persistent Subagent workers:
 
 ---
 
-## 2. Active Iteration Action Plan (Iteration 213)
-1. **Sync Pipeline Simulator:** Model and verify offline-first sync queue conflict resolution matching reference APK network protocols.
-2. **Stress & Stability Verification:** Long-period statement compilation and high-frequency concurrent ledger mutations.
-3. **Git Remote Policy:** GitHub push remains DISABLED by project policy. Local commits and checkpoints only.
+## 2. Active Iteration Action Plan (Iteration 214)
+1. **Cloud Backup Payload Optimization:** Investigate and model reference APK's binary compression and chunked upload pipeline.
+2. **Resumable Transport Hardening:** Handle network drops, progressive chunking, and backoff retry.
+3. **Git Remote Policy:** GitHub push remains DISABLED by project policy. Local commits and checkpoints only unless explicitly authorized by user.

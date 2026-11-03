@@ -877,6 +877,8 @@ function TallyKhataApp() {
   const [googleAccessToken, setGoogleAccessToken] = useState('');
   const [cloudBackupMetadata, setCloudBackupMetadata] = useState(null);
   const [cloudBackupStatus, setCloudBackupStatus] = useState('idle'); // 'idle' | 'checking' | 'backing_up' | 'restoring' | 'success' | 'error'
+  const [isOffline, setIsOffline] = useState(false);
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
   const [cloudRestoreConfirmVisible, setCloudRestoreConfirmVisible] = useState(false);
   const [restoreDomain, setRestoreDomain] = useState('all'); // 'all' | 'business' | 'moneyManager'
@@ -2200,6 +2202,11 @@ function TallyKhataApp() {
         if (d.autoBackupEnabled !== undefined) setAutoBackupEnabled(Boolean(d.autoBackupEnabled));
         if (d.cloudBackupMetadata) setCloudBackupMetadata(d.cloudBackupMetadata);
         if (d.openingBalance !== undefined) setOpeningBalance(Number(d.openingBalance));
+        try {
+          const initialUn = storageRepository.getUnsyncedRecords();
+          const initialCount = Object.values(initialUn).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
+          setUnsyncedCount(initialCount);
+        } catch (e) {}
         if (Array.isArray(d.tagadaLogs)) setTagadaLogs(d.tagadaLogs);
         try {
           const storedPrefs = await preferencesService.getStoredPreferences(AsyncStorage);
@@ -2246,6 +2253,24 @@ function TallyKhataApp() {
       return { success: false, error: err };
     }
   };
+
+  // --- SYNC & OFFLINE COMPUTATION HOOKS ---
+  const getUnsyncedCount = () => {
+    try {
+      if (!storageRepository || typeof storageRepository.getUnsyncedRecords !== 'function') return 0;
+      const un = storageRepository.getUnsyncedRecords();
+      return Object.values(un).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
+    } catch (e) {
+      return 0;
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const count = getUnsyncedCount();
+      setUnsyncedCount(count);
+    } catch (e) {}
+  }, [accounts, journals, cashEntries, inventory, notes, cloudBackupStatus]);
 
   // --- BUSINESS-SCOPED DATA COLLECTIONS ---
   const activeBizId = activeBusinessId || '1';
@@ -3428,7 +3453,7 @@ function TallyKhataApp() {
       console.warn('[executeCloudBackup] Failed to read persisted Money Manager state:', e);
     }
 
-    return orchestrateCloudBackup({
+    const backupRes = await orchestrateCloudBackup({
       storageRepository,
       driveService: googleDriveBackupService,
       getAccessToken: getValidGoogleAccessToken,
@@ -3443,11 +3468,54 @@ function TallyKhataApp() {
         setCloudBackupMetadata(meta);
         await persistData({ cloudBackupMetadata: meta });
       },
-      alertFn: (title, message) => Alert.alert(title, message),
+      alertFn: (title, message) => {
+        if (title && (title.includes('সফল') || title.includes('ব্যাকআপ'))) {
+          Alert.alert(tStatic("ডাটা সিঙ্ক সম্পন্ন হয়েছে"), message);
+        } else {
+          Alert.alert(title, message);
+        }
+      },
     });
+
+    if (backupRes && backupRes.success) {
+      try {
+        hapticFeedbackService.notificationSuccess();
+      } catch (e) {}
+      try {
+        const unsynced = storageRepository.getUnsyncedRecords();
+        for (const col of Object.keys(unsynced)) {
+          const ids = (unsynced[col] || []).map((r) => r.id).filter(Boolean);
+          if (ids.length > 0) {
+            await storageRepository.markRecordsSynced(col, ids);
+          }
+        }
+        setUnsyncedCount(0);
+        setIsOffline(false);
+      } catch (syncErr) {
+        console.warn('[executeCloudBackup] markRecordsSynced error:', syncErr);
+      }
+    } else {
+      try {
+        hapticFeedbackService.onError();
+      } catch (e) {}
+      if (backupRes && backupRes.userFacingMessage && (
+        backupRes.userFacingMessage.includes('Network') ||
+        backupRes.userFacingMessage.includes('নেটওয়ার্ক') ||
+        backupRes.userFacingMessage.includes('ইন্টারনেট')
+      )) {
+        setIsOffline(true);
+      }
+    }
+
+    return backupRes;
   };
 
   const handleCloudBackupNow = async () => {
+    // 1. Tactile haptic feedback on manual sync trigger
+    try {
+      hapticFeedbackService.impactLight();
+    } catch (e) {}
+
     if (!googleUser || !googleUser.sub) {
       Alert.alert(
         tStatic("গুগল একাউন্ট প্রয়োজন"),
@@ -3460,6 +3528,34 @@ function TallyKhataApp() {
       return;
     }
 
+    // 2. Offline / Connectivity Pre-check
+    setCloudBackupStatus('checking');
+    let isConnected = true;
+    try {
+      if (googleDriveBackupService && typeof googleDriveBackupService.checkDriveConnectivity === 'function') {
+        const conn = await googleDriveBackupService.checkDriveConnectivity(null, { timeoutMs: 3500 });
+        if (conn && conn.reachable === false) {
+          isConnected = false;
+        }
+      }
+    } catch (netErr) {
+      isConnected = false;
+    }
+
+    if (!isConnected) {
+      setIsOffline(true);
+      setCloudBackupStatus('idle');
+      try {
+        hapticFeedbackService.onError();
+      } catch (e) {}
+      Alert.alert(
+        tStatic("ইন্টারনেট সংযোগ নেই"),
+        tStatic("ক্লাউড ব্যাকআপ ও সিঙ্কের জন্য সক্রিয় ইন্টারনেট সংযোগ প্রয়োজন। অনুগ্রহ করে ইন্টারনেট সংযোগ চালু করে পুনরায় চেষ্টা করুন।")
+      );
+      return { success: false, reason: 'offline' };
+    }
+    setIsOffline(false);
+
     let token = await getValidGoogleAccessToken(false);
     if (!token) {
       // Attempt fresh token retrieval from native Play Services
@@ -3467,6 +3563,10 @@ function TallyKhataApp() {
     }
 
     if (!token) {
+      setCloudBackupStatus('idle');
+      try {
+        hapticFeedbackService.onError();
+      } catch (e) {}
       Alert.alert(
         tStatic("অনুমোদন প্রয়োজন"),
         tStatic("গুগল ড্রাইভ এক্সেস টোকেন পাওয়া যায়নি। অনুগ্রহ করে পুনরায় গুগল একাউন্ট সংযোগ করুন।"),
@@ -3479,6 +3579,18 @@ function TallyKhataApp() {
     }
 
     return executeCloudBackup();
+  };
+
+  const handleHeaderSyncPress = () => {
+    try {
+      hapticFeedbackService.selection();
+    } catch (e) {}
+    if (googleUser && googleUser.sub) {
+      handleCloudBackupNow();
+    } else {
+      setBackupJsonText('');
+      setModalBackupRestore(true);
+    }
   };
 
   const handleRunLiveSyntheticVerification = async () => {
@@ -3529,6 +3641,11 @@ function TallyKhataApp() {
 
   if (typeof global !== 'undefined') {
     global.__tallykhataRunLiveVerification = handleRunLiveSyntheticVerification;
+    global.__tallykhataHandleCloudBackupNow = handleCloudBackupNow;
+    global.__tallykhataGetUnsyncedCount = getUnsyncedCount;
+    global.__tallykhataSetOffline = setIsOffline;
+    global.__tallykhataExecuteCloudBackup = executeCloudBackup;
+    global.__tallykhataSetUnsyncedCount = setUnsyncedCount;
   }
 
   const applyStateToUi = (state, { resetPin = false } = {}) => {
@@ -5345,6 +5462,57 @@ function TallyKhataApp() {
         </View>
 
         <View style={styles.headerRightActionsRed}>
+          {/* Cloud Sync Status Indicator with Unsynced Badge & Haptic Feedback */}
+          <TouchableOpacity
+            style={styles.headerWhiteActionBtn}
+            onPress={handleHeaderSyncPress}
+            activeOpacity={0.7}
+            hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={
+              cloudBackupStatus === 'backing_up' || cloudBackupStatus === 'checking'
+                ? tStatic("ক্লাউড সিঙ্ক চলছে")
+                : isOffline
+                ? tStatic("অফলাইন মোড")
+                : unsyncedCount > 0
+                ? `${toBengaliNumber(unsyncedCount)} টি হিসাব সিঙ্ক বাকি`
+                : tStatic("সকল ডাটা সুরক্ষিত ও সিঙ্কড")
+            }
+          >
+            <View style={{ position: 'relative' }}>
+              <Image
+                source={require('./assets/icons/ic_cloud.png')}
+                style={[
+                  styles.headerWhiteActionIcon,
+                  { tintColor: '#FFFFFF' },
+                  isOffline && { opacity: 0.65 },
+                ]}
+                resizeMode="contain"
+              />
+              {unsyncedCount > 0 && (
+                <View style={[styles.headerBadgeWhite, { backgroundColor: '#FEF3C7', borderColor: '#D97706' }]}>
+                  <Text style={[styles.headerBadgeWhiteText, { color: '#92400E', fontWeight: 'bold', fontSize: 10 }]}>
+                    {unsyncedCount > 9 ? '৯+' : toBengaliNumber(unsyncedCount)}
+                  </Text>
+                </View>
+              )}
+              {unsyncedCount === 0 && cloudBackupMetadata && !isOffline && (
+                <View style={[styles.headerBadgeWhite, { backgroundColor: '#DCFCE7', borderColor: '#16A34A', paddingHorizontal: 3 }]}>
+                  <Text style={{ fontSize: 8, color: '#166534', fontWeight: 'bold' }}>✓</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.headerActionLabelWhite}>
+              {cloudBackupStatus === 'backing_up' || cloudBackupStatus === 'checking'
+                ? tStatic("সিঙ্ক...")
+                : isOffline
+                ? tStatic("অফলাইন")
+                : unsyncedCount > 0
+                ? tStatic("সিঙ্ক বাকি")
+                : tStatic("সিঙ্ক")}
+            </Text>
+          </TouchableOpacity>
+
           {/* Inbox with 99+ Badge and Bangla text */}
           <TouchableOpacity
             style={styles.headerWhiteActionBtn}
@@ -6705,14 +6873,37 @@ function TallyKhataApp() {
               <TouchableOpacity
                 style={[styles.menuListItem, isDark && tStyles.menuListItem]}
                 onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
                   setBackupJsonText('');
                   setModalBackupRestore(true);
                 }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('menu_backup_restore')}
               >
                 <AppIcon source={require('./assets/icons/ic_menu_backup.png')} variant="success" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_backup_restore')}</Text>
-                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{tStatic("১০০% অফলাইন ডাটা সেভ ও নতুন ফোনে ট্রান্সফার")}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: 8 }}>
+                    <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('menu_backup_restore')}</Text>
+                    {unsyncedCount > 0 ? (
+                      <View style={{ backgroundColor: isDark ? '#78350F' : '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: isDark ? '#B45309' : '#FCD34D' }}>
+                        <Text style={{ fontSize: 10, color: isDark ? '#FDE68A' : '#92400E', fontWeight: 'bold' }}>
+                          {toBengaliNumber(unsyncedCount)} টি বাকি
+                        </Text>
+                      </View>
+                    ) : cloudBackupMetadata ? (
+                      <View style={{ backgroundColor: isDark ? '#064E3B' : '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: isDark ? '#047857' : '#86EFAC' }}>
+                        <Text style={{ fontSize: 10, color: isDark ? '#6EE7B7' : '#15803D', fontWeight: 'bold' }}>
+                          ✓ সিঙ্কড
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>
+                    {cloudBackupMetadata && cloudBackupMetadata.modifiedTime
+                      ? `${tStatic("সর্বশেষ সিঙ্ক:")} ${new Date(cloudBackupMetadata.modifiedTime).toLocaleDateString('bn-BD', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                      : tStatic("১০০% অফলাইন ডাটা সেভ ও নতুন ফোনে ট্রান্সফার")}
+                  </Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
@@ -7572,8 +7763,50 @@ function TallyKhataApp() {
                     <Text style={[{ fontSize: 13 }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>{t('data_stat_storage_size')}</Text>
                     <Text style={[{ fontSize: 14, fontWeight: 'bold', color: currentTheme.primary }]}>~48 KB</Text>
                   </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: currentTheme.divider }}>
+                    <Text style={[{ fontSize: 13 }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>{tStatic("সিঙ্ক স্ট্যাটাস")}</Text>
+                    <Text style={[{ fontSize: 13, fontWeight: 'bold' }, isOffline ? { color: isDark ? '#F87171' : '#DC2626' } : (unsyncedCount > 0 ? { color: isDark ? '#FBBF24' : '#B45309' } : { color: isDark ? '#34D399' : '#15803D' })]}>
+                      {isOffline ? tStatic("অফলাইন মোড") : (unsyncedCount > 0 ? `${toBengaliNumber(unsyncedCount)} টি বাকি` : tStatic("সকল ডাটা সিঙ্কড"))}
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: currentTheme.divider }}>
+                    <Text style={[{ fontSize: 13 }, isDark ? { color: currentTheme.textSecondary } : { color: '#64748B' }]}>{tStatic("সর্বশেষ সিঙ্ক")}</Text>
+                    <Text style={[{ fontSize: 13, fontWeight: 'bold' }, isDark ? { color: currentTheme.textPrimary } : { color: '#1E293B' }]}>
+                      {cloudBackupMetadata && cloudBackupMetadata.modifiedTime
+                        ? new Date(cloudBackupMetadata.modifiedTime).toLocaleDateString('bn-BD', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : tStatic("এখনো সিঙ্ক হয়নি")}
+                    </Text>
+                  </View>
                 </View>
               </View>
+
+              {/* Action: Cloud Sync Now */}
+              <TouchableOpacity
+                style={[styles.themeOptionCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalDataManagement(false);
+                  setTimeout(() => {
+                    handleCloudBackupNow();
+                  }, 200);
+                }}
+                activeOpacity={0.7}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("এখনই ক্লাউডে সিঙ্ক করুন")}
+              >
+                <View style={[styles.themeOptionIconCircle, { backgroundColor: isDark ? '#064E3B' : '#ECFDF5', borderColor: isDark ? '#047857' : '#A7F3D0', borderWidth: 1 }]}>
+                  <Image source={require('./assets/icons/ic_cloud.png')} style={{ width: 22, height: 22, tintColor: isDark ? '#34D399' : '#059669' }} resizeMode="contain" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.themeOptionTitle, isDark && { color: currentTheme.textPrimary }]}>{tStatic("এখনই ক্লাউডে সিঙ্ক করুন")}</Text>
+                  <Text style={[styles.themeOptionSub, isDark && { color: currentTheme.textSecondary }]}>
+                    {unsyncedCount > 0 ? `${toBengaliNumber(unsyncedCount)} টি হিসাব ব্যাকআপ বাকি` : tStatic("গুগল ড্রাইভে ডাটা সুরক্ষিত রাখুন")}
+                  </Text>
+                </View>
+              </TouchableOpacity>
 
               {/* Action 1: Clear Cache */}
               <TouchableOpacity
@@ -11129,7 +11362,11 @@ function TallyKhataApp() {
                         <Text style={[styles.cloudControlTitle, { color: '#B81414' }]}>
                           {cloudBackupStatus === 'backing_up' ? tStatic("গুগল ড্রাইভে ব্যাকআপ হচ্ছে...") : tStatic("এখন ব্যাকআপ নিন")}
                         </Text>
-                        <Text style={styles.cloudControlSub}>{tStatic("খাতার সকল তথ্য ও লেনদেন গুগল ড্রাইভে নিরাপদ রাখুন                           খাতার সকল তথ্য ও লেনদেন গুগল ড্রাইভে নিরাপদ রাখুন")}</Text>
+                        <Text style={styles.cloudControlSub}>
+                          {unsyncedCount > 0
+                            ? `${toBengaliNumber(unsyncedCount)} টি হিসাব ক্লাউডে ব্যাকআপ বাকি`
+                            : tStatic("খাতার সকল তথ্য ও লেনদেন গুগল ড্রাইভে নিরাপদ রাখুন")}
+                        </Text>
                       </View>
                       <Image source={require('./assets/icons/arrow_right_red.png')} style={{ width: 14, height: 14 }} resizeMode="contain" />
                     </TouchableOpacity>

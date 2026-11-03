@@ -243,6 +243,68 @@ function createDefaultState() {
   };
 }
 
+/**
+ * Extracts numeric timestamp (epoch ms) from a record across multiple candidate field names.
+ * @param {Object} record
+ * @param {string|string[]} [customFields]
+ * @returns {number}
+ */
+function extractRecordTimestamp(record, customFields = null) {
+  if (!record || typeof record !== 'object') return 0;
+  const fields = customFields
+    ? (Array.isArray(customFields) ? customFields : [customFields])
+    : [
+        'updated_at',
+        'update_date',
+        'updatedAt',
+        'timestamp',
+        'syncedDate',
+        'synced_date',
+        'date',
+        'txn_date',
+        'created_at',
+        'create_date',
+        'createdAt',
+      ];
+  for (const f of fields) {
+    if (record[f] !== undefined && record[f] !== null && record[f] !== '') {
+      const val = record[f];
+      if (typeof val === 'number') {
+        if (!isNaN(val)) return val;
+      }
+      const parsed = Date.parse(val);
+      if (!isNaN(parsed)) return parsed;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Checks whether two records have meaningful differences in business data fields,
+ * ignoring synchronization metadata fields.
+ * @param {Object} recA
+ * @param {Object} recB
+ * @returns {boolean}
+ */
+function recordsDiffer(recA, recB) {
+  if (!recA || !recB) return true;
+  const ignore = new Set(['synced', 'is_synced', 'syncedDate', 'synced_date', 'last_sync', 'client_id']);
+  const allKeys = new Set([...Object.keys(recA), ...Object.keys(recB)]);
+  for (const k of allKeys) {
+    if (ignore.has(k)) continue;
+    const valA = recA[k];
+    const valB = recB[k];
+    if (valA === valB) continue;
+    if ((valA === undefined || valA === null) && (valB === undefined || valB === null)) continue;
+    if (typeof valA === 'object' && typeof valB === 'object' && valA !== null && valB !== null) {
+      if (JSON.stringify(valA) !== JSON.stringify(valB)) return true;
+    } else if (valA !== valB) {
+      return true;
+    }
+  }
+  return false;
+}
+
 class StorageRepository {
   constructor(storageAdapter = null) {
     this.adapter = storageAdapter || this.createInMemoryAdapter();
@@ -2842,6 +2904,346 @@ class StorageRepository {
       error: res.error,
     };
   }
+
+  /**
+   * Simulates bidirectional synchronization of a collection against a server snapshot.
+   * - Identifies pending local changes (synced === 0 || synced === false || synced === undefined).
+   * - Detects conflicts between local modifications and server incoming records using updated_at / timestamp.
+   * - Applies conflict resolution:
+   *     - local changes newer than server take precedence (local wins, merges non-conflicting fields if enabled).
+   *     - server changes newer than local overwrite local (server wins, merges non-conflicting fields if enabled).
+   *     - identical timestamps resolved via deterministic tieBreaker (default: server wins or field merge).
+   * - Marks successfully synchronized records with synced = 1, is_synced = 1, syncedDate = nowIso.
+   * - Supports atomic rollback on partial failure or simulated network errors.
+   * 
+   * @param {string} collectionName - Valid collection name ('accounts', 'journals', etc.)
+   * @param {Array<Object>} [serverSnapshot=[]] - Array of server records for this collection
+   * @param {Object} [options={}] - Sync options (dryRun, preferFieldMerge, forceLocal, forceServer, simulatePartialFailure, tieBreaker, etc.)
+   * @returns {Promise<{success: boolean, syncedCount: number, conflictCount: number, resolvedCount: number, errors: string[], details?: Object}>}
+   */
+  async simulateSyncBatch(collectionName, serverSnapshot = [], options = {}) {
+    // If collectionName is 'all' or omitted and serverSnapshot is an object with collection arrays
+    if ((!collectionName || collectionName === 'all') && serverSnapshot && typeof serverSnapshot === 'object' && !Array.isArray(serverSnapshot)) {
+      const summary = {
+        success: true,
+        syncedCount: 0,
+        conflictCount: 0,
+        resolvedCount: 0,
+        errors: [],
+        collections: {},
+      };
+      for (const col of Object.keys(serverSnapshot)) {
+        if (VALID_COLLECTIONS.has(col)) {
+          const colRes = await this.simulateSyncBatch(col, serverSnapshot[col], options);
+          summary.syncedCount += colRes.syncedCount || 0;
+          summary.conflictCount += colRes.conflictCount || 0;
+          summary.resolvedCount += colRes.resolvedCount || 0;
+          if (colRes.errors && colRes.errors.length) {
+            summary.errors.push(...colRes.errors);
+          }
+          if (!colRes.success) {
+            summary.success = false;
+          }
+          summary.collections[col] = colRes;
+        }
+      }
+      return summary;
+    }
+
+    if (!collectionName || !VALID_COLLECTIONS.has(collectionName)) {
+      return {
+        success: false,
+        syncedCount: 0,
+        conflictCount: 0,
+        resolvedCount: 0,
+        errors: [`INVALID_COLLECTION: ${collectionName}`],
+      };
+    }
+
+    if (!Array.isArray(serverSnapshot)) {
+      return {
+        success: false,
+        syncedCount: 0,
+        conflictCount: 0,
+        resolvedCount: 0,
+        errors: ['INVALID_SERVER_SNAPSHOT: expected array of server records'],
+      };
+    }
+
+    if (!this.currentStore) {
+      const loadRes = await this.loadInitialData();
+      if (!loadRes.success) {
+        return {
+          success: false,
+          syncedCount: 0,
+          conflictCount: 0,
+          resolvedCount: 0,
+          errors: [`LOAD_FAILED: ${loadRes.error}`],
+        };
+      }
+    }
+
+    const preferFieldMerge = options.preferFieldMerge !== false;
+    const tieBreaker = options.tieBreaker || 'server';
+    const nowIso = new Date().toISOString();
+    const errors = [];
+    let syncedCount = 0;
+    let conflictCount = 0;
+    let resolvedCount = 0;
+    let localPushedCount = 0;
+    let serverPulledCount = 0;
+    const conflictDetails = [];
+
+    const serverMap = new Map();
+    for (const sItem of serverSnapshot) {
+      if (sItem && typeof sItem === 'object' && sItem.id !== undefined && sItem.id !== null) {
+        serverMap.set(String(sItem.id), sItem);
+      }
+    }
+
+    // Dry-run mode: compute transitions and diffs without storage mutation
+    if (options.dryRun) {
+      const currentList = Array.isArray(this.currentStore[collectionName]) ? this.currentStore[collectionName] : [];
+      const processedServerIds = new Set();
+
+      for (let idx = 0; idx < currentList.length; idx++) {
+        const localItem = currentList[idx];
+        if (!localItem || localItem.id === undefined || localItem.id === null) continue;
+        const idStr = String(localItem.id);
+        const isDirty = (localItem.synced === 0 || localItem.synced === false || localItem.synced === undefined || localItem.synced === null);
+
+        if (serverMap.has(idStr)) {
+          processedServerIds.add(idStr);
+          const serverItem = serverMap.get(idStr);
+          if (!isDirty) {
+            syncedCount++;
+            serverPulledCount++;
+          } else {
+            const hasConflict = recordsDiffer(localItem, serverItem);
+            if (!hasConflict) {
+              syncedCount++;
+              localPushedCount++;
+            } else {
+              conflictCount++;
+              resolvedCount++;
+              syncedCount++;
+              const localTs = extractRecordTimestamp(localItem, options.timestampFields);
+              const serverTs = extractRecordTimestamp(serverItem, options.timestampFields);
+              const winner = options.forceLocal ? 'local' : (options.forceServer ? 'server' : (localTs > serverTs ? 'local' : (serverTs > localTs ? 'server' : tieBreaker)));
+              conflictDetails.push({
+                id: idStr,
+                winner,
+                localTs,
+                serverTs,
+                reason: localTs > serverTs ? 'local_newer' : (serverTs > localTs ? 'server_newer' : 'identical_timestamp_tie'),
+              });
+            }
+          }
+        } else {
+          if (isDirty) {
+            syncedCount++;
+            localPushedCount++;
+          }
+        }
+      }
+
+      for (const [sId] of serverMap.entries()) {
+        if (!processedServerIds.has(sId)) {
+          syncedCount++;
+          serverPulledCount++;
+        }
+      }
+
+      return {
+        success: true,
+        dryRun: true,
+        syncedCount,
+        conflictCount,
+        resolvedCount,
+        serverAddedCount: serverPulledCount,
+        localPushedCount,
+        errors,
+        conflictDetails,
+      };
+    }
+
+    // Actual persistent mutation with atomic rollback
+    let batchConflictDetails = [];
+    const mutationRes = await this.mutateCollection(collectionName, (currentList) => {
+      const updatedList = [];
+      const processedServerIds = new Set();
+      let batchSyncedCount = 0;
+      let batchConflictCount = 0;
+      let batchResolvedCount = 0;
+      let batchLocalPushed = 0;
+      let batchServerPulled = 0;
+      batchConflictDetails = [];
+
+      for (let idx = 0; idx < currentList.length; idx++) {
+        const localItem = currentList[idx];
+        if (!localItem || localItem.id === undefined || localItem.id === null) {
+          updatedList.push(localItem);
+          continue;
+        }
+        const idStr = String(localItem.id);
+        const isDirty = (localItem.synced === 0 || localItem.synced === false || localItem.synced === undefined || localItem.synced === null);
+
+        // Check simulated partial failure
+        if (options.simulatePartialFailure) {
+          if (typeof options.simulatePartialFailure === 'function' && options.simulatePartialFailure(localItem, idx)) {
+            throw new Error(`SIMULATED_SYNC_PARTIAL_FAILURE at record ID ${idStr}`);
+          } else if (typeof options.simulatePartialFailure === 'number' && idx >= options.simulatePartialFailure) {
+            throw new Error(`SIMULATED_SYNC_PARTIAL_FAILURE at index ${idx}`);
+          } else if (options.simulatePartialFailure === true && idx >= Math.floor(currentList.length / 2)) {
+            throw new Error(`SIMULATED_SYNC_PARTIAL_FAILURE midway at index ${idx}`);
+          }
+        }
+
+        if (serverMap.has(idStr)) {
+          processedServerIds.add(idStr);
+          const serverItem = serverMap.get(idStr);
+
+          if (!isDirty) {
+            // Local is clean: server is authoritative for updates
+            const updatedItem = {
+              ...localItem,
+              ...serverItem,
+              synced: 1,
+              is_synced: 1,
+              syncedDate: nowIso,
+              synced_date: nowIso,
+            };
+            updatedList.push(updatedItem);
+            batchSyncedCount++;
+            batchServerPulled++;
+          } else {
+            // Local is dirty: check for conflict
+            const hasConflict = recordsDiffer(localItem, serverItem);
+            if (!hasConflict) {
+              // Same content, mark clean
+              updatedList.push({
+                ...localItem,
+                synced: 1,
+                is_synced: 1,
+                syncedDate: nowIso,
+                synced_date: nowIso,
+              });
+              batchSyncedCount++;
+              batchLocalPushed++;
+            } else {
+              batchConflictCount++;
+              const localTs = extractRecordTimestamp(localItem, options.timestampFields);
+              const serverTs = extractRecordTimestamp(serverItem, options.timestampFields);
+
+              let winner = 'server';
+              if (options.forceLocal) {
+                winner = 'local';
+              } else if (options.forceServer) {
+                winner = 'server';
+              } else if (localTs > serverTs) {
+                winner = 'local';
+              } else if (serverTs > localTs) {
+                winner = 'server';
+              } else {
+                winner = tieBreaker;
+              }
+
+              let resolvedItem;
+              if (winner === 'local') {
+                resolvedItem = preferFieldMerge ? { ...serverItem, ...localItem } : { ...localItem };
+              } else {
+                resolvedItem = preferFieldMerge ? { ...localItem, ...serverItem } : { ...serverItem };
+              }
+
+              resolvedItem.synced = 1;
+              resolvedItem.is_synced = 1;
+              resolvedItem.syncedDate = nowIso;
+              resolvedItem.synced_date = nowIso;
+
+              updatedList.push(resolvedItem);
+              batchResolvedCount++;
+              batchSyncedCount++;
+
+              batchConflictDetails.push({
+                id: idStr,
+                winner,
+                localTs,
+                serverTs,
+                reason: localTs > serverTs ? 'local_newer' : (serverTs > localTs ? 'server_newer' : 'identical_timestamp_tie'),
+              });
+            }
+          }
+        } else {
+          // Local record not in server snapshot
+          if (isDirty) {
+            // Pushed to server
+            updatedList.push({
+              ...localItem,
+              synced: 1,
+              is_synced: 1,
+              syncedDate: nowIso,
+              synced_date: nowIso,
+            });
+            batchSyncedCount++;
+            batchLocalPushed++;
+          } else {
+            updatedList.push(localItem);
+          }
+        }
+      }
+
+      // Add new server records that were not present locally
+      for (const [sId, serverItem] of serverMap.entries()) {
+        if (!processedServerIds.has(sId)) {
+          const newItem = {
+            ...serverItem,
+            synced: 1,
+            is_synced: 1,
+            syncedDate: nowIso,
+            synced_date: nowIso,
+          };
+          updatedList.push(newItem);
+          batchSyncedCount++;
+          batchServerPulled++;
+        }
+      }
+
+      // Populate outer metrics upon successful preparation
+      syncedCount = batchSyncedCount;
+      conflictCount = batchConflictCount;
+      resolvedCount = batchResolvedCount;
+      localPushedCount = batchLocalPushed;
+      serverPulledCount = batchServerPulled;
+
+      return updatedList;
+    });
+
+    if (!mutationRes.success) {
+      const errMsg = mutationRes.error instanceof Error ? mutationRes.error.message : String(mutationRes.error);
+      errors.push(errMsg);
+      return {
+        success: false,
+        syncedCount: 0,
+        conflictCount: 0,
+        resolvedCount: 0,
+        errors,
+        rolledBack: true,
+      };
+    }
+
+    conflictDetails.push(...batchConflictDetails);
+
+    return {
+      success: true,
+      syncedCount,
+      conflictCount,
+      resolvedCount,
+      serverAddedCount: serverPulledCount,
+      localPushedCount,
+      errors,
+      conflictDetails,
+    };
+  }
 }
 
 // ============================================================================
@@ -3402,6 +3804,21 @@ function paginateConsolidatedReportDocumentRepo(reportPayload, options = {}, rep
   return paginateConsolidatedReportDocument(reportPayload, options);
 }
 
+function simulateSyncBatchRepo(collectionName, serverSnapshot = [], options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.simulateSyncBatch === 'function') {
+    return repo.simulateSyncBatch(collectionName, serverSnapshot, options);
+  }
+  return Promise.resolve({
+    success: false,
+    syncedCount: 0,
+    conflictCount: 0,
+    resolvedCount: 0,
+    errors: ['NO_STORAGE_REPOSITORY_AVAILABLE'],
+  });
+}
+
+
+
 function generateAccountStatementRepo(accountOrId, journalsOrBizId, dateRange = 'all', options = {}, repo = defaultRepository) {
   if (repo && typeof repo.generateAccountStatement === 'function') {
     return repo.generateAccountStatement(accountOrId, journalsOrBizId, dateRange, options);
@@ -3448,6 +3865,9 @@ const repoExport = {
   paginateStatementDocument: paginateStatementDocumentRepo,
   paginateConsolidatedReportDocument: paginateConsolidatedReportDocumentRepo,
   generatePdfShareIntentPayload: generatePdfShareIntentPayloadRepo,
+  simulateSyncBatch: simulateSyncBatchRepo,
+  extractRecordTimestamp,
+  recordsDiffer,
   TelemetryService,
   telemetryService: defaultTelemetryService,
   EVENT_TYPES,
@@ -3497,6 +3917,9 @@ if (typeof exports !== 'undefined') {
   exports.paginateStatementDocument = paginateStatementDocumentRepo;
   exports.paginateConsolidatedReportDocument = paginateConsolidatedReportDocumentRepo;
   exports.generatePdfShareIntentPayload = generatePdfShareIntentPayloadRepo;
+  exports.simulateSyncBatch = simulateSyncBatchRepo;
+  exports.extractRecordTimestamp = extractRecordTimestamp;
+  exports.recordsDiffer = recordsDiffer;
   exports.TelemetryService = TelemetryService;
   exports.telemetryService = defaultTelemetryService;
   exports.EVENT_TYPES = EVENT_TYPES;

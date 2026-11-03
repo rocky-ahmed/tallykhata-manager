@@ -2529,6 +2529,23 @@ const APP_STATIC_TEXT_EN = {
   'নোট মুছে ফেলতে চান?': 'Do you want to delete this note?',
   'তাগাদা': 'Reminder',
   'এখনো কোনো নোট লেখা হয়নি।': 'No notes created yet.',
+  'ডাটা সিঙ্ক সম্পন্ন হয়েছে': 'Data sync completed',
+  'ইন্টারনেট সংযোগ নেই': 'No internet connection',
+  'ক্লাউড ব্যাকআপ ও সিঙ্কের জন্য সক্রিয় ইন্টারনেট সংযোগ প্রয়োজন। অনুগ্রহ করে ইন্টারনেট সংযোগ চালু করে পুনরায় চেষ্টা করুন।': 'An active internet connection is required for cloud backup and sync. Please connect to the internet and try again.',
+  'ক্লাউড সিঙ্ক চলছে': 'Cloud sync in progress',
+  'অফলাইন মোড': 'Offline Mode',
+  'সকল ডাটা সুরক্ষিত ও সিঙ্কড': 'All data secure and synced',
+  'সিঙ্ক...': 'Syncing...',
+  'অফলাইন': 'Offline',
+  'সিঙ্ক বাকি': 'Pending sync',
+  'সিঙ্ক': 'Sync',
+  'সর্বশেষ সিঙ্ক:': 'Last sync:',
+  'সিঙ্ক স্ট্যাটাস': 'Sync Status',
+  'সকল ডাটা সিঙ্কড': 'All data synced',
+  'সর্বশেষ সিঙ্ক': 'Last sync',
+  'এখনো সিঙ্ক হয়নি': 'Not synced yet',
+  'এখনই ক্লাউডে সিঙ্ক করুন': 'Sync to cloud now',
+  'গুগল ড্রাইভে ডাটা সুরক্ষিত রাখুন': 'Keep data secure on Google Drive',
 };
 
 const STATIC_DICTIONARY_EN = Object.keys(STRINGS.bn).reduce((map, key) => {
