@@ -282,11 +282,316 @@ function initiateAddMoneyTransaction(merchantConfig, request = {}) {
   };
 }
 
+
+// -------------------------------------------------------------
+// 4. MOBILE RECHARGE OPERATORS & LIMITS
+// -------------------------------------------------------------
+const RECHARGE_LIMITS = {
+  minAmount: 10.00,
+  maxAmountPerTxn: 1000.00,
+  dailyMaxCount: 50,
+  dailyMaxAmount: 10000.00,
+  monthlyMaxCount: 500,
+  monthlyMaxAmount: 50000.00,
+};
+
+const SUPPORTED_OPERATORS = [
+  { id: 'gp', nameBn: 'গ্রামীণফোন', nameEn: 'Grameenphone', prefixes: ['017', '013'], color: '#00A3E0' },
+  { id: 'bl', nameBn: 'বাংলালিংক', nameEn: 'Banglalink', prefixes: ['019', '014'], color: '#FF6600' },
+  { id: 'robi', nameBn: 'রবি', nameEn: 'Robi', prefixes: ['018'], color: '#ED1C24' },
+  { id: 'airtel', nameBn: 'এয়ারটেল', nameEn: 'Airtel', prefixes: ['016'], color: '#E40000' },
+  { id: 'teletalk', nameBn: 'টেলিটক', nameEn: 'Teletalk', prefixes: ['015'], color: '#00843D' },
+];
+
+/**
+ * Automatically detects telecom operator from Bangladeshi mobile number prefix.
+ *
+ * @param {string} phone
+ * @returns {object|null} Matched operator or null
+ */
+function detectOperator(phone) {
+  if (!phone || typeof phone !== 'string') return null;
+  const clean = phone.replace(/[^0-9]/g, '');
+  const normalized = clean.startsWith('880') ? clean.slice(2) : clean;
+  if (normalized.length < 3) return null;
+  const prefix = normalized.slice(0, 3);
+  return SUPPORTED_OPERATORS.find(op => op.prefixes.includes(prefix)) || null;
+}
+
+/**
+ * Validates Send Money parameters.
+ */
+function validateSendMoney(amount, recipientPhone, existingDailyTxns = []) {
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount || 0);
+
+  if (isNaN(numAmount) || numAmount <= 0) {
+    return { valid: false, error: 'INVALID_AMOUNT: টাকার সঠিক পরিমাণ লিখুন' };
+  }
+
+  const cleanPhone = String(recipientPhone || '').replace(/[^0-9]/g, '');
+  const normalizedPhone = cleanPhone.startsWith('880') ? cleanPhone.slice(2) : cleanPhone;
+  if (!/^01[3-9]\d{8}$/.test(normalizedPhone)) {
+    return { valid: false, error: 'INVALID_PHONE: ১১ ডিজিটের সঠিক মোবাইল নম্বর লিখুন' };
+  }
+
+  const paisa = Math.round(numAmount * 100);
+  const roundedAmount = paisa / 100;
+  const limits = TRANSACTION_LIMITS.send_money;
+
+  if (roundedAmount < limits.minAmount) {
+    return {
+      valid: false,
+      error: `MIN_AMOUNT_LIMIT: সর্বনিম্ন সেন্ড মানি সীমা ৳ ${limits.minAmount.toFixed(2)}`,
+      paisa,
+      amount: roundedAmount,
+    };
+  }
+
+  if (roundedAmount > limits.maxAmountPerTxn) {
+    return {
+      valid: false,
+      error: `MAX_AMOUNT_LIMIT: প্রতিবার সর্বোচ্চ সেন্ড মানি সীমা ৳ ${limits.maxAmountPerTxn.toLocaleString('bn-BD')}`,
+      paisa,
+      amount: roundedAmount,
+    };
+  }
+
+  const todayTxns = Array.isArray(existingDailyTxns) ? existingDailyTxns : [];
+  const todayCount = todayTxns.length;
+  const todaySumPaisa = todayTxns.reduce((acc, t) => acc + Math.round((Number(t.amount) || 0) * 100), 0);
+
+  if (todayCount >= limits.dailyMaxCount) {
+    return {
+      valid: false,
+      error: `DAILY_COUNT_EXCEEDED: দৈনিক সর্বোচ্চ ${limits.dailyMaxCount} বার সেন্ড মানি করা যাবে`,
+      todayCount,
+    };
+  }
+
+  if (todaySumPaisa + paisa > Math.round(limits.dailyMaxAmount * 100)) {
+    const remainingPaisa = Math.max(0, Math.round(limits.dailyMaxAmount * 100) - todaySumPaisa);
+    return {
+      valid: false,
+      error: `DAILY_AMOUNT_EXCEEDED: দৈনিক অবশিষ্ট সীমা ৳ ${(remainingPaisa / 100).toFixed(2)}`,
+      remainingDailyAmount: remainingPaisa / 100,
+    };
+  }
+
+  const feeCalc = calculateServiceFee(roundedAmount, 'send_money');
+
+  return {
+    valid: true,
+    amount: roundedAmount,
+    paisa,
+    recipientPhone: normalizedPhone,
+    fee: feeCalc.fee,
+    netAmount: feeCalc.netAmount,
+  };
+}
+
+/**
+ * Initiates an outward Send Money transaction.
+ */
+function initiateSendMoneyTransaction(senderConfig, request = {}) {
+  const validation = validateSendMoney(request.amount, request.recipientPhone, request.existingDailyTxns || []);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  const curBal = Number(request.currentBalance || 0);
+  const curPaisa = Math.round(curBal * 100);
+  const sendPaisa = validation.paisa;
+
+  if (curPaisa < sendPaisa) {
+    throw new Error('INSUFFICIENT_BALANCE: ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই');
+  }
+
+  const newBalPaisa = curPaisa - sendPaisa;
+  const newBalance = newBalPaisa / 100;
+  const txnNumber = `TP-SEND-${Date.now().toString().slice(-8)}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+  const nowIso = new Date().toISOString();
+
+  const transaction = {
+    id: 'w_send_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8),
+    transactionNumber: txnNumber,
+    type: 'send_money',
+    direction: 'out',
+    title: `সেন্ড মানি (${validation.recipientPhone})`,
+    titleEn: `Send Money (${validation.recipientPhone})`,
+    amount: validation.amount,
+    paisa: validation.paisa,
+    fee: validation.fee,
+    recipientPhone: validation.recipientPhone,
+    recipientName: request.recipientName || 'TallyKhata User',
+    balanceBefore: curBal,
+    balanceAfter: newBalance,
+    status: 'SUCCESS',
+    statusCode: '00',
+    statusMessageBn: 'সেন্ড মানি সফল হয়েছে',
+    statusMessageEn: 'Send Money Successful',
+    senderWallet: senderConfig.accountNo || senderConfig.ownerPhone || '01700000000',
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+
+  return {
+    success: true,
+    transaction,
+    newBalance,
+    formattedBengaliAmount: `৳ ${validation.amount.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}`,
+  };
+}
+
+/**
+ * Validates Mobile Recharge parameters.
+ */
+function validateMobileRecharge(amount, recipientPhone, operatorId, connectionType = 'prepaid', existingDailyTxns = []) {
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount || 0);
+
+  if (isNaN(numAmount) || numAmount <= 0) {
+    return { valid: false, error: 'INVALID_AMOUNT: টাকার সঠিক পরিমাণ লিখুন' };
+  }
+
+  const cleanPhone = String(recipientPhone || '').replace(/[^0-9]/g, '');
+  const normalizedPhone = cleanPhone.startsWith('880') ? cleanPhone.slice(2) : cleanPhone;
+  if (!/^01[3-9]\d{8}$/.test(normalizedPhone)) {
+    return { valid: false, error: 'INVALID_PHONE: ১১ ডিজিটের সঠিক মোবাইল নম্বর লিখুন' };
+  }
+
+  const detectedOp = detectOperator(normalizedPhone);
+  const operator = SUPPORTED_OPERATORS.find(op => op.id === operatorId) || detectedOp;
+  if (!operator) {
+    return { valid: false, error: 'INVALID_OPERATOR: সঠিক মোবাইল অপারেটর নির্বাচন করুন' };
+  }
+
+  const paisa = Math.round(numAmount * 100);
+  const roundedAmount = paisa / 100;
+  const limits = RECHARGE_LIMITS;
+
+  if (roundedAmount < limits.minAmount) {
+    return {
+      valid: false,
+      error: `MIN_AMOUNT_LIMIT: সর্বনিম্ন রিচার্জের পরিমাণ ৳ ${limits.minAmount.toFixed(2)}`,
+      paisa,
+      amount: roundedAmount,
+    };
+  }
+
+  if (roundedAmount > limits.maxAmountPerTxn) {
+    return {
+      valid: false,
+      error: `MAX_AMOUNT_LIMIT: প্রতিবার সর্বোচ্চ রিচার্জের পরিমাণ ৳ ${limits.maxAmountPerTxn.toLocaleString('bn-BD')}`,
+      paisa,
+      amount: roundedAmount,
+    };
+  }
+
+  const todayTxns = Array.isArray(existingDailyTxns) ? existingDailyTxns : [];
+  const todayCount = todayTxns.length;
+  const todaySumPaisa = todayTxns.reduce((acc, t) => acc + Math.round((Number(t.amount) || 0) * 100), 0);
+
+  if (todayCount >= limits.dailyMaxCount) {
+    return {
+      valid: false,
+      error: `DAILY_COUNT_EXCEEDED: দৈনিক সর্বোচ্চ ${limits.dailyMaxCount} বার রিচার্জ করা যাবে`,
+      todayCount,
+    };
+  }
+
+  if (todaySumPaisa + paisa > Math.round(limits.dailyMaxAmount * 100)) {
+    const remainingPaisa = Math.max(0, Math.round(limits.dailyMaxAmount * 100) - todaySumPaisa);
+    return {
+      valid: false,
+      error: `DAILY_AMOUNT_EXCEEDED: দৈনিক অবশিষ্ট সীমা ৳ ${(remainingPaisa / 100).toFixed(2)}`,
+      remainingDailyAmount: remainingPaisa / 100,
+    };
+  }
+
+  return {
+    valid: true,
+    amount: roundedAmount,
+    paisa,
+    recipientPhone: normalizedPhone,
+    operator,
+    connectionType: connectionType === 'postpaid' ? 'postpaid' : 'prepaid',
+    fee: 0,
+  };
+}
+
+/**
+ * Initiates an outward Mobile Recharge transaction.
+ */
+function initiateMobileRechargeTransaction(merchantConfig, request = {}) {
+  const validation = validateMobileRecharge(
+    request.amount,
+    request.recipientPhone,
+    request.operatorId,
+    request.connectionType,
+    request.existingDailyTxns || []
+  );
+
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  const curBal = Number(request.currentBalance || 0);
+  const curPaisa = Math.round(curBal * 100);
+  const rcgPaisa = validation.paisa;
+
+  if (curPaisa < rcgPaisa) {
+    throw new Error('INSUFFICIENT_BALANCE: ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই');
+  }
+
+  const newBalPaisa = curPaisa - rcgPaisa;
+  const newBalance = newBalPaisa / 100;
+  const txnNumber = `TP-RCG-${Date.now().toString().slice(-8)}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+  const nowIso = new Date().toISOString();
+
+  const transaction = {
+    id: 'w_rcg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8),
+    transactionNumber: txnNumber,
+    type: 'mobile_recharge',
+    direction: 'out',
+    title: `মোবাইল রিচার্জ (${validation.operator.nameBn})`,
+    titleEn: `Mobile Recharge (${validation.operator.nameEn})`,
+    amount: validation.amount,
+    paisa: validation.paisa,
+    recipientPhone: validation.recipientPhone,
+    operatorId: validation.operator.id,
+    operatorName: validation.operator.nameBn,
+    connectionType: validation.connectionType,
+    balanceBefore: curBal,
+    balanceAfter: newBalance,
+    fee: 0,
+    status: 'SUCCESS',
+    statusCode: '00',
+    statusMessageBn: 'মোবাইল রিচার্জ সফল হয়েছে',
+    statusMessageEn: 'Mobile Recharge Successful',
+    merchantWallet: merchantConfig.accountNo || merchantConfig.ownerPhone || '01700000000',
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+
+  return {
+    success: true,
+    transaction,
+    newBalance,
+    formattedBengaliAmount: `৳ ${validation.amount.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}`,
+  };
+}
+
 module.exports = {
   TRANSACTION_LIMITS,
   SERVICE_CHARGES,
   SUPPORTED_ADD_MONEY_CHANNELS,
+  RECHARGE_LIMITS,
+  SUPPORTED_OPERATORS,
+  detectOperator,
   calculateServiceFee,
   validateAddMoney,
   initiateAddMoneyTransaction,
+  validateSendMoney,
+  initiateSendMoneyTransaction,
+  validateMobileRecharge,
+  initiateMobileRechargeTransaction,
 };
