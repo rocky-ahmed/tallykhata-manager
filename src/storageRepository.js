@@ -344,6 +344,8 @@ class StorageRepository {
       let v6DataStr = await this.adapter.getItem(V6_KEY);
       if (!v6DataStr && typeof this.adapter.getItem === 'function') {
         v6DataStr = (await this.adapter.getItem('@' + V6_KEY)) ||
+                    (await this.adapter.getItem('@tallykhata_state_v6')) ||
+                    (await this.adapter.getItem('tallykhata_state_v6')) ||
                     (await this.adapter.getItem('tallykhata_v6_store')) ||
                     (await this.adapter.getItem('@tallykhata_v6_store'));
       }
@@ -1491,6 +1493,10 @@ class StorageRepository {
 
       const activeBiz = updatedBusinesses.find((b) => String(b.id) === String(nextActiveId));
 
+      const cashReconciliation = (prevStore.cashReconciliation && getBizId(prevStore.cashReconciliation) === targetId)
+        ? null
+        : prevStore.cashReconciliation;
+
       return {
         ...prevStore,
         businesses: updatedBusinesses,
@@ -1504,6 +1510,7 @@ class StorageRepository {
         notes,
         walletTxns,
         tagadaLogs,
+        cashReconciliation,
       };
     });
   }
@@ -1512,6 +1519,23 @@ class StorageRepository {
    * Commits restored backup payload safely into storage.
    * Performs validation, recalculates ledger balances, and writes atomically.
    */
+  /**
+   * Calculates aggregate financial metrics (receivables, payables, customer/supplier counts)
+   * strictly isolated for a specific business or across the entire store.
+   *
+   * @param {string|null} [businessId=null]
+   * @returns {{ totalReceivable: number, totalPayable: number, netBalance: number, customerCount: number, supplierCount: number }}
+   */
+  calculateMetrics(businessId = null) {
+    const { recalculateAllAccountBalances, calculateAggregateMetrics } = require('./ledgerEngine');
+    const store = this.currentStore || {};
+    const accounts = Array.isArray(store.accounts) ? store.accounts : [];
+    const journals = Array.isArray(store.journals) ? store.journals : [];
+    const recalcRes = recalculateAllAccountBalances(accounts, journals, businessId);
+    const updatedAccounts = recalcRes && recalcRes.updatedAccounts ? recalcRes.updatedAccounts : accounts;
+    return calculateAggregateMetrics(updatedAccounts, journals, businessId);
+  }
+
   async commitRestorePayload(backupPayload, options = {}) {
     if (!backupPayload || typeof backupPayload !== 'object') {
       throw new Error('Invalid restore payload: payload must be an object');
@@ -1524,7 +1548,8 @@ class StorageRepository {
     }
 
     const expectedChecksum = (backupPayload && backupPayload.checksum) ||
-                             (backupPayload && backupPayload.manifest && backupPayload.manifest.checksum) ||
+                             (backupPayload && backupPayload.manifest && (backupPayload.manifest.checksum || backupPayload.manifest.sha256)) ||
+                             (backupPayload && backupPayload.sha256) ||
                              null;
     if (expectedChecksum) {
       const dataToVerify = backupPayload.data || backupPayload;
@@ -1867,9 +1892,12 @@ class StorageRepository {
       } catch (_) {}
     }
 
-    if (backupPayload.checksum) {
+    const expectedChecksum = (backupPayload && backupPayload.checksum) ||
+                             (backupPayload && backupPayload.manifest && (backupPayload.manifest.checksum || backupPayload.manifest.sha256)) ||
+                             (backupPayload && backupPayload.sha256) ||
+                             null;
+    if (expectedChecksum) {
       const dataToVerify = backupPayload.data || backupPayload;
-      const expectedChecksum = backupPayload.checksum;
       const isLegacyChk = String(expectedChecksum).startsWith('chk_');
       const computed = isLegacyChk ? this.computeLegacyChecksum(dataToVerify) : this.computeChecksum(dataToVerify);
       if (computed !== expectedChecksum) {

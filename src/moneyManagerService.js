@@ -631,7 +631,7 @@ function calculateCategoryBudgets(arg1, arg2, arg3, arg4) {
   const result = categories
     .filter(cat => cat.type === "expense")
     .map(cat => {
-      const budget = roundCurrency(cat.budget || 0);
+      const budget = roundCurrency(Math.max(0, Number(cat.budget) || 0));
       const spent = roundCurrency(spentMap.get(cat.id) || 0);
       const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
       const isOver = budget > 0 && spent > budget;
@@ -915,18 +915,20 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
     return { catId, cat, amount, percent };
   }).sort((a, b) => b.amount - a.amount);
 
-  const overallBudget = state.overallMonthlyBudget || 0;
-  const overallBudgetPercent = overallBudget > 0 ? Math.min(100, Math.round((totalExpense / overallBudget) * 100)) : 0;
+  const overallBudget = roundCurrency(Math.max(0, Number(state.overallMonthlyBudget) || 0));
+  const overallBudgetRawPct = overallBudget > 0 ? Math.round((totalExpense / overallBudget) * 100) : 0;
+  const overallBudgetPercent = overallBudget > 0 ? Math.min(100, overallBudgetRawPct) : 0;
   const isOverallBudgetOver = overallBudget > 0 && totalExpense > overallBudget;
+  const isOverallBudgetAtLimit = overallBudget > 0 && totalExpense === overallBudget;
+  const isOverallBudgetWarning = overallBudget > 0 && overallBudgetRawPct >= 80 && totalExpense <= overallBudget;
   const overallBudgetRemaining = overallBudget > 0 ? (totalExpense > overallBudget ? 0 : roundCurrency(overallBudget - totalExpense)) : 0;
   const overallBudgetStatus = overallBudget <= 0
     ? "no_budget"
     : totalExpense > overallBudget
     ? "exceeded"
-    : (overallBudget > 0 && Math.round((totalExpense / overallBudget) * 100) >= 80)
+    : overallBudgetRawPct >= 80
     ? "warning"
     : "safe";
-  const overallBudgetRawPct = overallBudget > 0 ? Math.round((totalExpense / overallBudget) * 100) : 0;
 
   const netWorth = calculateNetWorth(state);
   const result = {
@@ -946,6 +948,8 @@ function calculatePeriodMetrics(state, period = "this_month", customRange = null
     overallBudgetRawPct,
     overallBudgetStatus,
     isOverallBudgetOver,
+    isOverallBudgetAtLimit,
+    isOverallBudgetWarning,
     overallBudgetRemaining,
   };
 

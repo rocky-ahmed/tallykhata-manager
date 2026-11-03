@@ -1547,8 +1547,8 @@ function calculateAggregateMetrics(accounts = [], journals = [], businessId = nu
 
   for (const acc of accounts) {
     if (!acc) continue;
-    const accBiz = acc.businessId !== undefined && acc.businessId !== null ? acc.businessId : acc.business_id;
-    if (businessId && accBiz && String(accBiz) !== String(businessId)) {
+    const accBiz = String(acc.businessId !== undefined && acc.businessId !== null ? acc.businessId : (acc.business_id !== undefined && acc.business_id !== null ? acc.business_id : "1"));
+    if (businessId && accBiz !== String(businessId)) {
       continue;
     }
     const bal = Number(acc.balance) || 0;
@@ -1599,8 +1599,8 @@ function deriveCashBoxSummary(cashEntries = [], businessId = null) {
 
   for (const entry of cashEntries) {
     if (!entry) continue;
-    const entryBiz = entry.businessId !== undefined && entry.businessId !== null ? entry.businessId : entry.business_id;
-    if (businessId && entryBiz && String(entryBiz) !== String(businessId)) {
+    const entryBiz = String(entry.businessId !== undefined && entry.businessId !== null ? entry.businessId : (entry.business_id !== undefined && entry.business_id !== null ? entry.business_id : "1"));
+    if (businessId && entryBiz !== String(businessId)) {
       continue;
     }
     const numAmt = Number(entry.amount) || 0;
@@ -1639,11 +1639,12 @@ function indexJournalsByAccount(allJournals = [], businessId = null) {
   const map = new Map();
   for (const j of allJournals) {
     if (!j) continue;
-    const accId = j.accountId !== undefined && j.accountId !== null ? j.accountId : j.orig_account_id;
-    if (accId === undefined || accId === null) continue;
-    const effectiveBizId = j.businessId !== undefined && j.businessId !== null
+    const rawAccId = j.accountId !== undefined && j.accountId !== null ? j.accountId : j.orig_account_id;
+    if (rawAccId === undefined || rawAccId === null || rawAccId === "") continue;
+    const accId = String(rawAccId);
+    const effectiveBizId = String(j.businessId !== undefined && j.businessId !== null
       ? j.businessId
-      : (j.business_id !== undefined && j.business_id !== null ? j.business_id : (businessId || '1'));
+      : (j.business_id !== undefined && j.business_id !== null ? j.business_id : (businessId || "1")));
     if (businessId && String(effectiveBizId) !== String(businessId)) {
       continue;
     }
