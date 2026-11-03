@@ -43,6 +43,9 @@ const {
   generatePrintableHtmlStatement,
   generateConsolidatedReportDocument,
   generatePrintableHtmlReport,
+  generateCustomerListReportDocument,
+  generateExpenseReportDocument,
+  generateStockMovementReportDocument,
   REPORT_PREFIXES,
   toBengaliNumeral,
   paginateStatementDocument,
@@ -2579,6 +2582,92 @@ class StorageRepository {
   }
 
   /**
+   * Generates structured customer list & outstanding debt report.
+   * Parity with activity_customer_list_report_builder.xml
+   *
+   * @param {Object} [options={}] Filter and sorting options
+   * @returns {Object} Structured report document payload with embedded print-ready HTML
+   */
+  generateCustomerListReportDocument(options = {}) {
+    const store = this.currentStore || this.getAuthoritativeState() || {};
+    const businessId = String(options.businessId || this.getActiveBusinessId() || "1");
+    const businesses = Array.isArray(store.businesses) ? store.businesses : [];
+    const currentBiz = businesses.find(b => String(b.id || b.business_id) === businessId) || null;
+
+    const mergedOptions = {
+      accounts: Array.isArray(options.accounts) ? options.accounts : (store.accounts || []),
+      journals: Array.isArray(options.journals) ? options.journals : (store.journals || []),
+      businessId,
+      business: currentBiz || options.business,
+      businessName: options.businessName || (currentBiz ? (currentBiz.name || currentBiz.business_name || currentBiz.businessName) : "টালিখাতা ডিজিটাল"),
+      businessPhone: options.businessPhone || (currentBiz ? currentBiz.phone : ""),
+      businessAddress: options.businessAddress || (currentBiz ? (currentBiz.address || currentBiz.business_address || currentBiz.businessAddress) : ""),
+      businessOwner: options.businessOwner || (currentBiz ? currentBiz.owner : ""),
+      ...options,
+    };
+
+    return generateCustomerListReportDocument(mergedOptions);
+  }
+
+  /**
+   * Generates business expense breakdown report.
+   * Parity with MonthlyExpensePdfBuilderActivity
+   *
+   * @param {string|Object} [dateRange="this_month"] Date range selection
+   * @param {Object} [options={}] Storage collections and overrides
+   * @returns {Object} Structured report document payload with embedded print-ready HTML
+   */
+  generateExpenseReportDocument(dateRange = "this_month", options = {}) {
+    const store = this.currentStore || this.getAuthoritativeState() || {};
+    const businessId = String(options.businessId || this.getActiveBusinessId() || "1");
+    const businesses = Array.isArray(store.businesses) ? store.businesses : [];
+    const currentBiz = businesses.find(b => String(b.id || b.business_id) === businessId) || null;
+
+    const mergedOptions = {
+      cashEntries: Array.isArray(options.cashEntries) ? options.cashEntries : (store.cashEntries || []),
+      journals: Array.isArray(options.journals) ? options.journals : (store.journals || []),
+      businessId,
+      business: currentBiz || options.business,
+      businessName: options.businessName || (currentBiz ? (currentBiz.name || currentBiz.business_name || currentBiz.businessName) : "টালিখাতা ডিজিটাল"),
+      businessPhone: options.businessPhone || (currentBiz ? currentBiz.phone : ""),
+      businessAddress: options.businessAddress || (currentBiz ? (currentBiz.address || currentBiz.business_address || currentBiz.businessAddress) : ""),
+      businessOwner: options.businessOwner || (currentBiz ? currentBiz.owner : ""),
+      ...options,
+    };
+
+    return generateExpenseReportDocument(dateRange, mergedOptions);
+  }
+
+  /**
+   * Generates inventory stock movement and valuation report.
+   * Parity with stock ledger statement layout
+   *
+   * @param {string|Object} [dateRange="all"] Date range selection
+   * @param {Object} [options={}] Storage collections and overrides
+   * @returns {Object} Structured report document payload with embedded print-ready HTML
+   */
+  generateStockMovementReportDocument(dateRange = "all", options = {}) {
+    const store = this.currentStore || this.getAuthoritativeState() || {};
+    const businessId = String(options.businessId || this.getActiveBusinessId() || "1");
+    const businesses = Array.isArray(store.businesses) ? store.businesses : [];
+    const currentBiz = businesses.find(b => String(b.id || b.business_id) === businessId) || null;
+
+    const mergedOptions = {
+      inventory: Array.isArray(options.inventory) ? options.inventory : (store.inventory || store.stock || []),
+      stock: Array.isArray(options.stock) ? options.stock : (store.stock || store.inventory || []),
+      businessId,
+      business: currentBiz || options.business,
+      businessName: options.businessName || (currentBiz ? (currentBiz.name || currentBiz.business_name || currentBiz.businessName) : "টালিখাতা ডিজিটাল"),
+      businessPhone: options.businessPhone || (currentBiz ? currentBiz.phone : ""),
+      businessAddress: options.businessAddress || (currentBiz ? (currentBiz.address || currentBiz.business_address || currentBiz.businessAddress) : ""),
+      businessOwner: options.businessOwner || (currentBiz ? currentBiz.owner : ""),
+      ...options,
+    };
+
+    return generateStockMovementReportDocument(dateRange, mergedOptions);
+  }
+
+  /**
    * Generates a printable, standalone HTML5 report styled to standard A4 (794px x 1123px / 210mm x 297mm).
    *
    * @param {Object} reportPayload Consolidated report document payload
@@ -3236,6 +3325,27 @@ function generateConsolidatedReportDocumentRepo(reportType, dateRange = 'all', o
   return generateConsolidatedReportDocument(reportType, dateRange, options);
 }
 
+function generateCustomerListReportDocumentRepo(options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.generateCustomerListReportDocument === 'function') {
+    return repo.generateCustomerListReportDocument(options);
+  }
+  return generateCustomerListReportDocument(options);
+}
+
+function generateExpenseReportDocumentRepo(dateRange = 'this_month', options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.generateExpenseReportDocument === 'function') {
+    return repo.generateExpenseReportDocument(dateRange, options);
+  }
+  return generateExpenseReportDocument(dateRange, options);
+}
+
+function generateStockMovementReportDocumentRepo(dateRange = 'all', options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.generateStockMovementReportDocument === 'function') {
+    return repo.generateStockMovementReportDocument(dateRange, options);
+  }
+  return generateStockMovementReportDocument(dateRange, options);
+}
+
 function generatePrintableHtmlReportRepo(reportPayload, options = {}, repo = defaultRepository) {
   if (repo && typeof repo.generatePrintableHtmlReport === 'function') {
     return repo.generatePrintableHtmlReport(reportPayload, options);
@@ -3272,6 +3382,8 @@ function generateAccountStatementRepo(accountOrId, journalsOrBizId, dateRange = 
 }
 
 const repoExport = {
+  V6_KEY,
+  V5_KEY,
   StorageRepository,
   storageRepository: defaultRepository,
   createDefaultState,
@@ -3300,6 +3412,9 @@ const repoExport = {
   generatePrintableHtmlStatement: generatePrintableHtmlStatementRepo,
   generateConsolidatedReportDocument: generateConsolidatedReportDocumentRepo,
   generatePrintableHtmlReport: generatePrintableHtmlReportRepo,
+  generateCustomerListReportDocument: generateCustomerListReportDocumentRepo,
+  generateExpenseReportDocument: generateExpenseReportDocumentRepo,
+  generateStockMovementReportDocument: generateStockMovementReportDocumentRepo,
   REPORT_PREFIXES,
   toBengaliNumeral,
   paginateStatementDocument: paginateStatementDocumentRepo,
@@ -3319,6 +3434,8 @@ if (typeof exports !== 'undefined') {
   exports.StorageRepository = StorageRepository;
   exports.storageRepository = defaultRepository;
   exports.createDefaultState = createDefaultState;
+  exports.V6_KEY = V6_KEY;
+  exports.V5_KEY = V5_KEY;
   exports.SAMPLE_CUSTOMER_MAPPINGS = SAMPLE_CUSTOMER_MAPPINGS;
   exports.migrateLegacySampleCustomerNames = migrateLegacySampleCustomerNames;
   exports.loadStore = loadStore;
@@ -3344,6 +3461,9 @@ if (typeof exports !== 'undefined') {
   exports.generatePrintableHtmlStatement = generatePrintableHtmlStatementRepo;
   exports.generateConsolidatedReportDocument = generateConsolidatedReportDocumentRepo;
   exports.generatePrintableHtmlReport = generatePrintableHtmlReportRepo;
+  exports.generateCustomerListReportDocument = generateCustomerListReportDocumentRepo;
+  exports.generateExpenseReportDocument = generateExpenseReportDocumentRepo;
+  exports.generateStockMovementReportDocument = generateStockMovementReportDocumentRepo;
   exports.REPORT_PREFIXES = REPORT_PREFIXES;
   exports.toBengaliNumeral = toBengaliNumeral;
   exports.paginateStatementDocument = paginateStatementDocumentRepo;

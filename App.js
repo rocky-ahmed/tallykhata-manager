@@ -846,6 +846,7 @@ function TallyKhataApp() {
   const [statementDateFilter, setStatementDateFilter] = useState('all'); // 'all' | 'today' | 'this_month' | 'last_month'
   const [modalStatementExport, setModalStatementExport] = useState(false);
   const [modalPrintPreview, setModalPrintPreview] = useState(false);
+  const [reportPreviewType, setReportPreviewType] = useState('statement'); // 'statement' | 'customer_baki' | 'expense' | 'stock' | 'bechakena'
   const [modalBulkTagada, setModalBulkTagada] = useState(false);
   const [selectedBulkCustomerIds, setSelectedBulkCustomerIds] = useState({});
   const [modalTallyMessage, setModalTallyMessage] = useState(false);
@@ -4636,6 +4637,81 @@ function TallyKhataApp() {
     return fullStatement;
   };
 
+  const getFullReportText = (type = 'all') => {
+    const today = getTodayDate();
+    if (type === 'customer_baki') {
+      const debtors = (businessAccounts || []).filter(a => a.type === 1 && (Number(a.balance) || 0) > 0);
+      let text = `=== ${businessName} ===\n` +
+        `${tStatic("রিপোর্ট: কাস্টমার বাকি তালিকা")}\n` +
+        `${tStatic("তারিখ: ")}${today}\n` +
+        `${tStatic("মোট পাওনা বকেয়া: ৳ ")}${formatMoney(totalCustomerDue)}\n` +
+        `${tStatic("দেনাদার কাস্টমার সংখ্যা: ")}${debtors.length}${tStatic(" জন\n")}` +
+        `---------------------------------\n`;
+      debtors.slice(0, 50).forEach((c, idx) => {
+        text += `${idx + 1}. ${c.name}: ৳ ${formatMoney(c.balance)} (${c.phone || tStatic("ফোন নেই")})\n`;
+      });
+      text += `---------------------------------\n` +
+        `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
+      return text;
+    } else if (type === 'expense') {
+      const expenses = (businessCashEntries || []).filter(c => c.type === 'out');
+      let expSum = 0;
+      expenses.forEach(e => { expSum += Number(e.amount) || 0; });
+      let text = `=== ${businessName} ===\n` +
+        `${tStatic("রিপোর্ট: দোকানের খরচ রিপোর্ট")}\n` +
+        `${tStatic("তারিখ: ")}${today}\n` +
+        `${tStatic("মোট খরচ: ৳ ")}${formatMoney(expSum)}\n` +
+        `${tStatic("খরচ এন্ট্রি সংখ্যা: ")}${expenses.length}${tStatic(" টি\n")}` +
+        `---------------------------------\n`;
+      expenses.slice(0, 50).forEach((e, idx) => {
+        text += `${idx + 1}. ${e.date || today} - ${e.category || tStatic("সাধারণ খরচ")}: ৳ ${formatMoney(e.amount)} (${e.desc || e.note || '-'}\n`;
+      });
+      text += `---------------------------------\n` +
+        `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
+      return text;
+    } else if (type === 'stock') {
+      let text = `=== ${businessName} ===\n` +
+        `${tStatic("রিপোর্ট: পণ্য স্টক ও মূল্যায়ন রিপোর্ট")}\n` +
+        `${tStatic("তারিখ: ")}${today}\n` +
+        `${tStatic("মোট পণ্য প্রকার: ")}${businessInventory.length}${tStatic(" টি\n")}` +
+        `${tStatic("মোট স্টক ক্রয়মূল্য: ৳ ")}${formatMoney(totalStockCost)}\n` +
+        `${tStatic("মোট সম্ভাব্য বিক্রয়মূল্য: ৳ ")}${formatMoney(totalStockSaleValue)}\n` +
+        `---------------------------------\n`;
+      (businessInventory || []).slice(0, 50).forEach((p, idx) => {
+        const qty = Number(p.stock) || 0;
+        const buy = Number(p.buyPrice) || 0;
+        text += `${idx + 1}. ${p.name}: ${qty} ${p.unit || tStatic("পিস")} x ৳ ${formatMoney(buy)} = ৳ ${formatMoney(qty * buy)}\n`;
+      });
+      text += `---------------------------------\n` +
+        `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
+      return text;
+    } else if (type === 'bechakena') {
+      const gross = Math.max(0, todaySales + totalCustomerDue - totalSupplierDue - todayCosts);
+      let text = `=== ${businessName} ===\n` +
+        `${tStatic("রিপোর্ট: বেচাকেনা সামারি রিপোর্ট")}\n` +
+        `${tStatic("তারিখ: ")}${today}\n` +
+        `${tStatic("আজকের মোট বিক্রয়: ৳ ")}${formatMoney(todaySales)}\n` +
+        `${tStatic("মোট কাস্টমার বাকি: ৳ ")}${formatMoney(totalCustomerDue)}\n` +
+        `${tStatic("মোট সাপ্লায়ার দেনা: ৳ ")}${formatMoney(totalSupplierDue)}\n` +
+        `${tStatic("আজকের খরচ: ৳ ")}${formatMoney(todayCosts)}\n` +
+        `${tStatic("আনুমানিক নিট লাভ: ৳ ")}${formatMoney(gross)}\n` +
+        `---------------------------------\n` +
+        `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
+      return text;
+    } else {
+      let text = `=== ${businessName}${tStatic(" - সার্বিক হিসাব ও রিপোর্ট ডাউনলোড ===\n")}` +
+        `${tStatic("তারিখ: ")}${today}\n` +
+        `---------------------------------\n` +
+        `${tStatic("মোট বাকি পাবো: ৳ ")}${formatMoney(totalCustomerDue)}\n` +
+        `${tStatic("মোট দেনা দিবো: ৳ ")}${formatMoney(totalSupplierDue)}\n` +
+        `${tStatic("ক্যাশ বাক্সে আছে: ৳ ")}${formatMoney(totalCash)}\n` +
+        `${tStatic("স্টক পণ্যের মূল্য: ৳ ")}${formatMoney(totalStockCost)}\n` +
+        `${tStatic("মোট ব্যবসা সম্পদ: ৳ ")}${formatMoney(totalCash + totalCustomerDue + totalStockCost)}\n` +
+        `${tStatic("যোগাযোগ: ")}${ownerPhone}`;
+      return text;
+    }
+  };
+
   return (
     <ThemeContext.Provider value={themeContextValue}>
     <SafeAreaView style={[styles.container, isDark && { backgroundColor: currentTheme.screenBg }]}>
@@ -4902,6 +4978,350 @@ function TallyKhataApp() {
             style={{ flex: 1 }}
           />
         </View>
+        </View>
+      ) : currentScreen === 'reports' ? (
+        <View style={[{ flex: 1 }, isDark && tStyles.screenBg]}>
+          {/* Reports Screen Top Header */}
+          <View style={[styles.topHeaderBarRed, isDark && tStyles.topHeaderBar]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() => setCurrentScreen('home')}
+                activeOpacity={0.7}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("হোম স্ক্রিনে ফেরত যান")}
+              >
+                <Image
+                  source={require('./assets/icons/arrow_left.png')}
+                  style={{ width: 22, height: 22, tintColor: '#FFFFFF' }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+              <View style={{ marginLeft: 8, flex: 1 }}>
+                <Text style={styles.topBarTitleWhite}>{tStatic("রিপোর্ট ও স্টেটমেন্ট ডাউনলোড")}</Text>
+                <Text style={styles.headerSubtitleWhite}>{tStatic("সকল খতিয়ান ও পিডিএফ সামারি")}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.headerWhiteActionBtn}
+              onPress={() => {
+                const rep = getFullReportText('all');
+                Share.share({ message: rep, title: (businessName || '') + ' - রিপোর্ট ডাউনলোড' });
+              }}
+              activeOpacity={0.7}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("রিপোর্ট শেয়ার করুন")}
+            >
+              <Image
+                source={require('./assets/icons/ic_share.png')}
+                style={{ width: 20, height: 20, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* KPI Overview Row & 4 Report Download Cards */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 14, paddingBottom: Platform.OS === 'android' ? 60 : 30 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* KPI Metric Overview Row */}
+            <View style={[styles.reportKpiRow, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+              <View style={[styles.reportKpiMiniCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <Text style={[styles.reportKpiMiniLabel, isDark && tStyles.textSecondary]}>{tStatic("বাকি পাওনা")}</Text>
+                <Text style={[styles.reportKpiMiniValue, { color: '#B91C1C' }]}>৳ {formatMoney(totalCustomerDue)}</Text>
+              </View>
+              <View style={[styles.reportKpiMiniCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <Text style={[styles.reportKpiMiniLabel, isDark && tStyles.textSecondary]}>{tStatic("মোট দেনা")}</Text>
+                <Text style={[styles.reportKpiMiniValue, { color: '#15803D' }]}>৳ {formatMoney(totalSupplierDue)}</Text>
+              </View>
+              <View style={[styles.reportKpiMiniCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <Text style={[styles.reportKpiMiniLabel, isDark && tStyles.textSecondary]}>{tStatic("স্টক মূল্য")}</Text>
+                <Text style={[styles.reportKpiMiniValue, { color: '#D97706' }]}>৳ {formatMoney(totalStockCost)}</Text>
+              </View>
+              <View style={[styles.reportKpiMiniCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <Text style={[styles.reportKpiMiniLabel, isDark && tStyles.textSecondary]}>{tStatic("মোট সম্পদ")}</Text>
+                <Text style={[styles.reportKpiMiniValue, { color: '#2563EB' }]}>৳ {formatMoney(totalCash + totalCustomerDue + totalStockCost)}</Text>
+              </View>
+            </View>
+
+            {/* Section Header: "রিপোর্ট ও স্টেটমেন্ট ডাউনলোড" with count badge */}
+            <View style={styles.reportSectionHeaderRow}>
+              <Text style={[styles.reportSectionHeaderTitle, isDark && tStyles.textPrimary]}>
+                {tStatic("রিপোর্ট ও স্টেটমেন্ট ডাউনলোড")}
+              </Text>
+              <View style={styles.reportCountBadge}>
+                <Text style={styles.reportCountBadgeText}>{tStatic("৪টি রিপোর্ট উপলব্ধ")}</Text>
+              </View>
+            </View>
+
+            {/* Card 1: কাস্টমার বাকি তালিকা (Customer Debtors Directory Report) */}
+            <View style={[styles.reportDownloadCard, isDark && tStyles.card]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <AppIcon source={require('./assets/icons/ic_menu_baki_hisab.png')} variant="primary" shape="rounded" size={24} containerSize={42} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.reportDownloadTitle, isDark && tStyles.textPrimary]}>
+                    {tStatic("কাস্টমার বাকি তালিকা")}
+                  </Text>
+                  <Text style={[styles.reportDownloadSubtitle, isDark && tStyles.textSecondary]}>
+                    {tStatic("বকেয়াদার গ্রাহকের সম্পূর্ণ খতিয়ান ও তালিকা")}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.reportDownloadMetricBox, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <View>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>{tStatic("দেনাদার গ্রাহক")}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginTop: 2 }}>
+                    {(businessAccounts || []).filter(a => a.type === 1 && (Number(a.balance) || 0) > 0).length} {tStatic("জন")}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>{tStatic("মোট বাকি পাওনা")}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#B91C1C', marginTop: 2 }}>
+                    ৳ {formatMoney(totalCustomerDue)}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.reportDownloadBtn, { flex: 1.4 }]}
+                  onPress={() => {
+                    setReportPreviewType('customer_baki');
+                    setModalPrintPreview(true);
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("কাস্টমার বাকি তালিকা পিডিএফ প্রিভিউ")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_pdf.png')}
+                    style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 6 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.reportDownloadBtnText}>{tStatic("পিডিএফ প্রিভিউ / প্রিন্ট")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.reportDownloadShareBtn, { flex: 1 }]}
+                  onPress={() => {
+                    Share.share({ message: getFullReportText('customer_baki'), title: (businessName || '') + ' - কাস্টমার বাকি তালিকা' });
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("কাস্টমার বাকি তালিকা শেয়ার")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_share.png')}
+                    style={{ width: 16, height: 16, tintColor: isDark ? '#E2E8F0' : '#475569', marginRight: 6 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={[styles.reportDownloadShareBtnText, isDark && { color: currentTheme.textPrimary }]}>{tStatic("শেয়ার")}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Card 2: দোকানের খরচ রিপোর্ট (Monthly & Daily Expense Breakdown) */}
+            <View style={[styles.reportDownloadCard, isDark && tStyles.card]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <AppIcon source={require('./assets/icons/ic_menu_cost.png')} variant="danger" shape="rounded" size={24} containerSize={42} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.reportDownloadTitle, isDark && tStyles.textPrimary]}>
+                    {tStatic("দোকানের খরচ রিপোর্ট")}
+                  </Text>
+                  <Text style={[styles.reportDownloadSubtitle, isDark && tStyles.textSecondary]}>
+                    {tStatic("মাসিক ও দৈনিক দোকানের সকল খরচের হিসাব")}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.reportDownloadMetricBox, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <View>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>{tStatic("খরচ এন্ট্রি")}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginTop: 2 }}>
+                    {(businessCashEntries || []).filter(c => c.type === 'out').length} {tStatic("টি")}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>{tStatic("মোট খরচের পরিমাণ")}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#B91C1C', marginTop: 2 }}>
+                    ৳ {formatMoney((businessCashEntries || []).filter(c => c.type === 'out').reduce((sum, c) => sum + (Number(c.amount) || 0), 0))}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.reportDownloadBtn, { flex: 1.4 }]}
+                  onPress={() => {
+                    setReportPreviewType('expense');
+                    setModalPrintPreview(true);
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("দোকানের খরচ রিপোর্ট পিডিএফ প্রিভিউ")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_pdf.png')}
+                    style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 6 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.reportDownloadBtnText}>{tStatic("পিডিএফ প্রিভিউ / প্রিন্ট")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.reportDownloadShareBtn, { flex: 1 }]}
+                  onPress={() => {
+                    Share.share({ message: getFullReportText('expense'), title: (businessName || '') + ' - দোকানের খরচ রিপোর্ট' });
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("দোকানের খরচ রিপোর্ট শেয়ার")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_share.png')}
+                    style={{ width: 16, height: 16, tintColor: isDark ? '#E2E8F0' : '#475569', marginRight: 6 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={[styles.reportDownloadShareBtnText, isDark && { color: currentTheme.textPrimary }]}>{tStatic("শেয়ার")}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Card 3: পণ্য স্টক ও মূল্যায়ন রিপোর্ট (Product Stock Movement & Valuation) */}
+            <View style={[styles.reportDownloadCard, isDark && tStyles.card]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <AppIcon source={require('./assets/icons/ic_menu_stock.png')} variant="warning" shape="rounded" size={24} containerSize={42} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.reportDownloadTitle, isDark && tStyles.textPrimary]}>
+                    {tStatic("পণ্য স্টক ও মূল্যায়ন রিপোর্ট")}
+                  </Text>
+                  <Text style={[styles.reportDownloadSubtitle, isDark && tStyles.textSecondary]}>
+                    {tStatic("মজুদ পণ্যের পরিমাণ, ক্রয়মূল্য ও মোট মূল্যায়ন")}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.reportDownloadMetricBox, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <View>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>{tStatic("মোট পণ্য প্রকার")}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginTop: 2 }}>
+                    {businessInventory.length} {tStatic("টি")}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>{tStatic("মোট স্টক মূল্যায়ন")}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#047857', marginTop: 2 }}>
+                    ৳ {formatMoney(totalStockCost)}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.reportDownloadBtn, { flex: 1.4 }]}
+                  onPress={() => {
+                    setReportPreviewType('stock');
+                    setModalPrintPreview(true);
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("পণ্য স্টক ও মূল্যায়ন রিপোর্ট পিডিএফ প্রিভিউ")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_pdf.png')}
+                    style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 6 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.reportDownloadBtnText}>{tStatic("পিডিএফ প্রিভিউ / প্রিন্ট")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.reportDownloadShareBtn, { flex: 1 }]}
+                  onPress={() => {
+                    Share.share({ message: getFullReportText('stock'), title: (businessName || '') + ' - পণ্য স্টক ও মূল্যায়ন রিপোর্ট' });
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("পণ্য স্টক ও মূল্যায়ন রিপোর্ট শেয়ার")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_share.png')}
+                    style={{ width: 16, height: 16, tintColor: isDark ? '#E2E8F0' : '#475569', marginRight: 6 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={[styles.reportDownloadShareBtnText, isDark && { color: currentTheme.textPrimary }]}>{tStatic("শেয়ার")}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Card 4: বেচাকেনা সামারি রিপোর্ট (Sales & Purchase Summary) */}
+            <View style={[styles.reportDownloadCard, isDark && tStyles.card]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <AppIcon source={require('./assets/icons/ic_menu_report.png')} variant="purple" shape="rounded" size={24} containerSize={42} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.reportDownloadTitle, isDark && tStyles.textPrimary]}>
+                    {tStatic("বেচাকেনা সামারি রিপোর্ট")}
+                  </Text>
+                  <Text style={[styles.reportDownloadSubtitle, isDark && tStyles.textSecondary]}>
+                    {tStatic("মোট বিক্রয়, মোট ক্রয় ও লাভ-ক্ষতির সারাংশ")}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.reportDownloadMetricBox, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <View>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>{tStatic("আজকের বিক্রয়")}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#047857', marginTop: 2 }}>
+                    ৳ {formatMoney(todaySales)}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>{tStatic("আনুমানিক নিট লাভ")}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#B91C1C', marginTop: 2 }}>
+                    ৳ {formatMoney(Math.max(0, todaySales + totalCustomerDue - totalSupplierDue - todayCosts))}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.reportDownloadBtn, { flex: 1.4 }]}
+                  onPress={() => {
+                    setReportPreviewType('bechakena');
+                    setModalPrintPreview(true);
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("বেচাকেনা সামারি রিপোর্ট পিডিএফ প্রিভিউ")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_pdf.png')}
+                    style={{ width: 16, height: 16, tintColor: '#FFFFFF', marginRight: 6 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.reportDownloadBtnText}>{tStatic("পিডিএফ প্রিভিউ / প্রিন্ট")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.reportDownloadShareBtn, { flex: 1 }]}
+                  onPress={() => {
+                    Share.share({ message: getFullReportText('bechakena'), title: (businessName || '') + ' - বেচাকেনা সামারি রিপোর্ট' });
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("বেচাকেনা সামারি রিপোর্ট শেয়ার")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_share.png')}
+                    style={{ width: 16, height: 16, tintColor: isDark ? '#E2E8F0' : '#475569', marginRight: 6 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={[styles.reportDownloadShareBtnText, isDark && { color: currentTheme.textPrimary }]}>{tStatic("শেয়ার")}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
         </View>
       ) : (
         <View style={{ flex: 1 }}>
@@ -6104,7 +6524,9 @@ function TallyKhataApp() {
 
               <TouchableOpacity
                 style={[styles.menuListItem, isDark && tStyles.menuListItem]}
-                onPress={() => setModalFullReport(true)}
+                onPress={() => {
+                  setCurrentScreen('reports');
+                }}
               >
                 <AppIcon source={require('./assets/icons/ic_menu_report.png')} variant="purple" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
@@ -9363,7 +9785,7 @@ function TallyKhataApp() {
       </Modal>
 
       {/* ===================================================================
-          MODAL: PRINTABLE A4 STATEMENT PREVIEW (ITERATION 209)
+          MODAL: PRINTABLE A4 STATEMENT & REPORT PREVIEW (ITERATION 209 & 210)
          =================================================================== */}
       <Modal visible={modalPrintPreview} animationType="slide" onRequestClose={() => setModalPrintPreview(false)}>
         <SafeAreaView style={[styles.reportContainer, isDark && tStyles.reportContainer]}>
@@ -9383,7 +9805,13 @@ function TallyKhataApp() {
               />
             </TouchableOpacity>
             <View style={{ flex: 1, marginHorizontal: 8 }}>
-              <Text style={styles.reportHeaderTitle}>{tStatic("পিডিএফ ভিউ / প্রিন্ট")}</Text>
+              <Text style={styles.reportHeaderTitle}>
+                {reportPreviewType === 'customer_baki' ? tStatic("কাস্টমার বাকি তালিকা") :
+                 reportPreviewType === 'expense' ? tStatic("দোকানের খরচ রিপোর্ট") :
+                 reportPreviewType === 'stock' ? tStatic("পণ্য স্টক ও মূল্যায়ন রিপোর্ট") :
+                 reportPreviewType === 'bechakena' ? tStatic("বেচাকেনা সামারি রিপোর্ট") :
+                 tStatic("পিডিএফ ভিউ / প্রিন্ট")}
+              </Text>
               <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }} numberOfLines={1}>
                 {tStatic("A4 পেপার প্রিভিউ")}
               </Text>
@@ -9391,12 +9819,19 @@ function TallyKhataApp() {
             <TouchableOpacity
               style={styles.reportHeaderAction}
               onPress={() => {
-                if (!selectedAccount) return;
-                const fullText = getFullStatementText();
-                Share.share({ message: fullText, title: `${tStatic("হিসাব বিবরণী")} - ${selectedAccount.name}` });
+                if (reportPreviewType === 'statement') {
+                  if (!selectedAccount) return;
+                  const fullText = getFullStatementText();
+                  Share.share({ message: fullText, title: `${tStatic("হিসাব বিবরণী")} - ${selectedAccount.name}` });
+                } else {
+                  const fullText = getFullReportText(reportPreviewType);
+                  Share.share({ message: fullText, title: `${businessName || ''} - ${tStatic("রিপোর্ট ডাউনলোড")}` });
+                }
               }}
               activeOpacity={0.7}
               hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("শেয়ার")}
             >
               <Image
                 source={require('./assets/icons/ic_share.png')}
@@ -9426,7 +9861,11 @@ function TallyKhataApp() {
                 <View style={{ alignItems: 'flex-end' }}>
                   <View style={styles.printDocBadge}>
                     <Text style={styles.printDocBadgeText}>
-                      {selectedAccount && selectedAccount.type === 2 ? tStatic("দেনা হিসাব বিবরণী") : tStatic("বকেয়া হিসাব বিবরণী")}
+                      {reportPreviewType === 'customer_baki' ? tStatic("কাস্টমার বাকি তালিকা") :
+                       reportPreviewType === 'expense' ? tStatic("দোকানের খরচ রিপোর্ট") :
+                       reportPreviewType === 'stock' ? tStatic("পণ্য স্টক ও মূল্যায়ন রিপোর্ট") :
+                       reportPreviewType === 'bechakena' ? tStatic("বেচাকেনা সামারি রিপোর্ট") :
+                       (selectedAccount && selectedAccount.type === 2 ? tStatic("দেনা হিসাব বিবরণী") : tStatic("বকেয়া হিসাব বিবরণী"))}
                     </Text>
                   </View>
                   <Text style={styles.printMetaDate}>{tStatic("তারিখ: ")}{getTodayDate()}</Text>
@@ -9435,95 +9874,411 @@ function TallyKhataApp() {
 
               <View style={styles.printDivider} />
 
-              {/* Debtor / Account Summary Card */}
-              {selectedAccount ? (
-                <View style={styles.printAccountCard}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.printAccountName}>{selectedAccount.name}</Text>
-                      <Text style={styles.printAccountPhone}>{selectedAccount.phone || tStatic("মোবাইল নম্বর দেওয়া নেই")}</Text>
-                      <Text style={styles.printRangeBadge}>
-                        {tStatic("সময়কাল: ")}{
-                          statementDateFilter === 'today' ? tStatic("আজকের লেনদেন") :
-                          statementDateFilter === 'this_month' ? tStatic("চলতি মাসের লেনদেন") :
-                          statementDateFilter === 'last_month' ? tStatic("গত মাসের লেনদেন") :
-                          tStatic("সকল লেনদেন")
-                        }
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.printClosingLabel}>
-                        {selectedAccount.type === 2 ? tStatic("বর্তমান দেনা") : tStatic("বর্তমান বকেয়া")}
-                      </Text>
-                      <Text style={[styles.printClosingAmount, { color: statementBalance > 0 ? '#B91C1C' : '#047857' }]}>
-                        {tStatic("৳ ")}{formatMoney(statementBalance)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* 3 Metric Pills */}
-                  <View style={styles.printMetricRow}>
-                    <View style={styles.printMetricCol}>
-                      <Text style={styles.printMetricLabel}>{tStatic("দিলাম মোট (+)")}</Text>
-                      <Text style={[styles.printMetricVal, { color: '#B91C1C' }]}>{tStatic("৳ ")}{formatMoney(statementGiven)}</Text>
-                    </View>
-                    <View style={styles.printMetricDivider} />
-                    <View style={styles.printMetricCol}>
-                      <Text style={styles.printMetricLabel}>{tStatic("পেলাম মোট (-)")}</Text>
-                      <Text style={[styles.printMetricVal, { color: '#047857' }]}>{tStatic("৳ ")}{formatMoney(statementReceived)}</Text>
-                    </View>
-                    <View style={styles.printMetricDivider} />
-                    <View style={styles.printMetricCol}>
-                      <Text style={styles.printMetricLabel}>{tStatic("মোট লেনদেন")}</Text>
-                      <Text style={styles.printMetricVal}>{filteredStatementJournals.length}{tStatic(" টি")}</Text>
-                    </View>
-                  </View>
-                </View>
-              ) : null}
-
-              {/* Itemized 3-Column Table */}
-              <View style={styles.printTableWrap}>
-                <View style={styles.printTableHeader}>
-                  <Text style={[styles.printTh, { flex: 1.6 }]}>{tStatic("তারিখ ও বিবরণ")}</Text>
-                  <Text style={[styles.printTh, { flex: 1, textAlign: 'right', color: '#B91C1C' }]}>{tStatic("দিলাম (+)")}</Text>
-                  <Text style={[styles.printTh, { flex: 1, textAlign: 'right', color: '#047857' }]}>{tStatic("পেলাম (-)")}</Text>
-                </View>
-
-                {filteredStatementJournals.length > 0 ? (
-                  filteredStatementJournals.map((item, index) => {
-                    const isCust = selectedAccount ? selectedAccount.type === 1 : true;
-                    return (
-                      <View key={item.id || `print_${index}`} style={styles.printTableRow}>
-                        <View style={{ flex: 1.6, paddingRight: 4 }}>
-                          <Text style={styles.printTdDate}>{item.date || ''}</Text>
-                          <Text style={styles.printTdDesc} numberOfLines={2}>
-                            {item.desc || item.note || (item.type === 'given' ? (isCust ? 'বাকি দেওয়া' : 'পাওনা শোধ') : (isCust ? 'টাকা নেওয়া' : 'মাল বাকি'))}
-                          </Text>
-                          {item.balance !== undefined ? (
-                            <Text style={styles.printTdBal}>{tStatic("জের: ৳ ")}{formatMoney(item.balance)}</Text>
-                          ) : null}
-                        </View>
-                        <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
-                          <Text style={[styles.printTdAmount, { color: '#B91C1C' }]}>
-                            {item.type === 'given' ? `${tStatic("৳ ")}${formatMoney(item.amount)}` : '-'}
+              {/* REPORT TYPE 1: STATEMENT (selectedAccount) */}
+              {reportPreviewType === 'statement' ? (
+                <>
+                  {selectedAccount ? (
+                    <View style={styles.printAccountCard}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.printAccountName}>{selectedAccount.name}</Text>
+                          <Text style={styles.printAccountPhone}>{selectedAccount.phone || tStatic("মোবাইল নম্বর দেওয়া নেই")}</Text>
+                          <Text style={styles.printRangeBadge}>
+                            {tStatic("সময়কাল: ")}{
+                              statementDateFilter === 'today' ? tStatic("আজকের লেনদেন") :
+                              statementDateFilter === 'this_month' ? tStatic("চলতি মাসের লেনদেন") :
+                              statementDateFilter === 'last_month' ? tStatic("গত মাসের লেনদেন") :
+                              tStatic("সকল লেনদেন")
+                            }
                           </Text>
                         </View>
-                        <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
-                          <Text style={[styles.printTdAmount, { color: '#047857' }]}>
-                            {item.type === 'received' ? `${tStatic("৳ ")}${formatMoney(item.amount)}` : '-'}
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={styles.printClosingLabel}>
+                            {selectedAccount.type === 2 ? tStatic("বর্তমান দেনা") : tStatic("বর্তমান বকেয়া")}
+                          </Text>
+                          <Text style={[styles.printClosingAmount, { color: statementBalance > 0 ? '#B91C1C' : '#047857' }]}>
+                            {tStatic("৳ ")}{formatMoney(statementBalance)}
                           </Text>
                         </View>
                       </View>
-                    );
-                  })
-                ) : (
-                  <View style={{ padding: 24, alignItems: 'center' }}>
-                    <Text style={{ color: '#64748B', fontSize: 13 }}>
-                      {tStatic("এই সময়ের মধ্যে কোনো লেনদেন পাওয়া যায়নি")}
-                    </Text>
+
+                      {/* 3 Metric Pills */}
+                      <View style={styles.printMetricRow}>
+                        <View style={styles.printMetricCol}>
+                          <Text style={styles.printMetricLabel}>{tStatic("দিলাম মোট (+)")}</Text>
+                          <Text style={[styles.printMetricVal, { color: '#B91C1C' }]}>{tStatic("৳ ")}{formatMoney(statementGiven)}</Text>
+                        </View>
+                        <View style={styles.printMetricDivider} />
+                        <View style={styles.printMetricCol}>
+                          <Text style={styles.printMetricLabel}>{tStatic("পেলাম মোট (-)")}</Text>
+                          <Text style={[styles.printMetricVal, { color: '#047857' }]}>{tStatic("৳ ")}{formatMoney(statementReceived)}</Text>
+                        </View>
+                        <View style={styles.printMetricDivider} />
+                        <View style={styles.printMetricCol}>
+                          <Text style={styles.printMetricLabel}>{tStatic("মোট লেনদেন")}</Text>
+                          <Text style={styles.printMetricVal}>{filteredStatementJournals.length}{tStatic(" টি")}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* Itemized 3-Column Table */}
+                  <View style={styles.printTableWrap}>
+                    <View style={styles.printTableHeader}>
+                      <Text style={[styles.printTh, { flex: 1.6 }]}>{tStatic("তারিখ ও বিবরণ")}</Text>
+                      <Text style={[styles.printTh, { flex: 1, textAlign: 'right', color: '#B91C1C' }]}>{tStatic("দিলাম (+)")}</Text>
+                      <Text style={[styles.printTh, { flex: 1, textAlign: 'right', color: '#047857' }]}>{tStatic("পেলাম (-)")}</Text>
+                    </View>
+
+                    {filteredStatementJournals.length > 0 ? (
+                      filteredStatementJournals.map((item, index) => {
+                        const isCust = selectedAccount ? selectedAccount.type === 1 : true;
+                        return (
+                          <View key={item.id || `print_${index}`} style={styles.printTableRow}>
+                            <View style={{ flex: 1.6, paddingRight: 4 }}>
+                              <Text style={styles.printTdDate}>{item.date || ''}</Text>
+                              <Text style={styles.printTdDesc} numberOfLines={2}>
+                                {item.desc || item.note || (item.type === 'given' ? (isCust ? 'বাকি দেওয়া' : 'পাওনা শোধ') : (isCust ? 'টাকা নেওয়া' : 'মাল বাকি'))}
+                              </Text>
+                              {item.balance !== undefined ? (
+                                <Text style={styles.printTdBal}>{tStatic("জের: ৳ ")}{formatMoney(item.balance)}</Text>
+                              ) : null}
+                            </View>
+                            <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                              <Text style={[styles.printTdAmount, { color: '#B91C1C' }]}>
+                                {item.type === 'given' ? `${tStatic("৳ ")}${formatMoney(item.amount)}` : '-'}
+                              </Text>
+                            </View>
+                            <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                              <Text style={[styles.printTdAmount, { color: '#047857' }]}>
+                                {item.type === 'received' ? `${tStatic("৳ ")}${formatMoney(item.amount)}` : '-'}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })
+                    ) : (
+                      <View style={{ padding: 24, alignItems: 'center' }}>
+                        <Text style={{ color: '#64748B', fontSize: 13 }}>
+                          {tStatic("এই সময়ের মধ্যে কোনো লেনদেন পাওয়া যায়নি")}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
+                </>
+              ) : null}
+
+              {/* REPORT TYPE 2: CUSTOMER BAKI DIRECTORY */}
+              {reportPreviewType === 'customer_baki' ? (
+                <>
+                  {(() => {
+                    const debtors = (businessAccounts || []).filter(a => a.type === 1 && (Number(a.balance) || 0) > 0);
+                    return (
+                      <>
+                        <View style={styles.printAccountCard}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.printAccountName}>{tStatic("সকল দেনাদার গ্রাহক তালিকা")}</Text>
+                              <Text style={styles.printAccountPhone}>{tStatic("মোট বাকি খতিয়ান সারাংশ")}</Text>
+                              <Text style={styles.printRangeBadge}>{tStatic("তারিখ: ")}{getTodayDate()}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={styles.printClosingLabel}>{tStatic("মোট বকেয়া পাওনা")}</Text>
+                              <Text style={[styles.printClosingAmount, { color: '#B91C1C' }]}>
+                                ৳ {formatMoney(totalCustomerDue)}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.printMetricRow}>
+                            <View style={styles.printMetricCol}>
+                              <Text style={styles.printMetricLabel}>{tStatic("দেনাদার সংখ্যা")}</Text>
+                              <Text style={[styles.printMetricVal, { color: '#B91C1C' }]}>{debtors.length} {tStatic("জন")}</Text>
+                            </View>
+                            <View style={styles.printMetricDivider} />
+                            <View style={styles.printMetricCol}>
+                              <Text style={styles.printMetricLabel}>{tStatic("মোট বাকি")}</Text>
+                              <Text style={[styles.printMetricVal, { color: '#B91C1C' }]}>৳ {formatMoney(totalCustomerDue)}</Text>
+                            </View>
+                            <View style={styles.printMetricDivider} />
+                            <View style={styles.printMetricCol}>
+                              <Text style={styles.printMetricLabel}>{tStatic("গড় বাকি")}</Text>
+                              <Text style={styles.printMetricVal}>
+                                ৳ {debtors.length > 0 ? formatMoney(Math.round(totalCustomerDue / debtors.length)) : '০'}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={styles.printTableWrap}>
+                          <View style={styles.printTableHeader}>
+                            <Text style={[styles.printTh, { width: 32 }]}>#</Text>
+                            <Text style={[styles.printTh, { flex: 1.5 }]}>{tStatic("গ্রাহকের নাম ও ফোন")}</Text>
+                            <Text style={[styles.printTh, { flex: 1, textAlign: 'right', color: '#B91C1C' }]}>{tStatic("বাকি পাওনা")}</Text>
+                          </View>
+
+                          {debtors.length > 0 ? (
+                            debtors.map((c, idx) => (
+                              <View key={c.id || `deb_${idx}`} style={styles.printTableRow}>
+                                <Text style={[styles.printTdDate, { width: 32 }]}>{idx + 1}</Text>
+                                <View style={{ flex: 1.5, paddingRight: 4 }}>
+                                  <Text style={styles.printTdDesc}>{c.name}</Text>
+                                  <Text style={styles.printTdBal}>{c.phone || tStatic("ফোন নম্বর নেই")}</Text>
+                                </View>
+                                <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                                  <Text style={[styles.printTdAmount, { color: '#B91C1C' }]}>
+                                    ৳ {formatMoney(c.balance)}
+                                  </Text>
+                                </View>
+                              </View>
+                            ))
+                          ) : (
+                            <View style={{ padding: 24, alignItems: 'center' }}>
+                              <Text style={{ color: '#64748B', fontSize: 13 }}>
+                                {tStatic("কোনো বকেয়াদার গ্রাহক পাওয়া যায়নি")}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </>
+                    );
+                  })()}
+                </>
+              ) : null}
+
+              {/* REPORT TYPE 3: EXPENSE BREAKDOWN REPORT */}
+              {reportPreviewType === 'expense' ? (
+                <>
+                  {(() => {
+                    const expenses = (businessCashEntries || []).filter(c => c.type === 'out');
+                    let expSum = 0;
+                    expenses.forEach(e => { expSum += Number(e.amount) || 0; });
+                    return (
+                      <>
+                        <View style={styles.printAccountCard}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.printAccountName}>{tStatic("দোকানের খরচ বিবরণী")}</Text>
+                              <Text style={styles.printAccountPhone}>{tStatic("দৈনিক ও মাসিক খরচ হিসাব")}</Text>
+                              <Text style={styles.printRangeBadge}>{tStatic("তারিখ: ")}{getTodayDate()}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={styles.printClosingLabel}>{tStatic("মোট খরচ")}</Text>
+                              <Text style={[styles.printClosingAmount, { color: '#B91C1C' }]}>
+                                ৳ {formatMoney(expSum)}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.printMetricRow}>
+                            <View style={styles.printMetricCol}>
+                              <Text style={styles.printMetricLabel}>{tStatic("খরচ এন্ট্রি")}</Text>
+                              <Text style={[styles.printMetricVal, { color: '#B91C1C' }]}>{expenses.length} {tStatic("টি")}</Text>
+                            </View>
+                            <View style={styles.printMetricDivider} />
+                            <View style={styles.printMetricCol}>
+                              <Text style={styles.printMetricLabel}>{tStatic("মোট খরচ")}</Text>
+                              <Text style={[styles.printMetricVal, { color: '#B91C1C' }]}>৳ {formatMoney(expSum)}</Text>
+                            </View>
+                            <View style={styles.printMetricDivider} />
+                            <View style={styles.printMetricCol}>
+                              <Text style={styles.printMetricLabel}>{tStatic("আজকের খরচ")}</Text>
+                              <Text style={styles.printMetricVal}>৳ {formatMoney(todayCosts)}</Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={styles.printTableWrap}>
+                          <View style={styles.printTableHeader}>
+                            <Text style={[styles.printTh, { flex: 1.4 }]}>{tStatic("তারিখ ও বিবরণ")}</Text>
+                            <Text style={[styles.printTh, { flex: 1 }]}>{tStatic("ক্যাটাগরি")}</Text>
+                            <Text style={[styles.printTh, { flex: 1, textAlign: 'right', color: '#B91C1C' }]}>{tStatic("পরিমাণ")}</Text>
+                          </View>
+
+                          {expenses.length > 0 ? (
+                            expenses.map((e, idx) => (
+                              <View key={e.id || `exp_${idx}`} style={styles.printTableRow}>
+                                <View style={{ flex: 1.4, paddingRight: 4 }}>
+                                  <Text style={styles.printTdDate}>{e.date || getTodayDate()}</Text>
+                                  <Text style={styles.printTdDesc}>{e.desc || e.note || tStatic("সাধারণ খরচ")}</Text>
+                                </View>
+                                <View style={{ flex: 1, justifyContent: 'center' }}>
+                                  <Text style={styles.printTdBal}>{e.category || tStatic("সাধারণ")}</Text>
+                                </View>
+                                <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                                  <Text style={[styles.printTdAmount, { color: '#B91C1C' }]}>
+                                    ৳ {formatMoney(e.amount)}
+                                  </Text>
+                                </View>
+                              </View>
+                            ))
+                          ) : (
+                            <View style={{ padding: 24, alignItems: 'center' }}>
+                              <Text style={{ color: '#64748B', fontSize: 13 }}>
+                                {tStatic("কোনো খরচের এন্ট্রি পাওয়া যায়নি")}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </>
+                    );
+                  })()}
+                </>
+              ) : null}
+
+              {/* REPORT TYPE 4: PRODUCT STOCK & VALUATION REPORT */}
+              {reportPreviewType === 'stock' ? (
+                <>
+                  <View style={styles.printAccountCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.printAccountName}>{tStatic("পণ্য স্টক ও মূল্যায়ন রিপোর্ট")}</Text>
+                        <Text style={styles.printAccountPhone}>{tStatic("বর্তমান মজুত পণ্য ও মোট মূল্য")}</Text>
+                        <Text style={styles.printRangeBadge}>{tStatic("তারিখ: ")}{getTodayDate()}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.printClosingLabel}>{tStatic("মোট স্টক ক্রয়মূল্য")}</Text>
+                        <Text style={[styles.printClosingAmount, { color: '#D97706' }]}>
+                          ৳ {formatMoney(totalStockCost)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.printMetricRow}>
+                      <View style={styles.printMetricCol}>
+                        <Text style={styles.printMetricLabel}>{tStatic("পণ্য প্রকার")}</Text>
+                        <Text style={styles.printMetricVal}>{(businessInventory || []).length} {tStatic("টি")}</Text>
+                      </View>
+                      <View style={styles.printMetricDivider} />
+                      <View style={styles.printMetricCol}>
+                        <Text style={styles.printMetricLabel}>{tStatic("ক্রয়মূল্য মান")}</Text>
+                        <Text style={[styles.printMetricVal, { color: '#D97706' }]}>৳ {formatMoney(totalStockCost)}</Text>
+                      </View>
+                      <View style={styles.printMetricDivider} />
+                      <View style={styles.printMetricCol}>
+                        <Text style={styles.printMetricLabel}>{tStatic("সম্ভাব্য বিক্রয় মান")}</Text>
+                        <Text style={[styles.printMetricVal, { color: '#15803D' }]}>৳ {formatMoney(totalStockSaleValue)}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.printTableWrap}>
+                    <View style={styles.printTableHeader}>
+                      <Text style={[styles.printTh, { flex: 1.4 }]}>{tStatic("পণ্যের নাম")}</Text>
+                      <Text style={[styles.printTh, { flex: 0.9, textAlign: 'center' }]}>{tStatic("স্টক")}</Text>
+                      <Text style={[styles.printTh, { flex: 0.9, textAlign: 'right' }]}>{tStatic("ক্রয়মূল্য")}</Text>
+                      <Text style={[styles.printTh, { flex: 1, textAlign: 'right', color: '#D97706' }]}>{tStatic("মোট মূল্য")}</Text>
+                    </View>
+
+                    {(businessInventory || []).length > 0 ? (
+                      businessInventory.map((p, idx) => {
+                        const qty = Number(p.stock) || 0;
+                        const buy = Number(p.buyPrice) || 0;
+                        return (
+                          <View key={p.id || `stk_${idx}`} style={styles.printTableRow}>
+                            <View style={{ flex: 1.4, paddingRight: 4 }}>
+                              <Text style={styles.printTdDesc}>{p.name}</Text>
+                              <Text style={styles.printTdBal}>{p.unit || tStatic("পিস")}</Text>
+                            </View>
+                            <View style={{ flex: 0.9, alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={[styles.printTdAmount, { color: qty <= 5 ? '#B91C1C' : '#1E293B' }]}>
+                                {qty}
+                              </Text>
+                            </View>
+                            <View style={{ flex: 0.9, alignItems: 'flex-end', justifyContent: 'center' }}>
+                              <Text style={styles.printTdBal}>৳ {formatMoney(buy)}</Text>
+                            </View>
+                            <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
+                              <Text style={[styles.printTdAmount, { color: '#D97706' }]}>
+                                ৳ {formatMoney(qty * buy)}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })
+                    ) : (
+                      <View style={{ padding: 24, alignItems: 'center' }}>
+                        <Text style={{ color: '#64748B', fontSize: 13 }}>
+                          {tStatic("কোনো ইনভেন্টরি পণ্য পাওয়া যায়নি")}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </>
+              ) : null}
+
+              {/* REPORT TYPE 5: SALES & PURCHASE (BECHAKENA) SUMMARY */}
+              {reportPreviewType === 'bechakena' ? (
+                <>
+                  {(() => {
+                    const gross = Math.max(0, todaySales + totalCustomerDue - totalSupplierDue - todayCosts);
+                    return (
+                      <>
+                        <View style={styles.printAccountCard}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.printAccountName}>{tStatic("বেচাকেনা সামারি রিপোর্ট")}</Text>
+                              <Text style={styles.printAccountPhone}>{tStatic("আজকের বেচাকেনা ও নিট লাভ সারাংশ")}</Text>
+                              <Text style={styles.printRangeBadge}>{tStatic("তারিখ: ")}{getTodayDate()}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={styles.printClosingLabel}>{tStatic("আনুমানিক নিট লাভ")}</Text>
+                              <Text style={[styles.printClosingAmount, { color: '#15803D' }]}>
+                                ৳ {formatMoney(gross)}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.printMetricRow}>
+                            <View style={styles.printMetricCol}>
+                              <Text style={styles.printMetricLabel}>{tStatic("আজকের বিক্রয়")}</Text>
+                              <Text style={[styles.printMetricVal, { color: '#15803D' }]}>৳ {formatMoney(todaySales)}</Text>
+                            </View>
+                            <View style={styles.printMetricDivider} />
+                            <View style={styles.printMetricCol}>
+                              <Text style={styles.printMetricLabel}>{tStatic("আজকের খরচ")}</Text>
+                              <Text style={[styles.printMetricVal, { color: '#B91C1C' }]}>৳ {formatMoney(todayCosts)}</Text>
+                            </View>
+                            <View style={styles.printMetricDivider} />
+                            <View style={styles.printMetricCol}>
+                              <Text style={styles.printMetricLabel}>{tStatic("ক্যাশ জমা")}</Text>
+                              <Text style={styles.printMetricVal}>৳ {formatMoney(totalCash)}</Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={styles.printTableWrap}>
+                          <View style={styles.printTableHeader}>
+                            <Text style={[styles.printTh, { flex: 1.8 }]}>{tStatic("খাত ও বিবরণ")}</Text>
+                            <Text style={[styles.printTh, { flex: 1, textAlign: 'right' }]}>{tStatic("টাকার পরিমাণ")}</Text>
+                          </View>
+
+                          <View style={styles.printTableRow}>
+                            <Text style={[styles.printTdDesc, { flex: 1.8 }]}>{tStatic("আজকের মোট বিক্রয় (+)")}</Text>
+                            <Text style={[styles.printTdAmount, { flex: 1, textAlign: 'right', color: '#15803D' }]}>৳ {formatMoney(todaySales)}</Text>
+                          </View>
+                          <View style={styles.printTableRow}>
+                            <Text style={[styles.printTdDesc, { flex: 1.8 }]}>{tStatic("আজকের মোট খরচ (-)")}</Text>
+                            <Text style={[styles.printTdAmount, { flex: 1, textAlign: 'right', color: '#B91C1C' }]}>৳ {formatMoney(todayCosts)}</Text>
+                          </View>
+                          <View style={styles.printTableRow}>
+                            <Text style={[styles.printTdDesc, { flex: 1.8 }]}>{tStatic("মোট কাস্টমার বাকি পাওনা")}</Text>
+                            <Text style={[styles.printTdAmount, { flex: 1, textAlign: 'right', color: '#B91C1C' }]}>৳ {formatMoney(totalCustomerDue)}</Text>
+                          </View>
+                          <View style={styles.printTableRow}>
+                            <Text style={[styles.printTdDesc, { flex: 1.8 }]}>{tStatic("মোট সাপ্লায়ার দেনা")}</Text>
+                            <Text style={[styles.printTdAmount, { flex: 1, textAlign: 'right', color: '#15803D' }]}>৳ {formatMoney(totalSupplierDue)}</Text>
+                          </View>
+                          <View style={[styles.printTableRow, { backgroundColor: '#F8FAFC' }]}>
+                            <Text style={[styles.printTdDesc, { flex: 1.8, fontWeight: 'bold' }]}>{tStatic("আনুমানিক নিট লাভ / স্থিতি")}</Text>
+                            <Text style={[styles.printTdAmount, { flex: 1, textAlign: 'right', color: '#15803D', fontSize: 13 }]}>৳ {formatMoney(gross)}</Text>
+                          </View>
+                        </View>
+                      </>
+                    );
+                  })()}
+                </>
+              ) : null}
 
               {/* Document Footer */}
               <View style={styles.printFooterWrap}>
@@ -9541,30 +10296,88 @@ function TallyKhataApp() {
 
           {/* Sticky Bottom Action Bar with 46dp safe padding */}
           <View style={[styles.printPreviewBottomBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
-            <TouchableOpacity
-              style={[styles.printShareBtn, { minHeight: 48, borderRadius: 10 }]}
-              onPress={() => {
-                if (!selectedAccount) return;
-                const fullText = getFullStatementText();
-                Share.share({ message: fullText, title: `${tStatic("হিসাব বিবরণী")} - ${selectedAccount.name}` });
-              }}
-              activeOpacity={0.85}
-              hitSlop={STANDARD_TOUCH_HIT_SLOP}
-              accessibilityRole="button"
-              accessibilityLabel={tStatic("প্রিন্ট / স্টেটমেন্ট শেয়ার")}
-            >
-              <Image
-                source={require('./assets/icons/ic_share.png')}
-                style={{ width: 20, height: 20, tintColor: '#FFFFFF', marginRight: 8 }}
-                resizeMode="contain"
-              />
-              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
-                {tStatic("প্রিন্ট / স্টেটমেন্ট শেয়ার")}
-              </Text>
-            </TouchableOpacity>
+            {reportPreviewType === 'statement' ? (
+              <TouchableOpacity
+                style={[styles.printShareBtn, { minHeight: 48, borderRadius: 10 }]}
+                onPress={() => {
+                  if (!selectedAccount) return;
+                  const fullText = getFullStatementText();
+                  Share.share({ message: fullText, title: `${tStatic("হিসাব বিবরণী")} - ${selectedAccount.name}` });
+                }}
+                activeOpacity={0.85}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("প্রিন্ট / স্টেটমেন্ট শেয়ার")}
+              >
+                <Image
+                  source={require('./assets/icons/ic_share.png')}
+                  style={{ width: 20, height: 20, tintColor: '#FFFFFF', marginRight: 8 }}
+                  resizeMode="contain"
+                />
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
+                  {tStatic("প্রিন্ট / স্টেটমেন্ট শেয়ার")}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.reportPreviewActionRow}>
+                <TouchableOpacity
+                  style={[styles.printShareBtn, styles.reportPreviewPrintBtn]}
+                  onPress={() => {
+                    Alert.alert(
+                      tStatic("প্রিন্ট ও ডাউনলোড"),
+                      tStatic("রিপোর্টটি প্রিন্ট অথবা পিডিএফ সেভ করার জন্য তৈরি হয়েছে। আপনি কি শেয়ার বা প্রিন্ট করতে চান?"),
+                      [
+                        { text: tStatic("বাতিল"), style: "cancel" },
+                        {
+                          text: tStatic("হ্যাঁ, প্রিন্ট/শেয়ার"),
+                          onPress: () => {
+                            const fullText = getFullReportText(reportPreviewType);
+                            Share.share({ message: fullText, title: `${businessName || ''} - ${tStatic("রিপোর্ট ডাউনলোড")}` });
+                          }
+                        }
+                      ]
+                    );
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("প্রিন্ট / ডাউনলোড")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_pdf.png')}
+                    style={{ width: 18, height: 18, tintColor: '#FFFFFF', marginRight: 8 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>
+                    {tStatic("প্রিন্ট / ডাউনলোড")}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.reportPreviewShareBtn}
+                  onPress={() => {
+                    const fullText = getFullReportText(reportPreviewType);
+                    Share.share({ message: fullText, title: `${businessName || ''} - ${tStatic("রিপোর্ট শেয়ার")}` });
+                  }}
+                  activeOpacity={0.85}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={tStatic("শেয়ার করুন")}
+                >
+                  <Image
+                    source={require('./assets/icons/ic_share.png')}
+                    style={{ width: 18, height: 18, tintColor: '#FFFFFF', marginRight: 8 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>
+                    {tStatic("শেয়ার করুন")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </SafeAreaView>
       </Modal>
+
 
       {/* ===================================================================
           MODAL: BULK TAGADA (একসাথে তাগাদা পাঠান) (ITERATION 208)
@@ -19507,6 +20320,140 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#B81414',
     paddingVertical: 12,
+  },
+
+  // --- REPORT DOWNLOAD CENTER & PREVIEW UI (ITERATION 210) ---
+  reportKpiRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+  },
+  reportKpiMiniCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  reportKpiMiniLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  reportKpiMiniValue: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  reportSectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  reportSectionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  reportCountBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  reportCountBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#4F46E5',
+  },
+  reportDownloadCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+  },
+  reportDownloadTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  reportDownloadSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  reportDownloadMetricBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  reportDownloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#B81414',
+    paddingVertical: 10,
+    borderRadius: 8,
+    minHeight: 48,
+  },
+  reportDownloadBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  reportDownloadShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    minHeight: 48,
+  },
+  reportDownloadShareBtnText: {
+    color: '#334155',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  reportPreviewActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  reportPreviewPrintBtn: {
+    flex: 1.2,
+    minHeight: 48,
+    borderRadius: 10,
+  },
+  reportPreviewShareBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E293B',
+    paddingVertical: 12,
+    borderRadius: 10,
+    minHeight: 48,
   },
 
   // --- BULK TAGADA UI (ITERATION 208) ---

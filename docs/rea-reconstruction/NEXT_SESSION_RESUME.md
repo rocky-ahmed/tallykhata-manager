@@ -4,7 +4,7 @@
 **System Status:** ACTIVE — PRODUCTION READY & VERIFIED  
 **Reference Target:** `D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk` (`REF-001`)  
 **SHA-256:** `267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9`  
-**Test Baseline:** 262 / 262 test suites passing (100% green, 5,042+ discrete assertions, 0 regressions)
+**Test Baseline:** 265 / 265 test suites passing (100% green, 5,247+ discrete assertions, 0 regressions)
 
 ---
 

@@ -1967,11 +1967,17 @@ const REPORT_TYPES = Object.freeze({
   MONTHLY_BAKI: 'MONTHLY_BAKI',
   CASHBOX_SUMMARY: 'CASHBOX_SUMMARY',
   BECHA_KENA_SUMMARY: 'BECHA_KENA_SUMMARY',
+  CUSTOMER_LIST: 'CUSTOMER_LIST',
+  EXPENSE_REPORT: 'EXPENSE_REPORT',
+  STOCK_MOVEMENT: 'STOCK_MOVEMENT',
 });
 
+const HTML_ESCAPE_CHARS = /[&<>"\x27]/;
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
-  return String(str)
+  const s = String(str);
+  if (!HTML_ESCAPE_CHARS.test(s)) return s;
+  return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -2698,6 +2704,186 @@ function generatePrintableHtmlReport(reportPayload, options = {}) {
       }).join('\n');
     }
 
+  } else if (doc.reportType === REPORT_TYPES.CUSTOMER_LIST) {
+    summaryCardsHtml = `
+      <div class="summary-box">
+        <div class="box-label">কাস্টমার/সাপ্লায়ারের তালিকা</div>
+        <div class="box-amount font-bold">${summary.totalCustomers || 0} জন</div>
+        <div class="box-sublabel">তালিকায়: ${data.length} জন (${summary.hasDebtOnly ? 'বকেয়া রয়েছে' : 'সকল'})</div>
+      </div>
+      <div class="summary-box box-given">
+        <div class="box-label">মোট বাকি / পাবো (Receivable)</div>
+        <div class="box-amount font-bold" style="color: #b81414;">৳ ${fmt(summary.totalReceivable)}</div>
+        <div class="box-sublabel">দেনাদার: ${summary.totalDebtors || 0} জন</div>
+      </div>
+      <div class="summary-box box-received">
+        <div class="box-label">মোট দেবো (Payable / Advance)</div>
+        <div class="box-amount font-bold" style="color: #15803d;">৳ ${fmt(summary.totalPayable || 0)}</div>
+        <div class="box-sublabel">পাওনাদার / অগ্রিম: ${summary.totalCreditors || 0} জন</div>
+      </div>
+      <div class="summary-box box-closing">
+        <div class="box-label">সর্বমোট জের (Net Due)</div>
+        <div class="box-amount font-bold">৳ ${fmt(summary.netReceivable !== undefined ? summary.netReceivable : summary.totalReceivable)}</div>
+        <div class="box-sublabel">গড় বাকি: ৳ ${fmt(summary.avgDebtPerDebtor)}</div>
+      </div>`;
+
+    tableHeaderHtml = `
+      <tr class="page-break-avoid">
+        <th class="col-idx" style="width: 6%; text-align: center;">ক্রমিক</th>
+        <th class="col-name" style="width: 44%; text-align: left;">কাস্টমার/সাপ্লায়ারের তালিকা ও মোবাইল</th>
+        <th class="col-meta" style="width: 26%; text-align: left;">ঠিকানা ও শেষ লেনদেন</th>
+        <th class="col-pabo" style="width: 12%; text-align: right;">পাবো (৳)</th>
+        <th class="col-debo" style="width: 12%; text-align: right;">দেবো (৳)</th>
+      </tr>`;
+
+    if (data.length === 0) {
+      tableRowsHtml = `<tr class="empty-row"><td colspan="5" class="text-center text-muted" style="padding: 24px;">উক্ত ফিল্টারে কোনো কাস্টমার পাওয়া যায়নি।</td></tr>`;
+    } else {
+      const rows = data.map((c, idx) => {
+        const rowClass = idx % 2 === 0 ? 'even-row' : 'odd-row';
+        const paboVal = c.pabo !== undefined ? c.pabo : (c.balance > 0 ? c.balance : 0);
+        const deboVal = c.debo !== undefined ? c.debo : (c.balance < 0 ? Math.abs(c.balance) : 0);
+        return `
+        <tr class="ledger-row page-break-avoid zebra-row ${rowClass}">
+          <td class="col-idx text-center text-muted" style="font-size: 11px;">${c.index || (idx + 1)}</td>
+          <td class="col-name">
+            <div class="font-bold">${escapeHtml(c.name)}</div>
+            <div class="text-muted" style="font-size: 11px;">${escapeHtml(c.phone || '-')}</div>
+          </td>
+          <td class="col-meta">
+            <div>${escapeHtml(c.address || '-')}</div>
+            <div class="text-muted" style="font-size: 11px;">শেষ লেনদেন: ${escapeHtml(c.lastTxnDate || '-')}</div>
+          </td>
+          <td class="col-pabo text-right font-bold" style="color: #b81414;">
+            ${paboVal > 0 ? '৳ ' + fmt(paboVal) : '-'}
+          </td>
+          <td class="col-debo text-right font-bold" style="color: #15803d;">
+            ${deboVal > 0 ? '৳ ' + fmt(deboVal) : '-'}
+          </td>
+        </tr>`;
+      }).join('\n');
+
+      const footerRow = `
+        <tr class="summary-footer-row font-bold page-break-avoid" style="background: #f1f5f9; border-top: 2px solid #0f172a;">
+          <td colspan="3" class="text-left" style="padding: 10px 12px;">সর্বমোট বাকি ও দেনা</td>
+          <td class="col-pabo text-right" style="color: #b81414; padding: 10px 12px;">৳ ${fmt(summary.totalReceivable)}</td>
+          <td class="col-debo text-right" style="color: #15803d; padding: 10px 12px;">৳ ${fmt(summary.totalPayable || 0)}</td>
+        </tr>`;
+
+      tableRowsHtml = rows + '\n' + footerRow;
+    }
+
+  } else if (doc.reportType === REPORT_TYPES.EXPENSE_REPORT) {
+    summaryCardsHtml = `
+      <div class="summary-box box-given">
+        <div class="box-label">খরচের রিপোর্ট ও মোট খরচ</div>
+        <div class="box-amount font-bold" style="color: #b81414;">৳ ${fmt(summary.totalExpenses)}</div>
+        <div class="box-sublabel">খরচের বিবরণ এন্ট্রি: ${summary.expenseCount || 0} টি</div>
+      </div>
+      <div class="summary-box">
+        <div class="box-label">শীর্ষ খরচ খাত (Top Category)</div>
+        <div class="box-amount font-bold">${escapeHtml(summary.topCategoryName || 'নেই')}</div>
+        <div class="box-sublabel">৳ ${fmt(summary.topCategoryAmount || 0)}</div>
+      </div>
+      <div class="summary-box">
+        <div class="box-label">ব্যয় খাত সংখ্যা (Categories)</div>
+        <div class="box-amount font-bold">${summary.categoryCount || 0} টি খাত</div>
+        <div class="box-sublabel">${escapeHtml(rangeLabel)}</div>
+      </div>
+      <div class="summary-box box-closing">
+        <div class="box-label">গড় খরচ / এন্ট্রি</div>
+        <div class="box-amount font-bold">৳ ${fmt(summary.expenseCount > 0 ? summary.totalExpenses / summary.expenseCount : 0)}</div>
+        <div class="box-sublabel">হিসাব বিবরণী</div>
+      </div>`;
+
+    tableHeaderHtml = `
+      <tr class="page-break-avoid">
+        <th class="col-date-desc" style="width: 44%; text-align: left;">বিবরণ (তারিখ ও খরচের বিবরণ)</th>
+        <th class="col-cat" style="width: 28%; text-align: center;">ক্যাটাগরি</th>
+        <th class="col-amount" style="width: 28%; text-align: right;">দিলাম (৳)</th>
+      </tr>`;
+
+    if (data.length === 0) {
+      tableRowsHtml = `<tr class="empty-row"><td colspan="3" class="text-center text-muted" style="padding: 24px;">উক্ত সময়ে কোনো খরচের হিসাব নেই।</td></tr>`;
+    } else {
+      const rows = data.map((entry, idx) => {
+        const rowClass = idx % 2 === 0 ? 'even-row' : 'odd-row';
+        return `
+        <tr class="ledger-row page-break-avoid zebra-row ${rowClass}">
+          <td class="col-date-desc">
+            <div class="font-bold">${escapeHtml(entry.note || entry.description || '-')}</div>
+            <div class="text-muted" style="font-size: 11px;">${escapeHtml(entry.date)} ${escapeHtml(entry.time || '')}</div>
+          </td>
+          <td class="col-cat text-center">
+            <span class="badge" style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;">${escapeHtml(entry.categoryName || entry.categoryLabel || entry.category)}</span>
+          </td>
+          <td class="col-amount text-right font-bold" style="color: #b81414;">
+            ৳ ${fmt(entry.amount)}
+          </td>
+        </tr>`;
+      }).join('\n');
+
+      const footerRow = `
+        <tr class="summary-footer-row font-bold page-break-avoid" style="background: #f1f5f9; border-top: 2px solid #0f172a;">
+          <td colspan="2" class="text-left" style="padding: 10px 12px;">মোট খরচ (দিলাম)</td>
+          <td class="col-amount text-right" style="color: #b81414; padding: 10px 12px;">৳ ${fmt(summary.totalExpenses)}</td>
+        </tr>`;
+
+      tableRowsHtml = rows + '\n' + footerRow;
+    }
+
+  } else if (doc.reportType === REPORT_TYPES.STOCK_MOVEMENT) {
+    summaryCardsHtml = `
+      <div class="summary-box">
+        <div class="box-label">মোট পণ্য সংখ্যা</div>
+        <div class="box-amount font-bold">${summary.totalProducts || 0} টি পণ্য</div>
+        <div class="box-sublabel">বর্তমান মজুদ: ${summary.totalClosingUnits || 0} একক</div>
+      </div>
+      <div class="summary-box box-closing">
+        <div class="box-label">স্টক ক্রয়মূল্য (Valuation)</div>
+        <div class="box-amount font-bold">৳ ${fmt(summary.totalStockValuation)}</div>
+        <div class="box-sublabel">মোট ইনভেন্টরি সম্পদ</div>
+      </div>
+      <div class="summary-box box-received">
+        <div class="box-label">সম্ভাব্য বিক্রয়মূল্য</div>
+        <div class="box-amount font-bold" style="color: #15803d;">৳ ${fmt(summary.totalPotentialRevenue)}</div>
+        <div class="box-sublabel">বর্তমান স্টকের মূল্য</div>
+      </div>
+      <div class="summary-box">
+        <div class="box-label">সম্ভাব্য ট্রেড মার্জিন</div>
+        <div class="box-amount font-bold">৳ ${fmt(summary.totalProjectedMargin)}</div>
+        <div class="box-sublabel">লাভ প্রজেকশন</div>
+      </div>`;
+
+    tableHeaderHtml = `
+      <tr class="page-break-avoid">
+        <th class="col-name" style="width: 36%; text-align: left;">পণ্যের নাম ও বিবরণ</th>
+        <th class="col-movement" style="width: 32%; text-align: center;">মজুদ প্রবাহ (শুরু / ক্রয় / বিক্রয়)</th>
+        <th class="col-balance" style="width: 32%; text-align: right;">বর্তমান স্টক ও মোট মূল্য (৳)</th>
+      </tr>`;
+
+    if (data.length === 0) {
+      tableRowsHtml = `<tr class="empty-row"><td colspan="3" class="text-center text-muted" style="padding: 24px;">কোনো স্টক বা পণ্য পাওয়া যায়নি।</td></tr>`;
+    } else {
+      tableRowsHtml = data.map((item, idx) => {
+        const rowClass = idx % 2 === 0 ? 'even-row' : 'odd-row';
+        return `
+        <tr class="ledger-row page-break-avoid zebra-row ${rowClass}">
+          <td class="col-name">
+            <div class="font-bold">${escapeHtml(item.name)}</div>
+            <div class="text-muted" style="font-size: 11px;">একক: ${escapeHtml(item.unit)} | ক্যাটাগরি: ${escapeHtml(item.category)} ${item.isLowStock ? '<span style="color:#e11d48;font-weight:700;">(কম স্টক)</span>' : ''}</div>
+          </td>
+          <td class="col-movement text-center" style="font-size: 11px;">
+            <span class="text-muted">শুরু: ${item.openingUnits}</span> | <span style="color:#15803d;">+${item.receivedUnits}</span> | <span style="color:#b81414;">-${item.soldUnits}</span>
+          </td>
+          <td class="col-balance text-right font-bold">
+            <div>${item.closingUnits} ${escapeHtml(item.unit)}</div>
+            <div class="text-muted" style="font-size: 11px;">@ ৳ ${fmt(item.costPrice)} = ৳ ${fmt(item.valuation)}</div>
+          </td>
+        </tr>`;
+      }).join('\n');
+    }
+
   } else if (doc.reportType === REPORT_TYPES.BECHA_KENA_SUMMARY) {
     summaryCardsHtml = `
       <div class="summary-box box-received">
@@ -3141,6 +3327,27 @@ function generateConsolidatedReportDocument(reportType, dateRange = 'all', optio
     ? reportType
     : REPORT_TYPES.DAILY_BAKI;
 
+  const mergedDocOptions = {
+    ...options,
+    businessId,
+    business: foundBiz,
+    businessName,
+    businessPhone,
+    businessAddress,
+    businessOwner,
+    referenceDate: refDate,
+  };
+
+  if (validReportType === REPORT_TYPES.CUSTOMER_LIST) {
+    return generateCustomerListReportDocument(mergedDocOptions);
+  }
+  if (validReportType === REPORT_TYPES.EXPENSE_REPORT) {
+    return generateExpenseReportDocument(dateRange, mergedDocOptions);
+  }
+  if (validReportType === REPORT_TYPES.STOCK_MOVEMENT) {
+    return generateStockMovementReportDocument(dateRange, mergedDocOptions);
+  }
+
   const range = resolveStatementDateRange(
     dateRange || (validReportType === REPORT_TYPES.MONTHLY_BAKI ? 'this_month' : 'today'),
     options,
@@ -3536,6 +3743,517 @@ function generateConsolidatedReportDocument(reportType, dateRange = 'all', optio
   return docPayload;
 }
 
+// --- 9. IN-FIELD REPORT DOWNLOAD BUILDERS & STOCK MOVEMENT STATEMENTS (ITERATION 210) ---
+
+/**
+ * Generates structured document payload for Customer List & Outstanding Debt Report.
+ * Parity with CustomerListPdfBuilderActivity / activity_customer_list_report_builder.xml.
+ *
+ * @param {Object} [options={}] Storage collections, businessId, and filter/sort options
+ * @returns {Object} Structured report document payload with embedded print-ready HTML
+ */
+function generateCustomerListReportDocument(options = {}) {
+  const businessId = String(options.businessId || options.business?.id || '1');
+  const businesses = Array.isArray(options.businesses) ? options.businesses : [];
+  const foundBiz = businesses.find(b => String(b.id || b.business_id) === businessId) || options.business || null;
+
+  const businessName = String(options.businessName || foundBiz?.name || foundBiz?.business_name || 'টালিখাতা ডিজিটাল');
+  const businessPhone = String(options.businessPhone || foundBiz?.phone || '');
+  const businessAddress = String(options.businessAddress || foundBiz?.address || foundBiz?.business_address || '');
+  const businessOwner = String(options.businessOwner || foundBiz?.owner || '');
+
+  const allAccounts = Array.isArray(options.accounts) ? options.accounts : [];
+  const allJournals = Array.isArray(options.journals) ? options.journals : [];
+
+  const getBizId = (item) => String(item.businessId !== undefined && item.businessId !== null ? item.businessId : (item.business_id || '1'));
+  const bizAccounts = allAccounts.filter(a => getBizId(a) === businessId);
+  const bizJournals = allJournals.filter(j => getBizId(j) === businessId);
+
+  // Filter customer accounts (type === 1)
+  const customers = bizAccounts.filter(a => a.type === 1 && a.isArchived !== true && a.isActive !== false);
+
+  // Compute latest transaction date for each customer
+  const lastTxnMap = new Map();
+  for (let i = 0; i < bizJournals.length; i++) {
+    const j = bizJournals[i];
+    const accId = String(j.accountId !== undefined ? j.accountId : (j.account_id !== undefined ? j.account_id : (j.orig_account_id || '')));
+    if (!accId) continue;
+    const jDate = j.date || j.txn_date || j.createdAt || '';
+    const existing = lastTxnMap.get(accId);
+    if (!existing || (jDate && jDate > existing)) {
+      lastTxnMap.set(accId, jDate);
+    }
+  }
+
+  const roundMoney = (val) => Math.round((Number(val) || 0) * 100) / 100;
+
+  // Map customer data rows
+  let customerRows = customers.map(c => {
+    const cId = String(c.id);
+    const balance = roundMoney(c.balance !== undefined && c.balance !== null ? c.balance : (c.opening_balance || 0));
+    const lastDate = lastTxnMap.get(cId) || c.updatedAt || c.createdAt || '-';
+    return {
+      id: cId,
+      name: c.name || 'গ্রাহক',
+      phone: c.phone || '',
+      address: c.address || '',
+      balance,
+      hasDebt: balance > 0,
+      lastTxnDate: lastDate,
+    };
+  });
+
+  // Filter option: hasDebtOnly
+  if (options.hasDebtOnly) {
+    customerRows = customerRows.filter(c => c.balance > 0);
+  }
+
+  // Sort option: sortBy ('balance' descending by default, or 'name')
+  const sortBy = options.sortBy || 'balance';
+  if (sortBy === 'name') {
+    customerRows.sort((a, b) => String(a.name).localeCompare(String(b.name), 'bn'));
+  } else {
+    // default: balance descending (highest debt first)
+    customerRows.sort((a, b) => b.balance - a.balance);
+  }
+
+  // Re-index rows in place
+  for (let idx = 0; idx < customerRows.length; idx++) {
+    customerRows[idx].index = idx + 1;
+  }
+
+  // Aggregate metrics in integer-paisa
+  let totalReceivablePaisa = 0;
+  let totalPayablePaisa = 0;
+  let totalDebtors = 0;
+  let totalCreditors = 0;
+
+  for (let i = 0; i < customerRows.length; i++) {
+    const c = customerRows[i];
+    if (c.balance > 0) {
+      totalReceivablePaisa += Math.round(c.balance * 100);
+      totalDebtors++;
+    } else if (c.balance < 0) {
+      totalPayablePaisa += Math.round(Math.abs(c.balance) * 100);
+      totalCreditors++;
+    }
+  }
+
+  const totalReceivable = totalReceivablePaisa / 100;
+  const totalPayable = totalPayablePaisa / 100;
+  const netReceivable = (totalReceivablePaisa - totalPayablePaisa) / 100;
+  const avgDebtPerDebtor = totalDebtors > 0 ? roundMoney(totalReceivable / totalDebtors) : 0;
+  const totalCustomers = customers.length;
+
+  const now = options.referenceDate instanceof Date && !isNaN(options.referenceDate.getTime()) ? options.referenceDate : new Date();
+  const generatedDate = formatIsoDate(now);
+  const generatedTime = now.toTimeString().slice(0, 8);
+  const documentId = options.documentId || generateUniqueId('TK_CS_');
+
+  const doc = {
+    documentId,
+    docType: 'CONSOLIDATED_REPORT',
+    reportType: REPORT_TYPES.CUSTOMER_LIST,
+    version: '1.0',
+    generatedDate,
+    generatedTime,
+    business: {
+      id: businessId,
+      name: businessName,
+      owner: businessOwner,
+      phone: businessPhone,
+      address: businessAddress,
+    },
+    dateRange: {
+      range: 'all',
+      label: options.hasDebtOnly ? 'বকেয়াদার গ্রাহক তালিকা' : 'সকল গ্রাহক তালিকা',
+    },
+    summary: {
+      totalCustomers,
+      totalDebtors,
+      totalCreditors,
+      totalReceivable,
+      totalPayable,
+      netReceivable,
+      avgDebtPerDebtor,
+      filteredCount: customerRows.length,
+      hasDebtOnly: Boolean(options.hasDebtOnly),
+      sortBy,
+      floatDriftPaisa: 0,
+      currencySymbol: '৳',
+    },
+    presentation: {
+      title: options.title || 'কাস্টমার তালিকা ও মোট বাকি রিপোর্ট',
+      reportLabel: 'কাস্টমার/সাপ্লায়ারের তালিকা ও হিসাব',
+      summaryBanner: `${businessName} | কাস্টমার তালিকা | মোট গ্রাহক: ${totalCustomers} জন, মোট বাকি: ৳ ${totalReceivable.toFixed(2)}`,
+    },
+    data: customerRows,
+  };
+
+  doc.html = generatePrintableHtmlReport(doc, options);
+  doc.printableHtml = doc.html;
+  return doc;
+}
+
+/**
+ * Generates structured document payload for Business Expense Report.
+ * Parity with MonthlyExpensePdfBuilderActivity / DailyExpensePdfBuilderActivity.
+ *
+ * @param {string|Object} [dateRange='this_month'] Date range ('today', 'this_month', 'last_month', 'all', 'custom')
+ * @param {Object} [options={}] Storage collections, businessId, and metadata
+ * @returns {Object} Structured report document payload with embedded print-ready HTML
+ */
+function generateExpenseReportDocument(dateRange = 'this_month', options = {}) {
+  const refDate = options.referenceDate instanceof Date && !isNaN(options.referenceDate.getTime())
+    ? options.referenceDate
+    : new Date();
+
+  const businessId = String(options.businessId || options.business?.id || '1');
+  const businesses = Array.isArray(options.businesses) ? options.businesses : [];
+  const foundBiz = businesses.find(b => String(b.id || b.business_id) === businessId) || options.business || null;
+
+  const businessName = String(options.businessName || foundBiz?.name || foundBiz?.business_name || 'টালিখাতা ডিজিটাল');
+  const businessPhone = String(options.businessPhone || foundBiz?.phone || '');
+  const businessAddress = String(options.businessAddress || foundBiz?.address || foundBiz?.business_address || '');
+  const businessOwner = String(options.businessOwner || foundBiz?.owner || '');
+
+  const range = resolveStatementDateRange(dateRange || 'this_month', options, refDate);
+  let rangeLabel = 'সকল রেকর্ড';
+  if (range.range === 'today') {
+    rangeLabel = `আজ (${range.startDate || ''})`;
+  } else if (range.range === 'this_month') {
+    rangeLabel = `চলতি মাস (${range.startDate || ''} থেকে ${range.endDate || ''})`;
+  } else if (range.range === 'last_month') {
+    rangeLabel = `গত মাস (${range.startDate || ''} থেকে ${range.endDate || ''})`;
+  } else if (range.range === 'custom') {
+    rangeLabel = `${range.startDate || 'শুরু'} থেকে ${range.endDate || 'বর্তমান'}`;
+  }
+
+  const allCashEntries = Array.isArray(options.cashEntries) ? options.cashEntries : [];
+  const allJournals = Array.isArray(options.journals) ? options.journals : [];
+
+  const getBizId = (item) => String(item.businessId !== undefined && item.businessId !== null ? item.businessId : (item.business_id || '1'));
+  const bizCash = allCashEntries.filter(c => getBizId(c) === businessId);
+  const bizJournals = allJournals.filter(j => getBizId(j) === businessId);
+
+  const roundMoney = (val) => Math.round((Number(val) || 0) * 100) / 100;
+
+  // Category classification taxonomy
+  const CATEGORY_NAMES = {
+    rent: 'দোকান ভাড়া',
+    salary: 'কর্মচারী বেতন',
+    utility: 'বিদ্যুৎ ও ইউটিলিটি',
+    transport: 'পরিবহন খরচ',
+    entertainment: 'চা-নাস্তা ও আপ্যায়ন',
+    repair: 'মেরামত ও রক্ষণাবেক্ষণ',
+    other: 'অন্যান্য খরচ',
+  };
+
+  function classifyExpenseCategory(category, note = '', desc = '') {
+      const rawCat = String(category || '').toLowerCase().trim();
+      if (rawCat === 'rent' || rawCat === 'দোকান ভাড়া' || rawCat === 'দোকান ভাড়া') return 'rent';
+      if (rawCat === 'salary' || rawCat === 'বেতন' || rawCat === 'কর্মচারী বেতন') return 'salary';
+      if (rawCat === 'utility' || rawCat === 'বিদ্যুৎ বিল' || rawCat === 'ইউটিলিটি') return 'utility';
+      if (rawCat === 'transport' || rawCat === 'পরিবহন' || rawCat === 'যাতায়াত' || rawCat === 'যাতায়াত') return 'transport';
+      if (rawCat === 'tea' || rawCat === 'আপ্যায়ন' || rawCat === 'আপ্যায়ন' || rawCat === 'নাস্তা' || rawCat === 'entertainment') return 'entertainment';
+      if (rawCat === 'repair' || rawCat === 'মেরামত') return 'repair';
+
+      const text = `${category || ''} ${note || ''} ${desc || ''}`.toLowerCase();
+      if (text.includes('transport') || text.includes('পরিবহন') || text.includes('ভ্যান') || text.includes('গাড়ি') || text.includes('গাড়িভাড়া') || text.includes('যাতায়াত') || text.includes('যাতায়াত') || text.includes('ডেলিভারি')) return 'transport';
+      if (text.includes('rent') || text.includes('দোকান ভাড়া') || text.includes('দোকান ভাড়া') || text.includes('ঘর ভাড়া') || text.includes('ঘর ভাড়া') || text.includes('ভাড়া') || text.includes('ভাড়া')) return 'rent';
+      if (text.includes('salary') || text.includes('বেতন') || text.includes('মজুরি') || text.includes('staff') || text.includes('কর্মচারী')) return 'salary';
+      if (text.includes('utility') || text.includes('বিদ্যুৎ') || text.includes('কারেন্ট') || text.includes('পানি') || text.includes('গ্যাস') || text.includes('বিল') || text.includes('ইন্টারনেট')) return 'utility';
+      if (text.includes('tea') || text.includes('নাস্তা') || text.includes('চা') || text.includes('আপ্যায়ন') || text.includes('আপ্যায়ন') || text.includes('মিষ্টি') || text.includes('খাবার')) return 'entertainment';
+      if (text.includes('repair') || text.includes('মেরামত') || text.includes('কাজ') || text.includes('সার্ভিস') || text.includes('রক্ষণাবেক্ষণ')) return 'repair';
+      return 'other';
+    }
+
+  // Gather cash expenses (type === 'out' where category is cost/expense/etc and not malik_out / supplier payments)
+  const expenseItems = [];
+
+  bizCash.forEach(c => {
+    const cDate = c.date || c.txn_date || '';
+    if (range.startDate && cDate < range.startDate) return;
+    if (range.endDate && cDate > range.endDate) return;
+
+    if (c.type === 'out') {
+      const cat = String(c.category || '').toLowerCase();
+      // Exclude owner withdrawals or supplier payment cash entries if designated
+      if (cat === 'malik_out' || cat === 'supplier_payment') return;
+
+      const amt = roundMoney(c.amount);
+      const catKey = classifyExpenseCategory(c.category, c.note, c.desc);
+      expenseItems.push({
+        id: c.id || `exp_${expenseItems.length + 1}`,
+        date: cDate,
+        time: c.time || '',
+        amount: amt,
+        categoryKey: catKey,
+        categoryName: CATEGORY_NAMES[catKey] || 'অন্যান্য খরচ',
+        note: c.note || c.desc || c.description || CATEGORY_NAMES[catKey],
+        source: 'cashbox',
+      });
+    }
+  });
+
+  // Also include any explicit expense journals if present
+  bizJournals.forEach(j => {
+    const jDate = j.date || j.txn_date || '';
+    if (range.startDate && jDate < range.startDate) return;
+    if (range.endDate && jDate > range.endDate) return;
+
+    if (j.type === 'expense' || j.txn_type === 'expense') {
+      const amt = roundMoney(j.amount);
+      const catKey = classifyExpenseCategory(j.category, j.description, j.notes);
+      expenseItems.push({
+        id: j.id || `exp_j_${expenseItems.length + 1}`,
+        date: jDate,
+        time: '',
+        amount: amt,
+        categoryKey: catKey,
+        categoryName: CATEGORY_NAMES[catKey] || 'অন্যান্য খরচ',
+        note: j.description || j.notes || CATEGORY_NAMES[catKey],
+        source: 'journal',
+      });
+    }
+  });
+
+  // Calculate totals and category subtotals in integer-paisa
+  let totalExpensesPaisa = 0;
+  const categoryMap = new Map();
+
+  for (let i = 0; i < expenseItems.length; i++) {
+    const item = expenseItems[i];
+    const amtPaisa = Math.round(item.amount * 100);
+    totalExpensesPaisa += amtPaisa;
+
+    const existing = categoryMap.get(item.categoryKey) || {
+      categoryKey: item.categoryKey,
+      categoryName: item.categoryName,
+      totalPaisa: 0,
+      count: 0,
+    };
+    existing.totalPaisa += amtPaisa;
+    existing.count++;
+    categoryMap.set(item.categoryKey, existing);
+  }
+
+  const totalExpenses = totalExpensesPaisa / 100;
+
+  // Build categoryBreakdown
+  const categoryBreakdown = Array.from(categoryMap.values()).map(cat => {
+    const subtotal = cat.totalPaisa / 100;
+    const percentage = totalExpenses > 0 ? Math.round((subtotal / totalExpenses) * 10000) / 100 : 0;
+    return {
+      categoryKey: cat.categoryKey,
+      categoryName: cat.categoryName,
+      totalAmount: subtotal,
+      count: cat.count,
+      percentage,
+    };
+  }).sort((a, b) => b.totalAmount - a.totalAmount);
+
+  // Top expense category
+  const topCategory = categoryBreakdown[0] || null;
+
+  // Sort itemized entries by date descending
+  expenseItems.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  const now = refDate;
+  const generatedDate = formatIsoDate(now);
+  const generatedTime = now.toTimeString().slice(0, 8);
+  const documentId = options.documentId || generateUniqueId('TK_exp_report_');
+
+  const doc = {
+    documentId,
+    docType: 'CONSOLIDATED_REPORT',
+    reportType: REPORT_TYPES.EXPENSE_REPORT,
+    version: '1.0',
+    generatedDate,
+    generatedTime,
+    business: {
+      id: businessId,
+      name: businessName,
+      owner: businessOwner,
+      phone: businessPhone,
+      address: businessAddress,
+    },
+    dateRange: {
+      range: range.range,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      label: rangeLabel,
+    },
+    summary: {
+      totalExpenses,
+      expenseCount: expenseItems.length,
+      categoryCount: categoryBreakdown.length,
+      topCategoryName: topCategory ? topCategory.categoryName : 'নেই',
+      topCategoryAmount: topCategory ? topCategory.totalAmount : 0,
+      categoryBreakdown,
+      floatDriftPaisa: 0,
+      currencySymbol: '৳',
+    },
+    presentation: {
+      title: options.title || 'খরচের রিপোর্ট',
+      reportLabel: 'খরচের বিবরণ ও বিশ্লেষণ',
+      summaryBanner: `${businessName} | খরচ বিবরণী | মোট খরচ: ৳ ${totalExpenses.toFixed(2)} (${rangeLabel})`,
+    },
+    data: expenseItems,
+  };
+
+  doc.html = generatePrintableHtmlReport(doc, options);
+  doc.printableHtml = doc.html;
+  return doc;
+}
+
+/**
+ * Generates structured document payload for Stock Movement & Inventory Valuation Report.
+ * Parity with StockReportPdfBuilderActivity / activity_stock_report_builder.xml.
+ *
+ * @param {string|Object} [dateRange='all'] Date range ('today', 'this_month', 'last_month', 'all', 'custom')
+ * @param {Object} [options={}] Storage collections, businessId, and metadata
+ * @returns {Object} Structured report document payload with embedded print-ready HTML
+ */
+function generateStockMovementReportDocument(dateRange = 'all', options = {}) {
+  const refDate = options.referenceDate instanceof Date && !isNaN(options.referenceDate.getTime())
+    ? options.referenceDate
+    : new Date();
+
+  const businessId = String(options.businessId || options.business?.id || '1');
+  const businesses = Array.isArray(options.businesses) ? options.businesses : [];
+  const foundBiz = businesses.find(b => String(b.id || b.business_id) === businessId) || options.business || null;
+
+  const businessName = String(options.businessName || foundBiz?.name || foundBiz?.business_name || 'টালিখাতা ডিজিটাল');
+  const businessPhone = String(options.businessPhone || foundBiz?.phone || '');
+  const businessAddress = String(options.businessAddress || foundBiz?.address || foundBiz?.business_address || '');
+  const businessOwner = String(options.businessOwner || foundBiz?.owner || '');
+
+  const range = resolveStatementDateRange(dateRange || 'all', options, refDate);
+  let rangeLabel = 'সকল রেকর্ড';
+  if (range.range === 'today') {
+    rangeLabel = `আজ (${range.startDate || ''})`;
+  } else if (range.range === 'this_month') {
+    rangeLabel = `চলতি মাস (${range.startDate || ''} থেকে ${range.endDate || ''})`;
+  } else if (range.range === 'last_month') {
+    rangeLabel = `গত মাস (${range.startDate || ''} থেকে ${range.endDate || ''})`;
+  } else if (range.range === 'custom') {
+    rangeLabel = `${range.startDate || 'শুরু'} থেকে ${range.endDate || 'বর্তমান'}`;
+  }
+
+  const allInventory = Array.isArray(options.inventory) ? options.inventory : (Array.isArray(options.stock) ? options.stock : []);
+  const allJournals = Array.isArray(options.journals) ? options.journals : [];
+
+  const getBizId = (item) => String(item.businessId !== undefined && item.businessId !== null ? item.businessId : (item.business_id || '1'));
+  const bizInventory = allInventory.filter(i => getBizId(i) === businessId);
+  const bizJournals = allJournals.filter(j => getBizId(j) === businessId);
+
+  const roundMoney = (val) => Math.round((Number(val) || 0) * 100) / 100;
+
+  // Track stock movements per product
+  let totalOpeningUnits = 0;
+  let totalReceivedUnits = 0;
+  let totalSoldUnits = 0;
+  let totalClosingUnits = 0;
+  let totalStockValuationPaisa = 0;
+  let totalPotentialRevenuePaisa = 0;
+
+  const productRows = bizInventory.map((p, idx) => {
+    const costPrice = roundMoney(p.buyingPrice !== undefined && p.buyingPrice !== null ? p.buyingPrice : (p.buyPrice !== undefined && p.buyPrice !== null ? p.buyPrice : (p.costPrice || 0)));
+    const sellingPrice = roundMoney(p.sellingPrice !== undefined && p.sellingPrice !== null ? p.sellingPrice : (p.sellPrice || 0));
+    const baseStock = Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.quantity || 0));
+
+    // Movement tracking
+    const openingUnits = Number(p.openingUnits !== undefined ? p.openingUnits : baseStock);
+    const receivedUnits = Number(p.receivedUnits !== undefined ? p.receivedUnits : (p.purchasedUnits || 0));
+    const soldUnits = Number(p.soldUnits !== undefined ? p.soldUnits : 0);
+    const closingUnits = p.closingUnits !== undefined ? Number(p.closingUnits) : (openingUnits + receivedUnits - soldUnits);
+
+    const valuationPaisa = Math.round(closingUnits * Math.round(costPrice * 100));
+    const potentialRevPaisa = Math.round(closingUnits * Math.round(sellingPrice * 100));
+    const projectedMarginPaisa = potentialRevPaisa - valuationPaisa;
+
+    totalOpeningUnits += openingUnits;
+    totalReceivedUnits += receivedUnits;
+    totalSoldUnits += soldUnits;
+    totalClosingUnits += closingUnits;
+    totalStockValuationPaisa += valuationPaisa;
+    totalPotentialRevenuePaisa += potentialRevPaisa;
+
+    return {
+      index: idx + 1,
+      id: String(p.id),
+      name: p.name || 'পণ্য',
+      category: p.category || 'সাধারণ',
+      unit: p.unit || 'পিস',
+      costPrice,
+      sellingPrice,
+      openingUnits,
+      receivedUnits,
+      soldUnits,
+      closingUnits,
+      valuation: valuationPaisa / 100,
+      potentialRevenue: potentialRevPaisa / 100,
+      projectedMargin: projectedMarginPaisa / 100,
+      isLowStock: closingUnits <= (Number(p.minStockAlert) || 5),
+    };
+  });
+
+  const totalStockValuation = totalStockValuationPaisa / 100;
+  const totalPotentialRevenue = totalPotentialRevenuePaisa / 100;
+  const totalProjectedMargin = (totalPotentialRevenuePaisa - totalStockValuationPaisa) / 100;
+
+  const now = refDate;
+  const generatedDate = formatIsoDate(now);
+  const generatedTime = now.toTimeString().slice(0, 8);
+  const documentId = options.documentId || generateUniqueId('TK_stock_report_');
+
+  const doc = {
+    documentId,
+    docType: 'CONSOLIDATED_REPORT',
+    reportType: REPORT_TYPES.STOCK_MOVEMENT,
+    version: '1.0',
+    generatedDate,
+    generatedTime,
+    business: {
+      id: businessId,
+      name: businessName,
+      owner: businessOwner,
+      phone: businessPhone,
+      address: businessAddress,
+    },
+    dateRange: {
+      range: range.range,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      label: rangeLabel,
+    },
+    summary: {
+      totalProducts: productRows.length,
+      totalOpeningUnits,
+      totalReceivedUnits,
+      totalSoldUnits,
+      totalClosingUnits,
+      totalStockValuation,
+      totalPotentialRevenue,
+      totalProjectedMargin,
+      floatDriftPaisa: 0,
+      currencySymbol: '৳',
+    },
+    presentation: {
+      title: options.title || 'স্টক ও পণ্য বিবরণী',
+      reportLabel: 'মজুদ পণ্য ও স্টক খতিয়ান',
+      summaryBanner: `${businessName} | স্টক বিবরণী | মোট পণ্য: ${productRows.length} টি, মোট মূল্যায়ন: ৳ ${totalStockValuation.toFixed(2)}`,
+    },
+    data: productRows,
+  };
+
+  doc.html = generatePrintableHtmlReport(doc, options);
+  doc.printableHtml = doc.html;
+  return doc;
+}
+
+
 // --- 8. MULTI-PAGE PDF PAGINATION & SHARE INTENT PIPELINE (ITERATION 209) ---
 
 const ASCII_TO_BENGALI_DIGITS = Object.freeze({
@@ -3560,11 +4278,14 @@ const REPORT_PREFIXES = Object.freeze({
   MONTHLY_BAKI: 'TK_credit_report_',
   CUSTOMER_LIST: 'TK_CS_',
   SALES_SUMMARY: 'TK_sales_report_',
+  BECHA_KENA_SUMMARY: 'TK_sales_report_',
   CASHBOX_DETAIL: 'TK_cashbox_report_',
   CASHBOX_SUMMARY: 'TK_cashbox_report_',
   CASH_REPORT: 'TK_cash_report_',
   DAILY_EXPENSE: 'TK_exp_report_',
   MONTHLY_EXPENSE: 'TK_exp_report_',
+  EXPENSE_REPORT: 'TK_exp_report_',
+  STOCK_MOVEMENT: 'TK_stock_report_',
   MALIK_REPORT: 'TK_malik_report_',
   TRANSACTION_LIST: 'TK_TXN_',
   DEFAULT: 'TK-Report-',
@@ -3808,6 +4529,9 @@ const ledgerEngine = {
   generatePrintableHtmlStatement,
   generateConsolidatedReportDocument,
   generatePrintableHtmlReport,
+  generateCustomerListReportDocument,
+  generateExpenseReportDocument,
+  generateStockMovementReportDocument,
   REPORT_PREFIXES,
   toBengaliNumeral,
   paginateStatementDocument,
@@ -3840,6 +4564,9 @@ if (typeof exports !== 'undefined') {
   exports.generatePrintableHtmlStatement = generatePrintableHtmlStatement;
   exports.generateConsolidatedReportDocument = generateConsolidatedReportDocument;
   exports.generatePrintableHtmlReport = generatePrintableHtmlReport;
+  exports.generateCustomerListReportDocument = generateCustomerListReportDocument;
+  exports.generateExpenseReportDocument = generateExpenseReportDocument;
+  exports.generateStockMovementReportDocument = generateStockMovementReportDocument;
   exports.REPORT_PREFIXES = REPORT_PREFIXES;
   exports.toBengaliNumeral = toBengaliNumeral;
   exports.paginateStatementDocument = paginateStatementDocument;
