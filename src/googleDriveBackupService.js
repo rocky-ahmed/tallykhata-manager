@@ -23,6 +23,11 @@ if (typeof require !== 'undefined') {
   } catch (_) {
     audioNoteService = null;
   }
+  try {
+    receiptImageService = require('./receiptImageService');
+  } catch (_) {
+    receiptImageService = null;
+  }
 }
 
 /**
@@ -179,6 +184,14 @@ function buildBackupPayload(authoritativeState, userProfile, options = {}) {
               return { ...rest, fileUri: null, sanitized: true, backupExcludedBinary: true };
             }))
       : [],
+    receiptImages: Array.isArray(authoritativeState.receiptImages)
+      ? (receiptImageService && typeof receiptImageService.sanitizeReceiptImagesForBackup === 'function'
+          ? receiptImageService.sanitizeReceiptImagesForBackup(authoritativeState.receiptImages)
+          : authoritativeState.receiptImages.map((r) => {
+              const { imageBlob, base64Data, data, rawBytes, blob, buffer, imageData, ...rest } = r || {};
+              return { ...rest, fileUri: null, thumbnailUri: null, uri: null, thumbnail: null, sanitized: true, backupExcludedBinary: true };
+            }))
+      : [],
   };
 
   // Include Money Manager if present
@@ -205,6 +218,7 @@ function buildBackupPayload(authoritativeState, userProfile, options = {}) {
     notes: notes.length,
     businesses: businesses.length,
     audioNotes: Array.isArray(rawData.audioNotes) ? rawData.audioNotes.length : 0,
+    receiptImages: Array.isArray(rawData.receiptImages) ? rawData.receiptImages.length : 0,
   };
 
   const dataDomains = ['business'];
@@ -2987,6 +3001,7 @@ module.exports = {
   normalizeBackupPayload,
   validateBackupIntegrity,
   audioNoteService,
+  receiptImageService,
   previewBackup,
   toBengaliNumber,
   verifyUploadedBackupMatches,

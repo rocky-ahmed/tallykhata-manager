@@ -31,6 +31,22 @@ try {
   audioNoteService = require('./audioNoteService');
 } catch (e) {}
 
+let receiptImageService = null;
+try {
+  receiptImageService = require('./receiptImageService');
+} catch (e) {}
+
+const {
+  createReceiptImageMetadata,
+  validateReceiptImage,
+  sanitizeReceiptImagesForBackup,
+  calculateReceiptStorageUsage,
+  deleteReceiptFile,
+  cleanOrphanedReceiptImages,
+  calculateThumbnailBounds,
+  extractVoucherDetails,
+} = receiptImageService || {};
+
 const {
   createAudioNoteMetadata,
   validateAudioNote,
@@ -98,6 +114,7 @@ const VALID_COLLECTIONS = new Set([
   'businesses',
   'tagadaLogs',
   'audioNotes',
+  'receiptImages',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -294,6 +311,7 @@ function createDefaultState() {
         },
     tagadaLogs: [],
     audioNotes: [],
+    receiptImages: [],
     version: 6,
   };
 }
@@ -506,11 +524,19 @@ function decompressStoragePayload(payload) {
 
 class StorageRepository {
   constructor(storageAdapter = null) {
-    this.adapter = storageAdapter || this.createInMemoryAdapter();
+    if (storageAdapter && typeof storageAdapter === 'object' && storageAdapter.customStore) {
+      this.adapter = storageAdapter.customStore;
+    } else {
+      this.adapter = storageAdapter || this.createInMemoryAdapter();
+    }
     this.currentStore = null;
     this.writeQueue = Promise.resolve();
     this._pendingWrites = 0;
     this.telemetry = defaultTelemetryService;
+  }
+
+  async initialize() {
+    return this.loadStore();
   }
 
   getPendingWritesCount() {
@@ -1281,6 +1307,15 @@ class StorageRepository {
           });
     }
 
+    if (authoritative.receiptImages && Array.isArray(authoritative.receiptImages)) {
+      authoritative.receiptImages = receiptImageService && typeof receiptImageService.sanitizeReceiptImagesForBackup === 'function'
+        ? receiptImageService.sanitizeReceiptImagesForBackup(authoritative.receiptImages)
+        : authoritative.receiptImages.map((r) => {
+            const { imageBlob, base64Data, data, rawBytes, blob, buffer, imageData, ...rest } = r || {};
+            return { ...rest, fileUri: null, thumbnailUri: null, uri: null, thumbnail: null, sanitized: true, backupExcludedBinary: true };
+          });
+    }
+
     const domains = (extraState && Array.isArray(extraState.domains) && extraState.domains.length > 0)
       ? extraState.domains
       : ['all'];
@@ -1785,6 +1820,8 @@ class StorageRepository {
       const tagadaLogs = (prevStore.tagadaLogs || []).filter((t) => getBizId(t) !== targetId);
       const audioNotesToPurge = (prevStore.audioNotes || []).filter((a) => getBizId(a) === targetId);
       const audioNotes = (prevStore.audioNotes || []).filter((a) => getBizId(a) !== targetId);
+      const receiptsToPurge = (prevStore.receiptImages || []).filter((r) => getBizId(r) === targetId);
+      const receiptImages = (prevStore.receiptImages || []).filter((r) => getBizId(r) !== targetId);
 
       // Clean up physical audio files of deleted business
       if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
@@ -1794,6 +1831,16 @@ class StorageRepository {
               audioNoteService.deleteAudioFile(note.fileUri);
             } catch (_) {}
           }
+        }
+      }
+
+      // Clean up physical receipt files of deleted business
+      if (receiptImageService && typeof receiptImageService.deleteReceiptFile === 'function') {
+        for (const r of receiptsToPurge) {
+          try {
+            if (r.fileUri) receiptImageService.deleteReceiptFile(r.fileUri);
+            if (r.thumbnailUri) receiptImageService.deleteReceiptFile(r.thumbnailUri);
+          } catch (_) {}
         }
       }
 
@@ -1837,6 +1884,7 @@ class StorageRepository {
         walletTxns,
         tagadaLogs,
         audioNotes,
+        receiptImages,
         cashReconciliation,
       };
     });
@@ -1974,6 +2022,7 @@ class StorageRepository {
         const importedStock = ((data.stock || data.inventory) || []).filter(s => String(s.businessId || '1') === selectedBizId);
         const importedNotes = (data.notes || []).filter(n => String(n.businessId || '1') === selectedBizId);
         const importedAudio = (data.audioNotes || []).filter(a => String(a.businessId || '1') === selectedBizId);
+        const importedReceipts = (data.receiptImages || []).filter(r => String(r.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -1981,6 +2030,7 @@ class StorageRepository {
         const keptStock = ((prevStore.stock || prevStore.inventory) || []).filter(s => String(s.businessId || '1') !== selectedBizId);
         const keptNotes = (prevStore.notes || []).filter(n => String(n.businessId || '1') !== selectedBizId);
         const keptAudio = (prevStore.audioNotes || []).filter(a => String(a.businessId || '1') !== selectedBizId);
+        const keptReceipts = (prevStore.receiptImages || []).filter(r => String(r.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -1998,6 +2048,7 @@ class StorageRepository {
           inventory: [...keptStock, ...importedStock],
           notes: [...keptNotes, ...importedNotes],
           audioNotes: [...keptAudio, ...importedAudio],
+          receiptImages: [...keptReceipts, ...importedReceipts],
           version: 6,
           lastRestoredAt: new Date().toISOString(),
           restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -2271,6 +2322,10 @@ class StorageRepository {
       payload = decompressStoragePayload(payload);
     }
     return await this.restoreStorageBackup(payload, options);
+  }
+
+  async importBackupPayload(backupPayload, options = {}) {
+    return this.importCompressedBackup(backupPayload, options);
   }
 
   async createStorageBackup(extraState = {}, options = {}) {
@@ -4032,6 +4087,7 @@ class StorageRepository {
     const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
 
     let purgedAudioNotes = [];
+    let purgedReceiptImages = [];
     let purgedJournalsCount = 0;
 
     const res = await this.mutateStore((latestStore) => {
@@ -4056,10 +4112,18 @@ class StorageRepository {
         return biz === targetBizId && isEntityMatch;
       });
 
+      // Find receipt images to remove (attached to any of the purged journals for this account)
+      const curReceipts = latestStore.receiptImages || [];
+      purgedReceiptImages = curReceipts.filter((r) => {
+        const biz = getBizId(r);
+        return biz === targetBizId && accTxnIds.includes(String(r.journalId));
+      });
+
       const updatedAccounts = curAccounts.filter((a) => !(String(a.id) === targetAccId && getBizId(a) === targetBizId));
       const updatedJournals = curJournals.filter((j) => !(String(j.accountId) === targetAccId && getBizId(j) === targetBizId));
       const updatedCash = curCash.filter((c) => !accTxnIds.includes(String(c.transactionId || c.txnId || c.id)));
       const updatedAudio = curAudio.filter((a) => !purgedAudioNotes.some((p) => p.id === a.id));
+      const updatedReceipts = curReceipts.filter((r) => !purgedReceiptImages.some((p) => p.id === r.id));
 
       return {
         ...latestStore,
@@ -4067,6 +4131,7 @@ class StorageRepository {
         journals: updatedJournals,
         cashEntries: updatedCash,
         audioNotes: updatedAudio,
+        receiptImages: updatedReceipts,
       };
     });
 
@@ -4085,11 +4150,22 @@ class StorageRepository {
       }
     }
 
+    // Clean up receipt files on disk
+    if (options.deleteFile !== false && receiptImageService && typeof receiptImageService.deleteReceiptFile === 'function') {
+      for (const r of purgedReceiptImages) {
+        try {
+          if (r && r.fileUri) await receiptImageService.deleteReceiptFile(r.fileUri, options.fileSystemAdapter);
+          if (r && r.thumbnailUri) await receiptImageService.deleteReceiptFile(r.thumbnailUri, options.fileSystemAdapter);
+        } catch (_) {}
+      }
+    }
+
     return {
       success: true,
       deletedAccountId: targetAccId,
       deletedJournalsCount: purgedJournalsCount,
       deletedAudioNotesCount: purgedAudioNotes.length,
+      deletedReceiptImagesCount: purgedReceiptImages.length,
     };
   }
 
@@ -4136,6 +4212,234 @@ class StorageRepository {
       formattedBytes: `${totalBytes} B`,
       formattedDurationBn: '০০:০০',
       formattedDurationEn: '00:00',
+    };
+  }
+
+  /**
+   * Attaches a receipt image metadata record to a transaction/journal.
+   * Persists atomically in the 'receiptImages' collection under writeQueue mutex.
+   *
+   * @param {object} receiptImage - Receipt image metadata parameters
+   * @param {object} [options] - Options (businessId, etc.)
+   * @returns {Promise<{ success: boolean, receiptImage?: object, error?: any }>}
+   */
+  async attachReceiptImage(receiptImage, options = {}) {
+    if (!receiptImage || typeof receiptImage !== 'object') {
+      return { success: false, error: new Error('Receipt image must be an object') };
+    }
+
+    const bizId = options.businessId || receiptImage.businessId || receiptImage.business_id || this.currentStore?.activeBusinessId || '1';
+    let normalizedReceipt;
+    try {
+      if (receiptImageService && typeof receiptImageService.createReceiptImageMetadata === 'function') {
+        normalizedReceipt = receiptImageService.createReceiptImageMetadata({
+          ...receiptImage,
+          businessId: bizId,
+        });
+      } else {
+        const jId = receiptImage.journalId || receiptImage.journal_id;
+        if (!jId) throw new Error('journalId is required');
+        normalizedReceipt = {
+          ...receiptImage,
+          id: receiptImage.id || `rcp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          journalId: String(jId),
+          businessId: String(bizId),
+          createdAt: receiptImage.createdAt || new Date().toISOString(),
+        };
+      }
+    } catch (validationErr) {
+      return { success: false, error: validationErr };
+    }
+
+    const res = await this.mutateCollection('receiptImages', (list) => {
+      const existingIndex = list.findIndex((r) => r.id === normalizedReceipt.id);
+      if (existingIndex >= 0) {
+        const updated = [...list];
+        updated[existingIndex] = normalizedReceipt;
+        return updated;
+      }
+      return [...list, normalizedReceipt];
+    });
+
+    if (!res.success) {
+      return { success: false, error: res.error };
+    }
+
+    return { success: true, receiptImage: normalizedReceipt };
+  }
+
+  /**
+   * Retrieves all receipt images attached to a specific journal/transaction for the business.
+   *
+   * @param {string|number} journalId - Transaction/journal ID
+   * @param {string|number} [businessId=null] - Scoped business ID
+   * @returns {Array<object>} Matching receipt images
+   */
+  getReceiptImagesForJournal(journalId, businessId = null) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.receiptImages) ? store.receiptImages : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const cleanJournalId = String(journalId !== undefined && journalId !== null ? journalId : '');
+
+    return list.filter((r) => {
+      if (!r) return false;
+      const rBizId = String(r.businessId || r.business_id || '1');
+      const rJournalId = String(r.journalId !== undefined && r.journalId !== null ? r.journalId : (r.journal_id || ''));
+      return rBizId === targetBizId && rJournalId === cleanJournalId;
+    });
+  }
+
+  /**
+   * Retrieves all receipt images scoped to a specific business.
+   *
+   * @param {string|number} [businessId=null] - Business ID
+   * @returns {Array<object>} All receipt images for the business
+   */
+  getReceiptImagesForBusiness(businessId = null) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.receiptImages) ? store.receiptImages : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    return list.filter((r) => {
+      if (!r) return false;
+      const rBizId = String(r.businessId || r.business_id || '1');
+      return rBizId === targetBizId;
+    });
+  }
+
+  /**
+   * Deletes a receipt image by ID and safely unlinks its underlying image files.
+   *
+   * @param {string} receiptImageId - ID of the receipt image to delete
+   * @param {object} [options] - Options (deleteFile: boolean, fileSystemAdapter)
+   * @returns {Promise<{ success: boolean, deletedReceipt?: object, fileDeleted?: boolean, error?: any }>}
+   */
+  async deleteReceiptImage(receiptImageId, options = {}) {
+    if (!receiptImageId) {
+      return { success: false, error: new Error('receiptImageId is required') };
+    }
+
+    let deletedReceipt = null;
+    const res = await this.mutateCollection('receiptImages', (list) => {
+      const target = list.find((r) => r.id === receiptImageId);
+      if (target) {
+        deletedReceipt = target;
+        return list.filter((r) => r.id !== receiptImageId);
+      }
+      return list;
+    });
+
+    if (!res.success) {
+      return { success: false, error: res.error };
+    }
+
+    let fileDeleted = false;
+    if (deletedReceipt && options.deleteFile !== false) {
+      if (receiptImageService && typeof receiptImageService.deleteReceiptFile === 'function') {
+        if (deletedReceipt.fileUri) {
+          const delRes = await receiptImageService.deleteReceiptFile(deletedReceipt.fileUri, options.fileSystemAdapter);
+          fileDeleted = Boolean(delRes.deleted);
+        }
+        if (deletedReceipt.thumbnailUri) {
+          await receiptImageService.deleteReceiptFile(deletedReceipt.thumbnailUri, options.fileSystemAdapter);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      deletedReceipt,
+      fileDeleted,
+    };
+  }
+
+  /**
+   * Deletes all receipt images associated with a journal and unlinks their files.
+   *
+   * @param {string|number} journalId - Target journal ID
+   * @param {string|number} [businessId=null] - Scoped business ID
+   * @param {object} [options] - Options (deleteFile, fileSystemAdapter)
+   * @returns {Promise<{ success: boolean, deletedCount: number, deletedReceipts: Array<object> }>}
+   */
+  async deleteReceiptImagesForJournal(journalId, businessId = null, options = {}) {
+    const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+    const cleanJournalId = String(journalId !== undefined && journalId !== null ? journalId : '');
+
+    let deletedReceipts = [];
+    const res = await this.mutateCollection('receiptImages', (list) => {
+      const remaining = [];
+      for (const r of list) {
+        const rBizId = String(r?.businessId || r?.business_id || '1');
+        const rJournalId = String(r?.journalId !== undefined && r?.journalId !== null ? r.journalId : (r?.journal_id || ''));
+        if (rBizId === targetBizId && rJournalId === cleanJournalId) {
+          deletedReceipts.push(r);
+        } else {
+          remaining.push(r);
+        }
+      }
+      return remaining;
+    });
+
+    if (!res.success) {
+      return { success: false, deletedCount: 0, deletedReceipts: [], error: res.error };
+    }
+
+    if (options.deleteFile !== false && receiptImageService && typeof receiptImageService.deleteReceiptFile === 'function') {
+      for (const r of deletedReceipts) {
+        try {
+          if (r?.fileUri) await receiptImageService.deleteReceiptFile(r.fileUri, options.fileSystemAdapter);
+          if (r?.thumbnailUri) await receiptImageService.deleteReceiptFile(r.thumbnailUri, options.fileSystemAdapter);
+        } catch (_) {}
+      }
+    }
+
+    return {
+      success: true,
+      deletedCount: deletedReceipts.length,
+      deletedReceipts,
+    };
+  }
+
+  /**
+   * Scans receipt directory and cleans up orphaned receipt images not referenced by current store.
+   *
+   * @param {string} [directoryPath=null] - Directory path
+   * @param {object} [fileSystemAdapter=null] - Filesystem adapter
+   * @returns {Promise<object>} Garbage collection summary report
+   */
+  async cleanOrphanedReceiptImages(directoryPath = null, fileSystemAdapter = null) {
+    const allReceipts = Array.isArray(this.currentStore?.receiptImages) ? this.currentStore.receiptImages : [];
+    if (receiptImageService && typeof receiptImageService.cleanOrphanedReceiptImages === 'function') {
+      return receiptImageService.cleanOrphanedReceiptImages(allReceipts, directoryPath, fileSystemAdapter);
+    }
+    return {
+      scannedCount: 0,
+      referencedCount: allReceipts.length,
+      orphanedCount: 0,
+      deletedCount: 0,
+      bytesReclaimed: 0,
+      deletedFiles: [],
+      errors: [],
+    };
+  }
+
+  /**
+   * Returns aggregate receipt storage statistics for the business.
+   *
+   * @param {string|number} [businessId=null]
+   * @param {object} [options]
+   * @returns {object}
+   */
+  getReceiptStorageMetrics(businessId = null, options = {}) {
+    const list = this.getReceiptImagesForBusiness(businessId);
+    if (receiptImageService && typeof receiptImageService.calculateReceiptStorageUsage === 'function') {
+      return receiptImageService.calculateReceiptStorageUsage(list, options);
+    }
+    const totalBytes = list.reduce((sum, r) => sum + (Number(r?.fileSizeBytes !== undefined ? r.fileSizeBytes : r?.fileSize) || 0), 0);
+    return {
+      totalCount: list.length,
+      totalBytes,
+      averageFileSizeBytes: list.length > 0 ? Math.round(totalBytes / list.length) : 0,
     };
   }
 }
@@ -4867,6 +5171,55 @@ function getAudioStorageMetricsRepo(businessId = null, options = {}, repo = defa
   return { totalCount: 0, totalBytes: 0, totalDurationMs: 0 };
 }
 
+async function attachReceiptImageRepo(receiptImage, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.attachReceiptImage === 'function') {
+    return repo.attachReceiptImage(receiptImage, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getReceiptImagesForJournalRepo(journalId, businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getReceiptImagesForJournal === 'function') {
+    return repo.getReceiptImagesForJournal(journalId, businessId);
+  }
+  return [];
+}
+
+function getReceiptImagesForBusinessRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getReceiptImagesForBusiness === 'function') {
+    return repo.getReceiptImagesForBusiness(businessId);
+  }
+  return [];
+}
+
+async function deleteReceiptImageRepo(receiptImageId, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.deleteReceiptImage === 'function') {
+    return repo.deleteReceiptImage(receiptImageId, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function deleteReceiptImagesForJournalRepo(journalId, businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.deleteReceiptImagesForJournal === 'function') {
+    return repo.deleteReceiptImagesForJournal(journalId, businessId, options);
+  }
+  return { success: false, deletedCount: 0, deletedReceipts: [], error: 'NO_REPOSITORY' };
+}
+
+async function cleanOrphanedReceiptImagesRepo(directoryPath = null, fileSystemAdapter = null, repo = defaultRepository) {
+  if (repo && typeof repo.cleanOrphanedReceiptImages === 'function') {
+    return repo.cleanOrphanedReceiptImages(directoryPath, fileSystemAdapter);
+  }
+  return { scannedCount: 0, referencedCount: 0, orphanedCount: 0, deletedCount: 0, bytesReclaimed: 0, deletedFiles: [], errors: [] };
+}
+
+function getReceiptStorageMetricsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getReceiptStorageMetrics === 'function') {
+    return repo.getReceiptStorageMetrics(businessId, options);
+  }
+  return { totalCount: 0, totalBytes: 0, averageFileSizeBytes: 0 };
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -4938,6 +5291,14 @@ const repoExport = {
   deleteAccountCascade: deleteAccountCascadeRepo,
   cleanOrphanedAudioFiles: cleanOrphanedAudioFilesRepo,
   getAudioStorageMetrics: getAudioStorageMetricsRepo,
+  receiptImageService,
+  attachReceiptImage: attachReceiptImageRepo,
+  getReceiptImagesForJournal: getReceiptImagesForJournalRepo,
+  getReceiptImagesForBusiness: getReceiptImagesForBusinessRepo,
+  deleteReceiptImage: deleteReceiptImageRepo,
+  deleteReceiptImagesForJournal: deleteReceiptImagesForJournalRepo,
+  cleanOrphanedReceiptImages: cleanOrphanedReceiptImagesRepo,
+  getReceiptStorageMetrics: getReceiptStorageMetricsRepo,
   default: defaultRepository,
 };
 
@@ -5015,5 +5376,13 @@ if (typeof exports !== 'undefined') {
   exports.deleteAccountCascade = deleteAccountCascadeRepo;
   exports.cleanOrphanedAudioFiles = cleanOrphanedAudioFilesRepo;
   exports.getAudioStorageMetrics = getAudioStorageMetricsRepo;
+  exports.receiptImageService = receiptImageService;
+  exports.attachReceiptImage = attachReceiptImageRepo;
+  exports.getReceiptImagesForJournal = getReceiptImagesForJournalRepo;
+  exports.getReceiptImagesForBusiness = getReceiptImagesForBusinessRepo;
+  exports.deleteReceiptImage = deleteReceiptImageRepo;
+  exports.deleteReceiptImagesForJournal = deleteReceiptImagesForJournalRepo;
+  exports.cleanOrphanedReceiptImages = cleanOrphanedReceiptImagesRepo;
+  exports.getReceiptStorageMetrics = getReceiptStorageMetricsRepo;
   exports.default = defaultRepository;
 }

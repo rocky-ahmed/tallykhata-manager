@@ -44,6 +44,8 @@ import * as biometricAuthModule from './src/biometricAuthService';
 const biometricAuthService = biometricAuthModule.biometricAuthService || biometricAuthModule.default || biometricAuthModule;
 import * as audioNoteModule from './src/audioNoteService';
 const audioNoteService = audioNoteModule.audioNoteService || audioNoteModule.default || audioNoteModule;
+import * as receiptScannerModule from './src/receiptScannerService';
+const receiptScannerService = receiptScannerModule.receiptScannerService || receiptScannerModule.default || receiptScannerModule;
 
 export const ThemeContext = React.createContext({
   theme: themeService.LIGHT_THEME,
@@ -805,6 +807,22 @@ function TallyKhataApp() {
   const [changePinError, setChangePinError] = useState('');
 
   const [pinRecoveryPhone, setPinRecoveryPhone] = useState('');
+
+  // --- ITERATION 217: VOUCHER / RECEIPT CAMERA SCANNER & VIEWER STATES ---
+  const [modalReceiptScanner, setModalReceiptScanner] = useState(false);
+  const [modalReceiptViewer, setModalReceiptViewer] = useState(false);
+  const [activeReceipt, setActiveReceipt] = useState(null);
+  const [scannerTargetTxn, setScannerTargetTxn] = useState(null);
+  const [scannerState, setScannerState] = useState('IDLE'); // 'IDLE' | 'SCANNING' | 'CAPTURED' | 'CROPPING'
+  const [scannerPhotoUri, setScannerPhotoUri] = useState(null);
+  const [scannerRotation, setScannerRotation] = useState(0);
+  const [scannerCropRect, setScannerCropRect] = useState({ x: 0.05, y: 0.05, width: 0.9, height: 0.9 });
+  const [scannerFlash, setScannerFlash] = useState(false);
+  const [scannerCameraType, setScannerCameraType] = useState('back');
+  const [viewerZoom, setViewerZoom] = useState(1.0);
+  const [viewerRotation, setViewerRotation] = useState(0);
+  const [currentDraftReceipt, setCurrentDraftReceipt] = useState(null);
+  const [attachedReceipts, setAttachedReceipts] = useState({});
 
   // --- ITERATION 216: AUDIO / VOICE NOTE & TAGADA MESSAGING STATES ---
   const [modalAudioRecord, setModalAudioRecord] = useState(false);
@@ -2168,6 +2186,8 @@ function TallyKhataApp() {
   // --- HARDWARE BACK HANDLER (Closes modals & navigates back natively) ---
   useEffect(() => {
     const onBackPress = () => {
+      if (modalReceiptViewer) { setModalReceiptViewer(false); return true; }
+      if (modalReceiptScanner) { setModalReceiptScanner(false); return true; }
       if (modalAddTxn) { setModalAddTxn(false); return true; }
       if (modalEditTxn) { setModalEditTxn(false); return true; }
       if (modalAddAccount) { setModalAddAccount(false); return true; }
@@ -2265,7 +2285,7 @@ function TallyKhataApp() {
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
     modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
-    modalMobileRecharge, modalAudioRecord, modalTagada, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
+    modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
     modalMalikReport, modalMoneyOut, modalTxnLimit, modalThemePicker, modalLanguagePicker, modalNotifications, modalDataManagement, modalAbout, modalFilter, modalMoneyManager, modalMMAddTxn, modalMMEditTxn, modalMMAddAccount, modalMMSetBudget, modalMMTransfer, modalMMAddCategory, modalMMOverallBudget, modalMMAddGoal, modalMMDepositGoal, modalMMWithdrawGoal, modalMMPreferences, modalMMRecurring, modalMMAddRecurring, modalMMEditCategory, modalMMCustomDateRange, modalMMMonthPicker, currentScreen, activeTab
   ]);
@@ -2644,6 +2664,13 @@ function TallyKhataApp() {
     setJournals(saveRes.data.journals);
     setCashEntries(saveRes.data.cashEntries);
 
+    if (currentDraftReceipt) {
+      const targetTxn = saveRes.data.journals && saveRes.data.journals[saveRes.data.journals.length - 1];
+      const targetId = targetTxn ? targetTxn.id : ('txn_' + Date.now());
+      const linkedReceipt = Object.assign({}, currentDraftReceipt, { txnId: targetId });
+      setAttachedReceipts((prev) => Object.assign({}, prev, { [targetId]: linkedReceipt }));
+      setCurrentDraftReceipt(null);
+    }
     setCalcExpr('');
     setCalcDisplay('০');
     setTxnDesc('');
@@ -3569,6 +3596,106 @@ function TallyKhataApp() {
     });
   };
 
+  // --- ITERATION 217: RECEIPT SCANNER & VIEWER HANDLERS ---
+  const handleOpenReceiptScanner = (targetTxn = null) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setScannerTargetTxn(targetTxn);
+    setScannerState('SCANNING');
+    setScannerPhotoUri(null);
+    setScannerRotation(0);
+    setScannerCropRect({ x: 0.05, y: 0.05, width: 0.9, height: 0.9 });
+    setModalReceiptScanner(true);
+  };
+
+  const handleCaptureReceiptPhoto = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    const mockUri = 'file:///storage/emulated/0/DCIM/Camera/RECEIPT_' + Date.now() + '.jpg';
+    setScannerPhotoUri(mockUri);
+    setScannerState('CAPTURED');
+  };
+
+  const handlePickReceiptGallery = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const mockUri = 'file:///storage/emulated/0/DCIM/Gallery/RECEIPT_PICK_' + Date.now() + '.jpg';
+    setScannerPhotoUri(mockUri);
+    setScannerState('CAPTURED');
+  };
+
+  const handleRotateReceipt = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setScannerRotation((prev) => (prev + 90) % 360);
+  };
+
+  const handleRetakeReceipt = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setScannerState('SCANNING');
+    setScannerPhotoUri(null);
+    setScannerRotation(0);
+    setScannerCropRect({ x: 0.05, y: 0.05, width: 0.9, height: 0.9 });
+  };
+
+  const handleSaveReceipt = () => {
+    if (!scannerPhotoUri) return;
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    const newReceipt = receiptScannerService.createReceiptRecord({
+      uri: scannerPhotoUri,
+      rotation: scannerRotation,
+      cropRect: scannerCropRect,
+      txnId: scannerTargetTxn ? scannerTargetTxn.id : null,
+      accountId: selectedAccount ? selectedAccount.id : null,
+      businessId: currentBusinessId || 'biz_default',
+      fileSize: 245760, // 240 KB
+    });
+
+    if (scannerTargetTxn && scannerTargetTxn.id) {
+      setAttachedReceipts((prev) => Object.assign({}, prev, { [scannerTargetTxn.id]: newReceipt }));
+    } else {
+      setCurrentDraftReceipt(newReceipt);
+    }
+    setModalReceiptScanner(false);
+    Alert.alert(t('receipt_scanner_title'), t('receipt_saved_toast'));
+  };
+
+  const handleOpenReceiptViewer = (receipt) => {
+    if (!receipt) return;
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setActiveReceipt(receipt);
+    setViewerZoom(1.0);
+    setViewerRotation(receipt.rotation || 0);
+    setModalReceiptViewer(true);
+  };
+
+  const handleDeleteReceipt = (receiptId) => {
+    Alert.alert(
+      t('receipt_delete_btn'),
+      t('receipt_delete_confirm'),
+      [
+        { text: tStatic("বাতিল"), style: 'cancel' },
+        {
+          text: t('receipt_delete_btn'),
+          style: 'destructive',
+          onPress: () => {
+            try { hapticFeedbackService.onError(); } catch (e) {}
+            if (currentDraftReceipt && currentDraftReceipt.id === receiptId) {
+              setCurrentDraftReceipt(null);
+            }
+            setAttachedReceipts((prev) => {
+              const next = Object.assign({}, prev);
+              Object.keys(next).forEach((k) => {
+                if (next[k] && (next[k].id === receiptId || k === receiptId)) {
+                  delete next[k];
+                }
+              });
+              return next;
+            });
+            setModalReceiptViewer(false);
+            Alert.alert(t('receipt_viewer_title'), t('receipt_deleted_toast'));
+          },
+        },
+      ]
+    );
+  };
+
   const handleDeleteVoiceNote = (targetId) => {
     if (!targetId || !voiceNotes[targetId]) return;
     Alert.alert(
@@ -4389,6 +4516,43 @@ function TallyKhataApp() {
       handleTogglePlayAudio,
       handleStopAudioPlayback,
       handleDeleteVoiceNote,
+    };
+
+    global.__RECEIPT_SCANNER_TEST_HOOKS__ = {
+      modalReceiptScanner,
+      setModalReceiptScanner,
+      modalReceiptViewer,
+      setModalReceiptViewer,
+      activeReceipt,
+      setActiveReceipt,
+      scannerState,
+      setScannerState,
+      scannerPhotoUri,
+      setScannerPhotoUri,
+      scannerRotation,
+      setScannerRotation,
+      scannerCropRect,
+      setScannerCropRect,
+      scannerFlash,
+      setScannerFlash,
+      scannerCameraType,
+      setScannerCameraType,
+      viewerZoom,
+      setViewerZoom,
+      viewerRotation,
+      setViewerRotation,
+      currentDraftReceipt,
+      setCurrentDraftReceipt,
+      attachedReceipts,
+      setAttachedReceipts,
+      handleOpenReceiptScanner,
+      handleCaptureReceiptPhoto,
+      handlePickReceiptGallery,
+      handleRotateReceipt,
+      handleRetakeReceipt,
+      handleSaveReceipt,
+      handleOpenReceiptViewer,
+      handleDeleteReceipt,
     };
   }
 
@@ -6184,6 +6348,36 @@ function TallyKhataApp() {
                   <Text style={[styles.ledgerRowBalance, isDark && tStyles.textMuted]}>
                     {tStatic("জের: ৳ ")}{formatMoney(item.balance)}
                   </Text>
+                  {/* Attached Receipt Indicator Pill (Iteration 217) */}
+                  {attachedReceipts[item.id] ? (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: isDark ? '#064E3B' : '#DCFCE7',
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 12,
+                        alignSelf: 'flex-start',
+                        marginTop: 4,
+                        borderWidth: 1,
+                        borderColor: isDark ? '#059669' : '#86EFAC',
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleOpenReceiptViewer(attachedReceipts[item.id]);
+                      }}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('receipt_attached_badge')}
+                    >
+                      <Text style={{ fontSize: 11, marginRight: 4 }}>🧾</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#A7F3D0' : '#064E3B' }}>
+                        {t('receipt_attached_badge')}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
                 <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
                   {isGiven ? (
@@ -9480,6 +9674,75 @@ accessibilityLabel={
               ))}
             </ScrollView>
 
+            {/* Voucher / Receipt Attachment Section (Iteration 217) */}
+            <View style={{ marginVertical: 10, padding: 10, borderRadius: 12, backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+              {currentDraftReceipt ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: isDark ? '#0F172A' : '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginRight: 10, borderWidth: 1, borderColor: isDark ? '#334155' : '#CBD5E1' }}>
+                      <Text style={{ fontSize: 22 }}>🧾</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F8FAFC' : '#1E293B' }}>
+                        {t('receipt_attached_badge')}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B' }}>
+                        {receiptScannerService.formatFileSize(currentDraftReceipt.fileSize, effectiveLanguage)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: isDark ? '#0D6E5C' : '#E0F2FE', marginRight: 6 }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      onPress={() => handleOpenReceiptViewer(currentDraftReceipt)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('receipt_view_full')}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#A7F3D0' : '#0369A1' }}>
+                        {t('receipt_view_full')}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, backgroundColor: isDark ? '#450A0A' : '#FEE2E2' }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      onPress={() => setCurrentDraftReceipt(null)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('receipt_delete_btn')}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#EF4444' }}>
+                        ✕
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderStyle: 'dashed',
+                    borderColor: isDark ? '#34D399' : '#0D6E5C',
+                    backgroundColor: isDark ? '#064E3B20' : '#F0FDF4',
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={() => handleOpenReceiptScanner()}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('receipt_add_btn')}
+                >
+                  <Text style={{ fontSize: 16, marginRight: 6 }}>📷</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#34D399' : '#0D6E5C' }}>
+                    {t('receipt_add_btn')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             {/* Modal Action Buttons with 3D tactile buttons */}
             <View style={styles.modalBtnRow}>
               <Button3D
@@ -9656,6 +9919,45 @@ accessibilityLabel={
                     {tStatic("৳ ")}{formatMoney(selectedAccount?.balance)}
                   </Text>
                 </View>
+
+                {/* Attached Voucher Image Row in Modal Voucher (Iteration 217) */}
+                {selectedVoucherTxn && (
+                  <View style={{ marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+                    {attachedReceipts[selectedVoucherTxn.id] ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 16, marginRight: 6 }}>🧾</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#A7F3D0' : '#064E3B' }}>
+                            {t('receipt_attached_badge')}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: isDark ? '#0D6E5C' : '#DCFCE7' }}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          onPress={() => handleOpenReceiptViewer(attachedReceipts[selectedVoucherTxn.id])}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('receipt_view_full')}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? '#A7F3D0' : '#064E3B' }}>
+                            {t('receipt_view_full')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}
+                        onPress={() => handleOpenReceiptScanner(selectedVoucherTxn)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('receipt_add_btn')}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#34D399' : '#0D6E5C' }}>
+                          📷 {t('receipt_add_btn')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
             </ScrollView>
 
@@ -11355,6 +11657,421 @@ accessibilityLabel={
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: RECEIPT CAMERA SCANNER & CROPPER (ITERATION 217)
+         =================================================================== */}
+      <Modal
+        visible={modalReceiptScanner}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setModalReceiptScanner(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
+          {/* Top Camera Controls Bar */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            backgroundColor: '#0F172A',
+            borderBottomWidth: 1,
+            borderBottomColor: '#1E293B',
+          }}>
+            <TouchableOpacity
+              onPress={() => setModalReceiptScanner(false)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('btn_cancel')}
+            >
+              <Text style={{ fontSize: 20, color: '#F8FAFC' }}>✕</Text>
+            </TouchableOpacity>
+
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#F8FAFC' }}>
+              {t('receipt_scanner_title')}
+            </Text>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity
+                onPress={() => setScannerFlash((prev) => !prev)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={{
+                  padding: 8,
+                  borderRadius: 20,
+                  backgroundColor: scannerFlash ? '#F59E0B25' : '#1E293B',
+                  marginRight: 10,
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('receipt_flash_toggle')}
+              >
+                <Text style={{ fontSize: 16, color: scannerFlash ? '#F59E0B' : '#94A3B8' }}>⚡</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setScannerCameraType((prev) => (prev === 'back' ? 'front' : 'back'))}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={{ padding: 8, borderRadius: 20, backgroundColor: '#1E293B' }}
+                accessibilityRole="button"
+                accessibilityLabel={t('receipt_camera_toggle')}
+              >
+                <Text style={{ fontSize: 16, color: '#94A3B8' }}>🔄</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Central Camera Viewfinder Area */}
+          <View style={{
+            flex: 1,
+            backgroundColor: '#000000',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+          }}>
+            {scannerState === 'CAPTURED' || scannerState === 'CROPPING' ? (
+              <View style={{ width: '85%', height: '80%', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: 16,
+                  borderWidth: 2,
+                  borderColor: '#10B981',
+                  backgroundColor: '#1E293B',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  transform: [{ rotate: scannerRotation + 'deg' }],
+                }}>
+                  <Text style={{ fontSize: 48, marginBottom: 12 }}>🧾</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC', textAlign: 'center', paddingHorizontal: 20 }}>
+                    {t('receipt_ocr_detect')}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                    {scannerPhotoUri ? scannerPhotoUri.split('/').pop() : ''}
+                  </Text>
+                </View>
+
+                {/* 4 Crop Corner Handles Overlay */}
+                <View style={{ position: 'absolute', top: 0, left: 0, width: 24, height: 24, borderTopWidth: 4, borderLeftWidth: 4, borderColor: '#34D399' }} />
+                <View style={{ position: 'absolute', top: 0, right: 0, width: 24, height: 24, borderTopWidth: 4, borderRightWidth: 4, borderColor: '#34D399' }} />
+                <View style={{ position: 'absolute', bottom: 0, left: 0, width: 24, height: 24, borderBottomWidth: 4, borderLeftWidth: 4, borderColor: '#34D399' }} />
+                <View style={{ position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderBottomWidth: 4, borderRightWidth: 4, borderColor: '#34D399' }} />
+              </View>
+            ) : (
+              <View style={{ width: '85%', height: '75%', alignItems: 'center', justifyContent: 'center' }}>
+                {/* Viewfinder Target Frame */}
+                <View style={{
+                  width: '100%',
+                  height: '100%',
+                  borderWidth: 2,
+                  borderColor: '#10B981',
+                  borderStyle: 'dashed',
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#10B98108',
+                }}>
+                  <Text style={{ fontSize: 40, marginBottom: 10 }}>📷</Text>
+                  <Text style={{ fontSize: 14, color: '#E2E8F0', fontWeight: '600', textAlign: 'center', paddingHorizontal: 16 }}>
+                    {t('receipt_scan_hint')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 6 }}>
+                    {t('receipt_crop_guides')}
+                  </Text>
+                </View>
+
+                {/* 4 Optical Corner Brackets */}
+                <View style={{ position: 'absolute', top: -4, left: -4, width: 28, height: 28, borderTopWidth: 4, borderLeftWidth: 4, borderColor: '#10B981', borderTopLeftRadius: 8 }} />
+                <View style={{ position: 'absolute', top: -4, right: -4, width: 28, height: 28, borderTopWidth: 4, borderRightWidth: 4, borderColor: '#10B981', borderTopRightRadius: 8 }} />
+                <View style={{ position: 'absolute', bottom: -4, left: -4, width: 28, height: 28, borderBottomWidth: 4, borderLeftWidth: 4, borderColor: '#10B981', borderBottomLeftRadius: 8 }} />
+                <View style={{ position: 'absolute', bottom: -4, right: -4, width: 28, height: 28, borderBottomWidth: 4, borderRightWidth: 4, borderColor: '#10B981', borderBottomRightRadius: 8 }} />
+              </View>
+            )}
+          </View>
+
+          {/* Bottom Action Controls Bar */}
+          <View style={{
+            backgroundColor: '#0F172A',
+            paddingHorizontal: 20,
+            paddingVertical: 18,
+            borderTopWidth: 1,
+            borderTopColor: '#1E293B',
+          }}>
+            {scannerState === 'CAPTURED' || scannerState === 'CROPPING' ? (
+              <View>
+                <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+                  <Button3D
+                    title={t('receipt_retake_btn')}
+                    variant="secondary"
+                    size="md"
+                    isDark={true}
+                    onPress={handleRetakeReceipt}
+                    style={{ flex: 1, marginRight: 8 }}
+                  />
+                  <Button3D
+                    title={t('receipt_rotate')}
+                    variant="info"
+                    size="md"
+                    isDark={true}
+                    onPress={handleRotateReceipt}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+                <Button3D
+                  title={t('receipt_use_photo')}
+                  variant="success"
+                  size="lg"
+                  isDark={true}
+                  onPress={handleSaveReceipt}
+                  style={{ width: '100%' }}
+                />
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                {/* Pick from Gallery */}
+                <TouchableOpacity
+                  style={{
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    borderRadius: 10,
+                    backgroundColor: '#1E293B',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 90,
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={handlePickReceiptGallery}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('receipt_gallery_pick')}
+                >
+                  <Text style={{ fontSize: 13, color: '#38BDF8', fontWeight: 'bold' }}>
+                    🖼️ {t('receipt_gallery_pick')}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 3D Shutter Capture Button */}
+                <TouchableOpacity
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36,
+                    backgroundColor: '#FFFFFF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 4,
+                    borderColor: '#E2E8F0',
+                    elevation: 6,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 6,
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={handleCaptureReceiptPhoto}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('receipt_capture_btn')}
+                >
+                  <View style={{
+                    width: 54,
+                    height: 54,
+                    borderRadius: 27,
+                    backgroundColor: '#0D6E5C',
+                    borderWidth: 2,
+                    borderColor: '#10B981',
+                  }} />
+                </TouchableOpacity>
+
+                {/* Cancel */}
+                <TouchableOpacity
+                  style={{
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    borderRadius: 10,
+                    backgroundColor: '#1E293B',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 90,
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={() => setModalReceiptScanner(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('btn_cancel')}
+                >
+                  <Text style={{ fontSize: 13, color: '#94A3B8', fontWeight: 'bold' }}>
+                    {t('btn_cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: RECEIPT & VOUCHER VIEWER (ITERATION 217)
+         =================================================================== */}
+      <Modal
+        visible={modalReceiptViewer}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setModalReceiptViewer(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)' }}>
+          {/* Top Bar */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: '#1E293B',
+          }}>
+            <TouchableOpacity
+              onPress={() => setModalReceiptViewer(false)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('btn_cancel')}
+            >
+              <Text style={{ fontSize: 22, color: '#F8FAFC' }}>✕</Text>
+            </TouchableOpacity>
+
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#F8FAFC' }}>
+              {t('receipt_viewer_title')}
+            </Text>
+
+            <View style={{ width: 24 }} />
+          </View>
+
+          {/* Interactive Zoom Canvas */}
+          <View style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}>
+            <View style={{
+              width: '90%',
+              height: '75%',
+              borderRadius: 16,
+              backgroundColor: '#1E293B',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: '#334155',
+              transform: [
+                { scale: viewerZoom },
+                { rotate: viewerRotation + 'deg' },
+              ],
+            }}>
+              <Text style={{ fontSize: 56, marginBottom: 12 }}>🧾</Text>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#F8FAFC' }}>
+                {activeReceipt && activeReceipt.title ? activeReceipt.title : t('receipt_attached_badge')}
+              </Text>
+              <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                {activeReceipt && activeReceipt.uri ? activeReceipt.uri.split('/').pop() : ''}
+              </Text>
+            </View>
+
+            {/* Floating Zoom & Pan Controls Pill */}
+            <View style={{
+              position: 'absolute',
+              bottom: 24,
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#0F172ACC',
+              borderRadius: 24,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderWidth: 1,
+              borderColor: '#334155',
+            }}>
+              <TouchableOpacity
+                onPress={() => setViewerZoom((z) => Math.min(4.0, z + 0.25))}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ padding: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('receipt_zoom_in')}
+              >
+                <Text style={{ fontSize: 16, color: '#F8FAFC' }}>➕</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setViewerZoom((z) => Math.max(0.5, z - 0.25))}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ padding: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('receipt_zoom_out')}
+              >
+                <Text style={{ fontSize: 16, color: '#F8FAFC' }}>➖</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setViewerZoom(1.0)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ padding: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('receipt_zoom_reset')}
+              >
+                <Text style={{ fontSize: 12, color: '#38BDF8', fontWeight: 'bold' }}>1:1</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setViewerRotation((r) => (r + 90) % 360)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ padding: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('receipt_rotate')}
+              >
+                <Text style={{ fontSize: 16, color: '#F8FAFC' }}>🔄</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Bottom Metadata & Action Panel */}
+          <View style={{
+            backgroundColor: '#0F172A',
+            paddingHorizontal: 20,
+            paddingVertical: 16,
+            borderTopWidth: 1,
+            borderTopColor: '#1E293B',
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={{ fontSize: 12, color: '#94A3B8' }}>
+                {t('receipt_file_size')}: {receiptScannerService.formatFileSize(activeReceipt ? activeReceipt.fileSize : 0, effectiveLanguage)}
+              </Text>
+              <Text style={{ fontSize: 12, color: '#94A3B8' }}>
+                {activeReceipt && activeReceipt.timestamp ? activeReceipt.timestamp.split('T')[0] : ''}
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row' }}>
+              <Button3D
+                title={t('receipt_share_btn')}
+                variant="primary"
+                size="md"
+                isDark={true}
+                onPress={() => {
+                  if (activeReceipt) {
+                    Share.share({ message: (activeReceipt.title || 'Voucher Receipt') + ' - ' + activeReceipt.uri });
+                  }
+                }}
+                style={{ flex: 1, marginRight: 8 }}
+              />
+              <Button3D
+                title={t('receipt_delete_btn')}
+                variant="destructive"
+                size="md"
+                isDark={true}
+                onPress={() => {
+                  if (activeReceipt) handleDeleteReceipt(activeReceipt.id);
+                }}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </SafeAreaView>
       </Modal>
 
       {/* ===================================================================
@@ -14345,6 +15062,33 @@ accessibilityLabel={
               value={newBizAddress}
               onChangeText={setNewBizAddress}
             />
+
+            {/* Voucher / Receipt Attachment in Money Out (Iteration 217) */}
+            <View style={{ marginVertical: 8, padding: 8, borderRadius: 10, backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+              {currentDraftReceipt ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#A7F3D0' : '#064E3B' }}>
+                    🧾 {t('receipt_attached_badge')} ({receiptScannerService.formatFileSize(currentDraftReceipt.fileSize, effectiveLanguage)})
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setCurrentDraftReceipt(null)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: 'bold' }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}
+                  onPress={() => handleOpenReceiptScanner()}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#38BDF8' : '#0284C7' }}>
+                    📷 {t('receipt_add_btn')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <View style={[styles.modalBtnRow, { marginTop: 14 }]}>
               <Button3D
