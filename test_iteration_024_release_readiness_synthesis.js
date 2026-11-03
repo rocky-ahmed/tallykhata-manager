@@ -81,7 +81,7 @@ function createMockAdapter(initialData = null) {
       ...fs.readdirSync("src").filter(f => f.endsWith(".js")).map(f => path.join("src", f)),
       ...fs.readdirSync("src/components").filter(f => f.endsWith(".js")).map(f => path.join("src/components", f))
     ];
-    assert.strictEqual(jsFiles.length, 30, "Must contain exactly 24 core application JS files");
+    assert.strictEqual(jsFiles.length, 31, "Must contain exactly 24 core application JS files");
     for (const f of jsFiles) {
       const src = fs.readFileSync(f, "utf8");
       assert.doesNotThrow(() => {

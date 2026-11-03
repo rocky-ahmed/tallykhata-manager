@@ -77,6 +77,27 @@ const {
   toBengaliNumeral = digitalAnalyticsModule.toBengaliNumeral,
 } = digitalAnalyticsModule;
 
+import * as batchTagadaModule from './src/batchTagadaService';
+const batchTagadaService = batchTagadaModule.batchTagadaService || batchTagadaModule.default || batchTagadaModule;
+const {
+  TAGADA_CHANNELS = batchTagadaModule.TAGADA_CHANNELS,
+  DISPATCH_MODES = batchTagadaModule.DISPATCH_MODES,
+  DEBT_AGING_TIERS = batchTagadaModule.DEBT_AGING_TIERS,
+  TELECOM_LIMITS = batchTagadaModule.TELECOM_LIMITS,
+  BENGALI_ARSC_TOKENS = batchTagadaModule.BENGALI_ARSC_TOKENS,
+  toBengaliNumerals = batchTagadaModule.toBengaliNumerals,
+  formatBengaliCurrency = batchTagadaModule.formatBengaliCurrency,
+  formatBengaliDate = batchTagadaModule.formatBengaliDate,
+  isValidBangladeshiMobile = batchTagadaModule.isValidBangladeshiMobile,
+  calculateSmsSegments = batchTagadaModule.calculateSmsSegments,
+  generateSmsContent = batchTagadaModule.generateSmsContent,
+  evaluateBatchSelection = batchTagadaModule.evaluateBatchSelection,
+  categorizeDebtAging = batchTagadaModule.categorizeDebtAging,
+  sortDebtorsByPriority = batchTagadaModule.sortDebtorsByPriority,
+  TagadaBatchDispatchEngine = batchTagadaModule.TagadaBatchDispatchEngine,
+  batchTagadaEngine = batchTagadaModule.batchTagadaEngine,
+} = batchTagadaModule;
+
 const ANALYTICS_BRAND_COLORS = {
   bkash: '#E2136E',
   nagad: '#F7941D',
@@ -1019,6 +1040,17 @@ function TallyKhataApp() {
   const [modalDigitalAnalytics, setModalDigitalAnalytics] = useState(false);
   const [analyticsPeriod, setAnalyticsPeriod] = useState('TODAY'); // 'TODAY' | 'THIS_WEEK' | 'THIS_MONTH' | 'ALL_TIME'
   const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0);
+
+  // --- ITERATION 225: BATCH TAGADA & DEBT REMINDER SUBSYSTEM ---
+  const [modalBatchTagada, setModalBatchTagada] = useState(false);
+  const [batchTagadaSelectedAccounts, setBatchTagadaSelectedAccounts] = useState([]);
+  const [batchTagadaFilter, setBatchTagadaFilter] = useState('all'); // 'all' | 'high' | 'aging'
+  const [batchTagadaSending, setBatchTagadaSending] = useState(false);
+  const [batchTagadaResultModal, setBatchTagadaResultModal] = useState(false);
+  const [batchTagadaQuotaModal, setBatchTagadaQuotaModal] = useState(false);
+  const [batchTagadaPreviewModal, setBatchTagadaPreviewModal] = useState(false);
+  const [batchTagadaPreviewCustomer, setBatchTagadaPreviewCustomer] = useState(null);
+  const [batchTagadaDispatchResult, setBatchTagadaDispatchResult] = useState(null);
   const [modalBackupRestore, setModalBackupRestore] = useState(false);
   const [modalInbox, setModalInbox] = useState(false);
   const [modalSupport, setModalSupport] = useState(false);
@@ -2293,6 +2325,10 @@ function TallyKhataApp() {
       if (modalTallyMessage) { setModalTallyMessage(false); return true; }
       if (modalSoundboxSettings) { setModalSoundboxSettings(false); return true; }
       if (modalDigitalAnalytics) { setModalDigitalAnalytics(false); return true; }
+      if (batchTagadaResultModal) { setBatchTagadaResultModal(false); return true; }
+      if (batchTagadaQuotaModal) { setBatchTagadaQuotaModal(false); return true; }
+      if (batchTagadaPreviewModal) { setBatchTagadaPreviewModal(false); return true; }
+      if (modalBatchTagada) { setModalBatchTagada(false); return true; }
       if (modalSettings) { setModalSettings(false); return true; }
       if (modalSupport) { setModalSupport(false); return true; }
       if (modalInbox) { setModalInbox(false); return true; }
@@ -2364,7 +2400,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -4063,6 +4099,160 @@ function TallyKhataApp() {
   };
 
   // =========================================================================
+  // BATCH TAGADA & DEBT REMINDER HANDLERS (Iteration 225)
+  // =========================================================================
+  const batchTagadaDebtorsList = useMemo(() => {
+    let list = dueCustomers || [];
+    if (batchTagadaFilter === "high") {
+      list = list.filter((c) => (Number(c.balance) || 0) >= 1000);
+    } else if (batchTagadaFilter === "aging") {
+      const nowMs = Date.now();
+      list = list.filter((c) => {
+        const dateStr = c.lastTxnDate || c.lastDate || c.lastTagadaDate || c.createDate || c.create_date || c.createdAt;
+        if (!dateStr) return false;
+        const dMs = new Date(dateStr).getTime();
+        if (isNaN(dMs)) return false;
+        return Math.floor((nowMs - dMs) / (1000 * 60 * 60 * 24)) >= 30;
+      });
+    }
+    return list;
+  }, [dueCustomers, batchTagadaFilter]);
+
+  const batchTagadaSelectedList = useMemo(() => {
+    return (dueCustomers || []).filter((c) => (batchTagadaSelectedAccounts || []).includes(c.id));
+  }, [dueCustomers, batchTagadaSelectedAccounts]);
+
+  const batchTagadaSelectedCount = batchTagadaSelectedList.length;
+
+  const batchTagadaSelectedTotalDue = useMemo(() => {
+    return batchTagadaSelectedList.reduce((sum, c) => sum + (Number(c.balance) || 0), 0);
+  }, [batchTagadaSelectedList]);
+
+  const isAllBatchSelected = useMemo(() => {
+    if (!batchTagadaDebtorsList || batchTagadaDebtorsList.length === 0) return false;
+    return batchTagadaDebtorsList.every((c) => (batchTagadaSelectedAccounts || []).includes(c.id));
+  }, [batchTagadaDebtorsList, batchTagadaSelectedAccounts]);
+
+  const handleOpenBatchTagada = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    if (!dueCustomers || dueCustomers.length === 0) {
+      Alert.alert(t("batch_tagada_title"), t("batch_tagada_empty_list"));
+      return;
+    }
+    const allIds = dueCustomers.map((c) => c.id);
+    setBatchTagadaSelectedAccounts(allIds);
+    setBatchTagadaFilter("all");
+    setModalBatchTagada(true);
+  };
+
+  const handleCloseBatchTagada = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalBatchTagada(false);
+  };
+
+  const handleToggleSelectAllBatchTagada = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const visibleIds = batchTagadaDebtorsList.map((c) => c.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => (batchTagadaSelectedAccounts || []).includes(id));
+    if (allSelected) {
+      setBatchTagadaSelectedAccounts((prev) => (prev || []).filter((id) => !visibleIds.includes(id)));
+    } else {
+      setBatchTagadaSelectedAccounts((prev) => [...new Set([...(prev || []), ...visibleIds])]);
+    }
+  };
+
+  const handleToggleDebtorAccount = (id) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setBatchTagadaSelectedAccounts((prev) =>
+      (prev || []).includes(id) ? (prev || []).filter((x) => x !== id) : [...(prev || []), id]
+    );
+  };
+
+  const handleSelectBatchTagadaFilter = (filterKey) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setBatchTagadaFilter(filterKey);
+  };
+
+  const handleOpenSmsPreview = (customer) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setBatchTagadaPreviewCustomer(customer || batchTagadaSelectedList[0] || dueCustomers[0]);
+    setBatchTagadaPreviewModal(true);
+  };
+
+  const handleCloseSmsPreview = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setBatchTagadaPreviewModal(false);
+  };
+
+  const handleDispatchBatchTagada = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    if (batchTagadaSelectedCount === 0) {
+      Alert.alert(tStatic("সতর্কতা"), t("batch_tagada_no_selection_warning"));
+      return;
+    }
+    if (remainingSmsCount <= 0) {
+      setBatchTagadaQuotaModal(true);
+      return;
+    }
+    Alert.alert(
+      t("batch_tagada_confirm_title"),
+      t("batch_tagada_confirm_msg").replace("%s", toBengaliNumerals(batchTagadaSelectedCount)).replace("%s", toBengaliNumerals(formatMoney(batchTagadaSelectedTotalDue))),
+      [
+        { text: tStatic("বাতিল"), style: "cancel" },
+        {
+          text: t("batch_tagada_send_btn"),
+          onPress: executeBatchTagadaDispatch,
+        },
+      ]
+    );
+  };
+
+  const executeBatchTagadaDispatch = async () => {
+    if (batchTagadaSelectedCount === 0) return;
+    if (remainingSmsCount <= 0) {
+      setBatchTagadaQuotaModal(true);
+      return;
+    }
+
+    setBatchTagadaSending(true);
+    try {
+      const prep = storageRepository.prepareBulkTagadaBatch(batchTagadaSelectedList, {
+        businessId: activeBusinessId,
+        businessName: typeof businessName !== "undefined" ? businessName : undefined,
+        remainingSmsCount: remainingSmsCount,
+      });
+
+      const res = await storageRepository.dispatchBulkTagadaBatch(prep, {
+        isFreeSms: true,
+      });
+
+      setBatchTagadaSending(false);
+
+      if (res && res.success) {
+        try { hapticFeedbackService.onTransactionSave(); } catch (e) {}
+        setRemainingSmsCount(res.remainingSmsCount);
+        if (Array.isArray(res.tagadaLogs)) {
+          setTagadaLogs(res.tagadaLogs);
+        }
+        setBatchTagadaDispatchResult({
+          dispatchedCount: res.dispatchedCount,
+          skippedCount: res.skippedDuplicates,
+          deductedQuota: res.deductedQuota,
+          remainingSmsCount: res.remainingSmsCount,
+          totalRecipients: batchTagadaSelectedCount,
+        });
+        setModalBatchTagada(false);
+        setBatchTagadaResultModal(true);
+      } else {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("গ্রুপ তাগাদা সংরক্ষণ ব্যর্থ হয়েছে।"));
+      }
+    } catch (err) {
+      setBatchTagadaSending(false);
+      Alert.alert(tStatic("ত্রুটি"), err.message || tStatic("গ্রুপ তাগাদা সংরক্ষণ ব্যর্থ হয়েছে।"));
+    }
+  };
+
+  // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
   // =========================================================================
   const handleOpenSoundboxSettings = () => {
@@ -5153,6 +5343,47 @@ function TallyKhataApp() {
       soundboxDeviceManager,
       soundboxService,
     };
+
+    global.__BATCH_TAGADA_TEST_HOOKS__ = {
+      modalBatchTagada,
+      setModalBatchTagada,
+      batchTagadaSelectedAccounts,
+      setBatchTagadaSelectedAccounts,
+      batchTagadaFilter,
+      setBatchTagadaFilter,
+      batchTagadaSending,
+      setBatchTagadaSending,
+      batchTagadaResultModal,
+      setBatchTagadaResultModal,
+      batchTagadaQuotaModal,
+      setBatchTagadaQuotaModal,
+      batchTagadaPreviewModal,
+      setBatchTagadaPreviewModal,
+      batchTagadaPreviewCustomer,
+      setBatchTagadaPreviewCustomer,
+      batchTagadaDispatchResult,
+      setBatchTagadaDispatchResult,
+      handleOpenBatchTagada,
+      handleCloseBatchTagada,
+      handleToggleSelectAllBatchTagada,
+      handleToggleDebtorAccount,
+      handleSelectBatchTagadaFilter,
+      handleOpenSmsPreview,
+      handleCloseSmsPreview,
+      handleDispatchBatchTagada,
+      executeBatchTagadaDispatch,
+      batchTagadaDebtorsList,
+      batchTagadaSelectedList,
+      batchTagadaSelectedCount,
+      batchTagadaSelectedTotalDue,
+      isAllBatchSelected,
+      batchTagadaService,
+      storageRepository,
+      TAGADA_CHANNELS,
+      DISPATCH_MODES,
+      DEBT_AGING_TIERS,
+      BENGALI_ARSC_TOKENS,
+    };
   }
 
 
@@ -5979,6 +6210,7 @@ function TallyKhataApp() {
   };
 
   const handleSendBulkTagada = () => {
+    handleOpenBatchTagada();
     if (dueCustomers.length === 0) {
       Alert.alert(tStatic("তথ্য"), tStatic("কোনো কাস্টমারের কাছে বকেয়া বাকি নেই।"));
       return;
@@ -5988,7 +6220,6 @@ function TallyKhataApp() {
       initialSelected[cust.id] = true;
     });
     setSelectedBulkCustomerIds(initialSelected);
-    setModalBulkTagada(true);
   };
 
   const handleToggleBulkCustomer = (id) => {
@@ -7561,10 +7792,10 @@ accessibilityLabel={
 
                       <TouchableOpacity
                         style={styles.quickGridItem}
-                        onPress={() => setActiveTab('tagada')}
+                        onPress={handleOpenBatchTagada}
                         activeOpacity={0.7}
                         accessibilityRole="button"
-                        accessibilityLabel={tStatic("গ্রুপ তাগাদা")}
+                        accessibilityLabel={t('batch_tagada_title')}
                       >
                         <AppIcon
                           source={require('./assets/icons/grid_bulk_tagada.png')} iconKey='grid_bulk_tagada'
@@ -8861,6 +9092,35 @@ accessibilityLabel={
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
 
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenBatchTagada}
+                activeOpacity={0.7}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('batch_tagada_title')}
+              >
+                <AppIcon source={require('./assets/icons/grid_bulk_tagada.png')} iconKey='grid_bulk_tagada' variant="danger" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('batch_tagada_title')}</Text>
+                    <View style={{
+                      marginLeft: 8,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      backgroundColor: isDark ? '#7F1D1D' : '#FEE2E2',
+                    }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#FCA5A5' : '#B91C1C' }}>
+                        {dueCustomers.length > 0 ? (toBengaliNumerals(dueCustomers.length) + " জন") : t('batch_tagada_channel_free')}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('batch_tagada_desc')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.menuListItem, isDark && tStyles.menuListItem]}
@@ -15427,6 +15687,433 @@ accessibilityLabel={
         </SafeAreaView>
       </Modal>
 
+
+      {/* ===================================================================
+          MODAL: BATCH TAGADA & DEBT REMINDERS (ITERATION 225)
+         =================================================================== */}
+      <Modal
+        visible={modalBatchTagada}
+        animationType="slide"
+        onRequestClose={handleCloseBatchTagada}
+      >
+        <SafeAreaView style={[styles.reportContainer, isDark && tStyles.reportContainer]}>
+          {/* Header */}
+          <View style={[styles.batchTagadaHeader, isDark && { backgroundColor: "#7F1D1D" }]}>
+            <TouchableOpacity
+              onPress={handleCloseBatchTagada}
+              style={styles.reportHeaderBack}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Image
+                source={require("./assets/icons/arrow_left.png")}
+                style={{ width: 22, height: 22, tintColor: "#FFFFFF" }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.batchTagadaHeaderTitle}>{t("batch_tagada_title")}</Text>
+              <Text style={styles.batchTagadaHeaderSubtitle}>
+                {t("batch_tagada_selected_count") + ": " + toBengaliNumerals(batchTagadaSelectedCount) + " জন (" + toBengaliNumerals(dueCustomers.length) + " জনের মধ্যে)"}
+              </Text>
+            </View>
+            <View style={styles.batchTagadaQuotaBadge}>
+              <Text style={styles.batchTagadaQuotaBadgeText}>
+                {t("batch_tagada_free_sms_quota").replace("%s", toBengaliNumerals(remainingSmsCount)).replace("%s", toBengaliNumerals(Math.max(5, remainingSmsCount)))}
+              </Text>
+            </View>
+          </View>
+
+          {/* Filter Chips Row: সকল | বেশি বাকি (>১০০০৳) | ৩০+ দিন বাকি */}
+          <View style={[styles.batchTagadaFilterRow, isDark && { backgroundColor: currentTheme.cardBgElevated, borderBottomColor: currentTheme.cardBorder }]}>
+            {[
+              { id: "all", label: t("batch_tagada_filter_all") },
+              { id: "high", label: t("batch_tagada_filter_high") },
+              { id: "aging", label: t("batch_tagada_filter_aging") },
+            ].map((filter) => {
+              const isActive = batchTagadaFilter === filter.id;
+              return (
+                <TouchableOpacity
+                  key={filter.id}
+                  style={[
+                    styles.batchTagadaFilterChip,
+                    isActive && styles.batchTagadaFilterChipActive,
+                    isDark && !isActive && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }
+                  ]}
+                  onPress={() => handleSelectBatchTagadaFilter(filter.id)}
+                  activeOpacity={0.7}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={filter.label}
+                >
+                  <Text
+                    style={[
+                      styles.batchTagadaFilterChipText,
+                      isActive && styles.batchTagadaFilterChipTextActive,
+                      isDark && !isActive && { color: currentTheme.textSecondary }
+                    ]}
+                  >
+                    {filter.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Master Select-All Bar */}
+          <View style={[styles.batchTagadaMasterBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderBottomColor: currentTheme.cardBorder }]}>
+            <TouchableOpacity
+              style={styles.batchTagadaMasterToggle}
+              onPress={handleToggleSelectAllBatchTagada}
+              activeOpacity={0.7}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isAllBatchSelected }}
+              accessibilityLabel={t("batch_tagada_select_all")}
+            >
+              <View style={[styles.batchCheckbox, isAllBatchSelected && styles.batchCheckboxChecked]}>
+                {isAllBatchSelected ? (
+                  <Text style={styles.batchCheckboxCheckmark}>✓</Text>
+                ) : null}
+              </View>
+              <Text style={[styles.batchTagadaMasterLabel, isDark && tStyles.textPrimary]}>
+                {t("batch_tagada_select_all")}
+              </Text>
+            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TouchableOpacity
+                onPress={() => handleOpenSmsPreview(batchTagadaSelectedList[0] || dueCustomers[0])}
+                style={{ marginRight: 12, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: isDark ? "#1E293B" : "#F1F5F9" }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t("batch_tagada_preview_title")}
+              >
+                <Text style={{ fontSize: 11, color: isDark ? "#93C5FD" : "#2563EB", fontWeight: "600" }}>
+                  {"👁️ " + t("batch_tagada_preview_title")}
+                </Text>
+              </TouchableOpacity>
+              <Text style={[styles.batchTagadaSelectionStats, isDark && tStyles.textSecondary]}>
+                {toBengaliNumerals(batchTagadaSelectedCount) + " / " + toBengaliNumerals(batchTagadaDebtorsList.length) + " জন"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Customer Debtor List */}
+          <FlatList
+            data={batchTagadaDebtorsList}
+            keyExtractor={(item, index) => item.id || ("batch_debtor_" + index)}
+            contentContainerStyle={{ paddingBottom: 130 }}
+            renderItem={({ item }) => {
+              const isSelected = (batchTagadaSelectedAccounts || []).includes(item.id);
+              const hasPhone = !!(item.phone && item.phone.trim().length >= 6);
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.batchCustomerRow,
+                    isDark && { backgroundColor: currentTheme.cardBg, borderBottomColor: currentTheme.cardBorder }
+                  ]}
+                  onPress={() => handleToggleDebtorAccount(item.id)}
+                  activeOpacity={0.7}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isSelected }}
+                  accessibilityLabel={item.name + ", বকেয়া ৳ " + formatMoney(item.balance)}
+                >
+                  <View style={[styles.batchCheckbox, isSelected && styles.batchCheckboxChecked]}>
+                    {isSelected ? (
+                      <Text style={styles.batchCheckboxCheckmark}>✓</Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.batchCustomerAvatar}>
+                    <Text style={styles.batchCustomerAvatarText}>
+                      {(item.name || "ন").trim().charAt(0)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={[styles.batchCustomerName, isDark && tStyles.textPrimary]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+                      <Text style={[styles.batchCustomerPhone, isDark && tStyles.textSecondary]}>
+                        {item.phone || t("batch_tagada_no_phone_warning")}
+                      </Text>
+                      {!hasPhone && (
+                        <View style={styles.batchNoPhoneBadge}>
+                          <Text style={styles.batchNoPhoneText}>⚠️ {t("batch_tagada_no_phone_warning")}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.batchDuePill}>
+                    <Text style={styles.batchDueAmount}>
+                      {"৳ " + toBengaliNumerals(formatMoney(item.balance))}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={{ padding: 40, alignItems: "center" }}>
+                <Text style={[{ color: "#6B7280", fontSize: 14 }, isDark && tStyles.textSecondary]}>
+                  {t("batch_tagada_empty_list")}
+                </Text>
+              </View>
+            }
+          />
+
+          {/* Sticky Bottom Action Bar with 46dp safe padding */}
+          <View style={[styles.batchBottomBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
+            <View style={styles.batchBottomMetaRow}>
+              <View>
+                <Text style={[styles.batchMetaSubText, isDark && tStyles.textSecondary]}>
+                  {t("batch_tagada_total_due") + " (" + toBengaliNumerals(batchTagadaSelectedCount) + " জন)"}
+                </Text>
+                <Text style={styles.batchMetaDueValue}>
+                  {"৳ " + toBengaliNumerals(formatMoney(batchTagadaSelectedTotalDue))}
+                </Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={[styles.batchQuotaText, isDark && tStyles.textSecondary]}>
+                  {"ফ্রি কোটা: " + toBengaliNumerals(remainingSmsCount) + "টি"}
+                </Text>
+                <Text style={[
+                  styles.batchQuotaText,
+                  { fontWeight: "bold", color: batchTagadaSelectedCount > remainingSmsCount ? "#DC2626" : (isDark ? currentTheme.textSecondary : "#475569") }
+                ]}>
+                  {"প্রয়োজন: " + toBengaliNumerals(batchTagadaSelectedCount) + "টি SMS"}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.batchSendBtn,
+                (batchTagadaSelectedCount === 0 || batchTagadaSending) && { opacity: 0.5 },
+                { minHeight: 48, borderRadius: 12 }
+              ]}
+              onPress={handleDispatchBatchTagada}
+              activeOpacity={0.85}
+              disabled={batchTagadaSelectedCount === 0 || batchTagadaSending}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t("batch_tagada_send_btn")}
+            >
+              {batchTagadaSending ? (
+                <ActivityIndicator color="#FFFFFF" size="small" style={{ marginRight: 8 }} />
+              ) : (
+                <Image
+                  source={require("./assets/icons/ic_sms.png")}
+                  style={{ width: 22, height: 22, tintColor: "#FFFFFF", marginRight: 8 }}
+                  resizeMode="contain"
+                />
+              )}
+              <Text style={styles.batchSendBtnText}>
+                {batchTagadaSending
+                  ? t("batch_tagada_sending")
+                  : (t("batch_tagada_send_btn") + " (" + toBengaliNumerals(batchTagadaSelectedCount) + ")")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* MODAL: SMS PREVIEW */}
+      <Modal
+        visible={batchTagadaPreviewModal}
+        animationType="fade"
+        transparent
+        onRequestClose={handleCloseSmsPreview}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: "80%", padding: 18 }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>
+                {t("batch_tagada_preview_title")}
+              </Text>
+              <TouchableOpacity
+                onPress={handleCloseSmsPreview}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("বন্ধ করুন")}
+              >
+                <Image
+                  source={require("./assets/icons/ic_close.png")}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : "#64748B", marginTop: 4, marginBottom: 14 }}>
+              {t("batch_tagada_preview_desc")}
+            </Text>
+
+            <View style={styles.smsPreviewBubble}>
+              <Text style={styles.smsPreviewText}>
+                {(() => {
+                  const cust = batchTagadaPreviewCustomer || batchTagadaSelectedList[0] || dueCustomers[0];
+                  const dateStr = formatBengaliDate(new Date());
+                  const amtStr = toBengaliNumerals(formatMoney(cust ? cust.balance : 0));
+                  const lines = [
+                    "প্রিয় গ্রাহক,",
+                    " " + dateStr + " পর্যন্ত আপনার মোট বাকি " + amtStr + " টাকা। অনুগ্রহ করে আপনার বাকি পরিশোধ করুন।",
+                    " বিস্তারিত জানতে ট্যাপ করুন https://tallypay.com/baki/sample"
+                  ];
+                  return lines.join("\n");
+                })()}
+              </Text>
+            </View>
+
+            <View style={{ marginTop: 14, flexDirection: "row", alignItems: "center", backgroundColor: isDark ? "#1E293B" : "#F8FAFC", padding: 10, borderRadius: 8 }}>
+              <Text style={{ fontSize: 13, marginRight: 6 }}>ℹ️</Text>
+              <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : "#475569", flex: 1 }}>
+                {t("batch_tagada_channel_free")} (১ পার্ট এসএমএস / UCS-2)
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.confirmBtnPrimary, { marginTop: 18, minHeight: 48, borderRadius: 10 }]}
+              onPress={handleCloseSmsPreview}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("ঠিক আছে")}
+            >
+              <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "700" }}>
+                {tStatic("ঠিক আছে")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL: QUOTA EXHAUSTED ALERT */}
+      <Modal
+        visible={batchTagadaQuotaModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setBatchTagadaQuotaModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: "80%", padding: 20 }]}>
+            <View style={{ alignItems: "center", marginBottom: 14 }}>
+              <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: "#FEE2E2", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                <Text style={{ fontSize: 26 }}>⚠️</Text>
+              </View>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { textAlign: "center" }]}>
+                {t("batch_tagada_quota_exhausted_title")}
+              </Text>
+            </View>
+
+            <Text style={{ fontSize: 13, color: isDark ? currentTheme.textSecondary : "#475569", textAlign: "center", lineHeight: 20, marginBottom: 18 }}>
+              {t("batch_tagada_quota_exhausted_msg")}
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.confirmBtnPrimary, { backgroundColor: "#B81414", minHeight: 48, borderRadius: 10, marginBottom: 10 }]}
+              onPress={() => {
+                setBatchTagadaQuotaModal(false);
+                setModalTallyMessage(true);
+              }}
+              activeOpacity={0.85}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t("batch_tagada_buy_sms_pack")}
+            >
+              <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "700" }}>
+                {"🛒 " + t("batch_tagada_buy_sms_pack")}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[{ minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: isDark ? currentTheme.cardBorder : "#D1D5DB", alignItems: "center", justifyContent: "center", marginBottom: 10 }]}
+              onPress={() => {
+                setBatchTagadaQuotaModal(false);
+                try {
+                  Share.share({
+                    message: "গ্রুপ তাগাদা: মোট বকেয়া ৳ " + toBengaliNumerals(formatMoney(batchTagadaSelectedTotalDue)),
+                  });
+                } catch (e) {}
+              }}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t("batch_tagada_share_fallback")}
+            >
+              <Text style={{ color: isDark ? currentTheme.textPrimary : "#1E293B", fontSize: 14, fontWeight: "600" }}>
+                {"📤 " + t("batch_tagada_share_fallback")}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ minHeight: 44, alignItems: "center", justifyContent: "center" }}
+              onPress={() => setBatchTagadaQuotaModal(false)}
+              activeOpacity={0.7}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("বন্ধ করুন")}
+            >
+              <Text style={{ color: isDark ? currentTheme.textMuted : "#6B7280", fontSize: 13 }}>
+                {tStatic("বন্ধ করুন")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL: BATCH TAGADA RESULT */}
+      <Modal
+        visible={batchTagadaResultModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setBatchTagadaResultModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: "80%", padding: 20 }]}>
+            <View style={{ alignItems: "center", marginBottom: 14 }}>
+              <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: "#DCFCE7", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                <Text style={{ fontSize: 26 }}>✅</Text>
+              </View>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { textAlign: "center" }]}>
+                {t("batch_tagada_success")}
+              </Text>
+            </View>
+
+            {batchTagadaDispatchResult && (
+              <View style={{ backgroundColor: isDark ? "#1E293B" : "#F8FAFC", padding: 14, borderRadius: 10, marginBottom: 18 }}>
+                <Text style={{ fontSize: 13, color: isDark ? currentTheme.textPrimary : "#1E293B", marginBottom: 6 }}>
+                  {t("batch_tagada_result_success_count").replace("%s", toBengaliNumerals(batchTagadaDispatchResult.dispatchedCount))}
+                </Text>
+                {batchTagadaDispatchResult.skippedCount > 0 && (
+                  <Text style={{ fontSize: 12, color: "#D97706", marginBottom: 6 }}>
+                    {t("batch_tagada_result_failed_count").replace("%s", toBengaliNumerals(batchTagadaDispatchResult.skippedCount))}
+                  </Text>
+                )}
+                <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : "#475569" }}>
+                  {t("batch_tagada_result_quota_left").replace("%s", toBengaliNumerals(batchTagadaDispatchResult.remainingSmsCount))}
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.confirmBtnPrimary, { minHeight: 48, borderRadius: 10 }]}
+              onPress={() => setBatchTagadaResultModal(false)}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("ঠিক আছে")}
+            >
+              <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "700" }}>
+                {tStatic("ঠিক আছে")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* ===================================================================
           MODAL: BULK TAGADA (একসাথে তাগাদা পাঠান) (ITERATION 208)
@@ -26731,6 +27418,232 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  // --- ITERATION 225: BATCH TAGADA & SMS SUBSYSTEM STYLES ---
+  batchTagadaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#B81414',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  batchTagadaHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  batchTagadaHeaderSubtitle: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  batchTagadaQuotaBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  batchTagadaQuotaBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  batchTagadaFilterRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  batchTagadaFilterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    marginRight: 8,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  batchTagadaFilterChipActive: {
+    backgroundColor: '#B81414',
+    borderColor: '#B81414',
+  },
+  batchTagadaFilterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  batchTagadaFilterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  batchTagadaMasterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    minHeight: 48,
+  },
+  batchTagadaMasterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  batchCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#64748B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  batchCheckboxChecked: {
+    backgroundColor: '#B81414',
+    borderColor: '#B81414',
+  },
+  batchCheckboxCheckmark: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  batchTagadaMasterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  batchTagadaSelectionStats: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  batchCustomerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    minHeight: 56,
+  },
+  batchCustomerAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  batchCustomerAvatarText: {
+    color: '#B81414',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  batchCustomerName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  batchCustomerPhone: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  batchNoPhoneBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  batchNoPhoneText: {
+    fontSize: 10,
+    color: '#92400E',
+    fontWeight: '600',
+  },
+  batchDuePill: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  batchDueAmount: {
+    color: '#B91C1C',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  batchBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'android' ? 46 : 24,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  batchBottomMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  batchMetaSubText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  batchMetaDueValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#B91C1C',
+  },
+  batchQuotaText: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  batchSendBtn: {
+    backgroundColor: '#B81414',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    minHeight: 48,
+  },
+  batchSendBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  smsPreviewBubble: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 12,
+    padding: 14,
+  },
+  smsPreviewText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#064E3B',
   },
 
 

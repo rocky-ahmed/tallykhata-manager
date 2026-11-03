@@ -1,7 +1,7 @@
 # TALLYKHATA — PERMANENT THREE-WORKER AGENT REGISTRY
 **System:** REA-Driven Autonomous Reconstruction System  
 **Maintained by:** Main Engineering Orchestrator  
-**Last Updated:** 2026-11-03  
+**Last Updated:** 2026-11-04  
 
 ---
 
@@ -10,7 +10,7 @@
 | Worker | Role Identity | Runtime Thread ID | Nickname | Operational Status | REA System Role |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Worker 1** | REA REVERSE ENGINEERING INVESTIGATOR | `01a19154-99ab-72a0-9e23-2611b9ffc74c` | `Gibbs` | **ACTIVE & VERIFIED** | Investigating authorized reference apps via REA |
-| **Worker 2** | BACKEND DEVELOPER & BUSINESS LOGIC | `01a19154-c135-75d0-b38a-1ea50f004895` | `Averroes` | **ACTIVE & VERIFIED** | Implementing backend, storage, engines, cloud |
+| **Worker 2** | BACKEND DEVELOPER & BUSINESS LOGIC | `01a1a349-61ae-74d0-aed6-1792e7d1d594` | `Averroes` | **ACTIVE & VERIFIED** | Implementing backend, storage, engines, cloud |
 | **Worker 3** | FRONTEND DEVELOPER, UI/UX & INTERACTIONS | `01a19154-e3ee-7ab2-b682-798b64a0bb6b` | `Ohm` | **ACTIVE & VERIFIED** | Implementing React Native UI, components, UX |
 
 ---
@@ -22,7 +22,7 @@
 - **Tools:** REA CLI (`rea inspect-artifact`, `rea project-android-application-graph`, `rea inspect-apk-signature`, `rea doctor`).
 - **Deliverables:** Immutable Evidence bundles (`.json`), feature specifications, data schema mapping, and UX flow models.
 
-### Worker 2: Averroes (`01a19154-c135-75d0-b38a-1ea50f004895`)
+### Worker 2: Averroes (`01a1a349-61ae-74d0-aed6-1792e7d1d594`)
 - **Primary Mission:** Continuously implement backend, data architecture, financial engines, and synchronization based on approved REA specifications.
 - **Scope:** `src/ledgerEngine.js`, `src/storageRepository.js`, `src/moneyManagerService.js`, `src/googleDriveBackupService.js`, `src/preferencesService.js`.
 - **Deliverables:** Integer-paisa double-entry bookkeeping, multi-tenant isolation, SQLite/AsyncStorage mutex queue, and cloud backup.

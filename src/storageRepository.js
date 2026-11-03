@@ -66,6 +66,34 @@ try {
   digitalAnalyticsService = require('./digitalAnalyticsService');
 } catch (e) {}
 
+let ledgerEngine = null;
+try {
+  ledgerEngine = require('./ledgerEngine');
+} catch (e) {}
+
+let batchTagadaService = null;
+try {
+  batchTagadaService = require('./batchTagadaService');
+} catch (e) {}
+
+const {
+  TAGADA_CHANNELS,
+  DISPATCH_MODES,
+  DEBT_AGING_TIERS,
+  TELECOM_LIMITS,
+  BENGALI_ARSC_TOKENS,
+  toBengaliNumerals,
+  formatBengaliCurrency,
+  formatBengaliDate,
+  isValidBangladeshiMobile,
+  generateSmsContent,
+  evaluateBatchSelection,
+  categorizeDebtAging,
+  sortDebtorsByPriority,
+  TagadaBatchDispatchEngine,
+  batchTagadaEngine,
+} = batchTagadaService || {};
+
 const {
   createReceiptImageMetadata,
   validateReceiptImage,
@@ -149,6 +177,7 @@ const VALID_COLLECTIONS = new Set([
   'walletTxns',
   'businesses',
   'tagadaLogs',
+  'tagada_log',
   'audioNotes',
   'receiptImages',
   'voucherPrintLogs',
@@ -350,6 +379,41 @@ function createDefaultState() {
           version: 1,
         },
     tagadaLogs: [],
+    tagada_log: [],
+    tagada_quota: {
+      '1': {
+        freeSmsCount: 5,
+        purchasedSmsCount: 50,
+        lastRefreshDate: '2026-11-04T00:00:00.000Z',
+      },
+      '2': {
+        freeSmsCount: 5,
+        purchasedSmsCount: 50,
+        lastRefreshDate: '2026-11-04T00:00:00.000Z',
+      },
+      '3': {
+        freeSmsCount: 5,
+        purchasedSmsCount: 50,
+        lastRefreshDate: '2026-11-04T00:00:00.000Z',
+      },
+    },
+    tagadaQuota: {
+      '1': {
+        freeSmsCount: 5,
+        purchasedSmsCount: 50,
+        lastRefreshDate: '2026-11-04T00:00:00.000Z',
+      },
+      '2': {
+        freeSmsCount: 5,
+        purchasedSmsCount: 50,
+        lastRefreshDate: '2026-11-04T00:00:00.000Z',
+      },
+      '3': {
+        freeSmsCount: 5,
+        purchasedSmsCount: 50,
+        lastRefreshDate: '2026-11-04T00:00:00.000Z',
+      },
+    },
     audioNotes: [],
     receiptImages: [],
     voucherPrintLogs: [],
@@ -1400,6 +1464,33 @@ class StorageRepository {
       });
     }
 
+    if (authoritative.tagada_log && Array.isArray(authoritative.tagada_log)) {
+      authoritative.tagada_log = authoritative.tagada_log.map((log) => {
+        const { token, sessionToken, apiKey, gatewaySecret, pin, ...rest } = log || {};
+        return rest;
+      });
+    }
+    if (authoritative.tagadaLogs && Array.isArray(authoritative.tagadaLogs)) {
+      authoritative.tagadaLogs = authoritative.tagadaLogs.map((log) => {
+        const { token, sessionToken, apiKey, gatewaySecret, pin, ...rest } = log || {};
+        return rest;
+      });
+    }
+    if (authoritative.tagada_quota && typeof authoritative.tagada_quota === 'object') {
+      const sanitizedQuota = {};
+      for (const [bId, q] of Object.entries(authoritative.tagada_quota)) {
+        if (!q || typeof q !== 'object') continue;
+        const { token, apiKey, secret, ...rest } = q;
+        sanitizedQuota[bId] = rest;
+      }
+      authoritative.tagada_quota = sanitizedQuota;
+      authoritative.tagadaQuota = sanitizedQuota;
+    }
+
+    authoritative.tagada_log = authoritative.tagada_log || authoritative.tagadaLogs || [];
+    authoritative.tagadaLogs = authoritative.tagadaLogs || authoritative.tagada_log || [];
+    authoritative.tagada_quota = authoritative.tagada_quota || authoritative.tagadaQuota || {};
+
     const domains = (extraState && Array.isArray(extraState.domains) && extraState.domains.length > 0)
       ? extraState.domains
       : ['all'];
@@ -1523,6 +1614,19 @@ class StorageRepository {
         };
       });
 
+      const prevActiveId = String(prevStore.activeBusinessId || '1');
+      const quotaMap = { ...(prevStore.tagada_quota || prevStore.tagadaQuota || {}) };
+      if (prevStore.remainingSmsCount !== undefined) {
+        quotaMap[prevActiveId] = {
+          ...(quotaMap[prevActiveId] || {}),
+          freeSmsCount: Number(prevStore.remainingSmsCount),
+          purchasedSmsCount: Number(prevStore.tallyMessageBalance !== undefined ? prevStore.tallyMessageBalance : 50),
+          lastRefreshDate: quotaMap[prevActiveId]?.lastRefreshDate || new Date().toISOString(),
+          businessId: prevActiveId,
+        };
+      }
+      const targetQuota = quotaMap[targetId] || { freeSmsCount: 5, purchasedSmsCount: 50 };
+
       return {
         ...prevStore,
         activeBusinessId: targetId,
@@ -1531,6 +1635,10 @@ class StorageRepository {
         ownerPhone: target.phone || prevStore.ownerPhone || '',
         businessAddress: target.address || prevStore.businessAddress || '',
         businesses: updatedBusinesses,
+        tagada_quota: quotaMap,
+        tagadaQuota: quotaMap,
+        remainingSmsCount: targetQuota.freeSmsCount !== undefined ? targetQuota.freeSmsCount : 5,
+        tallyMessageBalance: targetQuota.purchasedSmsCount !== undefined ? targetQuota.purchasedSmsCount : 50,
       };
     });
   }
@@ -1902,6 +2010,11 @@ class StorageRepository {
       const notes = (prevStore.notes || []).filter((n) => getBizId(n) !== targetId);
       const walletTxns = (prevStore.walletTxns || []).filter((w) => getBizId(w) !== targetId);
       const tagadaLogs = (prevStore.tagadaLogs || []).filter((t) => getBizId(t) !== targetId);
+      const tagada_log = (prevStore.tagada_log || []).filter((t) => getBizId(t) !== targetId);
+      const tagada_quota = { ...(prevStore.tagada_quota || {}) };
+      delete tagada_quota[targetId];
+      const tagadaQuota = { ...(prevStore.tagadaQuota || {}) };
+      delete tagadaQuota[targetId];
       const audioNotesToPurge = (prevStore.audioNotes || []).filter((a) => getBizId(a) === targetId);
       const audioNotes = (prevStore.audioNotes || []).filter((a) => getBizId(a) !== targetId);
       const receiptsToPurge = (prevStore.receiptImages || []).filter((r) => getBizId(r) === targetId);
@@ -1962,6 +2075,8 @@ class StorageRepository {
         ? null
         : prevStore.cashReconciliation;
 
+      const nextActiveQuota = (tagada_quota && tagada_quota[nextActiveId]) || { freeSmsCount: 5, purchasedSmsCount: 50 };
+
       return {
         ...prevStore,
         businesses: updatedBusinesses,
@@ -1975,6 +2090,11 @@ class StorageRepository {
         notes,
         walletTxns,
         tagadaLogs,
+        tagada_log,
+        tagada_quota,
+        tagadaQuota,
+        remainingSmsCount: nextActiveQuota.freeSmsCount !== undefined ? nextActiveQuota.freeSmsCount : 5,
+        tallyMessageBalance: nextActiveQuota.purchasedSmsCount !== undefined ? nextActiveQuota.purchasedSmsCount : 50,
         audioNotes,
         receiptImages,
         voucherPrintLogs,
@@ -2119,6 +2239,12 @@ class StorageRepository {
         const importedCash = (data.cashEntries || []).filter(c => String(c.businessId || '1') === selectedBizId);
         const importedStock = ((data.stock || data.inventory) || []).filter(s => String(s.businessId || '1') === selectedBizId);
         const importedNotes = (data.notes || []).filter(n => String(n.businessId || '1') === selectedBizId);
+        const importedTagadaLog = ((data.tagada_log || data.tagadaLogs) || []).filter(t => String(t.businessId || t.business_id || '1') === selectedBizId);
+        const keptTagadaLog = ((prevStore.tagada_log || prevStore.tagadaLogs) || []).filter(t => String(t.businessId || t.business_id || '1') !== selectedBizId);
+        const keptTagadaQuota = { ...(prevStore.tagada_quota || prevStore.tagadaQuota || {}) };
+        if (data.tagada_quota && data.tagada_quota[selectedBizId]) {
+          keptTagadaQuota[selectedBizId] = data.tagada_quota[selectedBizId];
+        }
         const importedAudio = (data.audioNotes || []).filter(a => String(a.businessId || '1') === selectedBizId);
         const importedReceipts = (data.receiptImages || []).filter(r => String(r.businessId || '1') === selectedBizId);
         const importedVouchers = (data.voucherPrintLogs || []).filter(v => String(v.businessId || '1') === selectedBizId);
@@ -2149,6 +2275,16 @@ class StorageRepository {
           stock: [...keptStock, ...importedStock],
           inventory: [...keptStock, ...importedStock],
           notes: [...keptNotes, ...importedNotes],
+          tagadaLogs: [...keptTagadaLog, ...importedTagadaLog],
+          tagada_log: [...keptTagadaLog, ...importedTagadaLog],
+          tagada_quota: keptTagadaQuota,
+          tagadaQuota: keptTagadaQuota,
+          remainingSmsCount: (selectedBizId === String(prevStore.activeBusinessId || "1") && keptTagadaQuota[selectedBizId]?.freeSmsCount !== undefined)
+            ? keptTagadaQuota[selectedBizId].freeSmsCount
+            : prevStore.remainingSmsCount,
+          tallyMessageBalance: (selectedBizId === String(prevStore.activeBusinessId || "1") && keptTagadaQuota[selectedBizId]?.purchasedSmsCount !== undefined)
+            ? keptTagadaQuota[selectedBizId].purchasedSmsCount
+            : prevStore.tallyMessageBalance,
           audioNotes: [...keptAudio, ...importedAudio],
           receiptImages: [...keptReceipts, ...importedReceipts],
           voucherPrintLogs: [...keptVouchers, ...importedVouchers],
@@ -2163,9 +2299,34 @@ class StorageRepository {
         ? data.inventory
         : (Array.isArray(data.stock) ? data.stock : []);
 
+      const rawQuotaMap = (data.tagada_quota && typeof data.tagada_quota === 'object')
+        ? data.tagada_quota
+        : ((data.tagadaQuota && typeof data.tagadaQuota === 'object') ? data.tagadaQuota : null);
+      const activeRestoredBizId = String(data.activeBusinessId || '1');
+      const restoredQuotaMap = rawQuotaMap ? { ...rawQuotaMap } : { ...createDefaultState().tagada_quota };
+
+      if (!rawQuotaMap && (data.remainingSmsCount !== undefined || data.tallyMessageBalance !== undefined)) {
+        restoredQuotaMap[activeRestoredBizId] = {
+          ...(restoredQuotaMap[activeRestoredBizId] || {}),
+          freeSmsCount: data.remainingSmsCount !== undefined ? data.remainingSmsCount : (restoredQuotaMap[activeRestoredBizId]?.freeSmsCount ?? 5),
+          purchasedSmsCount: data.tallyMessageBalance !== undefined ? data.tallyMessageBalance : (restoredQuotaMap[activeRestoredBizId]?.purchasedSmsCount ?? 50),
+          remainingSmsCount: data.remainingSmsCount !== undefined ? data.remainingSmsCount : (restoredQuotaMap[activeRestoredBizId]?.freeSmsCount ?? 5),
+          tallyMessageBalance: data.tallyMessageBalance !== undefined ? data.tallyMessageBalance : (restoredQuotaMap[activeRestoredBizId]?.purchasedSmsCount ?? 50),
+          lastRefreshDate: new Date().toISOString(),
+          businessId: activeRestoredBizId,
+        };
+      }
+      const activeRestoredQuota = restoredQuotaMap[activeRestoredBizId] || {};
+
       const newStore = {
         ...createDefaultState(),
         ...data,
+        tagada_log: Array.isArray(data.tagada_log) ? data.tagada_log : (Array.isArray(data.tagadaLogs) ? data.tagadaLogs : []),
+        tagadaLogs: Array.isArray(data.tagadaLogs) ? data.tagadaLogs : (Array.isArray(data.tagada_log) ? data.tagada_log : []),
+        tagada_quota: restoredQuotaMap,
+        tagadaQuota: restoredQuotaMap,
+        remainingSmsCount: activeRestoredQuota.freeSmsCount !== undefined ? activeRestoredQuota.freeSmsCount : (data.remainingSmsCount ?? 5),
+        tallyMessageBalance: activeRestoredQuota.purchasedSmsCount !== undefined ? activeRestoredQuota.purchasedSmsCount : (data.tallyMessageBalance ?? 50),
         inventory: restoredInventory,
         stock: restoredInventory,
         pinEnabled: false,
@@ -2449,6 +2610,8 @@ class StorageRepository {
           cashEntries: (fullState.cashEntries || []).length,
           businesses: (fullState.businesses || []).length,
           audioNotes: (fullState.audioNotes || []).length,
+          tagada_log: (fullState.tagada_log || fullState.tagadaLogs || []).length,
+          tagadaLogs: (fullState.tagadaLogs || fullState.tagada_log || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -2724,13 +2887,36 @@ class StorageRepository {
         throw new Error('SMS_QUOTA_EXHAUSTED');
       }
 
+      const bId = String(normalized.businessId || latestStore.activeBusinessId || '1');
+      const quotas = { ...(latestStore.tagada_quota || latestStore.tagadaQuota || {}) };
+      const currentQuota = quotas[bId] || {
+        freeSmsCount: curCount,
+        purchasedSmsCount: Number(latestStore.tallyMessageBalance || 50),
+        lastRefreshDate: new Date().toISOString(),
+      };
+
       const nextCount = isFreeSms ? Math.max(0, curCount - 1) : curCount;
       finalRemaining = nextCount;
+
+      quotas[bId] = {
+        ...currentQuota,
+        freeSmsCount: nextCount,
+        purchasedSmsCount: Number(currentQuota.purchasedSmsCount !== undefined ? currentQuota.purchasedSmsCount : (latestStore.tallyMessageBalance || 50)),
+        lastRefreshDate: currentQuota.lastRefreshDate || new Date().toISOString(),
+        remainingSmsCount: nextCount,
+        tallyMessageBalance: Number(currentQuota.purchasedSmsCount !== undefined ? currentQuota.purchasedSmsCount : (latestStore.tallyMessageBalance || 50)),
+        businessId: bId,
+      };
+
+      const updatedLogs = [normalized, ...curLogs];
 
       return {
         ...latestStore,
         remainingSmsCount: nextCount,
-        tagadaLogs: [normalized, ...curLogs],
+        tagadaLogs: updatedLogs,
+        tagada_log: updatedLogs,
+        tagada_quota: quotas,
+        tagadaQuota: quotas,
       };
     });
 
@@ -2775,18 +2961,187 @@ class StorageRepository {
    * @param {string|number|null} [businessId=null]
    * @returns {{ remainingSmsCount: number, tallyMessageBalance: number, maxSmsQuota: number }}
    */
+  /**
+   * Retrieves current Tagada quota status for a specific business.
+   * Multi-tenant business isolation by businessId.
+   *
+   * @param {string|number|null} [businessId=null]
+   * @returns {{
+   *   freeSmsCount: number,
+   *   purchasedSmsCount: number,
+   *   lastRefreshDate: string,
+   *   remainingSmsCount: number,
+   *   tallyMessageBalance: number,
+   *   maxSmsQuota: number,
+   *   businessId: string
+   * }}
+   */
   getTagadaQuota(businessId = null) {
     const state = this.getAuthoritativeState() || this.currentStore || {};
-    const remaining = Number(state.remainingSmsCount !== undefined && state.remainingSmsCount !== null
-      ? state.remainingSmsCount
-      : 5);
-    const tallyMsg = Number(state.tallyMessageBalance !== undefined && state.tallyMessageBalance !== null
-      ? state.tallyMessageBalance
-      : 50);
+    const bId = String(businessId || this.getActiveBusinessId() || '1');
+    const isActive = bId === String(state.activeBusinessId || '1');
+    const quotaMap = state.tagada_quota || state.tagadaQuota || {};
+    const bQuota = quotaMap[bId];
+
+    let freeSms;
+    if (isActive && state.remainingSmsCount !== undefined && state.remainingSmsCount !== null) {
+      freeSms = Number(state.remainingSmsCount);
+    } else if (bQuota?.freeSmsCount !== undefined && bQuota?.freeSmsCount !== null) {
+      freeSms = Number(bQuota.freeSmsCount);
+    } else {
+      freeSms = 5;
+    }
+
+    let purchasedSms;
+    if (isActive && state.tallyMessageBalance !== undefined && state.tallyMessageBalance !== null) {
+      purchasedSms = Number(state.tallyMessageBalance);
+    } else if (bQuota?.purchasedSmsCount !== undefined && bQuota?.purchasedSmsCount !== null) {
+      purchasedSms = Number(bQuota.purchasedSmsCount);
+    } else {
+      purchasedSms = 50;
+    }
+
+    const lastRefresh = bQuota?.lastRefreshDate || (state.lastQuotaRefreshDate || '2026-11-04T00:00:00.000Z');
+
     return {
-      remainingSmsCount: Math.max(0, remaining),
-      tallyMessageBalance: Math.max(0, tallyMsg),
+      freeSmsCount: Math.max(0, freeSms),
+      purchasedSmsCount: Math.max(0, purchasedSms),
+      lastRefreshDate: lastRefresh,
+      remainingSmsCount: Math.max(0, freeSms),
+      tallyMessageBalance: Math.max(0, purchasedSms),
       maxSmsQuota: 100,
+      businessId: bId,
+    };
+  }
+
+  /**
+   * Persists Tagada quota for a specific business.
+   * Multi-tenant business isolation by businessId.
+   *
+   * @param {string|number} businessId
+   * @param {Object} quota { freeSmsCount, purchasedSmsCount, lastRefreshDate }
+   * @returns {Promise<{ success: boolean, quota: Object, businessId: string, error?: string }>}
+   */
+  async setTagadaQuota(businessId, quota = {}) {
+    const bId = String(businessId || this.getActiveBusinessId() || '1');
+    let updatedQuota = null;
+
+    const res = await this.mutateStore((latestStore) => {
+      const quotaMap = { ...(latestStore.tagada_quota || latestStore.tagadaQuota || {}) };
+      const current = quotaMap[bId] || {
+        freeSmsCount: 5,
+        purchasedSmsCount: 50,
+        lastRefreshDate: new Date().toISOString(),
+      };
+
+      const free = quota.freeSmsCount !== undefined
+        ? quota.freeSmsCount
+        : (quota.remainingSmsCount !== undefined ? quota.remainingSmsCount : current.freeSmsCount);
+      const purchased = quota.purchasedSmsCount !== undefined
+        ? quota.purchasedSmsCount
+        : (quota.tallyMessageBalance !== undefined ? quota.tallyMessageBalance : current.purchasedSmsCount);
+      const refresh = quota.lastRefreshDate || current.lastRefreshDate || new Date().toISOString();
+
+      updatedQuota = {
+        freeSmsCount: Math.max(0, Number(free || 0)),
+        purchasedSmsCount: Math.max(0, Number(purchased || 0)),
+        lastRefreshDate: refresh,
+        remainingSmsCount: Math.max(0, Number(free || 0)),
+        tallyMessageBalance: Math.max(0, Number(purchased || 0)),
+        businessId: bId,
+      };
+
+      quotaMap[bId] = updatedQuota;
+
+      const nextStore = {
+        ...latestStore,
+        tagada_quota: quotaMap,
+        tagadaQuota: quotaMap,
+      };
+
+      if (bId === String(latestStore.activeBusinessId || '1')) {
+        nextStore.remainingSmsCount = updatedQuota.freeSmsCount;
+        nextStore.tallyMessageBalance = updatedQuota.purchasedSmsCount;
+      }
+
+      return nextStore;
+    });
+
+    return {
+      success: res.success,
+      quota: updatedQuota,
+      businessId: bId,
+      error: res.error,
+    };
+  }
+
+  /**
+   * Records SMS pack purchase and increments purchasedSmsCount for a business.
+   *
+   * @param {string|number} businessId
+   * @param {Object|number} pack Pack descriptor ({ smsCount, price, packId, name }) or count
+   * @returns {Promise<{ success: boolean, quota: Object, pack: Object, addedCount: number, businessId: string, error?: string }>}
+   */
+  async recordTagadaQuotaPurchase(businessId, pack = {}) {
+    const bId = String(businessId || this.getActiveBusinessId() || '1');
+    const addedCount = typeof pack === 'number'
+      ? pack
+      : Number(pack?.smsCount || pack?.count || pack?.quantity || pack?.tallyMessageBalance || 0);
+
+    if (addedCount <= 0) {
+      return {
+        success: false,
+        error: 'INVALID_PACK_SMS_COUNT',
+        quota: this.getTagadaQuota(bId),
+        businessId: bId,
+      };
+    }
+
+    let updatedQuota = null;
+
+    const res = await this.mutateStore((latestStore) => {
+      const quotaMap = { ...(latestStore.tagada_quota || latestStore.tagadaQuota || {}) };
+      const current = quotaMap[bId] || {
+        freeSmsCount: 5,
+        purchasedSmsCount: 50,
+        lastRefreshDate: new Date().toISOString(),
+      };
+
+      const newPurchased = Math.max(0, Number(current.purchasedSmsCount || 0) + addedCount);
+      const refresh = new Date().toISOString();
+
+      updatedQuota = {
+        freeSmsCount: Math.max(0, Number(current.freeSmsCount || 0)),
+        purchasedSmsCount: newPurchased,
+        lastRefreshDate: refresh,
+        remainingSmsCount: Math.max(0, Number(current.freeSmsCount || 0)),
+        tallyMessageBalance: newPurchased,
+        businessId: bId,
+      };
+
+      quotaMap[bId] = updatedQuota;
+
+      const nextStore = {
+        ...latestStore,
+        tagada_quota: quotaMap,
+        tagadaQuota: quotaMap,
+      };
+
+      if (bId === String(latestStore.activeBusinessId || '1')) {
+        nextStore.remainingSmsCount = updatedQuota.freeSmsCount;
+        nextStore.tallyMessageBalance = updatedQuota.purchasedSmsCount;
+      }
+
+      return nextStore;
+    });
+
+    return {
+      success: res.success,
+      quota: updatedQuota,
+      pack: typeof pack === 'object' ? pack : { smsCount: addedCount },
+      addedCount,
+      businessId: bId,
+      error: res.error,
     };
   }
 
@@ -2797,18 +3152,36 @@ class StorageRepository {
    * @returns {Promise<{ success: boolean, remainingSmsCount: number, prevRemaining: number, error?: string }>} 
    */
   async adjustTagadaQuota(delta = 0, options = {}) {
+    const targetBizId = String(options.businessId || this.getActiveBusinessId() || '1');
     const maxQuota = Math.max(1, Number(options.maxQuota || 100));
     let prev = 0;
     let next = 0;
 
     const res = await this.mutateStore((latestStore) => {
+      const quotas = { ...(latestStore.tagada_quota || latestStore.tagadaQuota || {}) };
+      const currentQuota = quotas[targetBizId] || {
+        freeSmsCount: 5,
+        purchasedSmsCount: 50,
+        lastRefreshDate: new Date().toISOString(),
+      };
+
       prev = Number(latestStore.remainingSmsCount !== undefined && latestStore.remainingSmsCount !== null
         ? latestStore.remainingSmsCount
         : 5);
       next = Math.min(maxQuota, Math.max(0, prev + Number(delta || 0)));
+
+      quotas[targetBizId] = {
+        ...currentQuota,
+        freeSmsCount: next,
+        remainingSmsCount: next,
+        businessId: targetBizId,
+      };
+
       return {
         ...latestStore,
         remainingSmsCount: next,
+        tagada_quota: quotas,
+        tagadaQuota: quotas,
       };
     });
 
@@ -2860,8 +3233,201 @@ class StorageRepository {
 
     return {
       tagadaLogs: filtered,
+      tagada_log: filtered,
       totalCount,
     };
+  }
+
+  /**
+   * Logs a batch of Tagada reminders with Room SQLite schema parity:
+   * (id, account_id, tagada_type, credit_amount, synced, create_date)
+   * Multi-tenant business isolation by businessId.
+   *
+   * @param {string|number} businessId
+   * @param {Array<Object>} batchRecords
+   * @returns {Promise<{ success: boolean, count: number, records: Array<Object>, businessId: string, error?: string }>}
+   */
+  async logTagadaBatch(businessId, batchRecords = []) {
+    const bId = String(businessId || this.getActiveBusinessId() || '1');
+    const rawList = Array.isArray(batchRecords)
+      ? batchRecords
+      : (batchRecords ? [batchRecords] : []);
+
+    if (rawList.length === 0) {
+      return {
+        success: true,
+        count: 0,
+        records: [],
+        businessId: bId,
+      };
+    }
+
+    let createdRecords = [];
+
+    const res = await this.mutateStore((latestStore) => {
+      const curLog = Array.isArray(latestStore.tagada_log)
+        ? latestStore.tagada_log
+        : (Array.isArray(latestStore.tagadaLogs) ? latestStore.tagadaLogs : []);
+
+      let maxId = 0;
+      for (const item of curLog) {
+        const numId = Number(item?.id);
+        if (!isNaN(numId) && numId > maxId) {
+          maxId = numId;
+        }
+      }
+
+      const normalizedBatch = [];
+      for (let i = 0; i < rawList.length; i++) {
+        const item = rawList[i];
+        if (!item || typeof item !== 'object') continue;
+
+        const normId = item.id !== undefined && item.id !== null && !isNaN(Number(item.id))
+          ? Number(item.id)
+          : (item.id || ++maxId);
+
+        const accId = item.account_id !== undefined && item.account_id !== null
+          ? item.account_id
+          : (item.accountId !== undefined && item.accountId !== null ? item.accountId : 0);
+
+        const creditAmt = Number(
+          item.credit_amount !== undefined
+            ? item.credit_amount
+            : (item.creditAmount !== undefined ? item.creditAmount : (item.amount || 0))
+        );
+        const cleanCreditAmt = Math.round((Number.isFinite(creditAmt) ? creditAmt : 0) * 100) / 100;
+
+        const tagadaType = String(
+          item.tagada_type || item.tagadaType || item.type || 'TAGADA_BY_FREE_SMS'
+        );
+
+        const synced = item.synced !== undefined && item.synced !== null
+          ? (Number(item.synced) === 1 ? 1 : 0)
+          : 0;
+
+        const createDate = String(
+          item.create_date || item.createDate || item.date || new Date().toISOString()
+        );
+
+        const record = {
+          id: normId,
+          account_id: isNaN(Number(accId)) ? accId : Number(accId),
+          accountId: String(accId),
+          create_date: createDate,
+          createDate: createDate,
+          credit_amount: cleanCreditAmt,
+          creditAmount: cleanCreditAmt,
+          tagada_type: tagadaType,
+          tagadaType: tagadaType,
+          synced,
+          business_id: isNaN(Number(bId)) ? bId : Number(bId),
+          businessId: bId,
+        };
+
+        normalizedBatch.push(record);
+      }
+
+      createdRecords = normalizedBatch;
+
+      return {
+        ...latestStore,
+        tagada_log: [...normalizedBatch, ...curLog],
+        tagadaLogs: [...normalizedBatch, ...curLog],
+      };
+    });
+
+    return {
+      success: res.success,
+      count: createdRecords.length,
+      records: createdRecords,
+      businessId: bId,
+      error: res.error,
+    };
+  }
+
+  /**
+   * Retrieves all Tagada reminder logs for an account, sorted descending by create_date.
+   * Multi-tenant business isolation by businessId.
+   *
+   * @param {string|number} businessId
+   * @param {string|number} accountId
+   * @returns {Array<Object>}
+   */
+  getTagadaLogsByAccount(businessId, accountId) {
+    const bId = String(businessId || this.getActiveBusinessId() || '1');
+    const accIdStr = String(accountId !== undefined && accountId !== null ? accountId : '');
+    const state = this.getAuthoritativeState() || this.currentStore || {};
+    const allLogs = Array.isArray(state.tagada_log)
+      ? state.tagada_log
+      : (Array.isArray(state.tagadaLogs) ? state.tagadaLogs : []);
+
+    const matches = allLogs.filter((log) => {
+      if (!log) return false;
+      const logBizId = String(
+        log.businessId !== undefined && log.businessId !== null
+          ? log.businessId
+          : (log.business_id !== undefined && log.business_id !== null ? log.business_id : '1')
+      );
+      if (logBizId !== bId) return false;
+
+      const logAccId = String(
+        log.accountId !== undefined && log.accountId !== null
+          ? log.accountId
+          : (log.account_id !== undefined && log.account_id !== null ? log.account_id : '')
+      );
+      return logAccId === accIdStr;
+    });
+
+    matches.sort((a, b) => {
+      const dateA = a.create_date || a.createDate || '';
+      const dateB = b.create_date || b.createDate || '';
+      const dateCmp = dateB.localeCompare(dateA);
+      if (dateCmp !== 0) return dateCmp;
+      return (Number(b.id) || 0) - (Number(a.id) || 0);
+    });
+
+    return matches;
+  }
+
+  /**
+   * Returns the timestamp (create_date) of the most recent Tagada reminder sent to an account.
+   * Multi-tenant business isolation by businessId.
+   *
+   * @param {string|number} businessId
+   * @param {string|number} accountId
+   * @returns {string|null}
+   */
+  getLastTagadaDateByAccount(businessId, accountId) {
+    const logs = this.getTagadaLogsByAccount(businessId, accountId);
+    if (!logs || logs.length === 0) return null;
+    return logs[0].create_date || logs[0].createDate || null;
+  }
+
+  /**
+   * Generates debt aging report for a business categorized into tiers:
+   * (0-15 days, 16-30 days, 31-60 days, 60+ days)
+   *
+   * @param {string|number|null} [businessId=null]
+   * @param {Date|string} [asOfDate=new Date()]
+   * @returns {Object}
+   */
+  getDebtAgingReport(businessId = null, asOfDate = new Date()) {
+    const bId = String(businessId || this.getActiveBusinessId() || '1');
+    const state = this.getAuthoritativeState() || this.currentStore || {};
+    const allAccounts = Array.isArray(state.accounts) ? state.accounts : [];
+    const bizAccounts = allAccounts.filter((a) => {
+      const aBizId = String(
+        a.businessId !== undefined && a.businessId !== null
+          ? a.businessId
+          : (a.business_id !== undefined && a.business_id !== null ? a.business_id : '1')
+      );
+      return aBizId === bId && a.type === 1;
+    });
+
+    if (batchTagadaService && typeof batchTagadaService.categorizeDebtAging === 'function') {
+      return batchTagadaService.categorizeDebtAging(bizAccounts, asOfDate);
+    }
+    return {};
   }
 
   /**
@@ -3014,14 +3580,39 @@ class StorageRepository {
         ? Math.max(0, curRemaining - quotaNeeded)
         : curRemaining;
 
+      const targetBizId = options.businessId !== undefined && options.businessId !== null
+        ? String(options.businessId)
+        : String(latestStore.activeBusinessId || '1');
+      const quotas = { ...(latestStore.tagada_quota || latestStore.tagadaQuota || {}) };
+      const currentQuota = quotas[targetBizId] || {
+        freeSmsCount: curRemaining,
+        purchasedSmsCount: Number(latestStore.tallyMessageBalance || 50),
+        lastRefreshDate: new Date().toISOString(),
+      };
+
+      quotas[targetBizId] = {
+        ...currentQuota,
+        freeSmsCount: nextRemaining,
+        purchasedSmsCount: Number(currentQuota.purchasedSmsCount !== undefined ? currentQuota.purchasedSmsCount : (latestStore.tallyMessageBalance || 50)),
+        lastRefreshDate: currentQuota.lastRefreshDate || new Date().toISOString(),
+        remainingSmsCount: nextRemaining,
+        tallyMessageBalance: Number(currentQuota.purchasedSmsCount !== undefined ? currentQuota.purchasedSmsCount : (latestStore.tallyMessageBalance || 50)),
+        businessId: targetBizId,
+      };
+
       finalQuotaDeducted = (isFreeSms && !bypassQuota) ? quotaNeeded : 0;
       finalRemaining = nextRemaining;
       dispatchedLogs = newItems;
 
+      const updatedLogs = [...newItems, ...curLogs];
+
       return {
         ...latestStore,
         remainingSmsCount: nextRemaining,
-        tagadaLogs: [...newItems, ...curLogs],
+        tagadaLogs: updatedLogs,
+        tagada_log: updatedLogs,
+        tagada_quota: quotas,
+        tagadaQuota: quotas,
       };
     });
 
@@ -4250,6 +4841,11 @@ class StorageRepository {
       const updatedCash = curCash.filter((c) => !accTxnIds.includes(String(c.transactionId || c.txnId || c.id)));
       const updatedAudio = curAudio.filter((a) => !purgedAudioNotes.some((p) => p.id === a.id));
       const updatedReceipts = curReceipts.filter((r) => !purgedReceiptImages.some((p) => p.id === r.id));
+      const curTagadaLogs = latestStore.tagada_log || latestStore.tagadaLogs || [];
+      const updatedTagadaLogs = curTagadaLogs.filter((t) => {
+        const accId = String(t.accountId !== undefined && t.accountId !== null ? t.accountId : (t.account_id !== undefined && t.account_id !== null ? t.account_id : ''));
+        return !(accId === targetAccId && getBizId(t) === targetBizId);
+      });
 
       return {
         ...latestStore,
@@ -4258,6 +4854,8 @@ class StorageRepository {
         cashEntries: updatedCash,
         audioNotes: updatedAudio,
         receiptImages: updatedReceipts,
+        tagadaLogs: updatedTagadaLogs,
+        tagada_log: updatedTagadaLogs,
         voucherPrintLogs: updatedVouchers,
         banglaQrTransactions: updatedBanglaQr,
       };
@@ -5646,6 +6244,30 @@ function listTagadaLogs(accountId = null, businessId = null, options = {}, repo 
   return repo.listTagadaLogs(accountId, businessId, options);
 }
 
+async function logTagadaBatch(businessId, batchRecords, repo = defaultRepository) {
+  return repo.logTagadaBatch(businessId, batchRecords);
+}
+
+function getTagadaLogsByAccount(businessId, accountId, repo = defaultRepository) {
+  return repo.getTagadaLogsByAccount(businessId, accountId);
+}
+
+function getLastTagadaDateByAccount(businessId, accountId, repo = defaultRepository) {
+  return repo.getLastTagadaDateByAccount(businessId, accountId);
+}
+
+async function setTagadaQuota(businessId, quota, repo = defaultRepository) {
+  return repo.setTagadaQuota(businessId, quota);
+}
+
+async function recordTagadaQuotaPurchase(businessId, pack, repo = defaultRepository) {
+  return repo.recordTagadaQuotaPurchase(businessId, pack);
+}
+
+function getDebtAgingReport(businessId = null, asOfDate = new Date(), repo = defaultRepository) {
+  return repo.getDebtAgingReport(businessId, asOfDate);
+}
+
 function getBulkTagadaEligibleCustomersRepo(businessId = null, accounts = null, repo = defaultRepository) {
   if (repo && typeof repo.getBulkTagadaEligibleCustomers === 'function') {
     return repo.getBulkTagadaEligibleCustomers(businessId, accounts);
@@ -6184,6 +6806,13 @@ const repoExport = {
   getSoundboxTelemetry: getSoundboxTelemetryRepo,
   digitalAnalyticsService,
   getDigitalInflowTransactions: getDigitalInflowTransactionsRepo,
+  batchTagadaService,
+  logTagadaBatch,
+  getTagadaLogsByAccount,
+  getLastTagadaDateByAccount,
+  setTagadaQuota,
+  recordTagadaQuotaPurchase,
+  getDebtAgingReport,
   default: defaultRepository,
 };
 
@@ -6297,5 +6926,12 @@ if (typeof exports !== 'undefined') {
   exports.getSoundboxTelemetry = getSoundboxTelemetryRepo;
   exports.digitalAnalyticsService = digitalAnalyticsService;
   exports.getDigitalInflowTransactions = getDigitalInflowTransactionsRepo;
+  exports.batchTagadaService = batchTagadaService;
+  exports.logTagadaBatch = logTagadaBatch;
+  exports.getTagadaLogsByAccount = getTagadaLogsByAccount;
+  exports.getLastTagadaDateByAccount = getLastTagadaDateByAccount;
+  exports.setTagadaQuota = setTagadaQuota;
+  exports.recordTagadaQuotaPurchase = recordTagadaQuotaPurchase;
+  exports.getDebtAgingReport = getDebtAgingReport;
   exports.default = defaultRepository;
 }
