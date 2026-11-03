@@ -1,4 +1,4 @@
-/**
+﻿/**
  * test_iteration_024_release_readiness_synthesis.js
  * Continuous Verification Suite for Iteration 024: Release Readiness Synthesis & Parity Audit
  *
@@ -245,8 +245,8 @@ function createMockAdapter(initialData = null) {
     assert.strictEqual(typeof metrics.overallBudgetRawPct, "number");
 
     // 2. Bilingual i18n 680-key Parity (FEAT-009)
-    assert.strictEqual(Object.keys(i18n.STRINGS.bn).length, 680);
-    assert.strictEqual(Object.keys(i18n.STRINGS.en).length, 680);
+    assert.strictEqual(Object.keys(i18n.STRINGS.bn).length, Object.keys(i18n.STRINGS.en).length);
+    assert.ok(Object.keys(i18n.STRINGS.bn).length >= 680);
     assert.strictEqual(i18n.toEnglishDigits("১২৩৪৫"), "12345");
     assert.strictEqual(i18n.parseNumber("৫০০.২৫"), 500.25);
 

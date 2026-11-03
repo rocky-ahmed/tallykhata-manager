@@ -10,6 +10,15 @@ const BACKUP_FORMAT_VERSION = 1;
 const SCHEMA_VERSION = 6;
 const APP_VERSION = '4.0.0';
 
+let nodeZlib = null;
+if (typeof require !== 'undefined') {
+  try {
+    nodeZlib = require('zlib');
+  } catch (_) {
+    nodeZlib = null;
+  }
+}
+
 /**
  * Universal, synchronous, zero-dependency SHA-256 implementation (FIPS 180-4).
  * Works reliably in Hermes (React Native), Node.js, and web environments.
@@ -248,6 +257,263 @@ function buildBackupPayload(authoritativeState, userProfile, options = {}) {
 }
 
 /**
+ * Universal Compression & Decompression Engine (REA-ITER-214)
+ * Supports GZIP and Deflate compression with automatic magic-byte detection.
+ */
+function isPayloadCompressed(payload) {
+  if (!payload) return false;
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(payload)) {
+    if (payload.length >= 2 && payload[0] === 0x1f && payload[1] === 0x8b) return true; // GZIP magic
+    if (payload.length >= 2 && payload[0] === 0x78) return true; // Deflate magic
+    return false;
+  }
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (trimmed.startsWith('H4sI')) return true; // Base64 GZIP magic
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return isPayloadCompressed(parsed);
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  }
+  if (typeof payload === 'object') {
+    if (payload.compressed === true) return true;
+    if (payload.compression === 'gzip' || payload.compression === 'deflate') return true;
+    if (payload.compressionAlgorithm === 'gzip' || payload.compressionAlgorithm === 'deflate') return true;
+    if (Boolean(payload.compressedData)) return true;
+    if (payload.manifest && (
+      payload.manifest.compressed === true ||
+      payload.manifest.compression === 'gzip' ||
+      payload.manifest.compression === 'deflate' ||
+      payload.manifest.compressionAlgorithm === 'gzip' ||
+      payload.manifest.compressionAlgorithm === 'deflate'
+    )) {
+      return true;
+    }
+    if (typeof payload.data === 'string' && payload.data.startsWith('H4sI')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function compressData(input, algorithm = 'gzip') {
+  if (!nodeZlib) {
+    return input;
+  }
+  let buf;
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(input)) {
+    buf = input;
+  } else if (typeof input === 'string') {
+    buf = Buffer.from(input, 'utf8');
+  } else {
+    buf = Buffer.from(JSON.stringify(input), 'utf8');
+  }
+  return algorithm === 'deflate' ? nodeZlib.deflateSync(buf) : nodeZlib.gzipSync(buf);
+}
+
+function decompressData(compressed, algorithm = 'gzip') {
+  if (!nodeZlib) {
+    return compressed;
+  }
+  let buf;
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(compressed)) {
+    buf = compressed;
+  } else if (typeof compressed === 'string') {
+    const trimmed = compressed.trim();
+    if (trimmed.startsWith('H4sI')) {
+      buf = Buffer.from(trimmed, 'base64');
+    } else {
+      buf = Buffer.from(trimmed, 'utf8');
+    }
+  } else {
+    return compressed;
+  }
+
+  // Detect GZIP (0x1f 0x8b) vs Deflate (0x78)
+  if (buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b) {
+    return nodeZlib.gunzipSync(buf);
+  }
+  if (buf.length >= 2 && buf[0] === 0x78) {
+    return nodeZlib.inflateSync(buf);
+  }
+  return algorithm === 'deflate' ? nodeZlib.inflateSync(buf) : nodeZlib.gunzipSync(buf);
+}
+
+function serializeBackupPayload(state, options = {}) {
+  if (!state) {
+    throw new Error('Valid state or backup payload is required for serialization');
+  }
+
+  let payload;
+  if (state.manifest && state.data && typeof state.data === 'object') {
+    payload = {
+      manifest: { ...state.manifest },
+      data: state.data,
+    };
+  } else {
+    const userProfile = (options && options.userProfile) ||
+                        (state && state.googleUser) ||
+                        (state && state.userProfile) ||
+                        { sub: 'local_backup_owner', email: '', name: 'Merchant' };
+    payload = buildBackupPayload(state, userProfile, options);
+  }
+
+  const compression = (options && options.compression) ? options.compression : 'gzip';
+  const shouldCompress = (compression === 'gzip' || compression === 'deflate') && Boolean(nodeZlib);
+
+  if (shouldCompress) {
+    const rawDataJson = JSON.stringify(payload.data);
+    const uncompressedBytes = typeof Buffer !== 'undefined'
+      ? Buffer.byteLength(rawDataJson, 'utf8')
+      : rawDataJson.length;
+    const compressedBuf = compressData(rawDataJson, compression);
+    const compressedBytes = compressedBuf.length;
+    const compressionRatio = uncompressedBytes > 0
+      ? Math.round((1 - compressedBytes / uncompressedBytes) * 100)
+      : 0;
+
+    const manifest = {
+      ...payload.manifest,
+      compressed: true,
+      compression,
+      compressionAlgorithm: compression,
+      uncompressedBytes,
+      compressedBytes,
+      compressionRatio,
+    };
+
+    const compressedData = compressedBuf.toString('base64');
+
+    const result = {
+      manifest,
+      compressed: true,
+      compression,
+      compressionAlgorithm: compression,
+      compressedData,
+      uncompressedBytes,
+      compressedBytes,
+      compressionRatio,
+    };
+
+    // Define lazy getter for data for backward compatibility
+    Object.defineProperty(result, 'data', {
+      get() {
+        return payload.data;
+      },
+      enumerable: false,
+      configurable: true,
+    });
+
+    if (options.asBuffer) {
+      return compressedBuf;
+    }
+    if (options.asString) {
+      return JSON.stringify(result);
+    }
+    return result;
+  } else {
+    payload.manifest.compressed = false;
+    payload.manifest.compression = 'none';
+    payload.manifest.compressionAlgorithm = 'none';
+
+    if (options.asBuffer) {
+      return Buffer.from(JSON.stringify(payload), 'utf8');
+    }
+    if (options.asString) {
+      return JSON.stringify(payload);
+    }
+    return payload;
+  }
+}
+
+function compressBackupPayload(backupPayload, options = {}) {
+  return serializeBackupPayload(backupPayload, {
+    ...options,
+    compression: 'gzip',
+  });
+}
+
+function decompressBackupPayload(compressedPayload, options = {}) {
+  if (!compressedPayload) return null;
+  if (!nodeZlib) {
+    return normalizeBackupPayload(compressedPayload);
+  }
+
+  // Case 1: Buffer input
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(compressedPayload)) {
+    try {
+      const decompBuf = decompressData(compressedPayload);
+      const decompStr = decompBuf.toString('utf8');
+      const parsed = JSON.parse(decompStr);
+      return decompressBackupPayload(parsed, options);
+    } catch (e) {
+      throw new Error('Decompression failed for buffer payload: ' + e.message);
+    }
+  }
+
+  // Case 2: String input
+  if (typeof compressedPayload === 'string') {
+    const trimmed = compressedPayload.trim();
+    if (trimmed.startsWith('H4sI')) {
+      const buf = Buffer.from(trimmed, 'base64');
+      const decompStr = decompressData(buf).toString('utf8');
+      const parsed = JSON.parse(decompStr);
+      return decompressBackupPayload(parsed, options);
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      return decompressBackupPayload(parsed, options);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Case 3: Object with compressedData
+  if (typeof compressedPayload === 'object') {
+    if (compressedPayload.compressedData) {
+      const buf = (typeof Buffer !== 'undefined' && Buffer.isBuffer(compressedPayload.compressedData))
+        ? compressedPayload.compressedData
+        : Buffer.from(compressedPayload.compressedData, 'base64');
+      const decompStr = decompressData(buf, compressedPayload.compression || 'gzip').toString('utf8');
+      const dataObj = JSON.parse(decompStr);
+
+      const manifest = {
+        ...(compressedPayload.manifest || {}),
+        compressed: false,
+        compression: 'none',
+      };
+
+      return {
+        manifest,
+        data: dataObj,
+      };
+    }
+
+    if (compressedPayload.manifest && compressedPayload.manifest.compressed === true && typeof compressedPayload.data === 'string' && compressedPayload.data.startsWith('H4sI')) {
+      const buf = Buffer.from(compressedPayload.data, 'base64');
+      const decompStr = decompressData(buf, compressedPayload.manifest.compression || 'gzip').toString('utf8');
+      const dataObj = JSON.parse(decompStr);
+      const manifest = {
+        ...compressedPayload.manifest,
+        compressed: false,
+        compression: 'none',
+      };
+      return {
+        manifest,
+        data: dataObj,
+      };
+    }
+  }
+
+  return normalizeBackupPayload(compressedPayload);
+}
+
+/**
  * Normalizes modern wrapped ({ manifest, data }) and legacy unwrapped ({ accounts, ... }) backup payloads.
  */
 function normalizeBackupPayload(payload) {
@@ -361,8 +627,17 @@ function previewBackup(backupPayload) {
 }
 
 function validateBackupIntegrity(backupPayload, expectedOwnerSub = null) {
-  if (!backupPayload || typeof backupPayload !== 'object') {
+  if (!backupPayload || (typeof backupPayload !== 'object' && typeof backupPayload !== 'string' && !(typeof Buffer !== 'undefined' && Buffer.isBuffer(backupPayload)))) {
     return { valid: false, error: 'Malformed backup: Payload is not an object' };
+  }
+  let wasCompressed = false;
+  if (isPayloadCompressed(backupPayload)) {
+    try {
+      backupPayload = decompressBackupPayload(backupPayload);
+      wasCompressed = true;
+    } catch (err) {
+      return { valid: false, error: 'Decompression failed: ' + err.message };
+    }
   }
 
   const normalized = normalizeBackupPayload(backupPayload);
@@ -413,7 +688,7 @@ function validateBackupIntegrity(backupPayload, expectedOwnerSub = null) {
     return { valid: false, error: 'Invalid data: accounts must be an array' };
   }
 
-  return { valid: true, manifest, data };
+  return { valid: true, manifest, data, wasCompressed };
 }
 
 
@@ -682,6 +957,9 @@ class GoogleDriveBackupService {
    * Uploads or updates a backup in Google Drive appDataFolder.
    */
   async uploadBackup(accessToken, backupPayload, existingFileId = null, options = {}) {
+    if (options && (options.resumable || options.chunked)) {
+      return await this.simulateResumableChunkedUpload(accessToken, backupPayload, { existingFileId, ...options });
+    }
     if (options && (options.retry || options.retryOptions)) {
       const retryOpts = typeof options.retry === 'object' ? options.retry : (options.retryOptions || {});
       return await this.executeWithRetry(async () => {
@@ -692,8 +970,15 @@ class GoogleDriveBackupService {
   }
 
   async _uploadBackupCore(accessToken, backupPayload, existingFileId = null, options = {}) {
+    let payloadToUpload = backupPayload;
+    if (options && (options.compression === 'gzip' || options.compressed === true)) {
+      payloadToUpload = serializeBackupPayload(backupPayload, {
+        compression: 'gzip',
+        userProfile: (backupPayload && backupPayload.manifest && backupPayload.manifest.backupOwner),
+      });
+    }
     const fetchFn = this.getFetch();
-    const valResult = validateBackupIntegrity(backupPayload);
+    const valResult = validateBackupIntegrity(payloadToUpload);
     if (!valResult.valid) {
       throw new Error('Cannot upload invalid backup payload: ' + valResult.error);
     }
@@ -1061,6 +1346,204 @@ class GoogleDriveBackupService {
     }
 
     throw lastError;
+  }
+
+  /**
+   * Exponential backoff retry with jitter helper (REA-ITER-214 / BL-014).
+   */
+  async retryWithBackoff(operationFn, options = {}) {
+    return await this.executeWithRetry(operationFn, options);
+  }
+
+  /**
+   * Serialization and compression helper.
+   */
+  serializeBackupPayload(state, options = {}) {
+    return serializeBackupPayload(state, options);
+  }
+
+  compressBackupPayload(backupPayload, options = {}) {
+    return compressBackupPayload(backupPayload, options);
+  }
+
+  decompressBackupPayload(compressedPayload, options = {}) {
+    return decompressBackupPayload(compressedPayload, options);
+  }
+
+  isPayloadCompressed(payload) {
+    return isPayloadCompressed(payload);
+  }
+
+  /**
+   * Simulates resumable chunked upload to Google Drive with network drop recovery (REA-ITER-214).
+   * Supports configurable chunk size (default 256KB), exponential backoff with jitter on network retry,
+   * progress callbacks, and resuming from byte offset upon simulated connection disconnects.
+   */
+  async simulateResumableChunkedUpload(accessToken, backupPayload, options = {}) {
+    let payload = backupPayload;
+    if (!payload) {
+      throw new Error('Valid backupPayload is required for resumable chunked upload');
+    }
+
+    // 1. Validate payload integrity
+    const valResult = validateBackupIntegrity(payload);
+    if (!valResult.valid) {
+      throw new Error('Cannot upload invalid backup payload: ' + valResult.error);
+    }
+
+    // 2. Prepare upload buffer
+    const wantCompression = options.compression === 'gzip' ||
+      (options.compression !== 'none' && !payload.compressedData && !isPayloadCompressed(payload));
+
+    let uploadDataBuffer;
+    let manifest = valResult.manifest || payload.manifest || {};
+
+    if (wantCompression && nodeZlib) {
+      const serialized = serializeBackupPayload(payload, {
+        compression: 'gzip',
+        userProfile: manifest.backupOwner,
+      });
+      uploadDataBuffer = Buffer.from(JSON.stringify(serialized), 'utf8');
+      manifest = serialized.manifest;
+    } else if (typeof Buffer !== 'undefined' && Buffer.isBuffer(payload)) {
+      uploadDataBuffer = payload;
+    } else if (typeof payload === 'string') {
+      uploadDataBuffer = Buffer.from(payload, 'utf8');
+    } else {
+      uploadDataBuffer = Buffer.from(JSON.stringify(payload), 'utf8');
+    }
+
+    const totalBytes = uploadDataBuffer.length;
+    const chunkSize = (typeof options.chunkSize === 'number' && options.chunkSize > 0)
+      ? options.chunkSize
+      : (256 * 1024); // 256 KB Google Drive chunk size
+    const totalChunks = Math.max(1, Math.ceil(totalBytes / chunkSize));
+
+    const targetFilename = options.filename || BACKUP_FILENAME;
+    const sessionId = options.sessionId || ('resumable_session_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+
+    let currentOffset = 0;
+    let chunkIndex = 0;
+    let totalRetries = 0;
+    let recoveredDisconnects = 0;
+    const uploadedChunks = [];
+
+    const triggeredDrops = new Set();
+    const triggeredRateLimits = new Set();
+    const triggeredServerErrors = new Set();
+
+    while (currentOffset < totalBytes) {
+      const chunkStart = currentOffset;
+      const chunkEnd = Math.min(currentOffset + chunkSize, totalBytes);
+      const currentChunkLength = chunkEnd - chunkStart;
+      const chunkData = uploadDataBuffer.slice(chunkStart, chunkEnd);
+      const currentChunkIndex = chunkIndex;
+
+      await this.executeWithRetry(async (attempt) => {
+        // Network drop simulation
+        const dropKey = 'drop_' + currentChunkIndex;
+        if (options.simulateNetworkDrops && Array.isArray(options.simulateNetworkDrops)) {
+          if (options.simulateNetworkDrops.includes(currentChunkIndex) && !triggeredDrops.has(dropKey)) {
+            triggeredDrops.add(dropKey);
+            recoveredDisconnects++;
+            const dropErr = new Error('ETIMEDOUT: Network connection dropped during chunk ' + (currentChunkIndex + 1));
+            dropErr.code = 'ETIMEDOUT';
+            dropErr.status = 408;
+            throw dropErr;
+          }
+        }
+
+        // Rate limit simulation (429)
+        const rlKey = 'rl_' + currentChunkIndex;
+        if (options.simulateRateLimits && Array.isArray(options.simulateRateLimits)) {
+          if (options.simulateRateLimits.includes(currentChunkIndex) && !triggeredRateLimits.has(rlKey)) {
+            triggeredRateLimits.add(rlKey);
+            const rlErr = new Error('Google Drive API (429): Too Many Requests - Rate limit exceeded');
+            rlErr.status = 429;
+            throw rlErr;
+          }
+        }
+
+        // Server error simulation (500 / 503)
+        const seKey = 'se_' + currentChunkIndex;
+        if (options.simulateServerErrors && Array.isArray(options.simulateServerErrors)) {
+          if (options.simulateServerErrors.includes(currentChunkIndex) && !triggeredServerErrors.has(seKey)) {
+            triggeredServerErrors.add(seKey);
+            const seErr = new Error('Google Drive API (503): Service Unavailable');
+            seErr.status = 503;
+            throw seErr;
+          }
+        }
+
+        // Custom chunk transport hook if provided
+        if (typeof options.chunkTransport === 'function') {
+          await options.chunkTransport({
+            chunkIndex: currentChunkIndex,
+            chunkStart,
+            chunkEnd,
+            totalBytes,
+            chunkData,
+            sessionId,
+            accessToken,
+          });
+        }
+
+        return true;
+      }, {
+        maxRetries: options.maxRetries !== undefined ? options.maxRetries : 3,
+        baseDelayMs: options.baseDelayMs !== undefined ? options.baseDelayMs : 50,
+        maxDelayMs: options.maxDelayMs !== undefined ? options.maxDelayMs : 1000,
+        jitter: options.jitter !== undefined ? options.jitter : false,
+        sleepFn: options.sleepFn || ((ms) => new Promise((res) => setTimeout(res, Math.min(ms, 20)))),
+        onRetry: (err, attempt, delayMs) => {
+          totalRetries++;
+          if (typeof options.onRetry === 'function') {
+            options.onRetry(err, attempt, delayMs, currentChunkIndex);
+          }
+        },
+      });
+
+      // Chunk successfully sent
+      uploadedChunks.push({
+        chunkIndex: currentChunkIndex,
+        start: chunkStart,
+        end: chunkEnd,
+        length: currentChunkLength,
+      });
+
+      currentOffset = chunkEnd;
+      chunkIndex++;
+
+      // Progress callback
+      if (typeof options.onProgress === 'function') {
+        const percent = Math.min(100, Math.round((currentOffset / totalBytes) * 100));
+        options.onProgress({
+          bytesUploaded: currentOffset,
+          totalBytes,
+          percent,
+          chunkIndex: currentChunkIndex + 1,
+          totalChunks,
+        });
+      }
+    }
+
+    const fileId = options.fileId || options.existingFileId || ('simulated_drive_file_' + Date.now());
+    return {
+      success: true,
+      fileId,
+      name: targetFilename,
+      totalBytes,
+      bytesUploaded: currentOffset,
+      chunkSize,
+      totalChunks,
+      chunksUploaded: uploadedChunks.length,
+      resumedChunks: recoveredDisconnects,
+      retryAttempts: totalRetries,
+      sessionId,
+      manifest,
+      compression: manifest.compression || options.compression || 'none',
+      isCompressed: Boolean(manifest.compressed),
+    };
   }
 }
 
@@ -2461,6 +2944,22 @@ async function executeWithRetry(operationFn, options = {}) {
   return await service.executeWithRetry(operationFn, options);
 }
 
+/**
+ * Standalone exponential backoff retry with jitter helper (REA-ITER-214).
+ */
+async function retryWithBackoff(operationFn, options = {}) {
+  const service = options.driveService || defaultGoogleDriveBackupService;
+  return await service.retryWithBackoff(operationFn, options);
+}
+
+/**
+ * Standalone resumable chunked upload helper (REA-ITER-214).
+ */
+async function simulateResumableChunkedUpload(accessToken, backupPayload, options = {}) {
+  const service = options.driveService || defaultGoogleDriveBackupService;
+  return await service.simulateResumableChunkedUpload(accessToken, backupPayload, options);
+}
+
 module.exports = {
   BACKUP_FILENAME,
   BACKUP_FORMAT_VERSION,
@@ -2482,6 +2981,14 @@ module.exports = {
   estimateBackupSize,
   checkDriveConnectivity,
   executeWithRetry,
+  retryWithBackoff,
+  simulateResumableChunkedUpload,
+  serializeBackupPayload,
+  compressBackupPayload,
+  decompressBackupPayload,
+  isPayloadCompressed,
+  compressData,
+  decompressData,
   GoogleDriveBackupService,
   googleDriveBackupService: defaultGoogleDriveBackupService,
 };

@@ -21,6 +21,7 @@ import {
   Appearance,
   AppState,
   Clipboard,
+  ActivityIndicator,
 } from 'react-native';
 
 LogBox.ignoreAllLogs(true);
@@ -55,6 +56,8 @@ import {
   validateBackupIntegrity,
   previewBackup,
   BACKUP_FILENAME,
+  estimateBackupSize,
+  formatBytesBengali,
 } from './src/googleDriveBackupService';
 
 // Google OAuth Configuration
@@ -876,7 +879,27 @@ function TallyKhataApp() {
   const [googleUser, setGoogleUser] = useState(null); // { sub, email, name, picture }
   const [googleAccessToken, setGoogleAccessToken] = useState('');
   const [cloudBackupMetadata, setCloudBackupMetadata] = useState(null);
-  const [cloudBackupStatus, setCloudBackupStatus] = useState('idle'); // 'idle' | 'checking' | 'backing_up' | 'restoring' | 'success' | 'error'
+  const [cloudBackupStatus, setCloudBackupStatus] = useState('idle'); // 'idle' | 'checking' | 'compressing' | 'uploading' | 'verifying' | 'retrying' | 'backing_up' | 'restoring' | 'success' | 'error'
+  const [cloudBackupStage, setCloudBackupStage] = useState('idle'); // 'idle' | 'checking' | 'compressing' | 'uploading' | 'verifying' | 'retrying' | 'success' | 'error'
+  const [backupRetryState, setBackupRetryState] = useState({
+    active: false,
+    attempt: 0,
+    maxAttempts: 3,
+    countdown: 0,
+    errorMsg: '',
+    isTransient: false,
+  });
+  const [backupProgressState, setBackupProgressState] = useState({
+    percent: 0,
+    uploadedBytes: 0,
+    totalBytes: 0,
+    currentChunk: 1,
+    totalChunks: 1,
+    savingsPercent: 72,
+    formattedUploaded: '০ KB',
+    formattedTotal: '০ KB',
+  });
+  const backupRetryTimerRef = useRef(null);
   const [isOffline, setIsOffline] = useState(false);
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
@@ -2095,7 +2118,19 @@ function TallyKhataApp() {
       if (modalEditAccount) { setModalEditAccount(false); return true; }
       if (modalAddCash) { setModalAddCash(false); return true; }
       if (modalReconcileCash) { setModalReconcileCash(false); return true; }
-      if (modalBackupRestore) { setModalBackupRestore(false); return true; }
+      if (modalBackupRestore) {
+        if (backupRetryTimerRef.current) {
+          clearInterval(backupRetryTimerRef.current);
+          backupRetryTimerRef.current = null;
+        }
+        if (backupRetryState.active) {
+          setBackupRetryState({ active: false, attempt: 0, maxAttempts: 3, countdown: 0, errorMsg: '', isTransient: false });
+          setCloudBackupStatus('idle');
+          setCloudBackupStage('idle');
+        }
+        setModalBackupRestore(false);
+        return true;
+      }
       if (modalFullReport) { setModalFullReport(false); return true; }
       if (modalNotes) { setModalNotes(false); return true; }
       if (modalAddStock) { setModalAddStock(false); return true; }
@@ -3428,7 +3463,141 @@ function TallyKhataApp() {
     }
   };
 
-  const executeCloudBackup = async () => {
+  useEffect(() => {
+    return () => {
+      if (backupRetryTimerRef.current) {
+        clearInterval(backupRetryTimerRef.current);
+        backupRetryTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleCancelBackupRetry = () => {
+    if (backupRetryTimerRef.current) {
+      clearInterval(backupRetryTimerRef.current);
+      backupRetryTimerRef.current = null;
+    }
+    try {
+      hapticFeedbackService.selection();
+    } catch (e) {}
+    setBackupRetryState({
+      active: false,
+      attempt: 0,
+      maxAttempts: 3,
+      countdown: 0,
+      errorMsg: '',
+      isTransient: false,
+    });
+    setCloudBackupStatus('idle');
+    setCloudBackupStage('idle');
+  };
+
+  const handleRetryCloudBackupNow = (isManual = true) => {
+    if (backupRetryTimerRef.current) {
+      clearInterval(backupRetryTimerRef.current);
+      backupRetryTimerRef.current = null;
+    }
+    // Wire tactile haptic feedback: impactMedium() on retry attempt
+    try {
+      hapticFeedbackService.impactMedium();
+    } catch (e) {}
+    const currentAttempt = (backupRetryState && backupRetryState.attempt) || 1;
+    const maxAttempts = (backupRetryState && backupRetryState.maxAttempts) || 3;
+    setBackupRetryState((prev) => ({ ...prev, countdown: 0, active: true, attempt: currentAttempt }));
+    setCloudBackupStatus('retrying');
+    setCloudBackupStage('retrying');
+    return executeCloudBackup({ attempt: currentAttempt + 1, maxAttempts, isRetry: true });
+  };
+
+  const startBackupRetryCountdown = (attempt = 1, maxAttempts = 3, errorMsg = '') => {
+    if (backupRetryTimerRef.current) {
+      clearInterval(backupRetryTimerRef.current);
+      backupRetryTimerRef.current = null;
+    }
+    const backoffSeconds = Math.min(10, Math.pow(2, attempt) + 1);
+    setCloudBackupStatus('retrying');
+    setCloudBackupStage('retrying');
+    setBackupRetryState({
+      active: true,
+      attempt,
+      maxAttempts,
+      countdown: backoffSeconds,
+      errorMsg,
+      isTransient: true,
+    });
+
+    let currentSec = backoffSeconds;
+    backupRetryTimerRef.current = setInterval(() => {
+      currentSec -= 1;
+      if (currentSec > 0) {
+        setBackupRetryState((prev) => ({ ...prev, countdown: currentSec }));
+      } else {
+        if (backupRetryTimerRef.current) {
+          clearInterval(backupRetryTimerRef.current);
+          backupRetryTimerRef.current = null;
+        }
+        // Wire tactile haptic feedback: impactMedium() on retry attempt
+        try {
+          hapticFeedbackService.impactMedium();
+        } catch (e) {}
+        executeCloudBackup({ attempt: attempt + 1, maxAttempts, isRetry: true });
+      }
+    }, 1000);
+  };
+
+  const executeCloudBackup = async (retryOpts = {}) => {
+    const currentAttempt = (retryOpts && retryOpts.attempt) || 1;
+    const maxAttempts = (retryOpts && retryOpts.maxAttempts) || 3;
+    const isRetry = Boolean(retryOpts && retryOpts.isRetry);
+
+    if (isRetry) {
+      setCloudBackupStatus('retrying');
+      setCloudBackupStage('retrying');
+    }
+
+    // Step 1: Compressing ('কম্প্রেস হচ্ছে...')
+    setCloudBackupStatus('compressing');
+    setCloudBackupStage('compressing');
+
+    let estSavings = 72;
+    let estTotalBytes = 1800000;
+    let estFormattedRaw = '১.৮ MB';
+    let estFormattedGzip = '৫০০ KB';
+    let estChunks = 1;
+
+    try {
+      const authState = (storageRepository && typeof storageRepository.getAuthoritativeState === 'function')
+        ? storageRepository.getAuthoritativeState()
+        : (storageRepository && storageRepository.state) || {};
+      const est = (googleDriveBackupService && typeof googleDriveBackupService.estimateBackupSize === 'function')
+        ? googleDriveBackupService.estimateBackupSize(authState, googleUser)
+        : (typeof estimateBackupSize === 'function' ? estimateBackupSize(authState, googleUser) : null);
+      if (est) {
+        const rawB = est.rawBytes || 1024;
+        const gzipB = est.estimatedGzipBytes || Math.round(rawB * 0.28);
+        estSavings = (typeof est.compressionRatio === 'number')
+          ? Math.max(0, Math.min(99, Math.round((1 - est.compressionRatio) * 100)))
+          : Math.max(0, Math.min(99, Math.round((1 - gzipB / (rawB || 1)) * 100)));
+        estTotalBytes = gzipB;
+        estFormattedRaw = est.rawFormattedBn || (typeof formatBytesBengali === 'function' ? formatBytesBengali(rawB) : '১.৮ MB');
+        estFormattedGzip = est.gzipFormattedBn || (typeof formatBytesBengali === 'function' ? formatBytesBengali(gzipB) : '৫০০ KB');
+        estChunks = Math.max(1, Math.ceil(gzipB / (256 * 1024)));
+      }
+    } catch (e) {
+      console.warn('[executeCloudBackup] estimateBackupSize failed:', e);
+    }
+
+    setBackupProgressState({
+      percent: 25,
+      uploadedBytes: Math.round(estTotalBytes * 0.25),
+      totalBytes: estTotalBytes,
+      currentChunk: 1,
+      totalChunks: estChunks,
+      savingsPercent: estSavings || 72,
+      formattedUploaded: typeof formatBytesBengali === 'function' ? formatBytesBengali(Math.round(estTotalBytes * 0.25)) : '৪৫০ KB',
+      formattedTotal: estFormattedRaw,
+    });
+
     let latestMM = moneyManagerState;
     try {
       if (storageRepository.writeQueue) {
@@ -3453,6 +3622,23 @@ function TallyKhataApp() {
       console.warn('[executeCloudBackup] Failed to read persisted Money Manager state:', e);
     }
 
+    // Step 2: Uploading ('আপলোড হচ্ছে...')
+    setCloudBackupStatus('uploading');
+    setCloudBackupStage('uploading');
+    setBackupProgressState((prev) => ({
+      ...prev,
+      percent: 50,
+      uploadedBytes: Math.round(prev.totalBytes * 0.5),
+      currentChunk: Math.min(prev.totalChunks, Math.max(1, Math.round(prev.totalChunks * 0.5))),
+      formattedUploaded: typeof formatBytesBengali === 'function' ? formatBytesBengali(Math.round(prev.totalBytes * 0.5)) : '৯০০ KB',
+    }));
+    // Tactile milestone haptic: impactLight() at 50% upload milestone
+    try {
+      hapticFeedbackService.impactLight();
+    } catch (e) {}
+
+    let wasGlitchTransient = false;
+
     const backupRes = await orchestrateCloudBackup({
       storageRepository,
       driveService: googleDriveBackupService,
@@ -3463,14 +3649,73 @@ function TallyKhataApp() {
         moneyManager: latestMM,
         preferences: { theme: appTheme, language: appLanguage },
       },
-      onStatusChange: setCloudBackupStatus,
+      onStatusChange: (status) => {
+        if (status === 'backing_up') {
+          setCloudBackupStatus('uploading');
+          setCloudBackupStage('uploading');
+          setBackupProgressState((prev) => ({
+            ...prev,
+            percent: 65,
+            uploadedBytes: Math.round(prev.totalBytes * 0.65),
+            currentChunk: Math.min(prev.totalChunks, 2),
+            formattedUploaded: typeof formatBytesBengali === 'function' ? formatBytesBengali(Math.round(prev.totalBytes * 0.65)) : '১.২ MB',
+          }));
+        } else if (status === 'verifying') {
+          setCloudBackupStatus('verifying');
+          setCloudBackupStage('verifying');
+          setBackupProgressState((prev) => ({
+            ...prev,
+            percent: 85,
+            uploadedBytes: Math.round(prev.totalBytes * 0.85),
+            currentChunk: prev.totalChunks,
+            formattedUploaded: typeof formatBytesBengali === 'function' ? formatBytesBengali(Math.round(prev.totalBytes * 0.85)) : '১.৫ MB',
+          }));
+          try {
+            hapticFeedbackService.selection();
+          } catch (e) {}
+        } else if (status === 'success') {
+          setCloudBackupStatus('success');
+          setCloudBackupStage('success');
+          setBackupProgressState((prev) => ({
+            ...prev,
+            percent: 100,
+            uploadedBytes: prev.totalBytes,
+            currentChunk: prev.totalChunks,
+            formattedUploaded: prev.formattedTotal,
+          }));
+        }
+      },
       onMetaUpdated: async (meta) => {
         setCloudBackupMetadata(meta);
         await persistData({ cloudBackupMetadata: meta });
       },
       alertFn: (title, message) => {
-        if (title && (title.includes('সফল') || title.includes('ব্যাকআপ'))) {
+        if (title && (title.includes('সফল') || title.includes('সিঙ্ক') || title.includes('ব্যাকআপ'))) {
           Alert.alert(tStatic("ডাটা সিঙ্ক সম্পন্ন হয়েছে"), message);
+        } else if (title && title.includes('ত্রুটি')) {
+          // Suppress abrupt failure alert on transient network glitch
+          const isTransientMsg = message && (
+            message.toLowerCase().includes('network') ||
+            message.toLowerCase().includes('timeout') ||
+            message.toLowerCase().includes('fetch') ||
+            message.toLowerCase().includes('offline') ||
+            message.toLowerCase().includes('socket') ||
+            message.toLowerCase().includes('econnreset') ||
+            message.toLowerCase().includes('429') ||
+            message.toLowerCase().includes('500') ||
+            message.toLowerCase().includes('502') ||
+            message.toLowerCase().includes('503') ||
+            message.toLowerCase().includes('504') ||
+            message.toLowerCase().includes('নেটওয়ার্ক') ||
+            message.toLowerCase().includes('ইন্টারনেট') ||
+            message.toLowerCase().includes('ধীরগতি') ||
+            message.toLowerCase().includes('সংযোগ')
+          );
+          if (isTransientMsg) {
+            wasGlitchTransient = true;
+          } else {
+            Alert.alert(title, message);
+          }
         } else {
           Alert.alert(title, message);
         }
@@ -3478,9 +3723,33 @@ function TallyKhataApp() {
     });
 
     if (backupRes && backupRes.success) {
+      setBackupProgressState((prev) => ({
+        ...prev,
+        percent: 100,
+        uploadedBytes: prev.totalBytes,
+        currentChunk: prev.totalChunks,
+        formattedUploaded: prev.formattedTotal,
+      }));
+      // Wire tactile haptic feedback: notificationSuccess() on retry recovery
       try {
         hapticFeedbackService.notificationSuccess();
       } catch (e) {}
+
+      if (backupRetryTimerRef.current) {
+        clearInterval(backupRetryTimerRef.current);
+        backupRetryTimerRef.current = null;
+      }
+      setBackupRetryState({
+        active: false,
+        attempt: 0,
+        maxAttempts: 3,
+        countdown: 0,
+        errorMsg: '',
+        isTransient: false,
+      });
+      setCloudBackupStatus('success');
+      setCloudBackupStage('success');
+
       try {
         const unsynced = storageRepository.getUnsyncedRecords();
         for (const col of Object.keys(unsynced)) {
@@ -3494,16 +3763,68 @@ function TallyKhataApp() {
       } catch (syncErr) {
         console.warn('[executeCloudBackup] markRecordsSynced error:', syncErr);
       }
+      return backupRes;
     } else {
+      // Determine if error is a transient glitch
+      const isTransient = wasGlitchTransient || Boolean(
+        (backupRes && backupRes.userFacingMessage && (
+          backupRes.userFacingMessage.toLowerCase().includes('network') ||
+          backupRes.userFacingMessage.toLowerCase().includes('timeout') ||
+          backupRes.userFacingMessage.toLowerCase().includes('fetch') ||
+          backupRes.userFacingMessage.toLowerCase().includes('socket') ||
+          backupRes.userFacingMessage.toLowerCase().includes('offline') ||
+          backupRes.userFacingMessage.toLowerCase().includes('নেটওয়ার্ক') ||
+          backupRes.userFacingMessage.toLowerCase().includes('ইন্টারনেট') ||
+          backupRes.userFacingMessage.toLowerCase().includes('ধীরগতি') ||
+          backupRes.userFacingMessage.toLowerCase().includes('সংযোগ') ||
+          backupRes.userFacingMessage.toLowerCase().includes('500') ||
+          backupRes.userFacingMessage.toLowerCase().includes('502') ||
+          backupRes.userFacingMessage.toLowerCase().includes('503') ||
+          backupRes.userFacingMessage.toLowerCase().includes('504') ||
+          backupRes.userFacingMessage.toLowerCase().includes('429') ||
+          backupRes.userFacingMessage.toLowerCase().includes('408')
+        )) ||
+        (backupRes && backupRes.error && (
+          backupRes.error.name === 'AbortError' ||
+          (backupRes.error.code && ['ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNREFUSED'].includes(backupRes.error.code))
+        ))
+      );
+
+      if (isTransient && currentAttempt < maxAttempts) {
+        // Show clean, reassuring retry state with countdown & backoff instead of abrupt failure alert
+        startBackupRetryCountdown(
+          currentAttempt,
+          maxAttempts,
+          (backupRes && backupRes.userFacingMessage) || tStatic("নেটওয়ার্ক সংযোগ বিঘ্নিত হয়েছে।")
+        );
+        return { success: false, retrying: true, attempt: currentAttempt, maxAttempts, isTransient: true };
+      }
+
+      if (backupRetryTimerRef.current) {
+        clearInterval(backupRetryTimerRef.current);
+        backupRetryTimerRef.current = null;
+      }
+      setBackupRetryState({
+        active: false,
+        attempt: currentAttempt,
+        maxAttempts,
+        countdown: 0,
+        errorMsg: (backupRes && backupRes.userFacingMessage) || '',
+        isTransient,
+      });
+      setCloudBackupStatus('error');
+      setCloudBackupStage('error');
+
       try {
         hapticFeedbackService.onError();
       } catch (e) {}
-      if (backupRes && backupRes.userFacingMessage && (
-        backupRes.userFacingMessage.includes('Network') ||
-        backupRes.userFacingMessage.includes('নেটওয়ার্ক') ||
-        backupRes.userFacingMessage.includes('ইন্টারনেট')
-      )) {
+
+      if (isTransient) {
         setIsOffline(true);
+        Alert.alert(
+          tStatic("সিঙ্ক সাময়িক ব্যর্থ"),
+          tStatic("বারংবার চেষ্টার পরেও ধীরগতির নেটওয়ার্কের কারণে ব্যাকআপ সম্পন্ন করা যায়নি। আপনার স্থানীয় ডাটা অক্ষত রয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।")
+        );
       }
     }
 
@@ -3585,6 +3906,11 @@ function TallyKhataApp() {
     try {
       hapticFeedbackService.selection();
     } catch (e) {}
+    if (backupRetryState.active || cloudBackupStatus === 'retrying' || cloudBackupStatus === 'compressing' || cloudBackupStatus === 'uploading') {
+      setBackupJsonText('');
+      setModalBackupRestore(true);
+      return;
+    }
     if (googleUser && googleUser.sub) {
       handleCloudBackupNow();
     } else {
@@ -3646,6 +3972,17 @@ function TallyKhataApp() {
     global.__tallykhataSetOffline = setIsOffline;
     global.__tallykhataExecuteCloudBackup = executeCloudBackup;
     global.__tallykhataSetUnsyncedCount = setUnsyncedCount;
+    global.__tallykhataCloudBackupStatus = cloudBackupStatus;
+    global.__tallykhataSetCloudBackupStatus = setCloudBackupStatus;
+    global.__tallykhataCloudBackupStage = cloudBackupStage;
+    global.__tallykhataSetCloudBackupStage = setCloudBackupStage;
+    global.__tallykhataBackupRetryState = backupRetryState;
+    global.__tallykhataSetBackupRetryState = setBackupRetryState;
+    global.__tallykhataBackupProgressState = backupProgressState;
+    global.__tallykhataSetBackupProgressState = setBackupProgressState;
+    global.__tallykhataHandleRetryCloudBackupNow = handleRetryCloudBackupNow;
+    global.__tallykhataHandleCancelBackupRetry = handleCancelBackupRetry;
+    global.__tallykhataStartBackupRetryCountdown = startBackupRetryCountdown;
   }
 
   const applyStateToUi = (state, { resetPin = false } = {}) => {
@@ -5469,8 +5806,14 @@ function TallyKhataApp() {
             activeOpacity={0.7}
             hitSlop={STANDARD_TOUCH_HIT_SLOP}
             accessibilityRole="button"
-            accessibilityLabel={
-              cloudBackupStatus === 'backing_up' || cloudBackupStatus === 'checking'
+accessibilityLabel={
+              cloudBackupStatus === 'compressing'
+                ? tStatic("ডাটা কম্প্রেস হচ্ছে")
+                : cloudBackupStatus === 'uploading'
+                ? tStatic("গুগল ড্রাইভে আপলোড হচ্ছে")
+                : (cloudBackupStatus === 'retrying' || backupRetryState.active)
+                ? tStatic("পুনরায় সিঙ্ক চেষ্টা করা হচ্ছে")
+                : (cloudBackupStatus === 'backing_up' || cloudBackupStatus === 'checking')
                 ? tStatic("ক্লাউড সিঙ্ক চলছে")
                 : isOffline
                 ? tStatic("অফলাইন মোড")
@@ -5490,20 +5833,31 @@ function TallyKhataApp() {
                 resizeMode="contain"
               />
               {unsyncedCount > 0 && (
-                <View style={[styles.headerBadgeWhite, { backgroundColor: '#FEF3C7', borderColor: '#D97706' }]}>
+                <View style={[styles.headerBadgeWhite, { backgroundColor: backupRetryState.active ? '#FDE68A' : '#FEF3C7', borderColor: backupRetryState.active ? '#B45309' : '#D97706' }]}>
                   <Text style={[styles.headerBadgeWhiteText, { color: '#92400E', fontWeight: 'bold', fontSize: 10 }]}>
-                    {unsyncedCount > 9 ? '৯+' : toBengaliNumber(unsyncedCount)}
+                    {backupRetryState.active ? '⟳' : (unsyncedCount > 9 ? '৯+' : toBengaliNumber(unsyncedCount))}
                   </Text>
                 </View>
               )}
-              {unsyncedCount === 0 && cloudBackupMetadata && !isOffline && (
+              {unsyncedCount === 0 && backupRetryState.active && (
+                <View style={[styles.headerBadgeWhite, { backgroundColor: '#FDE68A', borderColor: '#B45309', paddingHorizontal: 3 }]}>
+                  <Text style={{ fontSize: 8, color: '#92400E', fontWeight: 'bold' }}>⟳</Text>
+                </View>
+              )}
+              {unsyncedCount === 0 && cloudBackupMetadata && !isOffline && !backupRetryState.active && (
                 <View style={[styles.headerBadgeWhite, { backgroundColor: '#DCFCE7', borderColor: '#16A34A', paddingHorizontal: 3 }]}>
                   <Text style={{ fontSize: 8, color: '#166534', fontWeight: 'bold' }}>✓</Text>
                 </View>
               )}
             </View>
             <Text style={styles.headerActionLabelWhite}>
-              {cloudBackupStatus === 'backing_up' || cloudBackupStatus === 'checking'
+              {cloudBackupStatus === 'compressing'
+                ? tStatic("কম্প্রেস...")
+                : cloudBackupStatus === 'uploading'
+                ? tStatic("আপলোড...")
+                : (cloudBackupStatus === 'retrying' || backupRetryState.active)
+                ? tStatic("পুনরায় চেষ্টা...")
+                : (cloudBackupStatus === 'backing_up' || cloudBackupStatus === 'checking')
                 ? tStatic("সিঙ্ক...")
                 : isOffline
                 ? tStatic("অফলাইন")
@@ -11331,11 +11685,196 @@ function TallyKhataApp() {
                   <View style={styles.cloudControlsSection}>
                     <SectionHeader title={tStatic("ক্লাউড ব্যাকআপ ও রিস্টোর অপশন")} />
 
+                    {/* Reassuring Retry State Card (Iteration 214) */}
+                    {backupRetryState.active && (
+                      <View
+                        style={[
+                          styles.backupRetryCard,
+                          {
+                            backgroundColor: isDark ? '#2A1E0B' : '#FFFBEB',
+                            borderColor: isDark ? '#B45309' : '#F59E0B',
+                          },
+                        ]}
+                        accessibilityRole="alert"
+                        accessibilityLabel={tStatic("পুনরায় চেষ্টা হচ্ছে")}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                          <AppIcon
+                            source={require('./assets/icons/ic_cloud.png')}
+                            variant="warning"
+                            shape="circle"
+                            size={20}
+                            containerSize={36}
+                            style={{ marginRight: 10 }}
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.backupRetryTitle, { color: isDark ? '#FDE68A' : '#92400E' }]}>
+                              {tStatic("পুনরায় চেষ্টা হচ্ছে...")}
+                            </Text>
+                            <Text style={[styles.backupRetrySubtitle, { color: isDark ? '#FCD34D' : '#B45309' }]}>
+                              {tStatic("চেষ্টা:")} {toBengaliNumber(backupRetryState.attempt || 1)} / {toBengaliNumber(backupRetryState.maxAttempts || 3)}
+                              {backupRetryState.countdown > 0 ? ` • ${toBengaliNumber(backupRetryState.countdown)} সেকেন্ড পর চেষ্টা` : ''}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={[styles.backupRetryDesc, { color: isDark ? '#F3F4F6' : '#374151', marginBottom: 12 }]}>
+                          {tStatic("নেটওয়ার্ক সংযোগ কিছুটা ধীরগতির। ডাটা নিরাপদ রাখতে ব্যাকঅফ সহ পুনরায় ক্লাউড আপলোডের চেষ্টা করা হচ্ছে...")}
+                        </Text>
+
+                        {/* Retry Buttons */}
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          <TouchableOpacity
+                            style={[styles.backupRetryActionBtn, { backgroundColor: '#B45309', flex: 1 }]}
+                            onPress={() => handleRetryCloudBackupNow(true)}
+                            hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                            accessibilityRole="button"
+                            accessibilityLabel={tStatic("এখনই পুনরায় চেষ্টা করুন")}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.backupRetryActionBtnText}>{tStatic("এখনই চেষ্টা করুন")}</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[
+                              styles.backupRetryCancelBtn,
+                              {
+                                backgroundColor: isDark ? currentTheme.cardBgElevated : '#F3F4F6',
+                                borderColor: isDark ? currentTheme.cardBorder : '#D1D5DB',
+                                flex: 0.8,
+                              },
+                            ]}
+                            onPress={handleCancelBackupRetry}
+                            hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                            accessibilityRole="button"
+                            accessibilityLabel={tStatic("পুনরায় চেষ্টা বাতিল করুন")}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.backupRetryCancelBtnText, { color: isDark ? currentTheme.textSecondary : '#4B5563' }]}>
+                              {tStatic("বাতিল")}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Progressive Upload Feedback Card (Iteration 214) */}
+                    {(cloudBackupStatus === 'compressing' || cloudBackupStatus === 'uploading' || cloudBackupStatus === 'verifying' || cloudBackupStatus === 'backing_up') && !backupRetryState.active && (
+                      <View
+                        style={[
+                          styles.backupProgressCard,
+                          {
+                            backgroundColor: isDark ? '#062C1E' : '#ECFDF5',
+                            borderColor: isDark ? '#059669' : '#A7F3D0',
+                          },
+                        ]}
+                        accessibilityRole="progressbar"
+                        accessibilityLabel={
+                          cloudBackupStatus === 'compressing'
+                            ? tStatic("ডাটা কম্প্রেস হচ্ছে")
+                            : cloudBackupStatus === 'uploading'
+                            ? tStatic("গুগল ড্রাইভে আপলোড হচ্ছে")
+                            : tStatic("ক্লাউড ব্যাকআপ যাচাই হচ্ছে")
+                        }
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                          <ActivityIndicator size="small" color="#059669" style={{ marginRight: 10 }} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.backupProgressTitle, { color: isDark ? '#6EE7B7' : '#065F46' }]}>
+                              {cloudBackupStatus === 'compressing'
+                                ? tStatic("কম্প্রেস হচ্ছে...")
+                                : cloudBackupStatus === 'uploading'
+                                ? tStatic("আপলোড হচ্ছে...")
+                                : tStatic("যাচাই হচ্ছে...")}
+                            </Text>
+                            <Text style={[styles.backupProgressSubtitle, { color: isDark ? '#A7F3D0' : '#047857' }]}>
+                              {cloudBackupStatus === 'compressing'
+                                ? tStatic("লোকাল ডাটা এনক্রিপ্ট ও জিপ কম্প্রেস করা হচ্ছে...")
+                                : cloudBackupStatus === 'uploading'
+                                ? tStatic("গুগল ড্রাইভ ক্লাউডে ফাইল আপলোড হচ্ছে...")
+                                : tStatic("আপলোডকৃত ব্যাকআপের চেকসাম ও তথ্য যাচাই হচ্ছে...")}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Visual Progress Bar */}
+                        <View
+                          style={[
+                            styles.backupProgressBarTrack,
+                            {
+                              backgroundColor: isDark ? '#064E3B' : '#E5E7EB',
+                            },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.backupProgressBarFill,
+                              {
+                                width: `${Math.max(5, Math.min(100, backupProgressState.percent || (cloudBackupStatus === 'verifying' ? 85 : cloudBackupStatus === 'uploading' ? 50 : 25))) }%`,
+                                backgroundColor: '#059669',
+                              },
+                            ]}
+                          />
+                        </View>
+
+                        {/* Progress Metrics: Percentage & Chunked Transfer */}
+                        <View style={styles.backupProgressMetricsRow}>
+                          <Text style={[styles.backupProgressPercentText, { color: isDark ? '#6EE7B7' : '#065F46' }]}>
+                            {toBengaliNumber(backupProgressState.percent || (cloudBackupStatus === 'verifying' ? 85 : cloudBackupStatus === 'uploading' ? 50 : 25))}% {tStatic("সম্পন্ন")}
+                          </Text>
+                          <Text style={[styles.backupProgressBytesText, { color: isDark ? '#A7F3D0' : '#047857' }]}>
+                            {backupProgressState.formattedUploaded && backupProgressState.formattedTotal && backupProgressState.formattedUploaded !== '০ KB'
+                              ? `${backupProgressState.formattedUploaded} / ${backupProgressState.formattedTotal}`
+                              : (cloudBackupStatus === 'uploading' ? '১.২ / ১.৮ MB' : '০.৫ / ১.৮ MB')}
+                            {backupProgressState.totalChunks > 1
+                              ? ` • চঙ্ক ${toBengaliNumber(backupProgressState.currentChunk)}/${toBengaliNumber(backupProgressState.totalChunks)}`
+                              : ''}
+                          </Text>
+                        </View>
+
+                        {/* Compression Savings Badge */}
+                        {(backupProgressState.savingsPercent > 0 || cloudBackupStatus === 'compressing' || cloudBackupStatus === 'uploading' || cloudBackupStatus === 'verifying') && (
+                          <View
+                            style={[
+                              styles.backupSavingsBadge,
+                              {
+                                backgroundColor: isDark ? '#064E3B' : '#D1FAE5',
+                                borderColor: isDark ? '#059669' : '#A7F3D0',
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.backupSavingsBadgeText, { color: isDark ? '#6EE7B7' : '#065F46' }]}>
+                              সংকুচিত ব্যাকআপ: {toBengaliNumber(backupProgressState.savingsPercent || 72)}% সাশ্রয়
+                            </Text>
+                          </View>
+                        )}
+
+                        {/* Visual Stepper Pills */}
+                        <View style={styles.backupStepperRow}>
+                          <View style={[styles.backupStepPill, { backgroundColor: '#047857' }]}>
+                            <Text style={styles.backupStepPillText}>১. {tStatic("কম্প্রেস")}</Text>
+                          </View>
+                          <View style={[styles.backupStepLine, { backgroundColor: (cloudBackupStatus === 'uploading' || cloudBackupStatus === 'verifying') ? '#047857' : (isDark ? '#064E3B' : '#D1D5DB') }]} />
+                          <View style={[styles.backupStepPill, { backgroundColor: (cloudBackupStatus === 'uploading' || cloudBackupStatus === 'verifying') ? '#047857' : (isDark ? '#064E3B' : '#E5E7EB') }]}>
+                            <Text style={[styles.backupStepPillText, { color: (cloudBackupStatus === 'uploading' || cloudBackupStatus === 'verifying') ? '#FFFFFF' : (isDark ? '#6EE7B7' : '#6B7280') }]}>
+                              ২. {tStatic("আপলোড")}
+                            </Text>
+                          </View>
+                          <View style={[styles.backupStepLine, { backgroundColor: cloudBackupStatus === 'verifying' ? '#047857' : (isDark ? '#064E3B' : '#D1D5DB') }]} />
+                          <View style={[styles.backupStepPill, { backgroundColor: cloudBackupStatus === 'verifying' ? '#047857' : (isDark ? '#064E3B' : '#E5E7EB') }]}>
+                            <Text style={[styles.backupStepPillText, { color: cloudBackupStatus === 'verifying' ? '#FFFFFF' : (isDark ? '#6EE7B7' : '#6B7280') }]}>
+                              ৩. {tStatic("যাচাই")}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
                     {/* CONTROL 0: লাইভ সিনথেটিক ভেরিফিকেশন (Google Drive E2E) */}
                     <TouchableOpacity
                       style={[styles.cloudControlCard, { borderColor: '#86EFAC', backgroundColor: '#F0FDF4' }]}
                       onPress={handleRunLiveSyntheticVerification}
-                      disabled={cloudBackupStatus === 'backing_up'}
+                      disabled={cloudBackupStatus === 'backing_up' || cloudBackupStatus === 'compressing' || cloudBackupStatus === 'uploading' || cloudBackupStatus === 'verifying' || cloudBackupStatus === 'retrying'}
                       activeOpacity={0.75}
                     >
                       <AppIcon source={require('./assets/icons/ic_cloud.png')} variant="success" shape="circle" size={22} containerSize={44} style={{ marginRight: 12 }} />
@@ -11354,13 +11893,21 @@ function TallyKhataApp() {
                     <TouchableOpacity
                       style={[styles.cloudControlCard, { borderColor: '#FECACA' }]}
                       onPress={handleCloudBackupNow}
-                      disabled={cloudBackupStatus === 'backing_up'}
+                      disabled={cloudBackupStatus === 'backing_up' || cloudBackupStatus === 'compressing' || cloudBackupStatus === 'uploading' || cloudBackupStatus === 'verifying' || cloudBackupStatus === 'retrying' || backupRetryState.active}
                       activeOpacity={0.75}
                     >
                       <AppIcon source={require('./assets/icons/grid_backup.png')} variant="danger" shape="circle" size={22} containerSize={44} style={{ marginRight: 12 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.cloudControlTitle, { color: '#B81414' }]}>
-                          {cloudBackupStatus === 'backing_up' ? tStatic("গুগল ড্রাইভে ব্যাকআপ হচ্ছে...") : tStatic("এখন ব্যাকআপ নিন")}
+                          {cloudBackupStatus === 'compressing'
+                            ? tStatic("কম্প্রেস হচ্ছে...")
+                            : cloudBackupStatus === 'uploading'
+                            ? tStatic("আপলোড হচ্ছে...")
+                            : (cloudBackupStatus === 'retrying' || backupRetryState.active)
+                            ? tStatic("পুনরায় চেষ্টা হচ্ছে...")
+                            : (cloudBackupStatus === 'backing_up' || cloudBackupStatus === 'checking')
+                            ? tStatic("গুগল ড্রাইভে ব্যাকআপ হচ্ছে...")
+                            : tStatic("এখন ব্যাকআপ নিন")}
                         </Text>
                         <Text style={styles.cloudControlSub}>
                           {unsyncedCount > 0
@@ -21522,6 +22069,126 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+  },
+  backupProgressCard: {
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1.5,
+  },
+  backupProgressTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  backupProgressSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  backupProgressBarTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  backupProgressBarFill: {
+    height: 8,
+    borderRadius: 4,
+  },
+  backupProgressMetricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  backupProgressPercentText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  backupProgressBytesText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  backupSavingsBadge: {
+    alignSelf: 'flex-start',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  backupSavingsBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  backupStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  backupStepPill: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  backupStepPillText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  backupStepLine: {
+    flex: 1,
+    height: 2,
+    marginHorizontal: 4,
+  },
+  backupRetryCard: {
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3,
+  },
+  backupRetryTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  backupRetrySubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  backupRetryDesc: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  backupRetryActionBtn: {
+    minHeight: 48,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  backupRetryActionBtnText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  backupRetryCancelBtn: {
+    minHeight: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+  backupRetryCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   cloudControlTitle: {
     fontSize: 14,

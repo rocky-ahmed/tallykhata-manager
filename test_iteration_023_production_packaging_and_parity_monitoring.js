@@ -1,4 +1,4 @@
-/**
+﻿/**
  * test_iteration_023_production_packaging_and_parity_monitoring.js
  * Continuous Verification Suite for Iteration 023: Production Packaging & Parity Monitoring
  *
@@ -106,8 +106,8 @@ function createMockAdapter(initialData = null) {
 
     const bnKeys = Object.keys(STRINGS.bn);
     const enKeys = Object.keys(STRINGS.en);
-    assert.strictEqual(bnKeys.length, 680, "Bengali dictionary must contain exactly 680 keys");
-    assert.strictEqual(enKeys.length, 680, "English dictionary must contain exactly 680 keys");
+    assert.strictEqual(bnKeys.length, enKeys.length, "Bengali and English dictionaries must maintain exact key parity");
+    assert.ok(bnKeys.length >= 680, "Dictionary must contain at least 680 keys");
 
     const missingInEn = bnKeys.filter(k => !(k in STRINGS.en));
     const missingInBn = enKeys.filter(k => !(k in STRINGS.bn));

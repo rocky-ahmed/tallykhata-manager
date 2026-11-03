@@ -1,4 +1,4 @@
-/**
+﻿/**
  * src/i18nService.js
  * App-wide Localization Service for TallyKhata (Bangla & English).
  * Ensures full coverage for all screens, navigation, quick actions, settings,
@@ -744,6 +744,23 @@ const STRINGS = {
     mm_error_goal_saved_funds: "লক্ষ্যে পর্যাপ্ত জমা নেই",
     mm_error_schedule_title: "শিডিউলের নাম লিখুন",
     mm_error_schedule_missing: "শিডিউল পাওয়া যায়নি",
+    // Iteration 214: UI Upload Progress, Chunked Transfer, Compression & Retry States
+    backup_stage_compressing: 'কম্প্রেস হচ্ছে...',
+    backup_stage_uploading: 'আপলোড হচ্ছে...',
+    backup_stage_verifying: 'যাচাই হচ্ছে...',
+    backup_stage_retrying: 'পুনরায় চেষ্টা হচ্ছে...',
+    backup_step_compress: 'কম্প্রেস',
+    backup_step_upload: 'আপলোড',
+    backup_step_verify: 'যাচাই',
+    backup_progress_completed: 'সম্পন্ন',
+    backup_chunk_indicator: 'চঙ্ক {current}/{total}',
+    backup_compression_savings: 'সংকুচিত ব্যাকআপ: {savings}% সাশ্রয়',
+    backup_retry_title: 'পুনরায় চেষ্টা হচ্ছে...',
+    backup_retry_attempt: 'চেষ্টা: {attempt} / {max}',
+    backup_retry_countdown: '{seconds} সেকেন্ডের মধ্যে পুনরায় চেষ্টা করা হবে...',
+    backup_retry_now: 'এখনই চেষ্টা করুন',
+    backup_retry_cancel: 'বাতিল',
+    backup_transient_glitch_msg: 'নেটওয়ার্ক সংযোগ কিছুটা ধীরগতির। ডাটা নিরাপদ রাখতে ব্যাকঅফ সহ পুনরায় ক্লাউড আপলোডের চেষ্টা করা হচ্ছে...',
   },
   en: {
     header_inbox: 'Inbox',
@@ -1447,6 +1464,23 @@ const STRINGS = {
     mm_error_goal_saved_funds: "The goal does not have enough saved funds",
     mm_error_schedule_title: "Enter a schedule name",
     mm_error_schedule_missing: "Schedule not found",
+    // Iteration 214: UI Upload Progress, Chunked Transfer, Compression & Retry States
+    backup_stage_compressing: 'Compressing...',
+    backup_stage_uploading: 'Uploading...',
+    backup_stage_verifying: 'Verifying...',
+    backup_stage_retrying: 'Retrying...',
+    backup_step_compress: 'Compress',
+    backup_step_upload: 'Upload',
+    backup_step_verify: 'Verify',
+    backup_progress_completed: 'completed',
+    backup_chunk_indicator: 'Chunk {current}/{total}',
+    backup_compression_savings: 'Compressed backup: {savings}% saved',
+    backup_retry_title: 'Reconnecting & Retrying...',
+    backup_retry_attempt: 'Attempt: {attempt} / {max}',
+    backup_retry_countdown: 'Retrying in {seconds} seconds...',
+    backup_retry_now: 'Retry Now',
+    backup_retry_cancel: 'Cancel',
+    backup_transient_glitch_msg: 'Network connection is slow. Retrying cloud backup automatically with backoff...',
   },
 };
 
@@ -2546,6 +2580,23 @@ const APP_STATIC_TEXT_EN = {
   'এখনো সিঙ্ক হয়নি': 'Not synced yet',
   'এখনই ক্লাউডে সিঙ্ক করুন': 'Sync to cloud now',
   'গুগল ড্রাইভে ডাটা সুরক্ষিত রাখুন': 'Keep data secure on Google Drive',
+  'নেটওয়ার্ক সংযোগ বিঘ্নিত হয়েছে।': 'Network connection interrupted.',
+  'সিঙ্ক সাময়িক ব্যর্থ': 'Sync temporarily failed',
+  'বারংবার চেষ্টার পরেও ধীরগতির নেটওয়ার্কের কারণে ব্যাকআপ সম্পন্ন করা যায়নি। আপনার স্থানীয় ডাটা অক্ষত রয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।': 'Could not complete backup due to a slow network despite multiple attempts. Your local data remains intact. Please try again in a few moments.',
+  'ডাটা কম্প্রেস হচ্ছে': 'Compressing data',
+  'গুগল ড্রাইভে আপলোড হচ্ছে': 'Uploading to Google Drive',
+  'পুনরায় সিঙ্ক চেষ্টা করা হচ্ছে': 'Retrying sync attempt',
+  'কম্প্রেস...': 'Compressing...',
+  'আপলোড...': 'Uploading...',
+  'পুনরায় চেষ্টা...': 'Retrying...',
+  'পুনরায় চেষ্টা হচ্ছে': 'Retrying attempt',
+  'চেষ্টা:': 'Attempt:',
+  'এখনই পুনরায় চেষ্টা করুন': 'Retry now',
+  'পুনরায় চেষ্টা বাতিল করুন': 'Cancel retry',
+  'ক্লাউড ব্যাকআপ যাচাই হচ্ছে': 'Verifying cloud backup',
+  'লোকাল ডাটা এনক্রিপ্ট ও জিপ কম্প্রেস করা হচ্ছে...': 'Encrypting and zip compressing local data...',
+  'গুগল ড্রাইভ ক্লাউডে ফাইল আপলোড হচ্ছে...': 'Uploading file to Google Drive cloud...',
+  'আপলোডকৃত ব্যাকআপের চেকসাম ও তথ্য যাচাই হচ্ছে...': 'Verifying uploaded backup checksum and details...',
 };
 
 const STATIC_DICTIONARY_EN = Object.keys(STRINGS.bn).reduce((map, key) => {

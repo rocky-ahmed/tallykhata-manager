@@ -1,4 +1,4 @@
-# REA RECONSTRUCTION — FEATURE PARITY MATRIX
+﻿# REA RECONSTRUCTION — FEATURE PARITY MATRIX
 **Reference Target:** `TallyKhata-Demo.apk` (`REF-001`)  
 **Maintained by:** Main Engineering Orchestrator  
 **Last Updated:** 2026-11-02  

@@ -305,6 +305,150 @@ function recordsDiffer(recA, recB) {
   return false;
 }
 
+/**
+ * Universal Compression Detection and Decompression for StorageRepository (REA-ITER-214)
+ */
+function isStoragePayloadCompressed(payload) {
+  if (!payload) return false;
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(payload)) {
+    if (payload.length >= 2 && payload[0] === 0x1f && payload[1] === 0x8b) return true;
+    if (payload.length >= 2 && payload[0] === 0x78) return true;
+    return false;
+  }
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (trimmed.startsWith('H4sI')) return true;
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return isStoragePayloadCompressed(parsed);
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  }
+  if (typeof payload === 'object') {
+    if (payload.compressed === true) return true;
+    if (payload.compression === 'gzip' || payload.compression === 'deflate') return true;
+    if (payload.compressionAlgorithm === 'gzip' || payload.compressionAlgorithm === 'deflate') return true;
+    if (Boolean(payload.compressedData)) return true;
+    if (payload.manifest && (
+      payload.manifest.compressed === true ||
+      payload.manifest.compression === 'gzip' ||
+      payload.manifest.compression === 'deflate' ||
+      payload.manifest.compressionAlgorithm === 'gzip' ||
+      payload.manifest.compressionAlgorithm === 'deflate'
+    )) {
+      return true;
+    }
+    if (typeof payload.data === 'string' && payload.data.startsWith('H4sI')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function decompressStoragePayload(payload) {
+  if (!payload) return payload;
+  let zlib = null;
+  if (typeof require !== 'undefined') {
+    try {
+      zlib = require('zlib');
+    } catch (_) {
+      zlib = null;
+    }
+  }
+  if (!zlib) return payload;
+
+  // Case 1: Buffer
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(payload)) {
+    try {
+      const isDeflate = payload.length >= 2 && payload[0] === 0x78;
+      const decompStr = isDeflate ? zlib.inflateSync(payload).toString('utf8') : zlib.gunzipSync(payload).toString('utf8');
+      const parsed = JSON.parse(decompStr);
+      return decompressStoragePayload(parsed);
+    } catch (e) {
+      return payload;
+    }
+  }
+
+  // Case 2: String
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (trimmed.startsWith('H4sI')) {
+      try {
+        const buf = Buffer.from(trimmed, 'base64');
+        const decompStr = zlib.gunzipSync(buf).toString('utf8');
+        const parsed = JSON.parse(decompStr);
+        return decompressStoragePayload(parsed);
+      } catch (e) {
+        return payload;
+      }
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      return decompressStoragePayload(parsed);
+    } catch (_) {
+      return payload;
+    }
+  }
+
+  // Case 3: Object with compressedData
+  if (typeof payload === 'object') {
+    if (payload.compressedData) {
+      try {
+        const buf = (typeof Buffer !== 'undefined' && Buffer.isBuffer(payload.compressedData))
+          ? payload.compressedData
+          : Buffer.from(payload.compressedData, 'base64');
+        const isDeflate = payload.compression === 'deflate' || payload.compressionAlgorithm === 'deflate';
+        const decompStr = isDeflate ? zlib.inflateSync(buf).toString('utf8') : zlib.gunzipSync(buf).toString('utf8');
+        const dataObj = JSON.parse(decompStr);
+        return {
+          ...payload,
+          compressed: false,
+          compression: 'none',
+          compressionAlgorithm: 'none',
+          manifest: payload.manifest ? {
+            ...payload.manifest,
+            compressed: false,
+            compression: 'none',
+            compressionAlgorithm: 'none',
+          } : undefined,
+          data: dataObj,
+        };
+      } catch (e) {
+        return payload;
+      }
+    }
+
+    if (payload.data && typeof payload.data === 'string' && payload.data.startsWith('H4sI')) {
+      try {
+        const buf = Buffer.from(payload.data, 'base64');
+        const decompStr = zlib.gunzipSync(buf).toString('utf8');
+        const dataObj = JSON.parse(decompStr);
+        return {
+          ...payload,
+          compressed: false,
+          compression: 'none',
+          compressionAlgorithm: 'none',
+          manifest: payload.manifest ? {
+            ...payload.manifest,
+            compressed: false,
+            compression: 'none',
+            compressionAlgorithm: 'none',
+          } : undefined,
+          data: dataObj,
+        };
+      } catch (e) {
+        return payload;
+      }
+    }
+  }
+
+  return payload;
+}
+
 class StorageRepository {
   constructor(storageAdapter = null) {
     this.adapter = storageAdapter || this.createInMemoryAdapter();
@@ -1599,6 +1743,9 @@ class StorageRepository {
   }
 
   async commitRestorePayload(backupPayload, options = {}) {
+    if (isStoragePayloadCompressed(backupPayload)) {
+      backupPayload = decompressStoragePayload(backupPayload);
+    }
     if (!backupPayload || typeof backupPayload !== 'object') {
       throw new Error('Invalid restore payload: payload must be an object');
     }
@@ -1910,6 +2057,95 @@ class StorageRepository {
     } catch (_) {}
   }
 
+  async exportCompressedBackup(extraState = {}, options = {}) {
+    const backup = await this.createStorageBackup(extraState, options);
+    let zlib = null;
+    if (typeof require !== 'undefined') {
+      try {
+        zlib = require('zlib');
+      } catch (_) {
+        zlib = null;
+      }
+    }
+    if (!zlib) {
+      return {
+        ...backup,
+        compressed: false,
+        compression: 'none',
+      };
+    }
+
+    const rawJson = JSON.stringify(backup.data);
+    const uncompressedBytes = Buffer.byteLength(rawJson, 'utf8');
+    const compressedBuf = zlib.gzipSync(Buffer.from(rawJson, 'utf8'));
+    const compressedBytes = compressedBuf.length;
+    const compressedData = compressedBuf.toString('base64');
+    const compressionRatio = uncompressedBytes > 0
+      ? Math.round((1 - compressedBytes / uncompressedBytes) * 100)
+      : 0;
+
+    const manifest = {
+      ...backup.manifest,
+      compressed: true,
+      compression: 'gzip',
+      compressionAlgorithm: 'gzip',
+      uncompressedBytes,
+      compressedBytes,
+      compressionRatio,
+    };
+
+    const compressedPayload = {
+      version: backup.version,
+      formatVersion: backup.formatVersion,
+      createdAt: backup.createdAt,
+      checksum: backup.checksum,
+      compressed: true,
+      compression: 'gzip',
+      compressionAlgorithm: 'gzip',
+      manifest,
+      compressedData,
+      uncompressedBytes,
+      compressedBytes,
+      compressionRatio,
+    };
+
+    // Define non-enumerable lazy getter for data for backward compatibility
+    Object.defineProperty(compressedPayload, 'data', {
+      get() {
+        try {
+          const decomp = zlib.gunzipSync(Buffer.from(this.compressedData, 'base64')).toString('utf8');
+          return JSON.parse(decomp);
+        } catch (_) {
+          return backup.data;
+        }
+      },
+      enumerable: false,
+      configurable: true,
+    });
+
+    if (options && options.asBuffer) {
+      return zlib.gzipSync(Buffer.from(JSON.stringify(compressedPayload), 'utf8'));
+    }
+    if (options && options.asString) {
+      return JSON.stringify(compressedPayload);
+    }
+
+    return compressedPayload;
+  }
+
+  async importCompressedBackup(compressedPayload, options = {}) {
+    if (this.writeQueue) {
+      try {
+        await Promise.resolve(this.writeQueue).catch(() => {});
+      } catch (_) {}
+    }
+    let payload = compressedPayload;
+    if (isStoragePayloadCompressed(payload)) {
+      payload = decompressStoragePayload(payload);
+    }
+    return await this.restoreStorageBackup(payload, options);
+  }
+
   async createStorageBackup(extraState = {}, options = {}) {
     const fullState = await this.getFullBackupState(extraState);
     const checksum = this.computeChecksum(fullState);
@@ -1944,6 +2180,9 @@ class StorageRepository {
   }
 
   async restoreStorageBackup(backupPayload, options = {}) {
+    if (isStoragePayloadCompressed(backupPayload)) {
+      backupPayload = decompressStoragePayload(backupPayload);
+    }
     if (!backupPayload || typeof backupPayload !== 'object') {
       throw new Error('Invalid restore payload: payload must be an object');
     }
@@ -3826,6 +4065,20 @@ function generateAccountStatementRepo(accountOrId, journalsOrBizId, dateRange = 
   return generateAccountStatement(accountOrId, journalsOrBizId, dateRange, options);
 }
 
+async function exportCompressedBackupRepo(extraState = {}, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.exportCompressedBackup === 'function') {
+    return repo.exportCompressedBackup(extraState, options);
+  }
+  return null;
+}
+
+async function importCompressedBackupRepo(compressedPayload, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.importCompressedBackup === 'function') {
+    return repo.importCompressedBackup(compressedPayload, options);
+  }
+  return null;
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -3866,6 +4119,10 @@ const repoExport = {
   paginateConsolidatedReportDocument: paginateConsolidatedReportDocumentRepo,
   generatePdfShareIntentPayload: generatePdfShareIntentPayloadRepo,
   simulateSyncBatch: simulateSyncBatchRepo,
+  exportCompressedBackup: exportCompressedBackupRepo,
+  importCompressedBackup: importCompressedBackupRepo,
+  isStoragePayloadCompressed,
+  decompressStoragePayload,
   extractRecordTimestamp,
   recordsDiffer,
   TelemetryService,
@@ -3918,6 +4175,10 @@ if (typeof exports !== 'undefined') {
   exports.paginateConsolidatedReportDocument = paginateConsolidatedReportDocumentRepo;
   exports.generatePdfShareIntentPayload = generatePdfShareIntentPayloadRepo;
   exports.simulateSyncBatch = simulateSyncBatchRepo;
+  exports.exportCompressedBackup = exportCompressedBackupRepo;
+  exports.importCompressedBackup = importCompressedBackupRepo;
+  exports.isStoragePayloadCompressed = isStoragePayloadCompressed;
+  exports.decompressStoragePayload = decompressStoragePayload;
   exports.extractRecordTimestamp = extractRecordTimestamp;
   exports.recordsDiffer = recordsDiffer;
   exports.TelemetryService = TelemetryService;
