@@ -111,6 +111,20 @@ const {
   pinSecurityEngine: TP_pinSecurityEngine = tallyPayModule.pinSecurityEngine,
   TallyPaySecurityManager: TP_TallyPaySecurityManager = tallyPayModule.TallyPaySecurityManager,
   tallyPaySecurityManager: TP_tallyPaySecurityManager = tallyPayModule.tallyPaySecurityManager,
+  // Milestone REA-ITER-232: Linked Bank Accounts & MFS Account Manager
+  ACCOUNT_STATUSES: TP_ACCOUNT_STATUSES = tallyPayModule.ACCOUNT_STATUSES,
+  ACCOUNT_TYPES: TP_ACCOUNT_TYPES = tallyPayModule.ACCOUNT_TYPES,
+  MFS_OPERATORS: TP_MFS_OPERATORS = tallyPayModule.MFS_OPERATORS,
+  BANGLADESH_SCHEDULED_BANKS: TP_BANGLADESH_SCHEDULED_BANKS = tallyPayModule.BANGLADESH_SCHEDULED_BANKS,
+  getScheduledBankList: tpGetScheduledBankList = tallyPayModule.getScheduledBankList,
+  getScheduledBankByCode: tpGetScheduledBankByCode = tallyPayModule.getScheduledBankByCode,
+  ACCOUNT_MANAGER_ARSC_TOKENS: TP_ACCOUNT_MANAGER_ARSC_TOKENS = tallyPayModule.ACCOUNT_MANAGER_ARSC_TOKENS,
+  ReconstructedLinkedAccountEngine: TP_ReconstructedLinkedAccountEngine = tallyPayModule.ReconstructedLinkedAccountEngine,
+  LinkedAccountEngine: TP_LinkedAccountEngine = tallyPayModule.LinkedAccountEngine,
+  linkedAccountEngine: tpLinkedAccountEngine = tallyPayModule.linkedAccountEngine,
+  TallyPayAccountManager: TP_TallyPayAccountManager = tallyPayModule.TallyPayAccountManager,
+  BankAccountManager: TP_BankAccountManager = tallyPayModule.BankAccountManager,
+  tallyPayAccountManager: TP_tallyPayAccountManager = tallyPayModule.tallyPayAccountManager,
 } = tallyPayModule;
 import * as soundboxModule from './src/soundboxService';
 const soundboxService = soundboxModule.soundboxService || soundboxModule.default || soundboxModule;
@@ -1198,6 +1212,23 @@ function TallyKhataApp() {
   // --- ITERATION 231: TALLYPAY SECURITY PIN, BIOMETRICS & DEVICE BINDING ---
   const [modalTpChangePin, setModalTpChangePin] = useState(false);
   const [modalResetPin, setModalResetPin] = useState(false);
+  // --- ITERATION 232: TALLYPAY LINKED BANK ACCOUNTS & MFS ACCOUNT MANAGER ---
+  const [modalLinkedAccountsManager, setModalLinkedAccountsManager] = useState(false);
+  const [modalAddNewBankAccount, setModalAddNewBankAccount] = useState(false);
+  const [modalLinkMfsAccount, setModalLinkMfsAccount] = useState(false);
+  const [linkedAccountTab, setLinkedAccountTab] = useState('ALL'); // 'ALL' | 'BANK' | 'MFS'
+  const [newLinkedBankCode, setNewLinkedBankCode] = useState('085');
+  const [newLinkedBankBranch, setNewLinkedBankBranch] = useState('Gulshan Head Office');
+  const [newLinkedBankRouting, setNewLinkedBankRouting] = useState('060261742');
+  const [newLinkedBankAccNum, setNewLinkedBankAccNum] = useState('');
+  const [newLinkedBankHolder, setNewLinkedBankHolder] = useState('');
+  const [newLinkedBankAccountType, setNewLinkedBankAccountType] = useState('SAVINGS');
+  const [selectedMfsOperator, setSelectedMfsOperator] = useState('BKASH');
+  const [newLinkedMfsMobile, setNewLinkedMfsMobile] = useState('');
+  const [newLinkedMfsHolderName, setNewLinkedMfsHolderName] = useState('');
+  const [newLinkedMfsOtp, setNewLinkedMfsOtp] = useState('');
+  const [linkedBankDepositInput, setLinkedBankDepositInput] = useState('');
+  const [selectedBankToVerify, setSelectedBankToVerify] = useState(null);
   const [pinCurrentInput, setPinCurrentInput] = useState('');
   const [pinNewInput, setPinNewInput] = useState('');
   const [pinConfirmInput, setPinConfirmInput] = useState('');
@@ -2509,6 +2540,18 @@ function TallyKhataApp() {
         setModalAddMfsAccount(false);
         return true;
       }
+      if (modalAddNewBankAccount) {
+        setModalAddNewBankAccount(false);
+        return true;
+      }
+      if (modalLinkMfsAccount) {
+        setModalLinkMfsAccount(false);
+        return true;
+      }
+      if (modalLinkedAccountsManager) {
+        setModalLinkedAccountsManager(false);
+        return true;
+      }
       if (modalResetPin) {
         setModalResetPin(false);
         setPinSecurityStatusBanner(null);
@@ -2644,7 +2687,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -5410,6 +5453,202 @@ function TallyKhataApp() {
     }
   };
 
+  // =========================================================================
+  // TALLYPAY LINKED BANK ACCOUNTS & MFS ACCOUNT MANAGER HANDLERS (Iteration 232)
+  // =========================================================================
+  const handleOpenLinkedAccountsManager = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setLinkedAccountTab('ALL');
+    setModalLinkedAccountsManager(true);
+  };
+
+  const handleCloseLinkedAccountsManager = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalLinkedAccountsManager(false);
+  };
+
+  const handleOpenAddNewBankAccount = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setNewLinkedBankCode('085');
+    setNewLinkedBankBranch('Gulshan Head Office');
+    setNewLinkedBankRouting('060261742');
+    setNewLinkedBankAccNum('');
+    setNewLinkedBankHolder('');
+    setNewLinkedBankAccountType('SAVINGS');
+    setModalAddNewBankAccount(true);
+  };
+
+  const handleCloseAddNewBankAccount = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalAddNewBankAccount(false);
+  };
+
+  const handleOpenLinkMfsAccount = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSelectedMfsOperator('BKASH');
+    setNewLinkedMfsMobile('');
+    setNewLinkedMfsHolderName('');
+    setNewLinkedMfsOtp('');
+    setModalLinkMfsAccount(true);
+  };
+
+  const handleCloseLinkMfsAccount = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalLinkMfsAccount(false);
+  };
+
+  const handleAddNewBankAccount = async () => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      if (!newLinkedBankRouting || !/^\d{9}$/.test(String(newLinkedBankRouting))) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("৯ ডিজিটের সঠিক রাউটিং নম্বর দিন।"));
+        return;
+      }
+      if (!newLinkedBankAccNum || !/^\d{8,34}$/.test(String(newLinkedBankAccNum))) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("সঠিক একাউন্ট নম্বর দিন (৮ থেকে ৩৪ ডিজিট)।"));
+        return;
+      }
+      if (!newLinkedBankHolder || String(newLinkedBankHolder).trim().length === 0) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("একাউন্ট হোল্ডারের নাম আবশ্যক।"));
+        return;
+      }
+
+      if (TP_tallyPayAccountManager) {
+        const bankInfo = (typeof tpGetScheduledBankByCode === 'function' && tpGetScheduledBankByCode(newLinkedBankCode)) || {};
+        const res = await TP_tallyPayAccountManager.addBankAccount(activeBusinessId, {
+          bankCode: newLinkedBankCode,
+          bankName: bankInfo.nameEn || bankInfo.nameBn || 'Bank',
+          branchName: newLinkedBankBranch,
+          routingNumber: newLinkedBankRouting,
+          accountNumber: newLinkedBankAccNum,
+          accountHolderName: newLinkedBankHolder,
+          accountType: newLinkedBankAccountType,
+        });
+        if (res && res.success) {
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+          Alert.alert(t('add_bank_account'), tStatic("ব্যাংক একাউন্ট সফলভাবে যোগ করা হয়েছে।"));
+          handleCloseAddNewBankAccount();
+          return res;
+        } else {
+          Alert.alert(tStatic("ত্রুটি"), (res && res.message) || tStatic("ব্যাংক একাউন্ট যোগ করতে ব্যর্থ হয়েছে।"));
+          return res;
+        }
+      }
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to add bank account');
+    }
+  };
+
+  const handleLinkMfsAccount = async () => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      if (!newLinkedMfsMobile || !/^01[3-9]\d{8}$/.test(String(newLinkedMfsMobile))) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।"));
+        return;
+      }
+      if (!newLinkedMfsOtp || !/^\d{6}$/.test(String(newLinkedMfsOtp))) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("সঠিক ৬ ডিজিটের ওটিপি দিন।"));
+        return;
+      }
+
+      if (TP_tallyPayAccountManager) {
+        const res = await TP_tallyPayAccountManager.linkMfsAccount(activeBusinessId, {
+          operator: selectedMfsOperator,
+          mobileNumber: newLinkedMfsMobile,
+          holderName: newLinkedMfsHolderName || 'User Wallet',
+          otp: newLinkedMfsOtp,
+        });
+        if (res && res.success) {
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+          Alert.alert(t('link_mfs_account'), t('mfs_wallet_linked'));
+          handleCloseLinkMfsAccount();
+          return res;
+        } else {
+          Alert.alert(tStatic("ত্রুটি"), (res && res.message) || tStatic("মোবাইল ব্যাংকিং যোগ করতে ব্যর্থ হয়েছে।"));
+          return res;
+        }
+      }
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to link MFS account');
+    }
+  };
+
+  const handleDeleteLinkedBank = async (accountId, pin = '1234') => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      if (TP_tallyPayAccountManager) {
+        const res = await TP_tallyPayAccountManager.deleteBankAccount(activeBusinessId, accountId, pin);
+        if (res && res.success) {
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+          Alert.alert(t('delete_bank_account'), t('bank_account_deleted'));
+          return res;
+        } else {
+          Alert.alert(tStatic("ত্রুটি"), (res && res.message) || t('bank_account_delete_failed'));
+          return res;
+        }
+      }
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || t('bank_account_delete_failed'));
+    }
+  };
+
+  const handleDeleteLinkedMfs = async (accountId) => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      if (TP_tallyPayAccountManager) {
+        const res = await TP_tallyPayAccountManager.deleteLinkedMfsAccount(activeBusinessId, accountId);
+        if (res && res.success) {
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+          Alert.alert(tStatic("সফল"), tStatic("মোবাইল ব্যাংকিং ওয়ালেটটি মুছে ফেলা হয়েছে।"));
+          return res;
+        } else {
+          Alert.alert(tStatic("ত্রুটি"), (res && res.message) || tStatic("মুছে ফেলা সম্ভব হয়নি।"));
+          return res;
+        }
+      }
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to delete MFS');
+    }
+  };
+
+  const handleSetDefaultBank = async (accountId) => {
+    try {
+      try { hapticFeedbackService.selection(); } catch (e) {}
+      if (TP_tallyPayAccountManager) {
+        const res = await TP_tallyPayAccountManager.setDefaultBankAccount(activeBusinessId, accountId);
+        if (res && res.success) {
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+          Alert.alert(tStatic("সফল"), tStatic("ডিফল্ট পে-আউট একাউন্ট সফলভাবে সেট করা হয়েছে।"));
+          return res;
+        } else {
+          Alert.alert(tStatic("ত্রুটি"), (res && res.message) || tStatic("ডিফল্ট সেট করা সম্ভব হয়নি।"));
+          return res;
+        }
+      }
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to set default bank');
+    }
+  };
+
+  const handleVerifyLinkedBank = async (accountId, depositPaisa) => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      if (TP_tallyPayAccountManager) {
+        const res = await TP_tallyPayAccountManager.verifyBankAccount(activeBusinessId, accountId, depositPaisa);
+        if (res && res.success) {
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+          Alert.alert(tStatic("সফল"), tStatic("ব্যাংক একাউন্ট সফলভাবে ভেরিফাই করা হয়েছে।"));
+          return res;
+        } else {
+          Alert.alert(tStatic("ত্রুটি"), (res && res.message) || tStatic("ভেরিফিকেশন ব্যর্থ হয়েছে।"));
+          return res;
+        }
+      }
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to verify bank');
+    }
+  };
+
 
   // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
@@ -6653,6 +6892,74 @@ function TallyKhataApp() {
       handleToggleBiometrics,
       tallyPaySecurityManager: TP_tallyPaySecurityManager,
       pinSecurityEngine: TP_pinSecurityEngine,
+      storageRepository,
+    };
+
+    global.__ACCOUNT_MANAGER_TEST_HOOKS__ = {
+      modalLinkedAccountsManager,
+      setModalLinkedAccountsManager,
+      modalAddNewBankAccount,
+      setModalAddNewBankAccount,
+      modalLinkMfsAccount,
+      setModalLinkMfsAccount,
+      linkedAccountTab,
+      setLinkedAccountTab,
+      newBankCode: newLinkedBankCode,
+      setNewBankCode: setNewLinkedBankCode,
+      newLinkedBankCode,
+      setNewLinkedBankCode,
+      newBankBranch: newLinkedBankBranch,
+      setNewBankBranch: setNewLinkedBankBranch,
+      newLinkedBankBranch,
+      setNewLinkedBankBranch,
+      newBankRouting: newLinkedBankRouting,
+      setNewBankRouting: setNewLinkedBankRouting,
+      newLinkedBankRouting,
+      setNewLinkedBankRouting,
+      newBankAccNum: newLinkedBankAccNum,
+      setNewBankAccNum: setNewLinkedBankAccNum,
+      newLinkedBankAccNum,
+      setNewLinkedBankAccNum,
+      newBankHolder: newLinkedBankHolder,
+      setNewBankHolder: setNewLinkedBankHolder,
+      newLinkedBankHolder,
+      setNewLinkedBankHolder,
+      newBankAccountType: newLinkedBankAccountType,
+      setNewBankAccountType: setNewLinkedBankAccountType,
+      newLinkedBankAccountType,
+      setNewLinkedBankAccountType,
+      selectedMfsOperator,
+      setSelectedMfsOperator,
+      newMfsMobile: newLinkedMfsMobile,
+      setNewMfsMobile: setNewLinkedMfsMobile,
+      newLinkedMfsMobile,
+      setNewLinkedMfsMobile,
+      newMfsHolderName: newLinkedMfsHolderName,
+      setNewMfsHolderName: setNewLinkedMfsHolderName,
+      newLinkedMfsHolderName,
+      setNewLinkedMfsHolderName,
+      newMfsOtp: newLinkedMfsOtp,
+      setNewMfsOtp: setNewLinkedMfsOtp,
+      newLinkedMfsOtp,
+      setNewLinkedMfsOtp,
+      linkedBankDepositInput,
+      setLinkedBankDepositInput,
+      selectedBankToVerify,
+      setSelectedBankToVerify,
+      handleOpenLinkedAccountsManager,
+      handleCloseLinkedAccountsManager,
+      handleOpenAddNewBankAccount,
+      handleCloseAddNewBankAccount,
+      handleOpenLinkMfsAccount,
+      handleCloseLinkMfsAccount,
+      handleAddNewBankAccount,
+      handleLinkMfsAccount,
+      handleDeleteLinkedBank,
+      handleDeleteLinkedMfs,
+      handleSetDefaultBank,
+      handleVerifyLinkedBank,
+      tallyPayAccountManager: TP_tallyPayAccountManager,
+      linkedAccountEngine: tpLinkedAccountEngine,
       storageRepository,
     };
 
@@ -10371,6 +10678,37 @@ accessibilityLabel={
               </View>
             </TouchableOpacity>
 
+            {/* Quick Action: Linked Bank Accounts & MFS Account Manager (Iteration 232) */}
+            <TouchableOpacity
+              testID="tp_linked_accounts_btn"
+              style={[styles.analyticsTallypayBanner, { marginTop: 8 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+              onPress={handleOpenLinkedAccountsManager}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('account_manager_title')}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  <Text style={{ fontSize: 18 }}>🏦</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('account_manager_title')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    {t('linked_bank_accounts')} • {t('linked_mfs_accounts')}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#0284C7', marginRight: 4 }}>
+                  {tStatic("ম্যানেজ")}
+                </Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 12, height: 12, tintColor: '#0284C7' }} resizeMode="contain" />
+              </View>
+            </TouchableOpacity>
+
             {/* Quick Action: TallyPay Security PIN & Biometrics (Iteration 231) */}
             <TouchableOpacity
               testID="btn_open_security_pin_settings"
@@ -10599,6 +10937,27 @@ accessibilityLabel={
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('settlement_history')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('gross_amount')} • {t('net_payout')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              {/* Menu Item: Linked Accounts Manager (Iteration 232) */}
+              <TouchableOpacity
+                testID="menu_tp_linked_accounts_item"
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenLinkedAccountsManager}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('account_manager_title')}
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_bank.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>
+                    {t('account_manager_title')}
+                  </Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>
+                    {t('linked_bank_accounts')} • {t('linked_mfs_accounts')}
+                  </Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
@@ -20603,6 +20962,604 @@ accessibilityLabel={
                 ℹ️ {t('single_device_binding_notice')}
               </Text>
             </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 85: TALLYPAY LINKED ACCOUNTS MANAGER (Iteration 232)
+         =================================================================== */}
+      <Modal
+        visible={modalLinkedAccountsManager}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseLinkedAccountsManager}
+        testID="modal_linked_accounts_manager"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseLinkedAccountsManager}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_linked_accounts"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Text style={[styles.thBackIcon, isDark && { color: currentTheme.textPrimary }]}>‹</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={[styles.bmTitle, isDark && { color: currentTheme.textPrimary }]}>
+                {t('account_manager_title')}
+              </Text>
+              <Text style={[{ fontSize: 11, color: '#64748B' }, isDark && { color: currentTheme.textSecondary }]}>
+                {t('linked_bank_accounts')} • {t('linked_mfs_accounts')}
+              </Text>
+            </View>
+          </View>
+
+          {/* Action CTAs: Add Bank & Link MFS */}
+          <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
+            <TouchableOpacity
+              testID="btn_open_add_bank_modal"
+              style={{ flex: 1, backgroundColor: '#0D6E5C', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 6 }}
+              onPress={handleOpenAddNewBankAccount}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('add_bank_account_cta')}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>
+                {t('add_bank_account_cta')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="btn_open_link_mfs_modal"
+              style={{ flex: 1, backgroundColor: '#2563EB', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }}
+              onPress={handleOpenLinkMfsAccount}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('link_mfs_account_cta')}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>
+                {t('link_mfs_account_cta')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Segmented Filter Tabs: ALL | BANK | MFS */}
+          <View style={{ flexDirection: 'row', backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderRadius: 8, padding: 4, marginHorizontal: 16, marginTop: 12 }}>
+            <TouchableOpacity
+              testID="tab_linked_all"
+              style={[{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 }, linkedAccountTab === 'ALL' && { backgroundColor: isDark ? '#0F172A' : '#FFFFFF', elevation: 1 }]}
+              onPress={() => setLinkedAccountTab('ALL')}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            >
+              <Text style={{ fontSize: 13, fontWeight: linkedAccountTab === 'ALL' ? 'bold' : '600', color: linkedAccountTab === 'ALL' ? (isDark ? '#F8FAFC' : '#1E293B') : '#64748B' }}>
+                {t('all_accounts')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="tab_linked_bank"
+              style={[{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 }, linkedAccountTab === 'BANK' && { backgroundColor: isDark ? '#0F172A' : '#FFFFFF', elevation: 1 }]}
+              onPress={() => setLinkedAccountTab('BANK')}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            >
+              <Text style={{ fontSize: 13, fontWeight: linkedAccountTab === 'BANK' ? 'bold' : '600', color: linkedAccountTab === 'BANK' ? (isDark ? '#F8FAFC' : '#1E293B') : '#64748B' }}>
+                {t('tab_filter_bank')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="tab_linked_mfs"
+              style={[{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 }, linkedAccountTab === 'MFS' && { backgroundColor: isDark ? '#0F172A' : '#FFFFFF', elevation: 1 }]}
+              onPress={() => setLinkedAccountTab('MFS')}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            >
+              <Text style={{ fontSize: 13, fontWeight: linkedAccountTab === 'MFS' ? 'bold' : '600', color: linkedAccountTab === 'MFS' ? (isDark ? '#F8FAFC' : '#1E293B') : '#64748B' }}>
+                {t('tab_filter_mfs')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Accounts List */}
+          <ScrollView
+            style={styles.thBody}
+            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {(() => {
+              const currentBanks = (TP_tallyPayAccountManager && TP_tallyPayAccountManager.getLinkedBankAccounts(activeBusinessId).items) || [];
+              const currentMfs = (TP_tallyPayAccountManager && TP_tallyPayAccountManager.getLinkedMfsAccounts(activeBusinessId).items) || [];
+
+              const showBanks = linkedAccountTab === 'ALL' || linkedAccountTab === 'BANK';
+              const showMfs = linkedAccountTab === 'ALL' || linkedAccountTab === 'MFS';
+
+              const hasItems = (showBanks && currentBanks.length > 0) || (showMfs && currentMfs.length > 0);
+
+              if (!hasItems) {
+                return (
+                  <View testID="empty_linked_accounts_prompt" style={{ padding: 32, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 36, marginBottom: 12 }}>🏦</Text>
+                    <Text style={[{ fontSize: 15, fontWeight: 'bold', color: '#1E293B', textAlign: 'center', marginBottom: 6 }, isDark && { color: currentTheme.textPrimary }]}>
+                      {t('empty_account_prompt')}
+                    </Text>
+                    <Text style={[{ fontSize: 12, color: '#64748B', textAlign: 'center' }, isDark && { color: currentTheme.textSecondary }]}>
+                      {t('empty_account_message')}
+                    </Text>
+                  </View>
+                );
+              }
+
+              return (
+                <View>
+                  {/* Linked Banks */}
+                  {showBanks && currentBanks.map((item) => (
+                    <View
+                      key={item.id}
+                      style={[{ padding: 14, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          <Text style={{ fontSize: 20, marginRight: 8 }}>🏛️</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[{ fontSize: 15, fontWeight: 'bold', color: '#1E293B' }, isDark && { color: currentTheme.textPrimary }]}>
+                              {item.bankName || 'Scheduled Bank'}
+                            </Text>
+                            <Text style={{ fontSize: 12, color: '#64748B' }}>
+                              {item.branchName} • {item.accountType === 'SAVINGS' ? t('savings_account') : t('current_account')}
+                            </Text>
+                          </View>
+                        </View>
+                        {item.isDefaultPayout && (
+                          <View testID="badge_default_payout" style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#15803D' }}>
+                              {t('default_payout_account')}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', padding: 8, borderRadius: 6, marginBottom: 8 }}>
+                        <Text style={[{ fontSize: 13, fontFamily: 'monospace', color: '#334155' }, isDark && { color: '#94A3B8' }]}>
+                          {item.accountNumberMasked || ('****' + String(item.accountNumber || '').slice(-4))} (Routing: {item.routingNumber})
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>
+                          {item.accountHolderName}
+                        </Text>
+                      </View>
+
+                      {/* Status Warnings & Verification */}
+                      {item.status === 'PENDING_VERIFICATION' && (
+                        <View style={{ padding: 10, backgroundColor: '#FEF3C7', borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A', marginBottom: 8 }}>
+                          <Text style={{ fontSize: 12, color: '#B45309', fontWeight: '600', marginBottom: 4 }}>
+                            ⚠️ {t('unverified_account_warning')}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#92400E', marginBottom: 8 }}>
+                            {t('micro_deposit_notice')}
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <TextInput
+                              testID="input_verify_bank_deposit"
+                              style={{ flex: 1, height: 38, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 6, paddingHorizontal: 10, fontSize: 14, backgroundColor: '#FFFFFF', marginRight: 8 }}
+                              value={linkedBankDepositInput}
+                              onChangeText={setLinkedBankDepositInput}
+                              placeholder={t('deposit_amount_paisa')}
+                              keyboardType="numeric"
+                            />
+                            <TouchableOpacity
+                              testID="btn_verify_bank_account"
+                              style={{ height: 38, backgroundColor: '#D97706', paddingHorizontal: 12, borderRadius: 6, justifyContent: 'center' }}
+                              onPress={() => handleVerifyLinkedBank(item.id, linkedBankDepositInput || 15)}
+                              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                            >
+                              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 }}>
+                                {t('verify_bank_account')}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Card Action Row: Set as Default & Delete */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderTopColor: isDark ? '#334155' : '#F1F5F9' }}>
+                        {!item.isDefaultPayout && item.status === 'VERIFIED' && (
+                          <TouchableOpacity
+                            testID="btn_set_default_payout"
+                            style={{ marginRight: 14 }}
+                            onPress={() => handleSetDefaultBank(item.id)}
+                            hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                          >
+                            <Text style={{ fontSize: 12, color: '#0D6E5C', fontWeight: 'bold' }}>
+                              {t('set_as_default_payout')}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          testID="btn_unlink_bank_account"
+                          onPress={() => handleDeleteLinkedBank(item.id)}
+                          hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                        >
+                          <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600' }}>
+                            {t('delete_bank_account')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+
+                  {/* Linked MFS Accounts */}
+                  {showMfs && currentMfs.map((item) => (
+                    <View
+                      key={item.id}
+                      style={[{ padding: 14, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          <Text style={{ fontSize: 20, marginRight: 8 }}>📱</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[{ fontSize: 15, fontWeight: 'bold', color: '#1E293B' }, isDark && { color: currentTheme.textPrimary }]}>
+                              {item.operator} Wallet
+                            </Text>
+                            <Text style={[{ fontSize: 13, fontFamily: 'monospace', color: '#334155' }, isDark && { color: '#94A3B8' }]}>
+                              {item.mobileNumberMasked || item.mobileNumber}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#15803D' }}>
+                            {item.status || 'VERIFIED'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderTopColor: isDark ? '#334155' : '#F1F5F9' }}>
+                        <Text style={{ fontSize: 12, color: '#64748B' }}>
+                          {item.holderName}
+                        </Text>
+                        <TouchableOpacity
+                          testID="btn_unlink_mfs_account"
+                          onPress={() => handleDeleteLinkedMfs(item.id)}
+                          hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                        >
+                          <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600' }}>
+                            {tStatic("মুছুন")}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 86: ADD NEW BANK ACCOUNT (Iteration 232)
+         =================================================================== */}
+      <Modal
+        visible={modalAddNewBankAccount}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseAddNewBankAccount}
+        testID="modal_add_new_bank_account"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseAddNewBankAccount}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_add_bank"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Text style={[styles.thBackIcon, isDark && { color: currentTheme.textPrimary }]}>‹</Text>
+            </TouchableOpacity>
+            <Text style={[styles.bmTitle, isDark && { color: currentTheme.textPrimary }]}>
+              {t('add_bank_account')}
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <ScrollView
+            style={styles.thBody}
+            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Bank Picker */}
+            <View testID="picker_select_bank" style={{ marginBottom: 16 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 8 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('select_bank')}
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                {(TP_BANGLADESH_SCHEDULED_BANKS || []).map((b) => (
+                  <TouchableOpacity
+                    key={b.code}
+                    style={[{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginRight: 8, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }, newLinkedBankCode === b.code && { borderColor: '#0D6E5C', backgroundColor: '#ECFDF5' }]}
+                    onPress={() => {
+                      setNewLinkedBankCode(b.code);
+                      if (b.routingNumber) setNewLinkedBankRouting(b.routingNumber);
+                    }}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  >
+                    <Text style={[{ fontSize: 13, color: '#1E293B' }, newLinkedBankCode === b.code && { color: '#0D6E5C', fontWeight: 'bold' }]}>
+                      {b.nameBn || b.nameEn}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Branch Name */}
+            <View style={{ marginBottom: 14 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 6 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('branch_name')}
+              </Text>
+              <TextInput
+                testID="input_new_bank_branch"
+                style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={newLinkedBankBranch}
+                onChangeText={setNewLinkedBankBranch}
+                placeholder={t('branch_name')}
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            {/* Routing Number */}
+            <View style={{ marginBottom: 14 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 6 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('routing_number')}
+              </Text>
+              <TextInput
+                testID="input_new_bank_routing"
+                style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={newLinkedBankRouting}
+                onChangeText={setNewLinkedBankRouting}
+                placeholder="000000000"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={9}
+              />
+            </View>
+
+            {/* Account Holder Name */}
+            <View style={{ marginBottom: 14 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 6 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('account_holder_name')}
+              </Text>
+              <TextInput
+                testID="input_new_bank_holder"
+                style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={newLinkedBankHolder}
+                onChangeText={setNewLinkedBankHolder}
+                placeholder={t('account_holder_name')}
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            {/* Account Number */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 6 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('account_number')}
+              </Text>
+              <TextInput
+                testID="input_new_bank_acc_num"
+                style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={newLinkedBankAccNum}
+                onChangeText={setNewLinkedBankAccNum}
+                placeholder="1234567890"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={34}
+              />
+            </View>
+
+            {/* Account Type Radio */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 8 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('account_type')}
+              </Text>
+              <View style={{ flexDirection: 'row' }}>
+                <TouchableOpacity
+                  testID="radio_savings_account"
+                  style={[{ flex: 1, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', marginRight: 6, backgroundColor: '#FFFFFF' }, newLinkedBankAccountType === 'SAVINGS' && { borderColor: '#0D6E5C', backgroundColor: '#ECFDF5' }]}
+                  onPress={() => setNewLinkedBankAccountType('SAVINGS')}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                >
+                  <Text style={[{ fontSize: 12, color: '#1E293B' }, newLinkedBankAccountType === 'SAVINGS' && { color: '#0D6E5C', fontWeight: 'bold' }]}>
+                    {t('savings_account')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="radio_current_account"
+                  style={[{ flex: 1, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', marginLeft: 6, backgroundColor: '#FFFFFF' }, newLinkedBankAccountType === 'CURRENT' && { borderColor: '#0D6E5C', backgroundColor: '#ECFDF5' }]}
+                  onPress={() => setNewLinkedBankAccountType('CURRENT')}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                >
+                  <Text style={[{ fontSize: 12, color: '#1E293B' }, newLinkedBankAccountType === 'CURRENT' && { color: '#0D6E5C', fontWeight: 'bold' }]}>
+                    {t('current_account')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* BEFTN Advisory Notice */}
+            <View style={{ padding: 12, backgroundColor: '#EFF6FF', borderRadius: 8, borderWidth: 1, borderColor: '#BFDBFE', marginBottom: 14 }}>
+              <Text style={{ fontSize: 12, color: '#1E40AF', lineHeight: 18 }}>
+                ℹ️ {t('beftn_advisory_notice')}
+              </Text>
+            </View>
+
+            {/* Accuracy Confirmation Notice */}
+            <Text testID="text_accuracy_confirmation" style={{ fontSize: 12, color: '#64748B', marginBottom: 18, lineHeight: 18 }}>
+              ✅ {t('accuracy_confirmation')}
+            </Text>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              testID="btn_submit_add_new_bank"
+              style={{ height: 48, backgroundColor: '#0D6E5C', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              onPress={handleAddNewBankAccount}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('add_bank_account')}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {t('add_bank_account')}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 87: LINK MFS ACCOUNT (Iteration 232)
+         =================================================================== */}
+      <Modal
+        visible={modalLinkMfsAccount}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseLinkMfsAccount}
+        testID="modal_link_mfs_account"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseLinkMfsAccount}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_link_mfs"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Text style={[styles.thBackIcon, isDark && { color: currentTheme.textPrimary }]}>‹</Text>
+            </TouchableOpacity>
+            <Text style={[styles.bmTitle, isDark && { color: currentTheme.textPrimary }]}>
+              {t('link_mfs_account')}
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <ScrollView
+            style={styles.thBody}
+            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Operator Selection Chips */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 8 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('select_mfs_operator')}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                <TouchableOpacity
+                  testID="chip_link_mfs_bkash"
+                  style={[{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', marginRight: 8, marginBottom: 8, backgroundColor: '#FFFFFF' }, selectedMfsOperator === 'BKASH' && { borderColor: '#E2136E', backgroundColor: '#FDF2F8' }]}
+                  onPress={() => setSelectedMfsOperator('BKASH')}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                >
+                  <Text style={[{ fontSize: 13, color: '#1E293B' }, selectedMfsOperator === 'BKASH' && { color: '#E2136E', fontWeight: 'bold' }]}>
+                    bKash
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="chip_link_mfs_nagad"
+                  style={[{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', marginRight: 8, marginBottom: 8, backgroundColor: '#FFFFFF' }, selectedMfsOperator === 'NAGAD' && { borderColor: '#F7941D', backgroundColor: '#FFFBEB' }]}
+                  onPress={() => setSelectedMfsOperator('NAGAD')}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                >
+                  <Text style={[{ fontSize: 13, color: '#1E293B' }, selectedMfsOperator === 'NAGAD' && { color: '#F7941D', fontWeight: 'bold' }]}>
+                    Nagad
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="chip_link_mfs_rocket"
+                  style={[{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', marginRight: 8, marginBottom: 8, backgroundColor: '#FFFFFF' }, selectedMfsOperator === 'ROCKET' && { borderColor: '#8C3494', backgroundColor: '#FAF5FF' }]}
+                  onPress={() => setSelectedMfsOperator('ROCKET')}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                >
+                  <Text style={[{ fontSize: 13, color: '#1E293B' }, selectedMfsOperator === 'ROCKET' && { color: '#8C3494', fontWeight: 'bold' }]}>
+                    Rocket
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="chip_link_mfs_upay"
+                  style={[{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', marginRight: 8, marginBottom: 8, backgroundColor: '#FFFFFF' }, selectedMfsOperator === 'UPAY' && { borderColor: '#00A3E0', backgroundColor: '#F0F9FF' }]}
+                  onPress={() => setSelectedMfsOperator('UPAY')}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                >
+                  <Text style={[{ fontSize: 13, color: '#1E293B' }, selectedMfsOperator === 'UPAY' && { color: '#00A3E0', fontWeight: 'bold' }]}>
+                    Upay
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Mobile Number Input */}
+            <View style={{ marginBottom: 14 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 6 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('mfs_mobile_number')}
+              </Text>
+              <TextInput
+                testID="input_link_mfs_mobile"
+                style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={newLinkedMfsMobile}
+                onChangeText={setNewLinkedMfsMobile}
+                placeholder="01XXXXXXXXX"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={11}
+              />
+            </View>
+
+            {/* Account Holder Name */}
+            <View style={{ marginBottom: 14 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 6 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('account_holder_name')}
+              </Text>
+              <TextInput
+                testID="input_link_mfs_holder"
+                style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={newLinkedMfsHolderName}
+                onChangeText={setNewLinkedMfsHolderName}
+                placeholder={t('account_holder_name')}
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            {/* OTP Input */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 6 }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('enter_otp')}
+              </Text>
+              <TextInput
+                testID="input_link_mfs_otp"
+                style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 16, color: '#1E293B', backgroundColor: '#FFFFFF', letterSpacing: 4 }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={newLinkedMfsOtp}
+                onChangeText={setNewLinkedMfsOtp}
+                placeholder="123456"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={6}
+              />
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              testID="btn_submit_link_mfs"
+              style={{ height: 48, backgroundColor: '#2563EB', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              onPress={handleLinkMfsAccount}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('link_mfs_account')}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {t('link_mfs_account')}
+              </Text>
+            </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
       </Modal>

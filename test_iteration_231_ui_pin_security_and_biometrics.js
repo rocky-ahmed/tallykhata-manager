@@ -17,7 +17,7 @@
  * Part 8: Hardware BackHandler safe stacked dismissal
  * Part 9: Touch target ergonomics & haptic feedback integration
  * Part 10: WCAG 2.1 AA / AAA luminance contrast validation
- * Part 11: Modal count & controller invariants (84 modals total)
+ * Part 11: Modal count & controller invariants (87 modals total)
  * Part 12: Babel AST compilation & performance benchmark
  */
 
@@ -465,24 +465,24 @@ console.log("\n--- PART 10: WCAG 2.1 AA / AAA LUMINANCE CONTRAST VALIDATION ---"
 // -----------------------------------------------------------------------------
 console.log("\n--- PART 11: MODAL COUNT & CONTROLLER INVARIANTS (84 MODALS) ---");
 
-  await runTest("11.1: App.js contains exactly 84 <Modal elements", () => {
+  await runTest("11.1: App.js contains exactly 87 <Modal elements", () => {
   const modalMatches = appSrc.match(/<Modal\b/g) || [];
-  assert.strictEqual(modalMatches.length, 84, `Expected exactly 84 modals in App.js, got ${modalMatches.length}`);
+  assert.strictEqual(modalMatches.length, 87, `Expected exactly 84 modals in App.js, got ${modalMatches.length}`);
 });
 
   await runTest("11.2: App.js contains exactly 84 onRequestClose handlers", () => {
   const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-  assert.strictEqual(reqCloseMatches.length, 84, `Expected 84 onRequestClose handlers, got ${reqCloseMatches.length}`);
+  assert.strictEqual(reqCloseMatches.length, 87, `Expected 84 onRequestClose handlers, got ${reqCloseMatches.length}`);
 });
 
-  await runTest("11.3: App.js contains exactly 84 unique modal state controllers", () => {
+  await runTest("11.3: App.js contains exactly 87 unique modal state controllers", () => {
   const regex = /visible=\{([a-zA-Z0-9_]+)\}/g;
   const uniqueModals = new Set();
   let m;
   while ((m = regex.exec(appSrc)) !== null) {
     uniqueModals.add(m[1]);
   }
-  assert.strictEqual(uniqueModals.size, 84, `Expected 84 unique visible controllers, got ${uniqueModals.size}`);
+  assert.strictEqual(uniqueModals.size, 87, `Expected 84 unique visible controllers, got ${uniqueModals.size}`);
   assert.ok(uniqueModals.has("modalTpChangePin"), "modalTpChangePin must be in unique controllers");
   assert.ok(uniqueModals.has("modalResetPin"), "modalResetPin must be in unique controllers");
 });

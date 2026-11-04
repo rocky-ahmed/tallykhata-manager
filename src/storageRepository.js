@@ -275,6 +275,8 @@ const VALID_COLLECTIONS = new Set([
   'reconciliations',
   'walletSecurityCredentials',
   'deviceBindings',
+    'linkedBankAccounts',
+    'linkedMfsAccounts',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -399,6 +401,8 @@ function sanitizeState(state) {
   if (!Array.isArray(s.reconciliations)) s.reconciliations = [];
   if (!Array.isArray(s.walletSecurityCredentials)) s.walletSecurityCredentials = [];
   if (!Array.isArray(s.deviceBindings)) s.deviceBindings = [];
+  if (!Array.isArray(s.linkedBankAccounts)) s.linkedBankAccounts = [];
+  if (!Array.isArray(s.linkedMfsAccounts)) s.linkedMfsAccounts = [];
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
   if (!Array.isArray(s.tallyPayBeneficiaries)) s.tallyPayBeneficiaries = [];
@@ -543,6 +547,8 @@ function createDefaultState() {
     reconciliations: [],
     walletSecurityCredentials: [],
     deviceBindings: [],
+      linkedBankAccounts: [],
+      linkedMfsAccounts: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1667,6 +1673,26 @@ class StorageRepository {
       authoritative.walletSecurityCredentials = [];
     }
 
+    if (authoritative.linkedBankAccounts && Array.isArray(authoritative.linkedBankAccounts)) {
+      authoritative.linkedBankAccounts = authoritative.linkedBankAccounts.map((b) => {
+        const accNo = String(b.accountNumber || "");
+        const maskedAcc = accNo.length > 4 ? "**** **** " + accNo.slice(-4) : "****";
+        return { ...b, accountNumber: maskedAcc };
+      });
+    } else {
+      authoritative.linkedBankAccounts = [];
+    }
+
+    if (authoritative.linkedMfsAccounts && Array.isArray(authoritative.linkedMfsAccounts)) {
+      authoritative.linkedMfsAccounts = authoritative.linkedMfsAccounts.map((m) => {
+        const mob = String(m.mobileNumber || "");
+        const maskedMob = mob.length >= 11 ? mob.slice(0, 3) + "****" + mob.slice(-4) : "****";
+        return { ...m, mobileNumber: maskedMob };
+      });
+    } else {
+      authoritative.linkedMfsAccounts = [];
+    }
+
     if (authoritative.deviceBindings && Array.isArray(authoritative.deviceBindings)) {
       authoritative.deviceBindings = authoritative.deviceBindings.map((b) => {
         const { pin, rawPin, sessionToken, token, secret, ...rest } = b || {};
@@ -2250,6 +2276,8 @@ class StorageRepository {
         const reconciliations = (prevStore.reconciliations || []).filter((r) => getBizId(r) !== targetId);
         const walletSecurityCredentials = (prevStore.walletSecurityCredentials || []).filter((c) => getBizId(c) !== targetId);
         const deviceBindings = (prevStore.deviceBindings || []).filter((b) => getBizId(b) !== targetId);
+        const linkedBankAccounts = (prevStore.linkedBankAccounts || []).filter((b) => getBizId(b) !== targetId);
+        const linkedMfsAccounts = (prevStore.linkedMfsAccounts || []).filter((m) => getBizId(m) !== targetId);
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
         delete autoDisbursementConfig[targetId];
 
@@ -2337,6 +2365,8 @@ class StorageRepository {
         reconciliations,
         walletSecurityCredentials,
         deviceBindings,
+        linkedBankAccounts,
+        linkedMfsAccounts,
         autoDisbursementConfig,
         cashReconciliation,
       };
@@ -2493,6 +2523,8 @@ class StorageRepository {
           const importedReconciliations = (data.reconciliations || []).filter(r => String(r.businessId || '1') === selectedBizId);
           const importedWalletCredentials = (data.walletSecurityCredentials || []).filter(c => String(c.businessId || '1') === selectedBizId);
           const importedDeviceBindings = (data.deviceBindings || []).filter(b => String(b.businessId || '1') === selectedBizId);
+          const importedLinkedBankAccounts = (data.linkedBankAccounts || []).filter(b => String(b.businessId || '1') === selectedBizId);
+          const importedLinkedMfsAccounts = (data.linkedMfsAccounts || []).filter(m => String(m.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -2512,6 +2544,8 @@ class StorageRepository {
         const keptReconciliations = (prevStore.reconciliations || []).filter(r => String(r.businessId || '1') !== selectedBizId);
         const keptWalletCredentials = (prevStore.walletSecurityCredentials || []).filter(c => String(c.businessId || '1') !== selectedBizId);
         const keptDeviceBindings = (prevStore.deviceBindings || []).filter(b => String(b.businessId || '1') !== selectedBizId);
+          const keptLinkedBankAccounts = (prevStore.linkedBankAccounts || []).filter(b => String(b.businessId || '1') !== selectedBizId);
+          const keptLinkedMfsAccounts = (prevStore.linkedMfsAccounts || []).filter(m => String(m.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2551,6 +2585,8 @@ class StorageRepository {
           reconciliations: [...keptReconciliations, ...importedReconciliations],
           walletSecurityCredentials: [...keptWalletCredentials, ...importedWalletCredentials],
           deviceBindings: [...keptDeviceBindings, ...importedDeviceBindings],
+            linkedBankAccounts: [...keptLinkedBankAccounts, ...importedLinkedBankAccounts],
+            linkedMfsAccounts: [...keptLinkedMfsAccounts, ...importedLinkedMfsAccounts],
           autoDisbursementConfig: { ...(prevStore.autoDisbursementConfig || {}), ...(data.autoDisbursementConfig || {}) },
           version: 6,
           lastRestoredAt: new Date().toISOString(),
@@ -2599,6 +2635,8 @@ class StorageRepository {
         reconciliations: Array.isArray(data.reconciliations) ? data.reconciliations : [],
         walletSecurityCredentials: Array.isArray(data.walletSecurityCredentials) ? data.walletSecurityCredentials : [],
         deviceBindings: Array.isArray(data.deviceBindings) ? data.deviceBindings : [],
+          linkedBankAccounts: Array.isArray(data.linkedBankAccounts) ? data.linkedBankAccounts : [],
+          linkedMfsAccounts: Array.isArray(data.linkedMfsAccounts) ? data.linkedMfsAccounts : [],
         autoDisbursementConfig: (data.autoDisbursementConfig && typeof data.autoDisbursementConfig === 'object') ? data.autoDisbursementConfig : {},
         inventory: restoredInventory,
         stock: restoredInventory,
@@ -7283,6 +7321,343 @@ class StorageRepository {
     return { success: true, revokedCount: count };
   }
 
+
+    /**
+     * REA-ITER-232: Saves or updates a linked commercial bank account.
+     */
+    async saveLinkedBankAccount(businessId = null, accountData = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const nowIso = new Date().toISOString();
+
+      const existingAccounts = (store.linkedBankAccounts || []).filter(
+        (a) => String(a.businessId || '1') === targetBizId
+      );
+      const isFirst = existingAccounts.length === 0;
+
+      const recordId = accountData.id || ('LBA_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+      const testDepositPaisa = accountData.testDepositPaisa !== undefined
+        ? Number(accountData.testDepositPaisa)
+        : Math.floor(Math.random() * 90) + 10;
+
+      const shouldBeDefault = accountData.isDefaultPayout !== undefined
+        ? Boolean(accountData.isDefaultPayout)
+        : isFirst;
+
+      const record = {
+        id: recordId,
+        businessId: targetBizId,
+        bankCode: accountData.bankCode || '',
+        bankName: accountData.bankName || '',
+        bankNameBn: accountData.bankNameBn || '',
+        branchName: accountData.branchName || '',
+        routingNumber: String(accountData.routingNumber || ''),
+        accountNumber: String(accountData.accountNumber || ''),
+        accountHolderName: accountData.accountHolderName || '',
+        accountType: accountData.accountType || 'SAVINGS',
+        status: accountData.status || 'PENDING_VERIFICATION',
+        testDepositPaisa,
+        verificationAttempts: Number(accountData.verificationAttempts) || 0,
+        isDefaultPayout: shouldBeDefault,
+        createDate: accountData.createDate || nowIso,
+        updateDate: nowIso,
+      };
+
+      let saved = null;
+      await this.mutateCollection('linkedBankAccounts', (list) => {
+        const withoutCurrent = list.filter((a) => a.id !== recordId);
+        let updatedList = withoutCurrent.map((a) => {
+          if (String(a.businessId || '1') === targetBizId && shouldBeDefault) {
+            return { ...a, isDefaultPayout: false, updateDate: nowIso };
+          }
+          return a;
+        });
+        saved = record;
+        return [record, ...updatedList];
+      });
+
+      return { success: true, account: saved };
+    }
+
+    /**
+     * REA-ITER-232: Retrieves linked bank accounts for a business.
+     */
+    getLinkedBankAccounts(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.linkedBankAccounts || []).filter(
+        (a) => String(a.businessId || '1') === targetBizId
+      );
+
+      if (options.status) {
+        list = list.filter((a) => a.status === options.status);
+      }
+
+      list.sort((a, b) => {
+        if (a.isDefaultPayout && !b.isDefaultPayout) return -1;
+        if (!a.isDefaultPayout && b.isDefaultPayout) return 1;
+        return new Date(b.createDate || 0) - new Date(a.createDate || 0);
+      });
+
+      return {
+        items: list,
+        accounts: list,
+        totalCount: list.length,
+      };
+    }
+
+    /**
+     * REA-ITER-232: Retrieves single linked bank account by ID.
+     */
+    getLinkedBankAccountById(businessId = null, id = null) {
+      if (!id) return null;
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const found = (store.linkedBankAccounts || []).find(
+        (a) => a.id === id && (!targetBizId || String(a.businessId || '1') === targetBizId)
+      );
+      return found ? { ...found } : null;
+    }
+
+    /**
+     * REA-ITER-232: Deletes / unlinks a bank account with auto-disbursement safety guard.
+     */
+    async deleteLinkedBankAccount(businessId = null, accountId = null) {
+      if (!accountId) return { success: false, error: 'ACCOUNT_ID_REQUIRED' };
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+      const existing = (store.linkedBankAccounts || []).find(
+        (a) => a.id === accountId && String(a.businessId || '1') === targetBizId
+      );
+      if (!existing) {
+        return { success: false, error: 'ACCOUNT_NOT_FOUND', message: 'ব্যাংক একাউন্টটি পাওয়া যায়নি।' };
+      }
+
+      // Check auto-disbursement protection
+      const autoConfig = store.autoDisbursementConfig && store.autoDisbursementConfig[targetBizId];
+      if (autoConfig && autoConfig.isAutoDisbursementEnabled && autoConfig.linkedBankAccountId === accountId) {
+        return {
+          success: false,
+          error: 'CANNOT_DELETE_ACTIVE_AUTODISBURSEMENT_ACCOUNT',
+          message: 'স্বয়ংক্রিয় ব্যাংক ট্রান্সফার চালু থাকায় এই একাউন্টটি মুছে ফেলা সম্ভব নয়।',
+        };
+      }
+
+      let promotedNext = null;
+      await this.mutateCollection('linkedBankAccounts', (list) => {
+        const remaining = list.filter((a) => a.id !== accountId);
+        if (existing.isDefaultPayout) {
+          const nextVerified = remaining.find(
+            (a) => String(a.businessId || '1') === targetBizId && a.status === 'VERIFIED'
+          );
+          if (nextVerified) {
+            promotedNext = nextVerified.id;
+            return remaining.map((a) => (a.id === nextVerified.id ? { ...a, isDefaultPayout: true } : a));
+          }
+        }
+        return remaining;
+      });
+
+      return { success: true, deletedId: accountId, promotedDefaultId: promotedNext };
+    }
+
+    /**
+     * REA-ITER-232: Sets a verified bank account as the default payout account.
+     */
+    async setDefaultBankAccount(businessId = null, accountId = null) {
+      if (!accountId) return { success: false, error: 'ACCOUNT_ID_REQUIRED' };
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+      const existing = (store.linkedBankAccounts || []).find(
+        (a) => a.id === accountId && String(a.businessId || '1') === targetBizId
+      );
+      if (!existing) {
+        return { success: false, error: 'ACCOUNT_NOT_FOUND', message: 'ব্যাংক একাউন্টটি পাওয়া যায়নি।' };
+      }
+      if (existing.status !== 'VERIFIED') {
+        return {
+          success: false,
+          error: 'ACCOUNT_NOT_VERIFIED',
+          message: 'শুধুমাত্র যাচাইকৃত ব্যাংক একাউন্ট ডিফল্ট হিসেবে সেট করা যাবে।',
+        };
+      }
+
+      let updated = null;
+      const nowIso = new Date().toISOString();
+      await this.mutateCollection('linkedBankAccounts', (list) => {
+        return list.map((a) => {
+          if (String(a.businessId || '1') === targetBizId) {
+            const isMatch = a.id === accountId;
+            const rec = { ...a, isDefaultPayout: isMatch, updateDate: nowIso };
+            if (isMatch) updated = rec;
+            return rec;
+          }
+          return a;
+        });
+      });
+
+      // Synchronize with auto-disbursement config if enabled
+      if (typeof this.getAutoDisbursementConfig === 'function' && typeof this.saveAutoDisbursementConfig === 'function') {
+        const autoConfig = this.getAutoDisbursementConfig(targetBizId);
+        if (autoConfig && autoConfig.isAutoDisbursementEnabled) {
+          await this.saveAutoDisbursementConfig(targetBizId, {
+            ...autoConfig,
+            linkedBankAccountId: accountId,
+            linkedBankAccountNo: existing.accountNumber,
+            linkedBankRoutingNo: existing.routingNumber,
+            linkedAccountName: existing.accountHolderName,
+          });
+        }
+      }
+
+      return { success: true, account: updated };
+    }
+
+    /**
+     * REA-ITER-232: Micro-deposit / penny deposit verification for a linked bank account.
+     */
+    async verifyLinkedBankAccount(businessId = null, accountId = null, depositPaisa = null) {
+      if (!accountId) return { success: false, error: 'ACCOUNT_ID_REQUIRED' };
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+      const existing = (store.linkedBankAccounts || []).find(
+        (a) => a.id === accountId && String(a.businessId || '1') === targetBizId
+      );
+      if (!existing) {
+        return { success: false, error: 'ACCOUNT_NOT_FOUND', message: 'ব্যাংক একাউন্টটি পাওয়া যায়নি।' };
+      }
+      if (existing.status === 'VERIFIED') {
+        return { success: true, status: 'VERIFIED', account: existing };
+      }
+
+      const inputPaisa = Number(depositPaisa);
+      const isMatch = existing.testDepositPaisa === inputPaisa;
+      const nextAttempts = (existing.verificationAttempts || 0) + 1;
+      let nextStatus = existing.status;
+
+      if (isMatch) {
+        nextStatus = 'VERIFIED';
+      } else if (nextAttempts >= 3) {
+        nextStatus = 'REJECTED';
+      }
+
+      const nowIso = new Date().toISOString();
+      let updated = null;
+      await this.mutateCollection('linkedBankAccounts', (list) => {
+        return list.map((a) => {
+          if (a.id === accountId) {
+            updated = {
+              ...a,
+              status: nextStatus,
+              verificationAttempts: nextAttempts,
+              verifiedAt: isMatch ? nowIso : a.verifiedAt,
+              updateDate: nowIso,
+            };
+            return updated;
+          }
+          return a;
+        });
+      });
+
+      if (isMatch) {
+        return { success: true, status: 'VERIFIED', account: updated };
+      } else {
+        return {
+          success: false,
+          error: 'DEPOSIT_MISMATCH',
+          status: nextStatus,
+          remainingAttempts: Math.max(0, 3 - nextAttempts),
+          message: nextStatus === 'REJECTED'
+            ? '৩ বার ভুল ডিপোজিট অ্যামাউন্ট দেওয়ার কারণে একাউন্টটি বাতিল করা হয়েছে।'
+            : 'প্রদত্ত ডিপোজিট অ্যামাউন্ট মিলছে না। সঠিক পরিমাণ দিন।',
+        };
+      }
+    }
+
+    /**
+     * REA-ITER-232: Saves a linked MFS mobile banking wallet (bKash, Nagad, Rocket, Upay).
+     */
+    async saveLinkedMfsAccount(businessId = null, mfsData = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const nowIso = new Date().toISOString();
+
+      const recordId = mfsData.id || ('MFS_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+      const record = {
+        id: recordId,
+        businessId: targetBizId,
+        operator: mfsData.operator || 'BKASH',
+        operatorName: mfsData.operatorName || mfsData.operator || 'bKash',
+        mobileNumber: String(mfsData.mobileNumber || ''),
+        accountHolderName: mfsData.accountHolderName || '',
+        status: mfsData.status || 'VERIFIED',
+        linkedAt: mfsData.linkedAt || nowIso,
+        updateDate: nowIso,
+      };
+
+      let saved = null;
+      await this.mutateCollection('linkedMfsAccounts', (list) => {
+        const withoutCurrent = list.filter((m) => m.id !== recordId);
+        saved = record;
+        return [record, ...withoutCurrent];
+      });
+
+      return { success: true, mfs: saved };
+    }
+
+    /**
+     * REA-ITER-232: Retrieves linked MFS mobile banking accounts for a business.
+     */
+    getLinkedMfsAccounts(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.linkedMfsAccounts || []).filter(
+        (m) => String(m.businessId || '1') === targetBizId
+      );
+
+      if (options.operator) {
+        list = list.filter((m) => m.operator === options.operator);
+      }
+
+      list.sort((a, b) => new Date(b.linkedAt || 0) - new Date(a.linkedAt || 0));
+
+      return {
+        items: list,
+        mfsAccounts: list,
+        totalCount: list.length,
+      };
+    }
+
+    /**
+     * REA-ITER-232: Retrieves single linked MFS account by ID.
+     */
+    getLinkedMfsAccountById(businessId = null, id = null) {
+      if (!id) return null;
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const found = (store.linkedMfsAccounts || []).find(
+        (m) => m.id === id && (!targetBizId || String(m.businessId || '1') === targetBizId)
+      );
+      return found ? { ...found } : null;
+    }
+
+    /**
+     * REA-ITER-232: Deletes a linked MFS account.
+     */
+    async deleteLinkedMfsAccount(businessId = null, id = null) {
+      if (!id) return { success: false, error: 'ID_REQUIRED' };
+      let removed = false;
+      await this.mutateCollection('linkedMfsAccounts', (list) => {
+        const filtered = list.filter((m) => m.id !== id);
+        if (filtered.length !== list.length) removed = true;
+        return filtered;
+      });
+      return { success: removed, deletedId: id };
+    }
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -8429,6 +8804,77 @@ async function saveAutoDisbursementConfigRepo(businessId = null, config = {}, re
   return { success: false, error: 'NO_REPOSITORY' };
 }
 
+
+async function saveLinkedBankAccountRepo(businessId = null, accountData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveLinkedBankAccount === 'function') {
+    return repo.saveLinkedBankAccount(businessId, accountData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getLinkedBankAccountsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getLinkedBankAccounts === 'function') {
+    return repo.getLinkedBankAccounts(businessId, options);
+  }
+  return { items: [], accounts: [], totalCount: 0 };
+}
+
+function getLinkedBankAccountByIdRepo(businessId = null, id = null, repo = defaultRepository) {
+  if (repo && typeof repo.getLinkedBankAccountById === 'function') {
+    return repo.getLinkedBankAccountById(businessId, id);
+  }
+  return null;
+}
+
+async function deleteLinkedBankAccountRepo(businessId = null, accountId = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteLinkedBankAccount === 'function') {
+    return repo.deleteLinkedBankAccount(businessId, accountId);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function setDefaultBankAccountRepo(businessId = null, accountId = null, repo = defaultRepository) {
+  if (repo && typeof repo.setDefaultBankAccount === 'function') {
+    return repo.setDefaultBankAccount(businessId, accountId);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function verifyLinkedBankAccountRepo(businessId = null, accountId = null, depositPaisa = null, repo = defaultRepository) {
+  if (repo && typeof repo.verifyLinkedBankAccount === 'function') {
+    return repo.verifyLinkedBankAccount(businessId, accountId, depositPaisa);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function saveLinkedMfsAccountRepo(businessId = null, mfsData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveLinkedMfsAccount === 'function') {
+    return repo.saveLinkedMfsAccount(businessId, mfsData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getLinkedMfsAccountsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getLinkedMfsAccounts === 'function') {
+    return repo.getLinkedMfsAccounts(businessId, options);
+  }
+  return { items: [], mfsAccounts: [], totalCount: 0 };
+}
+
+function getLinkedMfsAccountByIdRepo(businessId = null, id = null, repo = defaultRepository) {
+  if (repo && typeof repo.getLinkedMfsAccountById === 'function') {
+    return repo.getLinkedMfsAccountById(businessId, id);
+  }
+  return null;
+}
+
+async function deleteLinkedMfsAccountRepo(businessId = null, id = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteLinkedMfsAccount === 'function') {
+    return repo.deleteLinkedMfsAccount(businessId, id);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -8579,6 +9025,16 @@ const repoExport = {
   getDeviceBindings: getDeviceBindingsRepo,
   getActiveDeviceBinding: getActiveDeviceBindingRepo,
   revokeDeviceBinding: revokeDeviceBindingRepo,
+  saveLinkedBankAccount: saveLinkedBankAccountRepo,
+  getLinkedBankAccounts: getLinkedBankAccountsRepo,
+  getLinkedBankAccountById: getLinkedBankAccountByIdRepo,
+  deleteLinkedBankAccount: deleteLinkedBankAccountRepo,
+  setDefaultBankAccount: setDefaultBankAccountRepo,
+  verifyLinkedBankAccount: verifyLinkedBankAccountRepo,
+  saveLinkedMfsAccount: saveLinkedMfsAccountRepo,
+  getLinkedMfsAccounts: getLinkedMfsAccountsRepo,
+  getLinkedMfsAccountById: getLinkedMfsAccountByIdRepo,
+  deleteLinkedMfsAccount: deleteLinkedMfsAccountRepo,
   sanitizeState: sanitizeStateRepo,
   default: defaultRepository,
 };
@@ -8736,6 +9192,16 @@ if (typeof exports !== 'undefined') {
   exports.getDeviceBindings = getDeviceBindingsRepo;
   exports.getActiveDeviceBinding = getActiveDeviceBindingRepo;
   exports.revokeDeviceBinding = revokeDeviceBindingRepo;
+  exports.saveLinkedBankAccount = saveLinkedBankAccountRepo;
+  exports.getLinkedBankAccounts = getLinkedBankAccountsRepo;
+  exports.getLinkedBankAccountById = getLinkedBankAccountByIdRepo;
+  exports.deleteLinkedBankAccount = deleteLinkedBankAccountRepo;
+  exports.setDefaultBankAccount = setDefaultBankAccountRepo;
+  exports.verifyLinkedBankAccount = verifyLinkedBankAccountRepo;
+  exports.saveLinkedMfsAccount = saveLinkedMfsAccountRepo;
+  exports.getLinkedMfsAccounts = getLinkedMfsAccountsRepo;
+  exports.getLinkedMfsAccountById = getLinkedMfsAccountByIdRepo;
+  exports.deleteLinkedMfsAccount = deleteLinkedMfsAccountRepo;
   exports.sanitizeState = sanitizeStateRepo;
   exports.default = defaultRepository;
 }

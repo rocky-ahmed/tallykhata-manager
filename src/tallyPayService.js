@@ -3937,7 +3937,592 @@ const tallyPaySecurityManager = new TallyPaySecurityManager();
 class SettlementAndReconciliationEngine extends ReconstructedSettlementAndReconciliationEngine {}
 const settlementAndReconciliationEngine = new SettlementAndReconciliationEngine();
 
+// =========================================================================
+// MILESTONE REA-ITER-232: TALLYPAY LINKED BANK ACCOUNTS & ACCOUNT MANAGER
+// =========================================================================
+
+const ACCOUNT_STATUSES = Object.freeze({
+  PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+  BLOCKED: 'BLOCKED',
+});
+
+const ACCOUNT_TYPES = Object.freeze({
+  SAVINGS: 'SAVINGS',
+  CURRENT: 'CURRENT',
+});
+
+const MFS_OPERATORS = Object.freeze({
+  BKASH: {
+    code: 'BKASH',
+    name: 'bKash',
+    nameBn: 'বিকাশ',
+    prefix: '01',
+    color: '#E2136E',
+    logoUrl: 'https://tallykhata.com/assets/mfs/bkash.png',
+  },
+  NAGAD: {
+    code: 'NAGAD',
+    name: 'Nagad',
+    nameBn: 'নগদ',
+    prefix: '01',
+    color: '#F7941D',
+    logoUrl: 'https://tallykhata.com/assets/mfs/nagad.png',
+  },
+  ROCKET: {
+    code: 'ROCKET',
+    name: 'Rocket',
+    nameBn: 'রকেট',
+    prefix: '01',
+    color: '#8C3494',
+    logoUrl: 'https://tallykhata.com/assets/mfs/rocket.png',
+  },
+  UPAY: {
+    code: 'UPAY',
+    name: 'Upay',
+    nameBn: 'উপায়',
+    prefix: '01',
+    color: '#0055B8',
+    logoUrl: 'https://tallykhata.com/assets/mfs/upay.png',
+  },
+  SURECASH: {
+    code: 'SURECASH',
+    name: 'SureCash',
+    nameBn: 'শিওরক্যাশ',
+    prefix: '01',
+    color: '#F47920',
+  },
+  TAP: {
+    code: 'TAP',
+    name: 'Tap',
+    nameBn: 'ট্যাপ',
+    prefix: '01',
+    color: '#00A3E0',
+  },
+});
+
+const BANGLADESH_SCHEDULED_BANKS = Object.freeze([
+  {
+    code: '085',
+    bankCode: '085',
+    shortCode: 'BBL',
+    name: 'BRAC Bank Ltd',
+    nameBn: 'ব্র্যাক ব্যাংক লিমিটেড',
+    routingNumber: '060261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/bbl.png',
+    defaultBranches: [
+      { branchName: 'Gulshan Head Office', branchCode: '301', routingNumber: '060261742' },
+      { branchName: 'Asad Gate Branch', branchCode: '302', routingNumber: '060261743' },
+      { branchName: 'Uttara Branch', branchCode: '303', routingNumber: '060261744' },
+    ],
+  },
+  {
+    code: '225',
+    bankCode: '225',
+    shortCode: 'CBL',
+    name: 'The City Bank Ltd',
+    nameBn: 'সিটি ব্যাংক লিমিটেড',
+    routingNumber: '085261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/cbl.png',
+    defaultBranches: [
+      { branchName: 'Principal Office', branchCode: '201', routingNumber: '085261742' },
+      { branchName: 'Gulshan Avenue', branchCode: '202', routingNumber: '085261743' },
+      { branchName: 'Dhanmondi Branch', branchCode: '203', routingNumber: '085261744' },
+    ],
+  },
+  {
+    code: '090',
+    bankCode: '090',
+    shortCode: 'DBBL',
+    name: 'Dutch-Bangla Bank Ltd',
+    nameBn: 'ডাচ-বাংলা ব্যাংক লিমিটেড',
+    routingNumber: '090261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/dbbl.png',
+    defaultBranches: [
+      { branchName: 'Motijheel Head Office', branchCode: '401', routingNumber: '090261742' },
+      { branchName: 'Karwan Bazar', branchCode: '402', routingNumber: '090261743' },
+    ],
+  },
+  {
+    code: '200',
+    bankCode: '200',
+    shortCode: 'SBL',
+    name: 'Sonali Bank Ltd',
+    nameBn: 'সোনালী ব্যাংক লিমিটেড',
+    routingNumber: '200261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/sbl.png',
+    defaultBranches: [
+      { branchName: 'Principal Branch', branchCode: '501', routingNumber: '200261742' },
+      { branchName: 'Bangabandhu Avenue', branchCode: '502', routingNumber: '200261743' },
+    ],
+  },
+  {
+    code: '125',
+    bankCode: '125',
+    shortCode: 'IBBL',
+    name: 'Islami Bank Bangladesh Ltd',
+    nameBn: 'ইসলামী ব্যাংক বাংলাদেশ লিমিটেড',
+    routingNumber: '125261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/ibbl.png',
+    defaultBranches: [
+      { branchName: 'Dilkusha Corporate', branchCode: '101', routingNumber: '125261742' },
+      { branchName: 'Gulshan Branch', branchCode: '102', routingNumber: '125261743' },
+    ],
+  },
+  {
+    code: '095',
+    bankCode: '095',
+    shortCode: 'EBL',
+    name: 'Eastern Bank Ltd',
+    nameBn: 'ইস্টার্ন ব্যাংক লিমিটেড',
+    routingNumber: '095261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/ebl.png',
+    defaultBranches: [
+      { branchName: 'Principal Branch', branchCode: '601', routingNumber: '095261742' },
+      { branchName: 'Banani Branch', branchCode: '602', routingNumber: '095261743' },
+    ],
+  },
+  {
+    code: '155',
+    bankCode: '155',
+    shortCode: 'MTBL',
+    name: 'Mutual Trust Bank Ltd',
+    nameBn: 'মিউচুয়াল ট্রাস্ট ব্যাংক লিমিটেড',
+    routingNumber: '155261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/mtbl.png',
+    defaultBranches: [
+      { branchName: 'Panthapath', branchCode: '701', routingNumber: '155261742' },
+    ],
+  },
+  {
+    code: '175',
+    bankCode: '175',
+    shortCode: 'PBL',
+    name: 'Pubali Bank Ltd',
+    nameBn: 'পূবালী ব্যাংক লিমিটেড',
+    routingNumber: '175261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/pbl.png',
+    defaultBranches: [
+      { branchName: 'Principal Office', branchCode: '801', routingNumber: '175261742' },
+    ],
+  },
+  {
+    code: '170',
+    bankCode: '170',
+    shortCode: 'PRBL',
+    name: 'Prime Bank Ltd',
+    nameBn: 'প্রাইম ব্যাংক লিমিটেড',
+    routingNumber: '170261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/prbl.png',
+    defaultBranches: [
+      { branchName: 'Motijheel Corporate', branchCode: '901', routingNumber: '170261742' },
+    ],
+  },
+  {
+    code: '035',
+    bankCode: '035',
+    shortCode: 'BAL',
+    name: 'Bank Asia Ltd',
+    nameBn: 'ব্যাংক এশিয়া লিমিটেড',
+    routingNumber: '035261742',
+    npsbSupported: true,
+    instantTransferSupported: true,
+    beftnSupported: true,
+    logoUrl: 'https://tallykhata.com/assets/banks/bal.png',
+    defaultBranches: [
+      { branchName: 'Principal Office', branchCode: '051', routingNumber: '035261742' },
+    ],
+  },
+]);
+
+function getScheduledBankList() {
+  return BANGLADESH_SCHEDULED_BANKS.map((b) => ({ ...b }));
+}
+
+function getScheduledBankByCode(code) {
+  if (!code) return null;
+  const normalized = String(code).trim().toLowerCase();
+  return (
+    BANGLADESH_SCHEDULED_BANKS.find(
+      (b) =>
+        b.code.toLowerCase() === normalized ||
+        b.bankCode.toLowerCase() === normalized ||
+        b.shortCode.toLowerCase() === normalized
+    ) || null
+  );
+}
+
+const ACCOUNT_MANAGER_ARSC_TOKENS = Object.freeze({
+  ADD_NEW_BANK_ACCOUNT: 'নতুন ব্যাংক একাউন্ট',
+  DELETE_BANK_ACCOUNT_TITLE: 'ব্যাংক একাউন্ট ডিলিট করি',
+  BANK_ACCOUNT_DELETED_TOAST: 'ব্যাংক একাউন্ট টি ডিলিট করা হয়েছে।',
+  DELETION_FAILURE_ALERT: 'ব্যাংক একাউন্ট ডিলিট করা সম্ভব হয়নি',
+  VERIFY_BANK_ACCOUNT_CTA: 'ব্যাংক একাউন্ট ভেরিফাই করি',
+  UNVERIFIED_ACCOUNT_WARNING: 'আপনার যোগ করা ব্যাংক একাউন্ট ভেরিফাই করা হয়নি।',
+  MICRO_DEPOSIT_NOTICE: 'ভেরিফিকেশনের জন্য আপনার ব্যাংক একাউন্টে একটি প্রতীকী লেনদেন ডিপোজিট করা হয়েছে।',
+  EMPTY_STATE_PROMPT: 'ব্যাংক একাউন্ট বা মোবাইল ব্যাংকিং একাউন্ট যোগ করুন',
+  EMPTY_STATE_MESSAGE: 'যোগ করা হয়নি। ব্যাংক একাউন্ট বা মোবাইল ব্যাংকিং',
+  ACCURACY_CONFIRMATION: 'আমি নিশ্চিত করছি যে, উপরে প্রদত্ত ব্যাংক একাউন্টের তথ্য সঠিক ও নির্ভুল।',
+  MFS_DESTINATION_NOTICE: 'ট্রান্সফার করুন নগদ, রকেট বা',
+  BEFTN_ADVISORY_NOTICE: 'নোটঃ এই ব্যাংক একাউন্টে BEFTN এর মাধ্যমে টাকা জমা হতে ২-৩ কর্মদিবস লাগতে পারে।',
+  ROUTING_NUMBER_LABEL: 'রাউটিং নম্বর',
+  BRANCH_NAME_LABEL: 'শাখার নাম',
+  ACCOUNT_NUMBER_LABEL: 'একাউন্ট নম্বর',
+  ACCOUNT_HOLDER_NAME_LABEL: 'একাউন্ট হোল্ডারের নাম',
+  ACTIVE_LOAN_GUARD: 'লোন চলাকালীন এই একাউন্ট ডিলিট করা যাবে না',
+  LOCKOUT_ALERT_3_ATTEMPTS: '৩ বার ভুল টাকার পরিমাণ দেয়ার কারণে আপনার ব্যাংকিং কার্যক্রম ব্লক করা হয়েছে',
+  PIN_ENTRY_DELETION: 'PIN দিয়ে ডিলিট করুন',
+  NPSB_INSTANT_PROMPT: 'ইনস্ট্যান্ট ব্যাংক ট্রান্সফার',
+});
+
+class ReconstructedLinkedAccountEngine {
+  constructor() {
+    this.bankAccounts = [];
+    this.mfsAccounts = [];
+    this.autoDisbursementConfig = {
+      isAutoDisbursementEnabled: false,
+      linkedBankAccountId: null,
+    };
+  }
+
+  addBankAccount({ bankCode, bankName, branchName, routingNumber, accountNumber, accountHolderName, accountType, isLoanAccount }) {
+    if (!routingNumber || !/^\d{9}$/.test(routingNumber)) {
+      return { success: false, reason: 'INVALID_ROUTING_NUMBER', error: 'INVALID_ROUTING_NUMBER' };
+    }
+    if (!accountNumber || !/^\d{8,34}$/.test(accountNumber)) {
+      return { success: false, reason: 'INVALID_ACCOUNT_NUMBER', error: 'INVALID_ACCOUNT_NUMBER' };
+    }
+    if (!accountHolderName || accountHolderName.trim().length === 0) {
+      return { success: false, reason: 'MISSING_HOLDER_NAME', error: 'MISSING_HOLDER_NAME' };
+    }
+
+    const id = 'LBA_' + Math.random().toString(36).substring(2, 9);
+    const testDepositPaisa = Math.floor(Math.random() * 90) + 10;
+    const account = {
+      id,
+      bankCode: bankCode || '',
+      bankName: bankName || '',
+      branchName: branchName || '',
+      routingNumber: String(routingNumber),
+      accountNumber: String(accountNumber),
+      accountHolderName: accountHolderName.trim(),
+      accountType: accountType || 'SAVINGS',
+      status: 'PENDING_VERIFICATION',
+      testDepositPaisa,
+      verificationAttempts: 0,
+      isDefaultPayout: this.bankAccounts.length === 0,
+      isLoanAccount: Boolean(isLoanAccount),
+      createdAt: Date.now(),
+    };
+    this.bankAccounts.push(account);
+    return { success: true, account };
+  }
+
+  verifyBankAccount(accountId, depositPaisa) {
+    const acc = this.bankAccounts.find((a) => a.id === accountId);
+    if (!acc) return { success: false, reason: 'ACCOUNT_NOT_FOUND', error: 'ACCOUNT_NOT_FOUND' };
+    if (acc.status === 'VERIFIED') return { success: true, account: acc };
+    if (acc.status === 'REJECTED' || acc.status === 'BLOCKED') {
+      return { success: false, reason: 'ACCOUNT_LOCKED', error: 'ACCOUNT_LOCKED' };
+    }
+
+    acc.verificationAttempts++;
+    if (acc.testDepositPaisa === Number(depositPaisa)) {
+      acc.status = 'VERIFIED';
+      return { success: true, account: acc };
+    } else {
+      if (acc.verificationAttempts >= 3) {
+        acc.status = 'BLOCKED';
+      }
+      return {
+        success: false,
+        reason: 'DEPOSIT_MISMATCH',
+        error: 'DEPOSIT_MISMATCH',
+        remainingAttempts: Math.max(0, 3 - acc.verificationAttempts),
+        status: acc.status,
+      };
+    }
+  }
+
+  setDefaultPayoutAccount(accountId) {
+    const acc = this.bankAccounts.find((a) => a.id === accountId);
+    if (!acc) return { success: false, reason: 'ACCOUNT_NOT_FOUND', error: 'ACCOUNT_NOT_FOUND' };
+    if (acc.status !== 'VERIFIED') return { success: false, reason: 'ACCOUNT_NOT_VERIFIED', error: 'ACCOUNT_NOT_VERIFIED' };
+
+    this.bankAccounts.forEach((a) => {
+      a.isDefaultPayout = (a.id === accountId);
+    });
+    if (this.autoDisbursementConfig && this.autoDisbursementConfig.isAutoDisbursementEnabled) {
+      this.autoDisbursementConfig.linkedBankAccountId = accountId;
+    }
+    return { success: true, account: acc };
+  }
+
+  deleteBankAccount(accountId, pin) {
+    const acc = this.bankAccounts.find((a) => a.id === accountId);
+    if (!acc) return { success: false, reason: 'ACCOUNT_NOT_FOUND', error: 'ACCOUNT_NOT_FOUND' };
+    if (!pin || String(pin).length !== 4) return { success: false, reason: 'INVALID_PIN', error: 'INVALID_PIN' };
+
+    if (acc.isLoanAccount) {
+      return { success: false, reason: 'CANNOT_DELETE_LOAN_ACCOUNT', error: 'CANNOT_DELETE_LOAN_ACCOUNT' };
+    }
+
+    if (
+      this.autoDisbursementConfig &&
+      this.autoDisbursementConfig.isAutoDisbursementEnabled &&
+      this.autoDisbursementConfig.linkedBankAccountId === accountId
+    ) {
+      return { success: false, reason: 'CANNOT_DELETE_ACTIVE_AUTODISBURSEMENT_ACCOUNT', error: 'CANNOT_DELETE_ACTIVE_AUTODISBURSEMENT_ACCOUNT' };
+    }
+
+    this.bankAccounts = this.bankAccounts.filter((a) => a.id !== accountId);
+    if (acc.isDefaultPayout) {
+      const nextVerified = this.bankAccounts.find((a) => a.status === 'VERIFIED');
+      if (nextVerified) nextVerified.isDefaultPayout = true;
+    }
+    return { success: true, deletedId: accountId };
+  }
+
+  linkMfsAccount({ operator, mobileNumber, accountHolderName, otp }) {
+    if (!mobileNumber || !/^01[3-9]\d{8}$/.test(mobileNumber)) {
+      return { success: false, reason: 'INVALID_MOBILE_NUMBER', error: 'INVALID_MOBILE_NUMBER' };
+    }
+    if (!otp || !/^\d{6}$/.test(otp)) {
+      return { success: false, reason: 'INVALID_OTP', error: 'INVALID_OTP' };
+    }
+    const exists = this.mfsAccounts.find(
+      (m) => m.mobileNumber === mobileNumber && m.operator === operator
+    );
+    if (exists) {
+      return { success: false, reason: 'WALLET_ALREADY_LINKED', error: 'WALLET_ALREADY_LINKED' };
+    }
+
+    const id = 'MFS_' + Math.random().toString(36).substring(2, 9);
+    const mfs = {
+      id,
+      operator,
+      mobileNumber,
+      accountHolderName: accountHolderName || '',
+      status: 'VERIFIED',
+      linkedAt: Date.now(),
+    };
+    this.mfsAccounts.push(mfs);
+    return { success: true, mfs };
+  }
+}
+
+class LinkedAccountEngine extends ReconstructedLinkedAccountEngine {}
+const linkedAccountEngine = new LinkedAccountEngine();
+
+class TallyPayAccountManager {
+  constructor(repo = null, securityManager = null) {
+    this.repo = repo;
+    this.securityManager = securityManager;
+  }
+
+  getRepo() {
+    if (!this.repo && typeof require !== 'undefined') {
+      this.repo = require('./storageRepository').storageRepository;
+    }
+    return this.repo;
+  }
+
+  getSecurityManager() {
+    if (!this.securityManager) {
+      this.securityManager = tallyPaySecurityManager;
+    }
+    return this.securityManager;
+  }
+
+  async addBankAccount(businessId = null, accountData = {}) {
+    const { routingNumber, accountNumber, accountHolderName } = accountData;
+    if (!routingNumber || !/^\d{9}$/.test(String(routingNumber))) {
+      return { success: false, reason: 'INVALID_ROUTING_NUMBER', error: 'INVALID_ROUTING_NUMBER', message: '৯ ডিজিটের সঠিক রাউটিং নম্বর দিন।' };
+    }
+    if (!accountNumber || !/^\d{8,34}$/.test(String(accountNumber))) {
+      return { success: false, reason: 'INVALID_ACCOUNT_NUMBER', error: 'INVALID_ACCOUNT_NUMBER', message: 'সঠিক একাউন্ট নম্বর দিন (৮ থেকে ৩৪ ডিজিট)।' };
+    }
+    if (!accountHolderName || String(accountHolderName).trim().length === 0) {
+      return { success: false, reason: 'MISSING_HOLDER_NAME', error: 'MISSING_HOLDER_NAME', message: 'একাউন্ট হোল্ডারের নাম আবশ্যক।' };
+    }
+
+    const repo = this.getRepo();
+    if (repo && typeof repo.saveLinkedBankAccount === 'function') {
+      return repo.saveLinkedBankAccount(businessId, accountData);
+    }
+    return { success: false, error: 'NO_REPOSITORY' };
+  }
+
+  async verifyBankAccount(businessId = null, accountId = null, depositPaisa = null) {
+    if (!accountId) return { success: false, reason: 'ACCOUNT_ID_REQUIRED', error: 'ACCOUNT_ID_REQUIRED' };
+    const repo = this.getRepo();
+    if (repo && typeof repo.verifyLinkedBankAccount === 'function') {
+      return repo.verifyLinkedBankAccount(businessId, accountId, depositPaisa);
+    }
+    return { success: false, error: 'NO_REPOSITORY' };
+  }
+
+  async setDefaultBankAccount(businessId = null, accountId = null) {
+    if (!accountId) return { success: false, reason: 'ACCOUNT_ID_REQUIRED', error: 'ACCOUNT_ID_REQUIRED' };
+    const repo = this.getRepo();
+    if (repo && typeof repo.setDefaultBankAccount === 'function') {
+      return repo.setDefaultBankAccount(businessId, accountId);
+    }
+    return { success: false, error: 'NO_REPOSITORY' };
+  }
+
+  async deleteBankAccount(businessId = null, accountId = null, pin = null) {
+    if (!accountId) return { success: false, reason: 'ACCOUNT_NOT_FOUND', error: 'ACCOUNT_NOT_FOUND' };
+    if (!pin || String(pin).length !== 4) {
+      return { success: false, reason: 'INVALID_PIN', error: 'INVALID_PIN', message: '৪ ডিজিটের গোপন পিন দিন।' };
+    }
+
+    const repo = this.getRepo();
+    const existing = repo && typeof repo.getLinkedBankAccountById === 'function'
+      ? repo.getLinkedBankAccountById(businessId, accountId)
+      : null;
+
+    if (!existing) {
+      return { success: false, reason: 'ACCOUNT_NOT_FOUND', error: 'ACCOUNT_NOT_FOUND', message: 'ব্যাংক একাউন্টটি পাওয়া যায়নি।' };
+    }
+
+    if (existing.isLoanAccount) {
+      return {
+        success: false,
+        reason: 'CANNOT_DELETE_LOAN_ACCOUNT',
+        error: 'CANNOT_DELETE_LOAN_ACCOUNT',
+        message: 'লোন চলাকালীন এই একাউন্ট ডিলিট করা যাবে না',
+      };
+    }
+
+    const store = (repo && repo.currentStore) || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const autoConfig = store.autoDisbursementConfig && store.autoDisbursementConfig[targetBizId];
+    if (autoConfig && autoConfig.isAutoDisbursementEnabled && autoConfig.linkedBankAccountId === accountId) {
+      return {
+        success: false,
+        reason: 'CANNOT_DELETE_ACTIVE_AUTODISBURSEMENT_ACCOUNT',
+        error: 'CANNOT_DELETE_ACTIVE_AUTODISBURSEMENT_ACCOUNT',
+        message: 'স্বয়ংক্রিয় ব্যাংক ট্রান্সফার চালু থাকায় এই একাউন্টটি মুছে ফেলা সম্ভব নয়।',
+      };
+    }
+
+    return repo.deleteLinkedBankAccount(businessId, accountId);
+  }
+
+  async linkMfsAccount(businessId = null, mfsData = {}) {
+    const { operator, mobileNumber, otp } = mfsData;
+    if (!mobileNumber || !/^01[3-9]\d{8}$/.test(String(mobileNumber))) {
+      return { success: false, reason: 'INVALID_MOBILE_NUMBER', error: 'INVALID_MOBILE_NUMBER', message: 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।' };
+    }
+    if (!otp || !/^\d{6}$/.test(String(otp))) {
+      return { success: false, reason: 'INVALID_OTP', error: 'INVALID_OTP', message: 'সঠিক ৬ ডিজিটের ওটিপি দিন।' };
+    }
+
+    const repo = this.getRepo();
+    if (repo && typeof repo.getLinkedMfsAccounts === 'function') {
+      const existingList = repo.getLinkedMfsAccounts(businessId, { operator }).items || [];
+      const dup = existingList.find((m) => m.mobileNumber === mobileNumber);
+      if (dup) {
+        return { success: false, reason: 'WALLET_ALREADY_LINKED', error: 'WALLET_ALREADY_LINKED', message: 'এই ওয়ালেটটি ইতিমধ্যে যুক্ত রয়েছে।' };
+      }
+    }
+
+    if (repo && typeof repo.saveLinkedMfsAccount === 'function') {
+      return repo.saveLinkedMfsAccount(businessId, mfsData);
+    }
+    return { success: false, error: 'NO_REPOSITORY' };
+  }
+
+  getLinkedBankAccounts(businessId = null, options = {}) {
+    const repo = this.getRepo();
+    if (repo && typeof repo.getLinkedBankAccounts === 'function') {
+      return repo.getLinkedBankAccounts(businessId, options);
+    }
+    return { items: [], accounts: [], totalCount: 0 };
+  }
+
+  getLinkedBankAccountById(businessId = null, id = null) {
+    const repo = this.getRepo();
+    if (repo && typeof repo.getLinkedBankAccountById === 'function') {
+      return repo.getLinkedBankAccountById(businessId, id);
+    }
+    return null;
+  }
+
+  getLinkedMfsAccounts(businessId = null, options = {}) {
+    const repo = this.getRepo();
+    if (repo && typeof repo.getLinkedMfsAccounts === 'function') {
+      return repo.getLinkedMfsAccounts(businessId, options);
+    }
+    return { items: [], mfsAccounts: [], totalCount: 0 };
+  }
+
+  getLinkedMfsAccountById(businessId = null, id = null) {
+    const repo = this.getRepo();
+    if (repo && typeof repo.getLinkedMfsAccountById === 'function') {
+      return repo.getLinkedMfsAccountById(businessId, id);
+    }
+    return null;
+  }
+
+  async deleteLinkedMfsAccount(businessId = null, id = null) {
+    const repo = this.getRepo();
+    if (repo && typeof repo.deleteLinkedMfsAccount === 'function') {
+      return repo.deleteLinkedMfsAccount(businessId, id);
+    }
+    return { success: false, error: 'NO_REPOSITORY' };
+  }
+}
+
+const BankAccountManager = TallyPayAccountManager;
+const tallyPayAccountManager = new TallyPayAccountManager();
+
+
 module.exports = {
+  // Milestone REA-ITER-232 Exports
+  ACCOUNT_STATUSES,
+  ACCOUNT_TYPES,
+  MFS_OPERATORS,
+  BANGLADESH_SCHEDULED_BANKS,
+  getScheduledBankList,
+  getScheduledBankByCode,
+  ACCOUNT_MANAGER_ARSC_TOKENS,
+  ReconstructedLinkedAccountEngine,
+  LinkedAccountEngine,
+  linkedAccountEngine,
+  TallyPayAccountManager,
+  BankAccountManager,
+  tallyPayAccountManager,
+
   // Milestone REA-ITER-231 Exports
   DEFAULT_PIN_SALT,
   PIN_ARSC_TOKENS,
