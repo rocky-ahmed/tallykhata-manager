@@ -76,6 +76,32 @@ try {
   batchTagadaService = require('./batchTagadaService');
 } catch (e) {}
 
+let billPaymentService = null;
+try {
+  billPaymentService = require('./billPaymentService');
+} catch (e) {}
+
+const {
+  BILLER_CATEGORIES,
+  BILL_PAYMENT_INPUT_DATA_TYPES,
+  BILL_PAYMENT_INPUT_UI_TYPES,
+  BILL_PAYMENT_LABEL_KEYWORDS,
+  BENGALI_ARSC_TOKENS: BILL_ARSC_TOKENS,
+  BILLER_PROVIDERS,
+  calculateBillConvenienceFee,
+  calculateUtilityBillFeePaisa,
+  calculateServiceChargePaisa,
+  fetchBillInfo,
+  generateBillPaymentTransactionId,
+  executeBillPayment,
+  saveBillerAccount,
+  getSavedBillers,
+  deleteSavedBiller,
+  getBillReceiptList,
+  BillPaymentEngine,
+  billPaymentEngine,
+} = billPaymentService || {};
+
 const {
   TAGADA_CHANNELS,
   DISPATCH_MODES,
@@ -184,6 +210,8 @@ const VALID_COLLECTIONS = new Set([
   'banglaQrTransactions',
   'tallyPayAddMoneyTxns',
   'soundboxLogs',
+  'billPaymentTransactions',
+  'savedBillers',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -422,6 +450,8 @@ function createDefaultState() {
     soundboxLogs: [],
     soundboxSettings: {},
     soundboxDeviceSettings: {},
+    billPaymentTransactions: [],
+    savedBillers: [],
     version: 6,
   };
 }
@@ -1491,6 +1521,24 @@ class StorageRepository {
     authoritative.tagadaLogs = authoritative.tagadaLogs || authoritative.tagada_log || [];
     authoritative.tagada_quota = authoritative.tagada_quota || authoritative.tagadaQuota || {};
 
+    if (authoritative.billPaymentTransactions && Array.isArray(authoritative.billPaymentTransactions)) {
+      authoritative.billPaymentTransactions = authoritative.billPaymentTransactions.map((tx) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, ...rest } = tx || {};
+        return rest;
+      });
+    } else {
+      authoritative.billPaymentTransactions = [];
+    }
+
+    if (authoritative.savedBillers && Array.isArray(authoritative.savedBillers)) {
+      authoritative.savedBillers = authoritative.savedBillers.map((b) => {
+        const { pin, token, apiKey, secretKey, ...rest } = b || {};
+        return rest;
+      });
+    } else {
+      authoritative.savedBillers = [];
+    }
+
     const domains = (extraState && Array.isArray(extraState.domains) && extraState.domains.length > 0)
       ? extraState.domains
       : ['all'];
@@ -2027,6 +2075,8 @@ class StorageRepository {
         delete soundboxSettings[targetId];
         const soundboxDeviceSettings = { ...(prevStore.soundboxDeviceSettings || {}) };
         delete soundboxDeviceSettings[targetId];
+        const billPaymentTransactions = (prevStore.billPaymentTransactions || []).filter((b) => getBizId(b) !== targetId);
+        const savedBillers = (prevStore.savedBillers || []).filter((s) => getBizId(s) !== targetId);
 
       // Clean up physical audio files of deleted business
       if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
@@ -2103,6 +2153,8 @@ class StorageRepository {
         soundboxLogs,
         soundboxSettings,
         soundboxDeviceSettings,
+        billPaymentTransactions,
+        savedBillers,
         cashReconciliation,
       };
     });
@@ -2249,6 +2301,8 @@ class StorageRepository {
         const importedReceipts = (data.receiptImages || []).filter(r => String(r.businessId || '1') === selectedBizId);
         const importedVouchers = (data.voucherPrintLogs || []).filter(v => String(v.businessId || '1') === selectedBizId);
           const importedBanglaQr = (data.banglaQrTransactions || []).filter(b => String(b.businessId || '1') === selectedBizId);
+          const importedBillPayments = (data.billPaymentTransactions || []).filter(b => String(b.businessId || '1') === selectedBizId);
+          const importedSavedBillers = (data.savedBillers || []).filter(s => String(s.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -2259,6 +2313,8 @@ class StorageRepository {
         const keptReceipts = (prevStore.receiptImages || []).filter(r => String(r.businessId || '1') !== selectedBizId);
         const keptVouchers = (prevStore.voucherPrintLogs || []).filter(v => String(v.businessId || '1') !== selectedBizId);
           const keptBanglaQr = (prevStore.banglaQrTransactions || []).filter(b => String(b.businessId || '1') !== selectedBizId);
+          const keptBillPayments = (prevStore.billPaymentTransactions || []).filter(b => String(b.businessId || '1') !== selectedBizId);
+          const keptSavedBillers = (prevStore.savedBillers || []).filter(s => String(s.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2289,6 +2345,8 @@ class StorageRepository {
           receiptImages: [...keptReceipts, ...importedReceipts],
           voucherPrintLogs: [...keptVouchers, ...importedVouchers],
             banglaQrTransactions: [...keptBanglaQr, ...importedBanglaQr],
+            billPaymentTransactions: [...keptBillPayments, ...importedBillPayments],
+            savedBillers: [...keptSavedBillers, ...importedSavedBillers],
           version: 6,
           lastRestoredAt: new Date().toISOString(),
           restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -2327,6 +2385,8 @@ class StorageRepository {
         tagadaQuota: restoredQuotaMap,
         remainingSmsCount: activeRestoredQuota.freeSmsCount !== undefined ? activeRestoredQuota.freeSmsCount : (data.remainingSmsCount ?? 5),
         tallyMessageBalance: activeRestoredQuota.purchasedSmsCount !== undefined ? activeRestoredQuota.purchasedSmsCount : (data.tallyMessageBalance ?? 50),
+        billPaymentTransactions: Array.isArray(data.billPaymentTransactions) ? data.billPaymentTransactions : [],
+        savedBillers: Array.isArray(data.savedBillers) ? data.savedBillers : [],
         inventory: restoredInventory,
         stock: restoredInventory,
         pinEnabled: false,
@@ -2612,6 +2672,8 @@ class StorageRepository {
           audioNotes: (fullState.audioNotes || []).length,
           tagada_log: (fullState.tagada_log || fullState.tagadaLogs || []).length,
           tagadaLogs: (fullState.tagadaLogs || fullState.tagada_log || []).length,
+          billPaymentTransactions: (fullState.billPaymentTransactions || []).length,
+          savedBillers: (fullState.savedBillers || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -5775,6 +5837,222 @@ class StorageRepository {
 
     return filtered;
   }
+
+  /**
+   * Logs a TallyPay Utility Bill Payment transaction atomically.
+   */
+  async logBillPaymentTransaction(businessId, txnData, options = {}) {
+    if (!txnData || typeof txnData !== 'object') {
+      return { success: false, error: 'INVALID_TRANSACTION_PAYLOAD' };
+    }
+
+    const bizId = String(businessId || options.businessId || txnData.businessId || this.currentStore?.activeBusinessId || '1');
+    const id = String(txnData.id || txnData.transactionNumber || ('TKBP-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8).toUpperCase()));
+    const nowIso = txnData.paymentDate || txnData.createdAt || new Date().toISOString();
+
+    const normalizedTxn = {
+      ...txnData,
+      id,
+      transactionNumber: txnData.transactionNumber || id,
+      txnNumber: txnData.txnNumber || txnData.transactionNumber || id,
+      businessId: bizId,
+      business_id: bizId,
+      createdAt: txnData.createdAt || nowIso,
+      paymentDate: txnData.paymentDate || nowIso,
+      updatedAt: nowIso,
+    };
+
+    const res = await this.mutateCollection('billPaymentTransactions', (list) => {
+      const existingIndex = list.findIndex((l) => String(l.id) === String(normalizedTxn.id) || String(l.transactionNumber) === String(normalizedTxn.id));
+      if (existingIndex >= 0) {
+        const updated = [...list];
+        updated[existingIndex] = normalizedTxn;
+        return updated;
+      }
+      return [normalizedTxn, ...list];
+    });
+
+    if (res.success) {
+      return { success: true, transaction: normalizedTxn };
+    }
+    return { success: false, error: res.error };
+  }
+
+  /**
+   * Retrieves all Utility Bill Payment transactions for a given business.
+   */
+  getBillPaymentTransactions(businessId = null, options = {}) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.billPaymentTransactions) ? store.billPaymentTransactions : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    let filtered = list.filter((tx) => {
+      if (!tx) return false;
+      const txBiz = String(tx.businessId !== undefined && tx.businessId !== null ? tx.businessId : (tx.business_id || '1'));
+      return txBiz === targetBizId;
+    });
+
+    if (options && options.billerCode) {
+      const bCode = String(options.billerCode).trim().toUpperCase();
+      filtered = filtered.filter((tx) => String(tx.billerCode || '').toUpperCase() === bCode);
+    }
+
+    if (options && options.billerCategory) {
+      const bCat = String(options.billerCategory).trim().toUpperCase();
+      filtered = filtered.filter((tx) => String(tx.billerCategory || '').toUpperCase() === bCat);
+    }
+
+    // Sort descending by timestamp or paymentDate
+    filtered.sort((a, b) => {
+      const tA = new Date(a.paymentDate || a.timestamp || a.createdAt || 0).getTime();
+      const tB = new Date(b.paymentDate || b.timestamp || b.createdAt || 0).getTime();
+      return tB - tA;
+    });
+
+    if (options && options.offset !== undefined && options.offset > 0) {
+      filtered = filtered.slice(options.offset);
+    }
+    if (options && options.limit !== undefined && options.limit > 0) {
+      filtered = filtered.slice(0, options.limit);
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Retrieves a specific bill payment transaction by ID.
+   */
+  getBillPaymentTransactionById(businessId = null, txnId = null) {
+    if (!txnId) return null;
+    const list = this.getBillPaymentTransactions(businessId);
+    return list.find((tx) => String(tx.id) === String(txnId) || String(tx.transactionNumber) === String(txnId)) || null;
+  }
+
+  /**
+   * Saves or updates a biller account for fast re-entry.
+   */
+  async saveBillerAccount(businessId, billerData = {}, options = {}) {
+    if (!billerData || typeof billerData !== 'object') {
+      return { success: false, error: 'INVALID_BILLER_PAYLOAD' };
+    }
+
+    const bizId = String(businessId || options.businessId || billerData.businessId || this.currentStore?.activeBusinessId || '1');
+    const billerCode = String(billerData.billerCode || '').trim();
+    const accountNo = String(billerData.accountNo || billerData.smsAccountNo || '').trim();
+    if (!billerCode || !accountNo) {
+      return { success: false, error: 'BILLER_CODE_AND_ACCOUNT_REQUIRED' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const id = billerData.id || ('SAVED_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6));
+
+    const normalizedBiller = {
+      ...billerData,
+      id,
+      businessId: bizId,
+      business_id: bizId,
+      billerCode,
+      accountNo,
+      meterNo: billerData.meterNo || null,
+      nickName: billerData.nickName || billerData.customerName || billerCode,
+      customerMobile: billerData.customerMobile || '',
+      billerCategory: billerData.billerCategory || 'OTHER_BILL',
+      createdAt: billerData.createdAt || nowIso,
+      updatedAt: nowIso,
+    };
+
+    const res = await this.mutateCollection('savedBillers', (list) => {
+      const existingIndex = list.findIndex((b) => {
+        if (!b) return false;
+        const bBiz = String(b.businessId !== undefined && b.businessId !== null ? b.businessId : (b.business_id || '1'));
+        return bBiz === bizId &&
+               String(b.billerCode).toUpperCase() === billerCode.toUpperCase() &&
+               String(b.accountNo) === accountNo;
+      });
+
+      if (existingIndex >= 0) {
+        const updated = [...list];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          ...normalizedBiller,
+          id: updated[existingIndex].id,
+          createdAt: updated[existingIndex].createdAt || nowIso,
+          updatedAt: nowIso,
+        };
+        return updated;
+      }
+      return [normalizedBiller, ...list];
+    });
+
+    if (res.success) {
+      return { success: true, savedBiller: normalizedBiller };
+    }
+    return { success: false, error: res.error };
+  }
+
+  /**
+   * Retrieves saved billers for a given business.
+   */
+  getSavedBillers(businessId = null, options = {}) {
+    const store = this.currentStore || {};
+    const list = Array.isArray(store.savedBillers) ? store.savedBillers : [];
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    let filtered = list.filter((b) => {
+      if (!b) return false;
+      const bBiz = String(b.businessId !== undefined && b.businessId !== null ? b.businessId : (b.business_id || '1'));
+      return bBiz === targetBizId;
+    });
+
+    if (options && options.billerCategory) {
+      const cat = String(options.billerCategory).trim().toUpperCase();
+      filtered = filtered.filter((b) => String(b.billerCategory || '').toUpperCase() === cat);
+    }
+    if (options && options.billerCode) {
+      const code = String(options.billerCode).trim().toUpperCase();
+      filtered = filtered.filter((b) => String(b.billerCode || '').toUpperCase() === code);
+    }
+
+    filtered.sort((a, b) => {
+      const tA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const tB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return tB - tA;
+    });
+
+    return filtered;
+  }
+
+  /**
+   * Deletes a saved biller for a given business.
+   */
+  async deleteSavedBiller(businessId, savedBillerId) {
+    if (!savedBillerId) {
+      return { success: false, error: 'SAVED_BILLER_ID_REQUIRED' };
+    }
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const targetId = String(savedBillerId);
+
+    const res = await this.mutateCollection('savedBillers', (list) => {
+      return list.filter((b) => {
+        if (!b) return false;
+        const bBiz = String(b.businessId !== undefined && b.businessId !== null ? b.businessId : (b.business_id || '1'));
+        return !(bBiz === targetBizId && String(b.id) === targetId);
+      });
+    });
+
+    if (res.success) {
+      return { success: true, deletedId: targetId };
+    }
+    return { success: false, error: res.error };
+  }
+
+  /**
+   * Retrieves bill receipt history (alias to getBillPaymentTransactions).
+   */
+  getBillReceiptList(businessId = null, options = {}) {
+    return this.getBillPaymentTransactions(businessId, options);
+  }
 }
 
 // ============================================================================
@@ -6699,6 +6977,55 @@ async function deleteVoucherPrintLogRepo(logId, repo = defaultRepository) {
   return { success: false, error: 'NO_REPOSITORY' };
 }
 
+async function logBillPaymentTransactionRepo(businessId, txnData, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.logBillPaymentTransaction === 'function') {
+    return repo.logBillPaymentTransaction(businessId, txnData, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getBillPaymentTransactionsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getBillPaymentTransactions === 'function') {
+    return repo.getBillPaymentTransactions(businessId, options);
+  }
+  return [];
+}
+
+function getBillPaymentTransactionByIdRepo(businessId = null, txnId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getBillPaymentTransactionById === 'function') {
+    return repo.getBillPaymentTransactionById(businessId, txnId);
+  }
+  return null;
+}
+
+async function saveBillerAccountRepo(businessId, billerData = {}, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveBillerAccount === 'function') {
+    return repo.saveBillerAccount(businessId, billerData, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getSavedBillersRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getSavedBillers === 'function') {
+    return repo.getSavedBillers(businessId, options);
+  }
+  return [];
+}
+
+async function deleteSavedBillerRepo(businessId, savedBillerId, repo = defaultRepository) {
+  if (repo && typeof repo.deleteSavedBiller === 'function') {
+    return repo.deleteSavedBiller(businessId, savedBillerId);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getBillReceiptListRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getBillReceiptList === 'function') {
+    return repo.getBillReceiptList(businessId, options);
+  }
+  return [];
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -6813,6 +7140,14 @@ const repoExport = {
   setTagadaQuota,
   recordTagadaQuotaPurchase,
   getDebtAgingReport,
+  billPaymentService,
+  logBillPaymentTransaction: logBillPaymentTransactionRepo,
+  getBillPaymentTransactions: getBillPaymentTransactionsRepo,
+  getBillPaymentTransactionById: getBillPaymentTransactionByIdRepo,
+  saveBillerAccount: saveBillerAccountRepo,
+  getSavedBillers: getSavedBillersRepo,
+  deleteSavedBiller: deleteSavedBillerRepo,
+  getBillReceiptList: getBillReceiptListRepo,
   default: defaultRepository,
 };
 
@@ -6933,5 +7268,13 @@ if (typeof exports !== 'undefined') {
   exports.setTagadaQuota = setTagadaQuota;
   exports.recordTagadaQuotaPurchase = recordTagadaQuotaPurchase;
   exports.getDebtAgingReport = getDebtAgingReport;
+  exports.billPaymentService = billPaymentService;
+  exports.logBillPaymentTransaction = logBillPaymentTransactionRepo;
+  exports.getBillPaymentTransactions = getBillPaymentTransactionsRepo;
+  exports.getBillPaymentTransactionById = getBillPaymentTransactionByIdRepo;
+  exports.saveBillerAccount = saveBillerAccountRepo;
+  exports.getSavedBillers = getSavedBillersRepo;
+  exports.deleteSavedBiller = deleteSavedBillerRepo;
+  exports.getBillReceiptList = getBillReceiptListRepo;
   exports.default = defaultRepository;
 }

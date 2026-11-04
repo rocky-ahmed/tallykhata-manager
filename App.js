@@ -98,6 +98,30 @@ const {
   batchTagadaEngine = batchTagadaModule.batchTagadaEngine,
 } = batchTagadaModule;
 
+import * as billPaymentModule from './src/billPaymentService';
+const billPaymentService = billPaymentModule.billPaymentService || billPaymentModule.default || billPaymentModule;
+const {
+  BILLER_CATEGORIES: BP_BILLER_CATEGORIES = billPaymentModule.BILLER_CATEGORIES,
+  BILLER_PROVIDERS: BP_BILLER_PROVIDERS = billPaymentModule.BILLER_PROVIDERS,
+  getBillerCategories: bpGetBillerCategories = billPaymentModule.getBillerCategories,
+  getBillerList: bpGetBillerList = billPaymentModule.getBillerList,
+  getBillerByCode: bpGetBillerByCode = billPaymentModule.getBillerByCode,
+  validateBillerField: bpValidateBillerField = billPaymentModule.validateBillerField,
+  validateBillerInputs: bpValidateBillerInputs = billPaymentModule.validateBillerInputs,
+  calculateBillConvenienceFee: bpCalculateBillConvenienceFee = billPaymentModule.calculateBillConvenienceFee,
+  calculateUtilityBillFeePaisa: bpCalculateUtilityBillFeePaisa = billPaymentModule.calculateUtilityBillFeePaisa,
+  calculateServiceChargePaisa: bpCalculateServiceChargePaisa = billPaymentModule.calculateServiceChargePaisa,
+  fetchBillInfo: bpFetchBillInfo = billPaymentModule.fetchBillInfo,
+  generateBillPaymentTransactionId: bpGenerateBillPaymentTransactionId = billPaymentModule.generateBillPaymentTransactionId,
+  executeBillPayment: bpExecuteBillPayment = billPaymentModule.executeBillPayment,
+  getBillReceiptList: bpGetBillReceiptList = billPaymentModule.getBillReceiptList,
+  saveBillerAccount: bpSaveBillerAccount = billPaymentModule.saveBillerAccount,
+  getSavedBillers: bpGetSavedBillers = billPaymentModule.getSavedBillers,
+  deleteSavedBiller: bpDeleteSavedBiller = billPaymentModule.deleteSavedBiller,
+  BillPaymentEngine: BP_BillPaymentEngine = billPaymentModule.BillPaymentEngine,
+  billPaymentEngine: bpBillPaymentEngine = billPaymentModule.billPaymentEngine,
+} = billPaymentModule;
+
 const ANALYTICS_BRAND_COLORS = {
   bkash: '#E2136E',
   nagad: '#F7941D',
@@ -1051,6 +1075,24 @@ function TallyKhataApp() {
   const [batchTagadaPreviewModal, setBatchTagadaPreviewModal] = useState(false);
   const [batchTagadaPreviewCustomer, setBatchTagadaPreviewCustomer] = useState(null);
   const [batchTagadaDispatchResult, setBatchTagadaDispatchResult] = useState(null);
+
+  // --- ITERATION 226: TALLYPAY UTILITY BILL PAYMENT (BILLPAYMENTACTIVITY) ---
+  const [modalBillPayment, setModalBillPayment] = useState(false);
+  const [billPaymentStep, setBillPaymentStep] = useState('LANDING'); // 'LANDING' | 'INPUT' | 'PIN_CONFIRM' | 'SUCCESS' | 'RECEIPT'
+  const [selectedBiller, setSelectedBiller] = useState(null);
+  const [selectedBillerCategory, setSelectedBillerCategory] = useState('ALL'); // 'ALL' | 'ELECTRICITY_BILL' | 'WATER_BILL' | 'GAS_BILL' | 'INTERNET_BILL'
+  const [billerSearchQuery, setBillerSearchQuery] = useState('');
+  const [billerFormValues, setBillerFormValues] = useState({});
+  const [billerFormErrors, setBillerFormErrors] = useState({});
+  const [billInquiryResult, setBillInquiryResult] = useState(null);
+  const [billPaymentPin, setBillPaymentPin] = useState('');
+  const [saveBillerChecked, setSaveBillerChecked] = useState(true);
+  const [billerNickName, setBillerNickName] = useState('');
+  const [billPaymentReceipt, setBillPaymentReceipt] = useState(null);
+  const [showSampleBillModal, setShowSampleBillModal] = useState(false);
+  const [billInquiryLoading, setBillInquiryLoading] = useState(false);
+  const [billPaymentProcessing, setBillPaymentProcessing] = useState(false);
+  const [savedBillersList, setSavedBillersList] = useState([]);
   const [modalBackupRestore, setModalBackupRestore] = useState(false);
   const [modalInbox, setModalInbox] = useState(false);
   const [modalSupport, setModalSupport] = useState(false);
@@ -2325,6 +2367,23 @@ function TallyKhataApp() {
       if (modalTallyMessage) { setModalTallyMessage(false); return true; }
       if (modalSoundboxSettings) { setModalSoundboxSettings(false); return true; }
       if (modalDigitalAnalytics) { setModalDigitalAnalytics(false); return true; }
+      if (showSampleBillModal) { setShowSampleBillModal(false); return true; }
+      if (modalBillPayment) {
+        if (billPaymentStep === 'RECEIPT' || billPaymentStep === 'SUCCESS') {
+          setModalBillPayment(false);
+          setBillPaymentStep('LANDING');
+          return true;
+        } else if (billPaymentStep === 'PIN_CONFIRM') {
+          setBillPaymentStep('INPUT');
+          return true;
+        } else if (billPaymentStep === 'INPUT') {
+          setBillPaymentStep('LANDING');
+          return true;
+        } else {
+          setModalBillPayment(false);
+          return true;
+        }
+      }
       if (batchTagadaResultModal) { setBatchTagadaResultModal(false); return true; }
       if (batchTagadaQuotaModal) { setBatchTagadaQuotaModal(false); return true; }
       if (batchTagadaPreviewModal) { setBatchTagadaPreviewModal(false); return true; }
@@ -2400,7 +2459,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -4253,6 +4312,223 @@ function TallyKhataApp() {
   };
 
   // =========================================================================
+  // TALLYPAY UTILITY BILL PAYMENT HANDLERS (Iteration 226)
+  // =========================================================================
+  const loadSavedBillers = async () => {
+    try {
+      const list = await bpGetSavedBillers(activeBusinessId, storageRepository);
+      setSavedBillersList(list || []);
+    } catch (e) {
+      setSavedBillersList([]);
+    }
+  };
+
+  const handleOpenBillPayment = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    setBillPaymentStep('LANDING');
+    setSelectedBiller(null);
+    setSelectedBillerCategory('ALL');
+    setBillerSearchQuery('');
+    setBillerFormValues({});
+    setBillerFormErrors({});
+    setBillInquiryResult(null);
+    setBillPaymentPin('');
+    setSaveBillerChecked(true);
+    setBillerNickName('');
+    setBillPaymentReceipt(null);
+    setShowSampleBillModal(false);
+    loadSavedBillers();
+    setModalBillPayment(true);
+  };
+
+  const handleCloseBillPayment = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalBillPayment(false);
+    setBillPaymentStep('LANDING');
+    setShowSampleBillModal(false);
+  };
+
+  const handleBillPaymentBackStep = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    if (billPaymentStep === 'INPUT') {
+      setBillPaymentStep('LANDING');
+      setSelectedBiller(null);
+      setBillerFormValues({});
+      setBillerFormErrors({});
+    } else if (billPaymentStep === 'PIN_CONFIRM') {
+      setBillPaymentStep('INPUT');
+      setBillPaymentPin('');
+    } else if (billPaymentStep === 'RECEIPT' || billPaymentStep === 'SUCCESS') {
+      setModalBillPayment(false);
+      setBillPaymentStep('LANDING');
+    } else {
+      setModalBillPayment(false);
+    }
+  };
+
+  const handleSelectBiller = (biller) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSelectedBiller(biller);
+    setBillerFormValues({});
+    setBillerFormErrors({});
+    setBillInquiryResult(null);
+    setBillPaymentPin('');
+    setBillerNickName(biller.billerNameBn || biller.billerName || '');
+    setBillPaymentStep('INPUT');
+  };
+
+  const handleSelectSavedBiller = (saved) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const biller = bpGetBillerByCode(saved.billerCode);
+    if (!biller) {
+      Alert.alert(tStatic("সতর্কতা"), t('biller_not_found') || tStatic("বিলার পাওয়া যায়নি"));
+      return;
+    }
+    setSelectedBiller(biller);
+    const initialValues = {};
+    if (saved.accountNo) initialValues['account_no'] = saved.accountNo;
+    if (saved.customerMobile) initialValues['customer_mobile'] = saved.customerMobile;
+    if (saved.meterNo) initialValues['meter_no'] = saved.meterNo;
+    if (saved.fieldInputs) Object.assign(initialValues, saved.fieldInputs);
+    setBillerFormValues(initialValues);
+    setBillerFormErrors({});
+    setBillerNickName(saved.nickName || biller.billerNameBn || '');
+    setBillInquiryResult(null);
+    setBillPaymentPin('');
+    setBillPaymentStep('INPUT');
+  };
+
+  const handleBillerFieldChange = (key, value) => {
+    setBillerFormValues(prev => ({ ...prev, [key]: value }));
+    if (selectedBiller) {
+      const field = (selectedBiller.fields || []).find(f => f.key === key);
+      if (field) {
+        const valRes = bpValidateBillerField(field, value);
+        setBillerFormErrors(prev => ({
+          ...prev,
+          [key]: valRes.valid ? null : valRes.error
+        }));
+      }
+    }
+  };
+
+  const handleCheckBill = async () => {
+    if (!selectedBiller) return;
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    const valRes = bpValidateBillerInputs(selectedBiller.billerCode, billerFormValues);
+    if (!valRes.valid) {
+      setBillerFormErrors(valRes.errors || {});
+      Alert.alert(tStatic("সতর্কতা"), valRes.message || tStatic("অনুগ্রহ করে সঠিক তথ্য দিন"));
+      return;
+    }
+    setBillInquiryLoading(true);
+    try {
+      const res = await bpFetchBillInfo(selectedBiller.billerCode, billerFormValues);
+      setBillInquiryLoading(false);
+      if (res && res.success) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setBillInquiryResult(res);
+        setBillPaymentPin('');
+        setBillPaymentStep('PIN_CONFIRM');
+      } else {
+        Alert.alert(tStatic("ত্রুটি"), (res && res.message) || tStatic("বিল তথ্য পাওয়া যায়নি"));
+      }
+    } catch (err) {
+      setBillInquiryLoading(false);
+      Alert.alert(tStatic("ত্রুটি"), err.message || tStatic("বিল অনুসন্ধান ব্যর্থ হয়েছে"));
+    }
+  };
+
+  const handleConfirmBillPayment = async () => {
+    if (!billInquiryResult || !selectedBiller) return;
+    if (!billPaymentPin || String(billPaymentPin).trim().length !== 4) {
+      Alert.alert(tStatic("সতর্কতা"), t('pin_required') || tStatic("৪ ডিজিটের পিন আবশ্যক"));
+      return;
+    }
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    setBillPaymentProcessing(true);
+    try {
+      const paymentRes = await bpExecuteBillPayment({
+        billerCode: selectedBiller.billerCode,
+        amountPaisa: billInquiryResult.totalDuePaisa || billInquiryResult.billAmountPaisa,
+        feePaisa: billInquiryResult.feePaisa,
+        pin: String(billPaymentPin).trim(),
+        accountNo: billInquiryResult.accountNo || billerFormValues['account_no'],
+        meterNo: billInquiryResult.meterNo || billerFormValues['meter_no'],
+        customerMobile: billInquiryResult.customerMobile || billerFormValues['customer_mobile'],
+        customerName: billInquiryResult.customerName,
+        billPeriod: billInquiryResult.billPeriod,
+        dueDate: billInquiryResult.dueDate,
+        fieldInputs: billerFormValues,
+        saveBiller: saveBillerChecked,
+        billerNickName: billerNickName,
+        businessId: activeBusinessId
+      }, storageRepository);
+
+      setBillPaymentProcessing(false);
+      if (paymentRes && paymentRes.success) {
+        try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+        setBillPaymentReceipt(paymentRes);
+        setBillPaymentStep('SUCCESS');
+        loadSavedBillers();
+      } else {
+        try { hapticFeedbackService.onError(); } catch (e) {}
+        Alert.alert(tStatic("ত্রুটি"), (paymentRes && paymentRes.message) || tStatic("বিল পেমেন্ট ব্যর্থ হয়েছে"));
+      }
+    } catch (err) {
+      setBillPaymentProcessing(false);
+      try { hapticFeedbackService.onError(); } catch (e) {}
+      Alert.alert(tStatic("ত্রুটি"), err.message || tStatic("বিল পেমেন্ট ব্যর্থ হয়েছে"));
+    }
+  };
+
+  const handleDownloadReceiptPdf = () => {
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    Alert.alert(t('bill_receipt'), tStatic("বিল রশিদ PDF ডাউনলোড হয়েছে।"));
+  };
+
+  const handleShareBillReceipt = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    Alert.alert(t('share_bill_receipt'), tStatic("বিল রশিদ শেয়ার করা হয়েছে।"));
+  };
+
+  const handleDeleteSavedBillerAccount = async (id) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    Alert.alert(
+      t('delete_biller') || tStatic("বিলার মুছুন"),
+      tStatic("আপনি কি সেভ করা বিলার একাউন্টটি মুছে ফেলতে চান?"),
+      [
+        { text: tStatic("বাতিল"), style: "cancel" },
+        {
+          text: tStatic("মুছুন"),
+          style: "destructive",
+          onPress: async () => {
+            await bpDeleteSavedBiller(id, storageRepository);
+            loadSavedBillers();
+          }
+        }
+      ]
+    );
+  };
+
+  const filteredBillersList = useMemo(() => {
+    let list = bpGetBillerList();
+    if (selectedBillerCategory && selectedBillerCategory !== 'ALL') {
+      list = list.filter(b => b.billerCategory === selectedBillerCategory);
+    }
+    if (billerSearchQuery && billerSearchQuery.trim()) {
+      const q = billerSearchQuery.trim().toLowerCase();
+      list = list.filter(b =>
+        (b.billerName && b.billerName.toLowerCase().includes(q)) ||
+        (b.billerNameBn && b.billerNameBn.includes(q)) ||
+        (b.billerCode && b.billerCode.toLowerCase().includes(q)) ||
+        (b.billerCategoryBn && b.billerCategoryBn.includes(q))
+      );
+    }
+    return list;
+  }, [selectedBillerCategory, billerSearchQuery]);
+
+  // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
   // =========================================================================
   const handleOpenSoundboxSettings = () => {
@@ -5383,6 +5659,59 @@ function TallyKhataApp() {
       DISPATCH_MODES,
       DEBT_AGING_TIERS,
       BENGALI_ARSC_TOKENS,
+    };
+
+    global.__BILL_PAYMENT_TEST_HOOKS__ = {
+      modalBillPayment,
+      setModalBillPayment,
+      billPaymentStep,
+      setBillPaymentStep,
+      selectedBiller,
+      setSelectedBiller,
+      selectedBillerCategory,
+      setSelectedBillerCategory,
+      billerSearchQuery,
+      setBillerSearchQuery,
+      billerFormValues,
+      setBillerFormValues,
+      billerFormErrors,
+      setBillerFormErrors,
+      billInquiryResult,
+      setBillInquiryResult,
+      billPaymentPin,
+      setBillPaymentPin,
+      saveBillerChecked,
+      setSaveBillerChecked,
+      billerNickName,
+      setBillerNickName,
+      billPaymentReceipt,
+      setBillPaymentReceipt,
+      showSampleBillModal,
+      setShowSampleBillModal,
+      billInquiryLoading,
+      setBillInquiryLoading,
+      billPaymentProcessing,
+      setBillPaymentProcessing,
+      savedBillersList,
+      setSavedBillersList,
+      loadSavedBillers,
+      handleOpenBillPayment,
+      handleCloseBillPayment,
+      handleBillPaymentBackStep,
+      handleSelectBiller,
+      handleSelectSavedBiller,
+      handleBillerFieldChange,
+      handleCheckBill,
+      handleCheckBillInquiry: handleCheckBill,
+      handleConfirmBillPayment,
+      handleDownloadReceiptPdf,
+      handleShareBillReceipt,
+      handleShareReceipt: handleShareBillReceipt,
+      handleDeleteSavedBillerAccount,
+      handleDeleteSavedBiller: handleDeleteSavedBillerAccount,
+      filteredBillersList,
+      billPaymentService,
+      storageRepository,
     };
   }
 
@@ -7808,6 +8137,26 @@ accessibilityLabel={
                         />
                         <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("qa_group_tagada")}</Text>
                       </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.quickGridItem}
+                        onPress={handleOpenBillPayment}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('bill_pay')}
+                        testID="home_quick_grid_bill_pay"
+                      >
+                        <AppIcon
+                          source={require('./assets/icons/ic_menu_payment_messaging.png')}
+                          variant="warning"
+                          shape="rounded"
+                          size={28}
+                          containerSize={50}
+                          tintColor={null}
+                          style={styles.quickGrid3DIcon}
+                        />
+                        <Text style={[styles.quickGridLabel, isDark && tStyles.textPrimary]}>{t("bill_pay")}</Text>
+                      </TouchableOpacity>
                     </View>
 
                     {/* Row 2 */}
@@ -8782,6 +9131,26 @@ accessibilityLabel={
                 />
                 <Text style={styles.walletServiceLabel}>{tStatic("কিউআর পেমেন্ট")}</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.walletServiceBtn}
+                onPress={handleOpenBillPayment}
+                activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('bill_pay')}
+                testID="tallypay_bill_pay_btn"
+              >
+                <AppIcon
+                  source={require("./assets/icons/ic_menu_payment_messaging.png")}
+                  variant="warning"
+                  shape="circle"
+                  size={24}
+                  containerSize={50}
+                  accessibilityLabel={t('bill_pay')}
+                />
+                <Text style={styles.walletServiceLabel}>{t('bill_pay')}</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Quick Action: Digital Analytics Banner (Iteration 224) */}
@@ -9092,6 +9461,36 @@ accessibilityLabel={
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
 
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenBillPayment}
+                activeOpacity={0.7}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('bill_pay')}
+                testID="menu_bill_pay_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_payment_messaging.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('bill_pay')}</Text>
+                    <View style={{
+                      marginLeft: 8,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      backgroundColor: isDark ? '#78350F' : '#FEF3C7',
+                    }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#FDE68A' : '#B45309' }}>
+                        {tStatic("১৬টি প্রতিষ্ঠান")}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{tStatic("বিদ্যুৎ, পানি, গ্যাস ও ইন্টারনেট বিল পরিশোধ")}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.menuListItem, isDark && tStyles.menuListItem]}
@@ -16059,6 +16458,699 @@ accessibilityLabel={
             >
               <Text style={{ color: isDark ? currentTheme.textMuted : "#6B7280", fontSize: 13 }}>
                 {tStatic("বন্ধ করুন")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: TALLYPAY UTILITY BILL PAYMENT (ITERATION 226)
+         =================================================================== */}
+      <Modal
+        visible={modalBillPayment}
+        animationType="slide"
+        onRequestClose={handleBillPaymentBackStep}
+        testID="modal_bill_payment"
+      >
+        <SafeAreaView style={[styles.bpContainer, isDark && { backgroundColor: currentTheme.bgPrimary }]}>
+          {/* Header */}
+          <View style={[styles.bpHeader, isDark && { backgroundColor: '#78350F' }]}>
+            <TouchableOpacity
+              onPress={handleBillPaymentBackStep}
+              style={styles.reportHeaderBack}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+              testID="bp_back_btn"
+            >
+              <Image
+                source={require("./assets/icons/arrow_left.png")}
+                style={{ width: 22, height: 22, tintColor: "#FFFFFF" }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.bpHeaderTitle}>
+                {billPaymentStep === 'LANDING' ? t('bill_pay') :
+                 billPaymentStep === 'INPUT' ? (selectedBiller ? selectedBiller.billerNameBn : t('bill_payment')) :
+                 billPaymentStep === 'PIN_CONFIRM' ? t('confirm_bill_payment') :
+                 billPaymentStep === 'SUCCESS' ? t('bill_payment_successful') :
+                 t('bill_receipt')}
+              </Text>
+              <Text style={styles.bpHeaderSubtitle}>
+                {billPaymentStep === 'LANDING' ? tStatic("বিদ্যুৎ, পানি, গ্যাস ও ইন্টারনেট বিল") :
+                 billPaymentStep === 'INPUT' ? (selectedBiller ? selectedBiller.billerCategoryBn : '') :
+                 billPaymentStep === 'PIN_CONFIRM' ? tStatic("তথ্য যাচাই করে পিন দিন") :
+                 billPaymentStep === 'SUCCESS' ? tStatic("লেনদেন সম্পন্ন হয়েছে") :
+                 tStatic("ডিজিটাল পেমেন্ট প্রমাণ")}
+              </Text>
+            </View>
+            {billPaymentStep === 'LANDING' && (
+              <View style={styles.bpCategoryCountBadge}>
+                <Text style={styles.bpCategoryCountBadgeText}>
+                  {toBengaliNumerals(16) + "টি প্রতিষ্ঠান"}
+                </Text>
+              </View>
+            )}
+            {billPaymentStep === 'RECEIPT' && (
+              <TouchableOpacity
+                onPress={handleShareBillReceipt}
+                style={{ padding: 6 }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('share_bill_receipt')}
+                testID="bp_receipt_header_share"
+              >
+                <Text style={{ fontSize: 18, color: '#FFFFFF' }}>📤</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* STEP 1: LANDING VIEW */}
+          {billPaymentStep === 'LANDING' && (
+            <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+              {/* Search Bar */}
+              <View style={[styles.bpSearchBox, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
+                <TextInput
+                  style={[styles.bpSearchInput, isDark && { color: currentTheme.textPrimary }]}
+                  placeholder={t('search_biller')}
+                  placeholderTextColor={isDark ? currentTheme.textSecondary : '#94A3B8'}
+                  value={billerSearchQuery}
+                  onChangeText={setBillerSearchQuery}
+                  testID="biller_search_input"
+                />
+                {billerSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setBillerSearchQuery('')} hitSlop={STANDARD_TOUCH_HIT_SLOP}>
+                    <Text style={{ fontSize: 14, color: '#64748B', paddingHorizontal: 4 }}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Category Filter Chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bpFilterChipsRow}>
+                {[
+                  { key: 'ALL', labelBn: t('category_all') || 'সকল' },
+                  { key: 'ELECTRICITY_BILL', labelBn: t('category_electricity') },
+                  { key: 'WATER_BILL', labelBn: t('category_water') },
+                  { key: 'GAS_BILL', labelBn: t('category_gas') },
+                  { key: 'INTERNET_BILL', labelBn: t('category_internet') },
+                ].map(cat => {
+                  const isActive = selectedBillerCategory === cat.key;
+                  return (
+                    <TouchableOpacity
+                      key={cat.key}
+                      style={[
+                        styles.bpFilterChip,
+                        isActive && styles.bpFilterChipActive,
+                        isDark && !isActive && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }
+                      ]}
+                      onPress={() => setSelectedBillerCategory(cat.key)}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      activeOpacity={0.75}
+                      accessibilityRole="button"
+                      testID={'bp_cat_chip_' + cat.key}
+                    >
+                      <Text style={[
+                        styles.bpFilterChipText,
+                        isActive && styles.bpFilterChipTextActive,
+                        isDark && !isActive && { color: currentTheme.textSecondary }
+                      ]}>
+                        {cat.labelBn}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Saved Billers Section (if any) */}
+              {savedBillersList && savedBillersList.length > 0 && (
+                <View style={styles.bpSavedSection}>
+                  <Text style={[styles.bpSectionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    {t('saved_billers')} ({toBengaliNumerals(savedBillersList.length)})
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                    {savedBillersList.map(item => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[styles.bpSavedCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}
+                        onPress={() => handleSelectSavedBiller(item)}
+                        activeOpacity={0.8}
+                        hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                        testID={'saved_biller_' + item.id}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <View style={styles.bpSavedIconCircle}>
+                            <Text style={{ fontSize: 16 }}>
+                              {item.billerCategory === 'ELECTRICITY_BILL' ? '⚡' :
+                               item.billerCategory === 'WATER_BILL' ? '💧' :
+                               item.billerCategory === 'GAS_BILL' ? '🔥' : '📶'}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleDeleteSavedBillerAccount(item.id)}
+                            hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                            style={{ padding: 4 }}
+                          >
+                            <Text style={{ fontSize: 12, color: '#EF4444' }}>🗑️</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={[styles.bpSavedNick, isDark && { color: currentTheme.textPrimary }]} numberOfLines={1}>
+                          {item.nickName || item.billerNameBn}
+                        </Text>
+                        <Text style={styles.bpSavedAccNo} numberOfLines={1}>
+                          {item.accountNo || item.meterNo}
+                        </Text>
+                        <View style={styles.bpSavedCategoryBadge}>
+                          <Text style={styles.bpSavedCategoryText}>
+                            {item.billerCategoryBn}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* All Billers Directory Grid */}
+              <View style={styles.bpDirectorySection}>
+                <Text style={[styles.bpSectionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                  {t('all_billers')} ({toBengaliNumerals(filteredBillersList.length)}টি)
+                </Text>
+
+                {filteredBillersList.length === 0 ? (
+                  <View style={styles.bpEmptyDirectory}>
+                    <Text style={{ fontSize: 32, marginBottom: 8 }}>🏢</Text>
+                    <Text style={[styles.bpEmptyText, isDark && { color: currentTheme.textSecondary }]}>
+                      {t('biller_not_found')}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.bpBillerGrid}>
+                    {filteredBillersList.map(biller => (
+                      <TouchableOpacity
+                        key={biller.billerCode}
+                        style={[styles.bpBillerCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}
+                        onPress={() => handleSelectBiller(biller)}
+                        activeOpacity={0.75}
+                        hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                        accessibilityRole="button"
+                        testID={'biller_item_' + biller.billerCode}
+                      >
+                        <View style={[
+                          styles.bpBillerIconBox,
+                          {
+                            backgroundColor:
+                              biller.billerCategory === 'ELECTRICITY_BILL' ? '#FEF3C7' :
+                              biller.billerCategory === 'WATER_BILL' ? '#E0F2FE' :
+                              biller.billerCategory === 'GAS_BILL' ? '#FFEDD5' : '#EDE9FE'
+                          }
+                        ]}>
+                          <Text style={{ fontSize: 20 }}>
+                            {biller.billerCategory === 'ELECTRICITY_BILL' ? '⚡' :
+                             biller.billerCategory === 'WATER_BILL' ? '💧' :
+                             biller.billerCategory === 'GAS_BILL' ? '🔥' : '📶'}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={[styles.bpBillerName, isDark && { color: currentTheme.textPrimary }]} numberOfLines={1}>
+                            {biller.billerNameBn}
+                          </Text>
+                          <Text style={[styles.bpBillerFullName, isDark && { color: currentTheme.textSecondary }]} numberOfLines={1}>
+                            {biller.billerFullName}
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <View style={styles.bpBillerTypeBadge}>
+                              <Text style={styles.bpBillerTypeBadgeText}>
+                                {biller.billerType === 'POSTPAID' ? 'পোস্টপেইড' :
+                                 biller.billerType === 'PREPAID' ? 'প্রিপেইড' :
+                                 biller.billerType === 'NON_METER' ? 'নন-মিটার' : 'বিল'}
+                              </Text>
+                            </View>
+                            <Text style={[styles.bpBillerCategorySub, isDark && { color: currentTheme.textSecondary }]}>
+                              • {biller.billerCategoryBn}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={{ fontSize: 16, color: '#94A3B8' }}>›</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          )}
+
+          {/* STEP 2: INPUT VIEW */}
+          {billPaymentStep === 'INPUT' && selectedBiller && (
+            <View style={{ flex: 1 }}>
+              <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                {/* Biller Info Banner with Sample Bill Guide trigger */}
+                <View style={[styles.bpBillerHeaderBanner, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <View style={[
+                      styles.bpBillerIconBox,
+                      {
+                        backgroundColor:
+                          selectedBiller.billerCategory === 'ELECTRICITY_BILL' ? '#FEF3C7' :
+                          selectedBiller.billerCategory === 'WATER_BILL' ? '#E0F2FE' :
+                          selectedBiller.billerCategory === 'GAS_BILL' ? '#FFEDD5' : '#EDE9FE'
+                      }
+                    ]}>
+                      <Text style={{ fontSize: 22 }}>
+                        {selectedBiller.billerCategory === 'ELECTRICITY_BILL' ? '⚡' :
+                         selectedBiller.billerCategory === 'WATER_BILL' ? '💧' :
+                         selectedBiller.billerCategory === 'GAS_BILL' ? '🔥' : '📶'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[styles.bpBillerBannerTitle, isDark && { color: currentTheme.textPrimary }]}>
+                        {selectedBiller.billerNameBn}
+                      </Text>
+                      <Text style={[styles.bpBillerBannerSub, isDark && { color: currentTheme.textSecondary }]}>
+                        {selectedBiller.billerCategoryBn} • {selectedBiller.billerType}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.bpGuideLinkBtn}
+                    onPress={() => setShowSampleBillModal(true)}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    activeOpacity={0.7}
+                    testID="sample_bill_guide_btn"
+                  >
+                    <Text style={styles.bpGuideLinkText}>📄 {t('sample_bill_guide')}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Dynamic Form Fields */}
+                <View style={[styles.bpFormCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                  {(selectedBiller.fields || []).map(field => (
+                    <View key={field.key} style={styles.bpFormFieldGroup}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={[styles.bpFieldLabel, isDark && { color: currentTheme.textPrimary }]}>
+                          {field.labelBn || field.label} {field.required && <Text style={{ color: '#EF4444' }}>*</Text>}
+                        </Text>
+                        <Text style={styles.bpFieldHint}>
+                          {field.minLength ? `(${toBengaliNumerals(field.minLength)} ডিজিট)` : ''}
+                        </Text>
+                      </View>
+                      <TextInput
+                        style={[
+                          styles.bpInputField,
+                          isDark && { backgroundColor: currentTheme.cardBg, color: currentTheme.textPrimary, borderColor: currentTheme.cardBorder },
+                          billerFormErrors[field.key] ? { borderColor: '#EF4444' } : null
+                        ]}
+                        value={billerFormValues[field.key] || ''}
+                        onChangeText={(val) => handleBillerFieldChange(field.key, val)}
+                        placeholder={field.hintBn || field.hint}
+                        placeholderTextColor={isDark ? currentTheme.textSecondary : '#94A3B8'}
+                        keyboardType={field.inputType === 'DATA_TYPE_NUMBER' ? 'numeric' : 'default'}
+                        maxLength={field.maxLength || 30}
+                        testID={'biller_input_' + field.key}
+                      />
+                      {billerFormErrors[field.key] && (
+                        <Text style={styles.bpFieldErrorText}>
+                          {billerFormErrors[field.key]}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+
+                  {/* Optional Nickname Field */}
+                  <View style={styles.bpFormFieldGroup}>
+                    <Text style={[styles.bpFieldLabel, isDark && { color: currentTheme.textPrimary }]}>
+                      {tStatic("বিলার ডাকনাম (ঐচ্ছিক)")}
+                    </Text>
+                    <TextInput
+                      style={[styles.bpInputField, isDark && { backgroundColor: currentTheme.cardBg, color: currentTheme.textPrimary, borderColor: currentTheme.cardBorder }]}
+                      value={billerNickName}
+                      onChangeText={setBillerNickName}
+                      placeholder={tStatic("যেমন: আমার বাসা, দোকান, গোডাউন")}
+                      placeholderTextColor={isDark ? currentTheme.textSecondary : '#94A3B8'}
+                      testID="biller_nickname_input"
+                    />
+                  </View>
+
+                  {/* Save Biller Checkbox */}
+                  <TouchableOpacity
+                    style={styles.bpSaveCheckboxRow}
+                    onPress={() => setSaveBillerChecked(!saveBillerChecked)}
+                    activeOpacity={0.8}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    testID="save_biller_checkbox_row"
+                  >
+                    <View style={[styles.bpCheckboxBox, saveBillerChecked && styles.bpCheckboxBoxActive]}>
+                      {saveBillerChecked && <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
+                    </View>
+                    <Text style={[styles.bpSaveCheckboxLabel, isDark && { color: currentTheme.textPrimary }]}>
+                      {t('save_biller_checkbox')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+
+              {/* Sticky Bottom Action Bar */}
+              <View style={[styles.bpStickyBottomBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
+                <TouchableOpacity
+                  style={[styles.bpPrimaryBtn, billInquiryLoading && { opacity: 0.7 }]}
+                  onPress={handleCheckBill}
+                  disabled={billInquiryLoading}
+                  activeOpacity={0.8}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  testID="check_bill_submit_btn"
+                >
+                  {billInquiryLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.bpPrimaryBtnText}>
+                      {t('check_bill')} ›
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* STEP 3: PIN_CONFIRM VIEW */}
+          {billPaymentStep === 'PIN_CONFIRM' && billInquiryResult && (
+            <View style={{ flex: 1 }}>
+              <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+                {/* Summary Card */}
+                <View style={[styles.bpSummaryCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                  <View style={styles.bpSummaryHeader}>
+                    <Text style={styles.bpSummaryBillerTitle}>
+                      {billInquiryResult.billerNameBn}
+                    </Text>
+                    <View style={styles.bpStatusBadge}>
+                      <Text style={styles.bpStatusBadgeText}>
+                        {billInquiryResult.billStatus === 'UNPAID' ? 'অপরিশোধিত' : 'প্রদেয়'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.bpSummaryRow}>
+                    <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>গ্রাহকের নাম</Text>
+                    <Text style={[styles.bpSummaryValue, isDark && { color: currentTheme.textPrimary }]}>{billInquiryResult.customerName || '-'}</Text>
+                  </View>
+
+                  <View style={styles.bpSummaryRow}>
+                    <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>একাউন্ট / মিটার নং</Text>
+                    <Text style={[styles.bpSummaryValue, isDark && { color: currentTheme.textPrimary }]}>{billInquiryResult.accountNo || billInquiryResult.meterNo || '-'}</Text>
+                  </View>
+
+                  <View style={styles.bpSummaryRow}>
+                    <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>{t('bill_period')}</Text>
+                    <Text style={[styles.bpSummaryValue, isDark && { color: currentTheme.textPrimary }]}>{billInquiryResult.billPeriodBn || billInquiryResult.billPeriod || '-'}</Text>
+                  </View>
+
+                  <View style={styles.bpSummaryRow}>
+                    <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>{t('due_date')}</Text>
+                    <Text style={[styles.bpSummaryValue, { color: '#B91C1C', fontWeight: 'bold' }]}>{billInquiryResult.dueDate || '-'}</Text>
+                  </View>
+
+                  <View style={styles.bpSummaryDivider} />
+
+                  <View style={styles.bpSummaryRow}>
+                    <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>{t('bill_amount')}</Text>
+                    <Text style={[styles.bpSummaryValue, isDark && { color: currentTheme.textPrimary }]}>
+                      {"৳ " + toBengaliNumerals(billInquiryResult.totalDue || billInquiryResult.billAmount)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.bpSummaryRow}>
+                    <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>{t('service_charge')}</Text>
+                    <Text style={[styles.bpSummaryValue, isDark && { color: currentTheme.textPrimary }]}>
+                      {"৳ " + toBengaliNumerals(billInquiryResult.fee || 10)}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.bpSummaryRow, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#CBD5E1' }]}>
+                    <Text style={[styles.bpSummaryTotalLabel, isDark && { color: currentTheme.textPrimary }]}>{t('total_payable')}</Text>
+                    <Text style={styles.bpSummaryTotalValue}>
+                      {"৳ " + toBengaliNumerals((billInquiryResult.totalDue || billInquiryResult.billAmount) + (billInquiryResult.fee || 10))}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* PIN Input Section */}
+                <View style={[styles.bpPinCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                  <Text style={[styles.bpPinTitle, isDark && { color: currentTheme.textPrimary }]}>
+                    {t('enter_wallet_pin')}
+                  </Text>
+                  <Text style={[styles.bpPinSubtitle, isDark && { color: currentTheme.textSecondary }]}>
+                    ট্যালিপে ওয়ালেটের ৪-ডিজিট পিন কোড দিয়ে বিল পরিশোধ সম্পন্ন করুন
+                  </Text>
+                  <TextInput
+                    style={[styles.bpPinInput, isDark && { backgroundColor: currentTheme.cardBg, color: currentTheme.textPrimary, borderColor: currentTheme.cardBorder }]}
+                    value={billPaymentPin}
+                    onChangeText={setBillPaymentPin}
+                    secureTextEntry={true}
+                    keyboardType="numeric"
+                    maxLength={4}
+                    placeholder="••••"
+                    placeholderTextColor={isDark ? currentTheme.textSecondary : '#94A3B8'}
+                    testID="bill_payment_pin_input"
+                  />
+                </View>
+              </ScrollView>
+
+              {/* Sticky Bottom Bar */}
+              <View style={[styles.bpStickyBottomBar, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
+                <TouchableOpacity
+                  style={[styles.bpPrimaryBtn, billPaymentProcessing && { opacity: 0.7 }]}
+                  onPress={handleConfirmBillPayment}
+                  disabled={billPaymentProcessing}
+                  activeOpacity={0.8}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  testID="confirm_bill_payment_btn"
+                >
+                  {billPaymentProcessing ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.bpPrimaryBtnText}>
+                      {t('confirm_bill_payment')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* STEP 4: SUCCESS VIEW */}
+          {billPaymentStep === 'SUCCESS' && (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+              <View style={styles.bpSuccessCircle}>
+                <Text style={{ fontSize: 36, color: '#FFFFFF' }}>✓</Text>
+              </View>
+              <Text style={[styles.bpSuccessTitle, isDark && { color: currentTheme.textPrimary }]}>
+                {t('bill_payment_successful')}
+              </Text>
+              <Text style={styles.bpSuccessAmount}>
+                {"৳ " + (billInquiryResult ? toBengaliNumerals((billInquiryResult.totalDue || billInquiryResult.billAmount) + (billInquiryResult.fee || 10)) : '')}
+              </Text>
+              {billPaymentReceipt && (
+                <View style={styles.bpTxnBadge}>
+                  <Text style={styles.bpTxnBadgeText}>
+                    {t('transaction_id')}: {billPaymentReceipt.transactionNumber || (billPaymentReceipt.transaction && billPaymentReceipt.transaction.transactionNumber)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Success Info Card */}
+              <View style={[styles.bpSuccessDetailsCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <View style={styles.bpSummaryRow}>
+                  <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>প্রতিষ্ঠান</Text>
+                  <Text style={[styles.bpSummaryValue, isDark && { color: currentTheme.textPrimary }]}>{selectedBiller ? selectedBiller.billerNameBn : '-'}</Text>
+                </View>
+                <View style={styles.bpSummaryRow}>
+                  <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>গ্রাহকের নাম</Text>
+                  <Text style={[styles.bpSummaryValue, isDark && { color: currentTheme.textPrimary }]}>{billInquiryResult ? billInquiryResult.customerName : '-'}</Text>
+                </View>
+                <View style={styles.bpSummaryRow}>
+                  <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>একাউন্ট নম্বর</Text>
+                  <Text style={[styles.bpSummaryValue, isDark && { color: currentTheme.textPrimary }]}>{billInquiryResult ? (billInquiryResult.accountNo || billInquiryResult.meterNo) : '-'}</Text>
+                </View>
+                <View style={styles.bpSummaryRow}>
+                  <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>বিলের মাস</Text>
+                  <Text style={[styles.bpSummaryValue, isDark && { color: currentTheme.textPrimary }]}>{billInquiryResult ? (billInquiryResult.billPeriodBn || billInquiryResult.billPeriod) : '-'}</Text>
+                </View>
+                <View style={styles.bpSummaryRow}>
+                  <Text style={[styles.bpSummaryLabel, isDark && { color: currentTheme.textSecondary }]}>স্ট্যাটাস</Text>
+                  <Text style={{ color: '#059669', fontWeight: 'bold' }}>সফল</Text>
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={{ width: '100%', marginTop: 20 }}>
+                <TouchableOpacity
+                  style={styles.bpReceiptBtn}
+                  onPress={() => setBillPaymentStep('RECEIPT')}
+                  activeOpacity={0.8}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  testID="view_receipt_btn"
+                >
+                  <Text style={styles.bpReceiptBtnText}>📄 {t('view_bill_receipt')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.bpNewBillBtn, isDark && { borderColor: currentTheme.cardBorder }]}
+                  onPress={handleOpenBillPayment}
+                  activeOpacity={0.8}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  testID="new_bill_btn"
+                >
+                  <Text style={[styles.bpNewBillBtnText, isDark && { color: currentTheme.textPrimary }]}>{t('new_bill_pay')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.bpDoneBtn}
+                  onPress={handleCloseBillPayment}
+                  activeOpacity={0.8}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  testID="bp_done_btn"
+                >
+                  <Text style={styles.bpDoneBtnText}>{tStatic("ঠিক আছে")}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+
+          {/* STEP 5: RECEIPT VIEW */}
+          {billPaymentStep === 'RECEIPT' && (
+            <View style={{ flex: 1 }}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                <View style={[styles.bpReceiptPaper, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                  {/* Top Branding */}
+                  <View style={styles.bpReceiptPaperHeader}>
+                    <Text style={styles.bpReceiptShopName}>ট্যালিখাতা • ট্যালিপে</Text>
+                    <Text style={styles.bpReceiptDocTitle}>{t('bill_receipt')}</Text>
+                    <View style={styles.bpReceiptWatermark}>
+                      <Text style={styles.bpReceiptWatermarkText}>পরিশোধিত / PAID</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.bpReceiptTable}>
+                    <View style={styles.bpReceiptRow}>
+                      <Text style={styles.bpReceiptCellLabel}>ট্রানজেকশন আইডি:</Text>
+                      <Text style={styles.bpReceiptCellValue}>
+                        {billPaymentReceipt ? (billPaymentReceipt.transactionNumber || (billPaymentReceipt.transaction && billPaymentReceipt.transaction.transactionNumber)) : '-'}
+                      </Text>
+                    </View>
+                    <View style={styles.bpReceiptRow}>
+                      <Text style={styles.bpReceiptCellLabel}>প্রতিষ্ঠান:</Text>
+                      <Text style={styles.bpReceiptCellValue}>{selectedBiller ? selectedBiller.billerNameBn : '-'}</Text>
+                    </View>
+                    <View style={styles.bpReceiptRow}>
+                      <Text style={styles.bpReceiptCellLabel}>গ্রাহকের নাম:</Text>
+                      <Text style={styles.bpReceiptCellValue}>{billInquiryResult ? billInquiryResult.customerName : '-'}</Text>
+                    </View>
+                    <View style={styles.bpReceiptRow}>
+                      <Text style={styles.bpReceiptCellLabel}>একাউন্ট / মিটার নং:</Text>
+                      <Text style={styles.bpReceiptCellValue}>{billInquiryResult ? (billInquiryResult.accountNo || billInquiryResult.meterNo) : '-'}</Text>
+                    </View>
+                    <View style={styles.bpReceiptRow}>
+                      <Text style={styles.bpReceiptCellLabel}>বিলের সময়:</Text>
+                      <Text style={styles.bpReceiptCellValue}>{billInquiryResult ? (billInquiryResult.billPeriodBn || billInquiryResult.billPeriod) : '-'}</Text>
+                    </View>
+
+                    <View style={styles.bpReceiptDivider} />
+
+                    <View style={styles.bpReceiptRow}>
+                      <Text style={styles.bpReceiptCellLabel}>বিলের পরিমাণ:</Text>
+                      <Text style={styles.bpReceiptCellValue}>
+                        {"৳ " + (billInquiryResult ? toBengaliNumerals(billInquiryResult.totalDue || billInquiryResult.billAmount) : '')}
+                      </Text>
+                    </View>
+                    <View style={styles.bpReceiptRow}>
+                      <Text style={styles.bpReceiptCellLabel}>সার্ভিস চার্জ:</Text>
+                      <Text style={styles.bpReceiptCellValue}>
+                        {"৳ " + (billInquiryResult ? toBengaliNumerals(billInquiryResult.fee || 10) : '')}
+                      </Text>
+                    </View>
+                    <View style={[styles.bpReceiptRow, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#000000' }]}>
+                      <Text style={[styles.bpReceiptCellLabel, { fontWeight: 'bold' }]}>মোট পরিশোধিত:</Text>
+                      <Text style={[styles.bpReceiptCellValue, { fontWeight: 'bold', fontSize: 16 }]}>
+                        {"৳ " + (billInquiryResult ? toBengaliNumerals((billInquiryResult.totalDue || billInquiryResult.billAmount) + (billInquiryResult.fee || 10)) : '')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.bpReceiptFooterNotice}>
+                    <Text style={styles.bpReceiptNoticeText}>
+                      এই ডিজিটাল রশিদটি ট্যালিখাতা অ্যাপ দ্বারা প্রস্তুতকৃত এবং বৈধ প্রমাণপত্র হিসেবে গণ্য।
+                    </Text>
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Sticky Bottom Actions */}
+              <View style={[styles.bpStickyBottomBar, { flexDirection: 'row', justifyContent: 'space-between' }, isDark && { backgroundColor: currentTheme.cardBgElevated, borderTopColor: currentTheme.cardBorder }]}>
+                <TouchableOpacity
+                  style={[styles.bpReceiptActionBtn, { backgroundColor: '#0D6E5C', marginRight: 10 }]}
+                  onPress={handleDownloadReceiptPdf}
+                  activeOpacity={0.8}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  testID="download_receipt_pdf_btn"
+                >
+                  <Text style={styles.bpPrimaryBtnText}>📥 {t('download_receipt_pdf')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.bpReceiptActionBtn, { backgroundColor: '#2563EB' }]}
+                  onPress={handleShareBillReceipt}
+                  activeOpacity={0.8}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  testID="share_receipt_btn"
+                >
+                  <Text style={styles.bpPrimaryBtnText}>💬 {t('share_bill_receipt')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* SAMPLE BILL GUIDE MODAL */}
+      <Modal
+        visible={showSampleBillModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSampleBillModal(false)}
+        testID="modal_sample_bill_guide"
+      >
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.bpGuideSheet, isDark && { backgroundColor: currentTheme.cardBgElevated }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={[styles.bpGuideTitle, isDark && { color: currentTheme.textPrimary }]}>
+                📄 {t('sample_bill_guide_title')}
+              </Text>
+              <TouchableOpacity onPress={() => setShowSampleBillModal(false)} hitSlop={STANDARD_TOUCH_HIT_SLOP} testID="close_sample_guide_btn">
+                <Text style={{ fontSize: 18, color: '#64748B' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 13, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 12, lineHeight: 18 }}>
+              {t('sample_bill_guide_desc')}
+            </Text>
+            <View style={styles.bpGuideDiagramCard}>
+              <Text style={styles.bpGuideDiagramHeader}>[ বিল কাগজের নমুনা চিত্র ]</Text>
+              <View style={styles.bpGuideBox}>
+                <Text style={styles.bpGuideCallout}>👉 একাউন্ট নম্বর: বিলের উপরের ডান বা বাম পাশে 'Account No' বা 'SMS Account' লিখা থাকে</Text>
+                <Text style={styles.bpGuideCallout}>👉 মিটার নম্বর: প্রিপেইড বা মিটারের ক্ষেত্রে 'Meter No' হিসেবে ৮-১২ ডিজিট থাকে</Text>
+                <Text style={styles.bpGuideCallout}>👉 গ্রাহক মোবাইল: বিল এসএমএস পাওয়ার জন্য আপনার ১১ ডিজিটের মোবাইল নম্বর দিন</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.confirmBtnPrimary, { minHeight: 48, borderRadius: 10, marginTop: 14 }]}
+              onPress={() => setShowSampleBillModal(false)}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
+                {tStatic("বুঝেছি")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -27646,6 +28738,616 @@ const styles = StyleSheet.create({
     color: '#064E3B',
   },
 
+
+  // --- ITERATION 226: TALLYPAY UTILITY BILL PAYMENT STYLES ---
+  bpContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  bpHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#B45309',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  bpHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  bpHeaderSubtitle: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  bpCategoryCountBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  bpCategoryCountBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  bpSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 14,
+    marginTop: 12,
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  bpSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1E293B',
+    padding: 0,
+  },
+  bpFilterChipsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  bpFilterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    marginRight: 8,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bpFilterChipActive: {
+    backgroundColor: '#B45309',
+    borderColor: '#B45309',
+  },
+  bpFilterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  bpFilterChipTextActive: {
+    color: '#FFFFFF',
+  },
+  bpSavedSection: {
+    paddingHorizontal: 14,
+    marginTop: 10,
+  },
+  bpSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  bpSavedCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    marginRight: 10,
+    width: 140,
+  },
+  bpSavedIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  bpSavedNick: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  bpSavedAccNo: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  bpSavedCategoryBadge: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+    marginTop: 6,
+  },
+  bpSavedCategoryText: {
+    fontSize: 10,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  bpDirectorySection: {
+    paddingHorizontal: 14,
+    marginTop: 16,
+  },
+  bpBillerGrid: {
+    marginTop: 8,
+  },
+  bpBillerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 8,
+    minHeight: 56,
+  },
+  bpBillerIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bpBillerName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  bpBillerFullName: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  bpBillerTypeBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  bpBillerTypeBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  bpBillerCategorySub: {
+    fontSize: 10,
+    color: '#64748B',
+    marginLeft: 6,
+  },
+  bpEmptyDirectory: {
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bpEmptyText: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  bpBillerHeaderBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+  },
+  bpBillerBannerTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  bpBillerBannerSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  bpGuideLinkBtn: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  bpGuideLinkText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  bpFormCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+  },
+  bpFormFieldGroup: {
+    marginBottom: 14,
+  },
+  bpFieldLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  bpFieldHint: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  bpInputField: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1E293B',
+    marginTop: 6,
+    backgroundColor: '#FFFFFF',
+    minHeight: 46,
+  },
+  bpFieldErrorText: {
+    color: '#EF4444',
+    fontSize: 11,
+    marginTop: 4,
+  },
+  bpSaveCheckboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingVertical: 6,
+  },
+  bpCheckboxBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  bpCheckboxBoxActive: {
+    backgroundColor: '#B45309',
+    borderColor: '#B45309',
+  },
+  bpSaveCheckboxLabel: {
+    fontSize: 13,
+    color: '#334155',
+  },
+  bpStickyBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 46, // Android navigation safe area inset
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  bpPrimaryBtn: {
+    backgroundColor: '#B45309',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  bpPrimaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  bpSummaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    marginBottom: 16,
+  },
+  bpSummaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  bpSummaryBillerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#B45309',
+  },
+  bpStatusBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  bpStatusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  bpSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  bpSummaryLabel: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  bpSummaryValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  bpSummaryDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 8,
+  },
+  bpSummaryTotalLabel: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  bpSummaryTotalValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#B45309',
+  },
+  bpPinCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    alignItems: 'center',
+  },
+  bpPinTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  bpPinSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  bpPinInput: {
+    borderWidth: 1.5,
+    borderColor: '#B45309',
+    borderRadius: 10,
+    width: 160,
+    paddingVertical: 10,
+    textAlign: 'center',
+    fontSize: 22,
+    letterSpacing: 10,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    backgroundColor: '#FFFBEB',
+  },
+  bpSuccessCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 14,
+  },
+  bpSuccessTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#059669',
+    marginBottom: 6,
+  },
+  bpSuccessAmount: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 8,
+  },
+  bpTxnBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  bpTxnBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#047857',
+  },
+  bpSuccessDetailsCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+  },
+  bpReceiptBtn: {
+    backgroundColor: '#0D6E5C',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    minHeight: 48,
+  },
+  bpReceiptBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  bpNewBillBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    minHeight: 48,
+  },
+  bpNewBillBtnText: {
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bpDoneBtn: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  bpDoneBtnText: {
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bpReceiptPaper: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    padding: 18,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  bpReceiptPaperHeader: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingBottom: 14,
+    marginBottom: 14,
+  },
+  bpReceiptShopName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  bpReceiptDocTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  bpReceiptWatermark: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  bpReceiptWatermarkText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#059669',
+  },
+  bpReceiptTable: {
+    paddingVertical: 6,
+  },
+  bpReceiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 5,
+  },
+  bpReceiptCellLabel: {
+    fontSize: 13,
+    color: '#475569',
+  },
+  bpReceiptCellValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  bpReceiptDivider: {
+    height: 1,
+    backgroundColor: '#CBD5E1',
+    marginVertical: 10,
+  },
+  bpReceiptFooterNotice: {
+    marginTop: 18,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  bpReceiptNoticeText: {
+    fontSize: 10,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  bpReceiptActionBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  bpGuideSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 46,
+  },
+  bpGuideTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  bpGuideDiagramCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+  },
+  bpGuideDiagramHeader: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#64748B',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  bpGuideBox: {
+    paddingVertical: 6,
+  },
+  bpGuideCallout: {
+    fontSize: 12,
+    color: '#334155',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
 
   // --- BOTTOM SHEET & BUSINESS PICKER (BusinessPickerBottomSheet) ---
   bottomSheetOverlay: {
