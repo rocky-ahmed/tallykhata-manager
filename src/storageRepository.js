@@ -227,6 +227,7 @@ const VALID_COLLECTIONS = new Set([
   'billPaymentTransactions',
   'savedBillers',
   'tallyPayTransactions',
+  'tallyPayBeneficiaries',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -347,6 +348,7 @@ function migrateLegacySampleCustomerNames(accounts) {
 function sanitizeState(state) {
   if (!state || typeof state !== 'object') return createDefaultState();
   const s = { ...state };
+  if (!Array.isArray(s.tallyPayBeneficiaries)) s.tallyPayBeneficiaries = [];
   if (!Array.isArray(s.tallyPayTransactions)) s.tallyPayTransactions = [];
   if (!Array.isArray(s.billPaymentTransactions)) s.billPaymentTransactions = [];
   if (!Array.isArray(s.savedBillers)) s.savedBillers = [];
@@ -482,6 +484,7 @@ function createDefaultState() {
     billPaymentTransactions: [],
     savedBillers: [],
     tallyPayTransactions: [],
+    tallyPayBeneficiaries: [],
     version: 6,
   };
 }
@@ -1578,6 +1581,15 @@ class StorageRepository {
       authoritative.tallyPayTransactions = [];
     }
 
+    if (authoritative.tallyPayBeneficiaries && Array.isArray(authoritative.tallyPayBeneficiaries)) {
+      authoritative.tallyPayBeneficiaries = authoritative.tallyPayBeneficiaries.map((b) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, ...rest } = b || {};
+        return rest;
+      });
+    } else {
+      authoritative.tallyPayBeneficiaries = [];
+    }
+
     const domains = (extraState && Array.isArray(extraState.domains) && extraState.domains.length > 0)
       ? extraState.domains
       : ['all'];
@@ -2117,6 +2129,7 @@ class StorageRepository {
         const billPaymentTransactions = (prevStore.billPaymentTransactions || []).filter((b) => getBizId(b) !== targetId);
         const savedBillers = (prevStore.savedBillers || []).filter((s) => getBizId(s) !== targetId);
         const tallyPayTransactions = (prevStore.tallyPayTransactions || []).filter((t) => getBizId(t) !== targetId);
+        const tallyPayBeneficiaries = (prevStore.tallyPayBeneficiaries || []).filter((b) => getBizId(b) !== targetId);
 
       // Clean up physical audio files of deleted business
       if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
@@ -2196,6 +2209,7 @@ class StorageRepository {
         billPaymentTransactions,
         savedBillers,
         tallyPayTransactions,
+        tallyPayBeneficiaries,
         cashReconciliation,
       };
     });
@@ -2345,6 +2359,7 @@ class StorageRepository {
           const importedBillPayments = (data.billPaymentTransactions || []).filter(b => String(b.businessId || '1') === selectedBizId);
           const importedSavedBillers = (data.savedBillers || []).filter(s => String(s.businessId || '1') === selectedBizId);
           const importedTallyPay = (data.tallyPayTransactions || []).filter(t => String(t.businessId || '1') === selectedBizId);
+          const importedBeneficiaries = (data.tallyPayBeneficiaries || []).filter(b => String(b.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -2358,6 +2373,7 @@ class StorageRepository {
           const keptBillPayments = (prevStore.billPaymentTransactions || []).filter(b => String(b.businessId || '1') !== selectedBizId);
           const keptSavedBillers = (prevStore.savedBillers || []).filter(s => String(s.businessId || '1') !== selectedBizId);
           const keptTallyPay = (prevStore.tallyPayTransactions || []).filter(t => String(t.businessId || '1') !== selectedBizId);
+        const keptBeneficiaries = (prevStore.tallyPayBeneficiaries || []).filter(b => String(b.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2391,6 +2407,7 @@ class StorageRepository {
             billPaymentTransactions: [...keptBillPayments, ...importedBillPayments],
             savedBillers: [...keptSavedBillers, ...importedSavedBillers],
           tallyPayTransactions: [...keptTallyPay, ...importedTallyPay],
+          tallyPayBeneficiaries: [...keptBeneficiaries, ...importedBeneficiaries],
           version: 6,
           lastRestoredAt: new Date().toISOString(),
           restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -2432,6 +2449,7 @@ class StorageRepository {
         billPaymentTransactions: Array.isArray(data.billPaymentTransactions) ? data.billPaymentTransactions : [],
         savedBillers: Array.isArray(data.savedBillers) ? data.savedBillers : [],
         tallyPayTransactions: Array.isArray(data.tallyPayTransactions) ? data.tallyPayTransactions : [],
+        tallyPayBeneficiaries: Array.isArray(data.tallyPayBeneficiaries) ? data.tallyPayBeneficiaries : [],
         inventory: restoredInventory,
         stock: restoredInventory,
         pinEnabled: false,
@@ -6192,6 +6210,217 @@ class StorageRepository {
   }
 
   /**
+   * Saves or updates a TallyPay beneficiary (Bank or MFS) for a business.
+   */
+  async saveTallyPayBeneficiary(businessId, beneficiaryData, options = {}) {
+    if (!beneficiaryData || typeof beneficiaryData !== 'object') {
+      return { success: false, error: 'INVALID_BENEFICIARY_PAYLOAD' };
+    }
+
+    const store = this.currentStore || {};
+    const bizId = String(businessId || options.businessId || beneficiaryData.businessId || store.activeBusinessId || '1');
+    const targetType = String(
+      beneficiaryData.targetType || beneficiaryData.type || (beneficiaryData.routingNo || beneficiaryData.routingNumber ? 'BANK' : 'MFS')
+    ).toUpperCase();
+
+    let normalized = null;
+    if (targetType === 'BANK') {
+      const normalizer = (tallyPayService && typeof tallyPayService.formatBankAccountItem === 'function')
+        ? tallyPayService.formatBankAccountItem
+        : null;
+      normalized = normalizer ? normalizer(beneficiaryData) : { ...beneficiaryData, targetType: 'BANK' };
+    } else {
+      const normalizer = (tallyPayService && typeof tallyPayService.formatMfsAccountItem === 'function')
+        ? tallyPayService.formatMfsAccountItem
+        : null;
+      normalized = normalizer ? normalizer(beneficiaryData) : { ...beneficiaryData, targetType: 'MFS' };
+    }
+
+    if (!normalized) {
+      return { success: false, error: 'NORMALIZATION_FAILED' };
+    }
+
+    normalized.businessId = bizId;
+    if (!normalized.id) {
+      normalized.id = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 6);
+    }
+    normalized.updatedAt = new Date().toISOString();
+    if (!normalized.createdAt) {
+      normalized.createdAt = normalized.updatedAt;
+    }
+
+    await this.mutateCollection('tallyPayBeneficiaries', (list) => {
+      const existingIndex = list.findIndex((item) => {
+        if (String(item.businessId || '1') !== bizId) return false;
+        if (String(item.id) === String(normalized.id)) return true;
+        if (item.targetType === 'BANK' && normalized.targetType === 'BANK') {
+          return String(item.accountNumber).trim() === String(normalized.accountNumber).trim();
+        }
+        if (item.targetType === 'MFS' && normalized.targetType === 'MFS') {
+          return String(item.walletNo || item.mobileNumber).trim() === String(normalized.walletNo || normalized.mobileNumber).trim();
+        }
+        return false;
+      });
+
+      if (existingIndex !== -1) {
+        normalized.id = list[existingIndex].id;
+        normalized.createdAt = list[existingIndex].createdAt || normalized.createdAt;
+        list[existingIndex] = { ...list[existingIndex], ...normalized };
+      } else {
+        list.push(normalized);
+      }
+      return list;
+    });
+
+    return {
+      success: true,
+      beneficiary: normalized,
+      data: normalized,
+    };
+  }
+
+  /**
+   * Retrieves saved beneficiaries for a business with filtering, search, and pagination.
+   */
+  getTallyPayBeneficiaries(businessId = null, options = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const list = Array.isArray(store.tallyPayBeneficiaries) ? store.tallyPayBeneficiaries : [];
+    const items = list.filter((b) => String(b.businessId || '1') === targetBizId);
+
+    const queryFn = (tallyPayService && typeof tallyPayService.queryBeneficiaries === 'function')
+      ? tallyPayService.queryBeneficiaries
+      : null;
+
+    if (queryFn) {
+      return queryFn(items, options);
+    }
+
+    let filtered = [...items];
+    if (options.targetType && options.targetType !== 'ALL') {
+      const t = String(options.targetType).toUpperCase();
+      filtered = filtered.filter((b) => String(b.targetType || b.type).toUpperCase() === t);
+    }
+    if (options.status && options.status !== 'ALL') {
+      const s = String(options.status).toUpperCase();
+      filtered = filtered.filter((b) => String(b.status).toUpperCase() === s);
+    }
+    const query = options.search || options.searchQuery || options.query;
+    if (query && typeof query === 'string' && query.trim()) {
+      const q = query.trim().toLowerCase();
+      filtered = filtered.filter((b) => {
+        const name = String(b.accountName || b.name || '').toLowerCase();
+        const accNo = String(b.accountNumber || b.walletNo || b.mobileNumber || '').toLowerCase();
+        const bankName = String(b.bankName || b.mfsProvider || b.walletType || '').toLowerCase();
+        const routing = String(b.routingNo || b.routingNumber || '').toLowerCase();
+        return name.includes(q) || accNo.includes(q) || bankName.includes(q) || routing.includes(q);
+      });
+    }
+    if (options.isFavorite !== undefined && options.isFavorite !== null) {
+      const fav = Boolean(options.isFavorite);
+      filtered = filtered.filter((b) => Boolean(b.isFavorite) === fav);
+    }
+
+    filtered.sort((a, b) => {
+      const favA = a.isFavorite ? 1 : 0;
+      const favB = b.isFavorite ? 1 : 0;
+      if (favA !== favB) return favB - favA;
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
+
+    const totalCount = filtered.length;
+    const offset = Math.max(0, parseInt(options.offset, 10) || 0);
+    const limit = Math.max(1, parseInt(options.limit, 10) || 50);
+    const paginated = filtered.slice(offset, offset + limit);
+    const hasMore = offset + paginated.length < totalCount;
+
+    return {
+      items: paginated,
+      beneficiaries: paginated,
+      totalCount,
+      offset,
+      limit,
+      hasMore,
+    };
+  }
+
+  /**
+   * Retrieves a single saved beneficiary by ID.
+   */
+  getTallyPayBeneficiaryById(businessId = null, id) {
+    if (!id) return null;
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const list = Array.isArray(store.tallyPayBeneficiaries) ? store.tallyPayBeneficiaries : [];
+    return list.find((b) => String(b.id) === String(id) && String(b.businessId || '1') === targetBizId) || null;
+  }
+
+  /**
+   * Updates fields of an existing saved beneficiary.
+   */
+  async updateTallyPayBeneficiary(businessId, id, updates = {}) {
+    if (!id || typeof updates !== 'object') {
+      return { success: false, error: 'INVALID_PARAMETERS' };
+    }
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    let updatedRecord = null;
+    await this.mutateCollection('tallyPayBeneficiaries', (list) => {
+      const idx = list.findIndex((b) => String(b.id) === String(id) && String(b.businessId || '1') === targetBizId);
+      if (idx !== -1) {
+        list[idx] = {
+          ...list[idx],
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        };
+        updatedRecord = list[idx];
+      }
+      return list;
+    });
+
+    if (!updatedRecord) {
+      return { success: false, error: 'BENEFICIARY_NOT_FOUND' };
+    }
+    return { success: true, beneficiary: updatedRecord, data: updatedRecord };
+  }
+
+  /**
+   * Deletes a saved beneficiary with optional PIN authorization.
+   */
+  async deleteTallyPayBeneficiary(businessId, id, credential = null) {
+    if (!id) {
+      return { success: false, error: 'BENEFICIARY_ID_REQUIRED' };
+    }
+    if (credential !== null && credential !== undefined) {
+      const credStr = String(credential).trim();
+      if (credStr.length < 4) {
+        throw new Error('Invalid security credential for deletion');
+      }
+    }
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+
+    let deleted = false;
+    await this.mutateCollection('tallyPayBeneficiaries', (list) => {
+      const idx = list.findIndex((b) => String(b.id) === String(id) && String(b.businessId || '1') === targetBizId);
+      if (idx !== -1) {
+        list.splice(idx, 1);
+        deleted = true;
+      }
+      return list;
+    });
+
+    if (!deleted) {
+      return { success: false, error: 'BENEFICIARY_NOT_FOUND', message: 'Account not found' };
+    }
+    return { success: true, message: 'Bank beneficiary deleted successfully' };
+  }
+
+
+  /**
    * Sanitizes in-memory state ensuring all collections are well-formed arrays.
    */
   sanitizeState(state) {
@@ -7202,6 +7431,42 @@ function sanitizeStateRepo(state) {
   return sanitizeState(state);
 }
 
+async function saveTallyPayBeneficiaryRepo(businessId, beneficiaryData, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveTallyPayBeneficiary === 'function') {
+    return repo.saveTallyPayBeneficiary(businessId, beneficiaryData, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getTallyPayBeneficiariesRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getTallyPayBeneficiaries === 'function') {
+    return repo.getTallyPayBeneficiaries(businessId, options);
+  }
+  return { items: [], beneficiaries: [], totalCount: 0, offset: 0, limit: 50, hasMore: false };
+}
+
+function getTallyPayBeneficiaryByIdRepo(businessId = null, id = null, repo = defaultRepository) {
+  if (repo && typeof repo.getTallyPayBeneficiaryById === 'function') {
+    return repo.getTallyPayBeneficiaryById(businessId, id);
+  }
+  return null;
+}
+
+async function updateTallyPayBeneficiaryRepo(businessId, id, updates = {}, repo = defaultRepository) {
+  if (repo && typeof repo.updateTallyPayBeneficiary === 'function') {
+    return repo.updateTallyPayBeneficiary(businessId, id, updates);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function deleteTallyPayBeneficiaryRepo(businessId, id, credential = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteTallyPayBeneficiary === 'function') {
+    return repo.deleteTallyPayBeneficiary(businessId, id, credential);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+
 
 const repoExport = {
   V6_KEY,
@@ -7329,6 +7594,11 @@ const repoExport = {
   getTallyPayTransactions: getTallyPayTransactionsRepo,
   getTallyPayTransactionById: getTallyPayTransactionByIdRepo,
   getTallyPayMonthlySummary: getTallyPayMonthlySummaryRepo,
+  saveTallyPayBeneficiary: saveTallyPayBeneficiaryRepo,
+  getTallyPayBeneficiaries: getTallyPayBeneficiariesRepo,
+  getTallyPayBeneficiaryById: getTallyPayBeneficiaryByIdRepo,
+  updateTallyPayBeneficiary: updateTallyPayBeneficiaryRepo,
+  deleteTallyPayBeneficiary: deleteTallyPayBeneficiaryRepo,
   sanitizeState: sanitizeStateRepo,
   default: defaultRepository,
 };
@@ -7462,6 +7732,11 @@ if (typeof exports !== 'undefined') {
   exports.getTallyPayTransactions = getTallyPayTransactionsRepo;
   exports.getTallyPayTransactionById = getTallyPayTransactionByIdRepo;
   exports.getTallyPayMonthlySummary = getTallyPayMonthlySummaryRepo;
+  exports.saveTallyPayBeneficiary = saveTallyPayBeneficiaryRepo;
+  exports.getTallyPayBeneficiaries = getTallyPayBeneficiariesRepo;
+  exports.getTallyPayBeneficiaryById = getTallyPayBeneficiaryByIdRepo;
+  exports.updateTallyPayBeneficiary = updateTallyPayBeneficiaryRepo;
+  exports.deleteTallyPayBeneficiary = deleteTallyPayBeneficiaryRepo;
   exports.sanitizeState = sanitizeStateRepo;
   exports.default = defaultRepository;
 }
