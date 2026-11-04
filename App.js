@@ -100,6 +100,17 @@ const {
   SoundboxAudioDispatcher: TP_SoundboxAudioDispatcher = tallyPayModule.SoundboxAudioDispatcher,
   ReconstructedSoundboxAudioDispatcher: TP_ReconstructedSoundboxAudioDispatcher = tallyPayModule.ReconstructedSoundboxAudioDispatcher,
   QrSettlementEngine: TP_QrSettlementEngine = tallyPayModule.QrSettlementEngine,
+  // Iteration 231 additions
+  DEFAULT_PIN_SALT: TP_DEFAULT_PIN_SALT = tallyPayModule.DEFAULT_PIN_SALT,
+  PIN_ARSC_TOKENS: TP_PIN_ARSC_TOKENS = tallyPayModule.PIN_ARSC_TOKENS,
+  PIN_STRENGTH_ERRORS: TP_PIN_STRENGTH_ERRORS = tallyPayModule.PIN_STRENGTH_ERRORS,
+  hashPin: TP_hashPin = tallyPayModule.hashPin,
+  validatePinStrength: TP_validatePinStrength = tallyPayModule.validatePinStrength,
+  ReconstructedSecurityPinAndAuthEngine: TP_ReconstructedSecurityPinAndAuthEngine = tallyPayModule.ReconstructedSecurityPinAndAuthEngine,
+  PinSecurityEngine: TP_PinSecurityEngine = tallyPayModule.PinSecurityEngine,
+  pinSecurityEngine: TP_pinSecurityEngine = tallyPayModule.pinSecurityEngine,
+  TallyPaySecurityManager: TP_TallyPaySecurityManager = tallyPayModule.TallyPaySecurityManager,
+  tallyPaySecurityManager: TP_tallyPaySecurityManager = tallyPayModule.tallyPaySecurityManager,
 } = tallyPayModule;
 import * as soundboxModule from './src/soundboxService';
 const soundboxService = soundboxModule.soundboxService || soundboxModule.default || soundboxModule;
@@ -1184,6 +1195,18 @@ function TallyKhataApp() {
   // --- ITERATION 230: TALLYPAY SETTLEMENT HISTORY & AUTO-DISBURSEMENT ---
   const [modalSettlementHistory, setModalSettlementHistory] = useState(false);
   const [modalAutoDisbursementSettings, setModalAutoDisbursementSettings] = useState(false);
+  // --- ITERATION 231: TALLYPAY SECURITY PIN, BIOMETRICS & DEVICE BINDING ---
+  const [modalTpChangePin, setModalTpChangePin] = useState(false);
+  const [modalResetPin, setModalResetPin] = useState(false);
+  const [pinCurrentInput, setPinCurrentInput] = useState('');
+  const [pinNewInput, setPinNewInput] = useState('');
+  const [pinConfirmInput, setPinConfirmInput] = useState('');
+  const [pinResetMobile, setPinResetMobile] = useState('01712345678');
+  const [pinResetOtpInput, setPinResetOtpInput] = useState('');
+  const [pinResetOtpSent, setPinResetOtpSent] = useState(false);
+  const [pinResetCountdown, setPinResetCountdown] = useState(60);
+  const [biometricLoginActive, setBiometricLoginActive] = useState(false);
+  const [pinSecurityStatusBanner, setPinSecurityStatusBanner] = useState(null);
   const [settlementDateFilter, setSettlementDateFilter] = useState('ALL'); // 'ALL' | 'TODAY' | 'YESTERDAY' | 'THIS_WEEK' | 'THIS_MONTH'
   const [autoDisbursementConfig, setAutoDisbursementConfig] = useState({
     enabled: false,
@@ -2486,6 +2509,16 @@ function TallyKhataApp() {
         setModalAddMfsAccount(false);
         return true;
       }
+      if (modalResetPin) {
+        setModalResetPin(false);
+        setPinSecurityStatusBanner(null);
+        return true;
+      }
+      if (modalTpChangePin) {
+        setModalTpChangePin(false);
+        setPinSecurityStatusBanner(null);
+        return true;
+      }
       if (modalAutoDisbursementSettings) {
         setModalAutoDisbursementSettings(false);
         return true;
@@ -2611,7 +2644,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -5234,6 +5267,149 @@ function TallyKhataApp() {
     }
   };
 
+  // =========================================================================
+  // TALLYPAY SECURITY PIN, BIOMETRICS & DEVICE BINDING HANDLERS (Iteration 231)
+  // =========================================================================
+  const handleOpenChangePin = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setPinCurrentInput('');
+    setPinNewInput('');
+    setPinConfirmInput('');
+    setPinSecurityStatusBanner(null);
+    setModalTpChangePin(true);
+  };
+
+  const handleCloseChangePin = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setPinCurrentInput('');
+    setPinNewInput('');
+    setPinConfirmInput('');
+    setPinSecurityStatusBanner(null);
+    setModalTpChangePin(false);
+  };
+
+  const handleOpenResetPin = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setPinResetOtpInput('');
+    setPinResetOtpSent(false);
+    setPinResetCountdown(60);
+    setPinNewInput('');
+    setPinConfirmInput('');
+    setPinSecurityStatusBanner(null);
+    setModalResetPin(true);
+  };
+
+  const handleCloseResetPin = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setPinResetOtpInput('');
+    setPinResetOtpSent(false);
+    setPinSecurityStatusBanner(null);
+    setModalResetPin(false);
+  };
+
+  const handleSendResetOtp = async () => {
+    try {
+      try { hapticFeedbackService.selection(); } catch (e) {}
+      if (TP_tallyPaySecurityManager) {
+        await TP_tallyPaySecurityManager.requestResetPinOtp(pinResetMobile, 'PIN_RESET', activeBusinessId);
+      }
+      setPinResetOtpSent(true);
+      setPinResetCountdown(60);
+      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+      Alert.alert(t('reset_security_pin'), tStatic("ওটিপি সফলভাবে পাঠানো হয়েছে।"));
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to send OTP');
+    }
+  };
+
+  const handleSubmitChangePin = async () => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      if (pinNewInput !== pinConfirmInput) {
+        setPinSecurityStatusBanner({ type: 'error', message: t('pin_mismatch_alert') });
+        try { hapticFeedbackService.onError(); } catch (e) {}
+        Alert.alert(tStatic("ত্রুটি"), t('pin_mismatch_alert'));
+        return;
+      }
+      const strength = TP_validatePinStrength(pinNewInput);
+      if (!strength.valid) {
+        setPinSecurityStatusBanner({ type: 'error', message: t('pin_weak_alert') });
+        try { hapticFeedbackService.onError(); } catch (e) {}
+        Alert.alert(tStatic("ত্রুটি"), t('pin_weak_alert'));
+        return;
+      }
+      if (TP_tallyPaySecurityManager) {
+        const res = await TP_tallyPaySecurityManager.changePin(pinCurrentInput, pinNewInput, pinConfirmInput, activeBusinessId);
+        if (!res.success) {
+          setPinSecurityStatusBanner({ type: 'error', message: res.message || t('pin_lockout_alert') });
+          try { hapticFeedbackService.onError(); } catch (e) {}
+          Alert.alert(tStatic("ত্রুটি"), res.message || 'Failed to change PIN');
+          return;
+        }
+      }
+      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+      Alert.alert(t('change_security_pin'), tStatic("পিন সফলভাবে পরিবর্তিত হয়েছে।"));
+      handleCloseChangePin();
+    } catch (e) {
+      setPinSecurityStatusBanner({ type: 'error', message: e.message });
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to change PIN');
+    }
+  };
+
+  const handleSubmitResetPin = async () => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      if (!pinResetOtpInput || pinResetOtpInput.length !== 6) {
+        setPinSecurityStatusBanner({ type: 'error', message: tStatic("৬ ডিজিটের সঠিক ওটিপি দিন।") });
+        try { hapticFeedbackService.onError(); } catch (e) {}
+        Alert.alert(tStatic("ত্রুটি"), tStatic("৬ ডিজিটের সঠিক ওটিপি দিন।"));
+        return;
+      }
+      if (pinNewInput !== pinConfirmInput) {
+        setPinSecurityStatusBanner({ type: 'error', message: t('pin_mismatch_alert') });
+        try { hapticFeedbackService.onError(); } catch (e) {}
+        Alert.alert(tStatic("ত্রুটি"), t('pin_mismatch_alert'));
+        return;
+      }
+      const strength = TP_validatePinStrength(pinNewInput);
+      if (!strength.valid) {
+        setPinSecurityStatusBanner({ type: 'error', message: t('pin_weak_alert') });
+        try { hapticFeedbackService.onError(); } catch (e) {}
+        Alert.alert(tStatic("ত্রুটি"), t('pin_weak_alert'));
+        return;
+      }
+      if (TP_tallyPaySecurityManager) {
+        const res = await TP_tallyPaySecurityManager.resetPinWithOtp(pinResetMobile, pinResetOtpInput, pinNewInput, pinConfirmInput, activeBusinessId);
+        if (!res.success) {
+          setPinSecurityStatusBanner({ type: 'error', message: res.message || tStatic("ওটিপি যাচাই ব্যর্থ হয়েছে।") });
+          try { hapticFeedbackService.onError(); } catch (e) {}
+          Alert.alert(tStatic("ত্রুটি"), res.message || 'Failed to reset PIN');
+          return;
+        }
+      }
+      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+      Alert.alert(t('reset_security_pin'), tStatic("পিন সফলভাবে রিসেট করা হয়েছে।"));
+      handleCloseResetPin();
+    } catch (e) {
+      setPinSecurityStatusBanner({ type: 'error', message: e.message });
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to reset PIN');
+    }
+  };
+
+  const handleToggleBiometrics = async (val) => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      const nextVal = typeof val === 'boolean' ? val : !biometricLoginActive;
+      setBiometricLoginActive(nextVal);
+      if (nextVal && TP_tallyPaySecurityManager) {
+        await TP_tallyPaySecurityManager.enrollBiometrics('DEV_BIOMETRIC_KEY_' + Date.now(), activeBusinessId);
+      }
+      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    } catch (e) {
+      console.warn('Error toggling biometrics:', e);
+    }
+  };
+
 
   // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
@@ -6440,6 +6616,44 @@ function TallyKhataApp() {
       handleSaveAutoDisbursementConfig,
       storageRepository,
       tallyPayService,
+    };
+
+    global.__PIN_SECURITY_TEST_HOOKS__ = {
+      modalChangePin: modalTpChangePin,
+      setModalChangePin: setModalTpChangePin,
+      modalTpChangePin,
+      setModalTpChangePin,
+      modalResetPin,
+      setModalResetPin,
+      pinCurrentInput,
+      setPinCurrentInput,
+      pinNewInput,
+      setPinNewInput,
+      pinConfirmInput,
+      setPinConfirmInput,
+      pinResetMobile,
+      setPinResetMobile,
+      pinResetOtpInput,
+      setPinResetOtpInput,
+      pinResetOtpSent,
+      setPinResetOtpSent,
+      pinResetCountdown,
+      setPinResetCountdown,
+      biometricLoginActive,
+      setBiometricLoginActive,
+      pinSecurityStatusBanner,
+      setPinSecurityStatusBanner,
+      handleOpenChangePin,
+      handleCloseChangePin,
+      handleOpenResetPin,
+      handleCloseResetPin,
+      handleSendResetOtp,
+      handleSubmitChangePin,
+      handleSubmitResetPin,
+      handleToggleBiometrics,
+      tallyPaySecurityManager: TP_tallyPaySecurityManager,
+      pinSecurityEngine: TP_pinSecurityEngine,
+      storageRepository,
     };
 
     global.__TXN_HISTORY_TEST_HOOKS__ = {
@@ -10157,6 +10371,37 @@ accessibilityLabel={
               </View>
             </TouchableOpacity>
 
+            {/* Quick Action: TallyPay Security PIN & Biometrics (Iteration 231) */}
+            <TouchableOpacity
+              testID="btn_open_security_pin_settings"
+              style={[styles.analyticsTallypayBanner, { marginTop: 8 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+              onPress={handleOpenChangePin}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('security_pin_settings')}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  <Text style={{ fontSize: 18 }}>🔒</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('security_pin_settings')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    {t('change_security_pin')} • {t('biometric_auth')}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#4F46E5', marginRight: 4 }}>
+                  {tStatic("সেটিংস")}
+                </Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 12, height: 12, tintColor: '#4F46E5' }} resizeMode="contain" />
+              </View>
+            </TouchableOpacity>
+
             {/* Quick Action: Daily Auto-Disbursement (Iteration 230) */}
             <TouchableOpacity
               style={[styles.analyticsTallypayBanner, { marginTop: 8 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
@@ -10354,6 +10599,27 @@ accessibilityLabel={
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('settlement_history')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('gross_amount')} • {t('net_payout')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              {/* Menu Item: Security PIN & Biometrics (Iteration 231) */}
+              <TouchableOpacity
+                testID="menu_item_security_pin_settings"
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenChangePin}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('security_pin_settings')}
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_lock.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>
+                    {t('security_pin_settings')}
+                  </Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>
+                    {t('change_security_pin')} • {t('biometric_auth')}
+                  </Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
@@ -19989,6 +20255,354 @@ accessibilityLabel={
                 💾 {tStatic("সংরক্ষণ করুন")}
               </Text>
             </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: TALLYPAY CHANGE PIN (Iteration 231)
+         =================================================================== */}
+      <Modal
+        visible={modalTpChangePin}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseChangePin}
+        testID="modal_change_pin"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseChangePin}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_change_pin"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Text style={[styles.thBackIcon, isDark && { color: currentTheme.textPrimary }]}>‹</Text>
+            </TouchableOpacity>
+            <Text style={[styles.bmTitle, isDark && { color: currentTheme.textPrimary }]}>
+              {t('change_security_pin')}
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <ScrollView
+            style={styles.thBody}
+            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Security Status Banner */}
+            {pinSecurityStatusBanner && (
+              <View
+                testID="pin_security_banner"
+                style={{
+                  padding: 12,
+                  borderRadius: 8,
+                  marginBottom: 16,
+                  backgroundColor: pinSecurityStatusBanner.type === 'error' ? '#FEE2E2' : '#D1FAE5',
+                  borderWidth: 1,
+                  borderColor: pinSecurityStatusBanner.type === 'error' ? '#EF4444' : '#10B981',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: pinSecurityStatusBanner.type === 'error' ? '#991B1B' : '#065F46',
+                    fontWeight: '600',
+                  }}
+                >
+                  {pinSecurityStatusBanner.message}
+                </Text>
+              </View>
+            )}
+
+            {/* Current PIN Input */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 8, color: '#1E293B' }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('current_pin_label')}
+              </Text>
+              <TextInput
+                testID="input_current_pin"
+                style={[{ height: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 16, fontSize: 18, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={pinCurrentInput}
+                onChangeText={setPinCurrentInput}
+                keyboardType="numeric"
+                maxLength={4}
+                secureTextEntry
+                placeholder="••••"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            {/* New PIN Input */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 8, color: '#1E293B' }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('new_pin_label')}
+              </Text>
+              <TextInput
+                testID="input_new_pin"
+                style={[{ height: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 16, fontSize: 18, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={pinNewInput}
+                onChangeText={setPinNewInput}
+                keyboardType="numeric"
+                maxLength={4}
+                secureTextEntry
+                placeholder="••••"
+                placeholderTextColor="#94A3B8"
+              />
+              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                {t('pin_weak_alert')}
+              </Text>
+            </View>
+
+            {/* Confirm PIN Input */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 8, color: '#1E293B' }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('confirm_pin_label')}
+              </Text>
+              <TextInput
+                testID="input_confirm_pin"
+                style={[{ height: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 16, fontSize: 18, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={pinConfirmInput}
+                onChangeText={setPinConfirmInput}
+                keyboardType="numeric"
+                maxLength={4}
+                secureTextEntry
+                placeholder="••••"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            {/* Biometric Toggle Card */}
+            <View
+              style={[{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: 16,
+                borderRadius: 12,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                marginBottom: 20,
+              }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+            >
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={[{ fontSize: 15, fontWeight: '600', color: '#0F172A' }, isDark && { color: currentTheme.textPrimary }]}>
+                  {t('biometric_auth')}
+                </Text>
+                <Text style={[{ fontSize: 12, color: '#64748B', marginTop: 2 }, isDark && { color: currentTheme.textSecondary }]}>
+                  {t('biometric_auth_desc')}
+                </Text>
+              </View>
+              <Switch
+                testID="switch_biometric_auth"
+                value={biometricLoginActive}
+                onValueChange={handleToggleBiometrics}
+                trackColor={{ false: '#CBD5E1', true: '#A7F3D0' }}
+                thumbColor={biometricLoginActive ? '#0D6E5C' : '#F1F5F9'}
+              />
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              testID="btn_submit_change_pin"
+              style={{
+                height: 50,
+                backgroundColor: '#0D6E5C',
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 16,
+              }}
+              onPress={handleSubmitChangePin}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {t('change_security_pin')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Forgot PIN trigger */}
+            <TouchableOpacity
+              testID="btn_forgot_pin"
+              onPress={handleOpenResetPin}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              style={{ alignItems: 'center', padding: 12 }}
+            >
+              <Text style={{ fontSize: 14, color: '#2563EB', fontWeight: '600' }}>
+                {t('forgot_pin')}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: TALLYPAY RESET PIN & OTP (Iteration 231)
+         =================================================================== */}
+      <Modal
+        visible={modalResetPin}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseResetPin}
+        testID="modal_reset_pin"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseResetPin}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_reset_pin"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Text style={[styles.thBackIcon, isDark && { color: currentTheme.textPrimary }]}>‹</Text>
+            </TouchableOpacity>
+            <Text style={[styles.bmTitle, isDark && { color: currentTheme.textPrimary }]}>
+              {t('reset_security_pin')}
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <ScrollView
+            style={styles.thBody}
+            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Status Banner */}
+            {pinSecurityStatusBanner && (
+              <View
+                style={{
+                  padding: 12,
+                  borderRadius: 8,
+                  marginBottom: 16,
+                  backgroundColor: pinSecurityStatusBanner.type === 'error' ? '#FEE2E2' : '#D1FAE5',
+                  borderWidth: 1,
+                  borderColor: pinSecurityStatusBanner.type === 'error' ? '#EF4444' : '#10B981',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: pinSecurityStatusBanner.type === 'error' ? '#991B1B' : '#065F46',
+                    fontWeight: '600',
+                  }}
+                >
+                  {pinSecurityStatusBanner.message}
+                </Text>
+              </View>
+            )}
+
+            {/* Mobile Number & Send OTP */}
+            <View style={[{ padding: 16, borderRadius: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}>
+              <Text style={[{ fontSize: 13, color: '#64748B', marginBottom: 4 }, isDark && { color: currentTheme.textSecondary }]}>
+                {tStatic("নিবন্ধিত মোবাইল নম্বর")}
+              </Text>
+              <Text testID="text_reset_mobile" style={[{ fontSize: 16, fontWeight: 'bold', color: '#0F172A', marginBottom: 12 }, isDark && { color: currentTheme.textPrimary }]}>
+                {pinResetMobile}
+              </Text>
+              <TouchableOpacity
+                testID="btn_send_reset_otp"
+                style={{ height: 42, backgroundColor: '#2563EB', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+                onPress={handleSendResetOtp}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              >
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' }}>
+                  {pinResetOtpSent ? t('resend_otp') : t('send_otp')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* OTP Input */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 8, color: '#1E293B' }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('enter_otp')}
+              </Text>
+              <TextInput
+                testID="input_reset_otp"
+                style={[{ height: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 16, fontSize: 18, color: '#1E293B', backgroundColor: '#FFFFFF', letterSpacing: 4 }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={pinResetOtpInput}
+                onChangeText={setPinResetOtpInput}
+                keyboardType="numeric"
+                maxLength={6}
+                placeholder="123456"
+                placeholderTextColor="#94A3B8"
+              />
+              {pinResetOtpSent && (
+                <Text testID="text_otp_countdown" style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                  {t('resend_otp_countdown')} {pinResetCountdown} সেকেন্ড
+                </Text>
+              )}
+            </View>
+
+            {/* New PIN */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 8, color: '#1E293B' }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('new_pin_label')}
+              </Text>
+              <TextInput
+                testID="input_reset_new_pin"
+                style={[{ height: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 16, fontSize: 18, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={pinNewInput}
+                onChangeText={setPinNewInput}
+                keyboardType="numeric"
+                maxLength={4}
+                secureTextEntry
+                placeholder="••••"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            {/* Confirm New PIN */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 8, color: '#1E293B' }, isDark && { color: currentTheme.textPrimary }]}>
+                {t('confirm_pin_label')}
+              </Text>
+              <TextInput
+                testID="input_reset_confirm_pin"
+                style={[{ height: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 16, fontSize: 18, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={pinConfirmInput}
+                onChangeText={setPinConfirmInput}
+                keyboardType="numeric"
+                maxLength={4}
+                secureTextEntry
+                placeholder="••••"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            {/* Submit Reset Button */}
+            <TouchableOpacity
+              testID="btn_submit_reset_pin"
+              style={{
+                height: 50,
+                backgroundColor: '#0D6E5C',
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 20,
+              }}
+              onPress={handleSubmitResetPin}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {t('reset_security_pin')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Single Device Policy Clause Notice */}
+            <View style={{ padding: 12, backgroundColor: '#EFF6FF', borderRadius: 8, borderWidth: 1, borderColor: '#BFDBFE' }}>
+              <Text testID="text_single_device_clause" style={{ fontSize: 12, color: '#1E40AF', lineHeight: 18 }}>
+                ℹ️ {t('single_device_binding_notice')}
+              </Text>
+            </View>
           </ScrollView>
         </SafeAreaView>
       </Modal>

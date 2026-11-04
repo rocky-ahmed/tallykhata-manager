@@ -1,3 +1,45 @@
+
+async function saveWalletSecurityCredentialsRepo(businessId = null, credentials = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveWalletSecurityCredentials === 'function') {
+    return repo.saveWalletSecurityCredentials(businessId, credentials);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getWalletSecurityCredentialsRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getWalletSecurityCredentials === 'function') {
+    return repo.getWalletSecurityCredentials(businessId);
+  }
+  return { id: 'CRED_1', businessId: String(businessId || '1'), storedPinHash: null };
+}
+
+async function registerDeviceBindingRepo(businessId = null, binding = {}, repo = defaultRepository) {
+  if (repo && typeof repo.registerDeviceBinding === 'function') {
+    return repo.registerDeviceBinding(businessId, binding);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getDeviceBindingsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getDeviceBindings === 'function') {
+    return repo.getDeviceBindings(businessId, options);
+  }
+  return [];
+}
+
+function getActiveDeviceBindingRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getActiveDeviceBinding === 'function') {
+    return repo.getActiveDeviceBinding(businessId);
+  }
+  return null;
+}
+
+async function revokeDeviceBindingRepo(businessId = null, deviceId = null, repo = defaultRepository) {
+  if (repo && typeof repo.revokeDeviceBinding === 'function') {
+    return repo.revokeDeviceBinding(businessId, deviceId);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
 ﻿/**
  * src/storageRepository.js
  * Production Storage Repository & Offline State Manager for TallyKhata
@@ -231,6 +273,8 @@ const VALID_COLLECTIONS = new Set([
   'qrSettlementActions',
   'merchantDisbursements',
   'reconciliations',
+  'walletSecurityCredentials',
+  'deviceBindings',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -353,6 +397,8 @@ function sanitizeState(state) {
   const s = { ...state };
   if (!Array.isArray(s.merchantDisbursements)) s.merchantDisbursements = [];
   if (!Array.isArray(s.reconciliations)) s.reconciliations = [];
+  if (!Array.isArray(s.walletSecurityCredentials)) s.walletSecurityCredentials = [];
+  if (!Array.isArray(s.deviceBindings)) s.deviceBindings = [];
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
   if (!Array.isArray(s.tallyPayBeneficiaries)) s.tallyPayBeneficiaries = [];
@@ -495,6 +541,8 @@ function createDefaultState() {
     qrSettlementActions: [],
     merchantDisbursements: [],
     reconciliations: [],
+    walletSecurityCredentials: [],
+    deviceBindings: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1610,6 +1658,24 @@ class StorageRepository {
       authoritative.merchantDisbursements = [];
     }
 
+    if (authoritative.walletSecurityCredentials && Array.isArray(authoritative.walletSecurityCredentials)) {
+      authoritative.walletSecurityCredentials = authoritative.walletSecurityCredentials.map((c) => {
+        const { pin, rawPin, pinInput, oldPin, newPin, sessionToken, token, apiKey, secretKey, privateKey, ...rest } = c || {};
+        return rest;
+      });
+    } else {
+      authoritative.walletSecurityCredentials = [];
+    }
+
+    if (authoritative.deviceBindings && Array.isArray(authoritative.deviceBindings)) {
+      authoritative.deviceBindings = authoritative.deviceBindings.map((b) => {
+        const { pin, rawPin, sessionToken, token, secret, ...rest } = b || {};
+        return rest;
+      });
+    } else {
+      authoritative.deviceBindings = [];
+    }
+
     if (authoritative.reconciliations && Array.isArray(authoritative.reconciliations)) {
       authoritative.reconciliations = authoritative.reconciliations.map((r) => {
         const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, ...rest } = r || {};
@@ -2182,6 +2248,8 @@ class StorageRepository {
         const qrSettlementActions = (prevStore.qrSettlementActions || []).filter((q) => getBizId(q) !== targetId);
         const merchantDisbursements = (prevStore.merchantDisbursements || []).filter((d) => getBizId(d) !== targetId);
         const reconciliations = (prevStore.reconciliations || []).filter((r) => getBizId(r) !== targetId);
+        const walletSecurityCredentials = (prevStore.walletSecurityCredentials || []).filter((c) => getBizId(c) !== targetId);
+        const deviceBindings = (prevStore.deviceBindings || []).filter((b) => getBizId(b) !== targetId);
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
         delete autoDisbursementConfig[targetId];
 
@@ -2267,6 +2335,8 @@ class StorageRepository {
         qrSettlementActions,
         merchantDisbursements,
         reconciliations,
+        walletSecurityCredentials,
+        deviceBindings,
         autoDisbursementConfig,
         cashReconciliation,
       };
@@ -2421,6 +2491,8 @@ class StorageRepository {
           const importedQrSettlements = (data.qrSettlementActions || []).filter(q => String(q.businessId || '1') === selectedBizId);
           const importedDisbursements = (data.merchantDisbursements || []).filter(d => String(d.businessId || '1') === selectedBizId);
           const importedReconciliations = (data.reconciliations || []).filter(r => String(r.businessId || '1') === selectedBizId);
+          const importedWalletCredentials = (data.walletSecurityCredentials || []).filter(c => String(c.businessId || '1') === selectedBizId);
+          const importedDeviceBindings = (data.deviceBindings || []).filter(b => String(b.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -2438,6 +2510,8 @@ class StorageRepository {
         const keptQrSettlements = (prevStore.qrSettlementActions || []).filter(q => String(q.businessId || '1') !== selectedBizId);
         const keptDisbursements = (prevStore.merchantDisbursements || []).filter(d => String(d.businessId || '1') !== selectedBizId);
         const keptReconciliations = (prevStore.reconciliations || []).filter(r => String(r.businessId || '1') !== selectedBizId);
+        const keptWalletCredentials = (prevStore.walletSecurityCredentials || []).filter(c => String(c.businessId || '1') !== selectedBizId);
+        const keptDeviceBindings = (prevStore.deviceBindings || []).filter(b => String(b.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2475,6 +2549,8 @@ class StorageRepository {
           qrSettlementActions: [...keptQrSettlements, ...importedQrSettlements],
           merchantDisbursements: [...keptDisbursements, ...importedDisbursements],
           reconciliations: [...keptReconciliations, ...importedReconciliations],
+          walletSecurityCredentials: [...keptWalletCredentials, ...importedWalletCredentials],
+          deviceBindings: [...keptDeviceBindings, ...importedDeviceBindings],
           autoDisbursementConfig: { ...(prevStore.autoDisbursementConfig || {}), ...(data.autoDisbursementConfig || {}) },
           version: 6,
           lastRestoredAt: new Date().toISOString(),
@@ -2521,6 +2597,8 @@ class StorageRepository {
         qrSettlementActions: Array.isArray(data.qrSettlementActions) ? data.qrSettlementActions : [],
         merchantDisbursements: Array.isArray(data.merchantDisbursements) ? data.merchantDisbursements : [],
         reconciliations: Array.isArray(data.reconciliations) ? data.reconciliations : [],
+        walletSecurityCredentials: Array.isArray(data.walletSecurityCredentials) ? data.walletSecurityCredentials : [],
+        deviceBindings: Array.isArray(data.deviceBindings) ? data.deviceBindings : [],
         autoDisbursementConfig: (data.autoDisbursementConfig && typeof data.autoDisbursementConfig === 'object') ? data.autoDisbursementConfig : {},
         inventory: restoredInventory,
         stock: restoredInventory,
@@ -7045,6 +7123,166 @@ class StorageRepository {
     return { success: false, error: res?.error || 'MUTATION_FAILED' };
   }
 
+  /**
+   * REA-ITER-231: Saves or updates wallet security credentials for a business.
+   */
+  async saveWalletSecurityCredentials(businessId = null, credentials = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const nowIso = new Date().toISOString();
+
+    const record = {
+      id: credentials.id || `CRED_${targetBizId}`,
+      businessId: targetBizId,
+      storedPinHash: credentials.storedPinHash || credentials.pinHash || null,
+      salt: credentials.salt || 'jrhwesdfbmnew',
+      previousPins: Array.isArray(credentials.previousPins) ? credentials.previousPins : [],
+      failedAttempts: Number(credentials.failedAttempts) || 0,
+      lockoutUntil: credentials.lockoutUntil || null,
+      tempLockoutMinutes: Number(credentials.tempLockoutMinutes) || 60,
+      biometricEnabled: Boolean(credentials.biometricEnabled),
+      biometricPublicKey: credentials.biometricPublicKey || null,
+      activeDeviceId: credentials.activeDeviceId || 'DEV_INIT_001',
+      activeWalletNo: credentials.activeWalletNo || '01712345678',
+      createDate: credentials.createDate || nowIso,
+      updateDate: nowIso,
+    };
+
+    let saved = null;
+    await this.mutateCollection('walletSecurityCredentials', (list) => {
+      const remaining = list.filter((c) => String(c.businessId || '1') !== targetBizId);
+      saved = record;
+      return [record, ...remaining];
+    });
+
+    return { success: true, credentials: saved };
+  }
+
+  /**
+   * REA-ITER-231: Retrieves wallet security credentials for a business.
+   */
+  getWalletSecurityCredentials(businessId = null) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const list = Array.isArray(store.walletSecurityCredentials) ? store.walletSecurityCredentials : [];
+    const found = list.find((c) => String(c.businessId || '1') === targetBizId);
+    if (found) {
+      return { ...found };
+    }
+    return {
+      id: `CRED_${targetBizId}`,
+      businessId: targetBizId,
+      storedPinHash: null,
+      salt: 'jrhwesdfbmnew',
+      previousPins: [],
+      failedAttempts: 0,
+      lockoutUntil: null,
+      tempLockoutMinutes: 60,
+      biometricEnabled: false,
+      biometricPublicKey: null,
+      activeDeviceId: 'DEV_INIT_001',
+      activeWalletNo: '01712345678',
+    };
+  }
+
+  /**
+   * REA-ITER-231: Registers or updates a device binding.
+   * Enforces single active device policy: invalidates prior active device for the same business/wallet.
+   */
+  async registerDeviceBinding(businessId = null, binding = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const nowIso = new Date().toISOString();
+
+    const deviceId = binding.deviceId || binding.id || `DEV_${Date.now()}`;
+    const record = {
+      id: deviceId,
+      deviceId,
+      businessId: targetBizId,
+      mobileNumber: binding.mobileNumber || '01712345678',
+      walletNo: binding.walletNo || binding.mobileNumber || '01712345678',
+      deviceName: binding.deviceName || 'Android Device',
+      status: 'ACTIVE',
+      boundAt: binding.boundAt || nowIso,
+      updateDate: nowIso,
+    };
+
+    let invalidatedDeviceId = null;
+    let saved = null;
+
+    await this.mutateCollection('deviceBindings', (list) => {
+      const updated = list.map((d) => {
+        if (String(d.businessId || '1') === targetBizId && d.status === 'ACTIVE' && String(d.deviceId) !== String(deviceId)) {
+          invalidatedDeviceId = d.deviceId;
+          return { ...d, status: 'INACTIVE', invalidatedAt: nowIso, updateDate: nowIso };
+        }
+        return d;
+      });
+
+      const remaining = updated.filter((d) => String(d.deviceId) !== String(deviceId));
+      saved = record;
+      return [record, ...remaining];
+    });
+
+    return {
+      success: true,
+      binding: saved,
+      previousDeviceInvalidated: invalidatedDeviceId,
+    };
+  }
+
+  /**
+   * REA-ITER-231: Retrieves all device bindings for a business.
+   */
+  getDeviceBindings(businessId = null, options = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = businessId ? String(businessId) : null;
+    const list = Array.isArray(store.deviceBindings) ? store.deviceBindings : [];
+
+    let filtered = list.filter((d) => {
+      if (targetBizId && String(d.businessId || '1') !== targetBizId) return false;
+      if (options.status && String(d.status).toUpperCase() !== String(options.status).toUpperCase()) return false;
+      return true;
+    });
+
+    filtered.sort((a, b) => new Date(b.boundAt || b.updateDate || 0) - new Date(a.boundAt || a.updateDate || 0));
+    return filtered;
+  }
+
+  /**
+   * REA-ITER-231: Retrieves active device binding for a business.
+   */
+  getActiveDeviceBinding(businessId = null) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const list = Array.isArray(store.deviceBindings) ? store.deviceBindings : [];
+    return list.find((d) => String(d.businessId || '1') === targetBizId && d.status === 'ACTIVE') || null;
+  }
+
+  /**
+   * REA-ITER-231: Revokes a device binding.
+   */
+  async revokeDeviceBinding(businessId = null, deviceId = null) {
+    if (!deviceId) return { success: false, error: 'DEVICE_ID_REQUIRED' };
+    const store = this.currentStore || {};
+    const targetBizId = businessId ? String(businessId) : null;
+    const targetDevId = String(deviceId);
+    const nowIso = new Date().toISOString();
+    let count = 0;
+
+    await this.mutateCollection('deviceBindings', (list) => {
+      return list.map((d) => {
+        if (String(d.deviceId) === targetDevId && (!targetBizId || String(d.businessId || '1') === targetBizId)) {
+          count++;
+          return { ...d, status: 'REVOKED', revokedAt: nowIso, updateDate: nowIso };
+        }
+        return d;
+      });
+    });
+
+    return { success: true, revokedCount: count };
+  }
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -8335,6 +8573,12 @@ const repoExport = {
   markReconciliationsSynced: markReconciliationsSyncedRepo,
   getAutoDisbursementConfig: getAutoDisbursementConfigRepo,
   saveAutoDisbursementConfig: saveAutoDisbursementConfigRepo,
+  saveWalletSecurityCredentials: saveWalletSecurityCredentialsRepo,
+  getWalletSecurityCredentials: getWalletSecurityCredentialsRepo,
+  registerDeviceBinding: registerDeviceBindingRepo,
+  getDeviceBindings: getDeviceBindingsRepo,
+  getActiveDeviceBinding: getActiveDeviceBindingRepo,
+  revokeDeviceBinding: revokeDeviceBindingRepo,
   sanitizeState: sanitizeStateRepo,
   default: defaultRepository,
 };
@@ -8486,6 +8730,12 @@ if (typeof exports !== 'undefined') {
   exports.markReconciliationsSynced = markReconciliationsSyncedRepo;
   exports.getAutoDisbursementConfig = getAutoDisbursementConfigRepo;
   exports.saveAutoDisbursementConfig = saveAutoDisbursementConfigRepo;
+  exports.saveWalletSecurityCredentials = saveWalletSecurityCredentialsRepo;
+  exports.getWalletSecurityCredentials = getWalletSecurityCredentialsRepo;
+  exports.registerDeviceBinding = registerDeviceBindingRepo;
+  exports.getDeviceBindings = getDeviceBindingsRepo;
+  exports.getActiveDeviceBinding = getActiveDeviceBindingRepo;
+  exports.revokeDeviceBinding = revokeDeviceBindingRepo;
   exports.sanitizeState = sanitizeStateRepo;
   exports.default = defaultRepository;
 }

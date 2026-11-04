@@ -3474,10 +3474,482 @@ class ReconstructedSettlementAndReconciliationEngine {
   }
 }
 
+// ============================================================================
+// MILESTONE REA-ITER-231: TALLYPAY SECURITY PIN, BIOMETRICS & DEVICE BINDING
+// ============================================================================
+
+
+const DEFAULT_PIN_SALT = 'jrhwesdfbmnew';
+
+const PIN_ARSC_TOKENS = {
+  ALERT_ACCOUNT_LOCKED: '৩ বার ভুল PIN দেয়ার জন্য আপনার একাউন্টটি ১ ঘণ্টার জন্য ব্লক করা হয়েছে।',
+  ALERT_ATTEMPT_WARNING: 'আপনি পরপর ২ বার ভুল PIN দিয়েছেন। আরেকবার ভুল PIN দিলে আপনার একাউন্ট ব্লক করে দেওয়া হবে।',
+  RULE_WEAK_PIN: 'অনুগ্রহ করে ধারাবাহিক বা পুনরাবৃত্ত নম্বর ছাড়া একটি ভিন্ন PIN দিন।',
+  RULE_PREVIOUSLY_USED: 'এই PIN পূর্বে ব্যবহৃত হয়েছে',
+  ALERT_PIN_MISMATCH: 'PIN দুটি মিলছে না, আবার চেষ্টা করুন।',
+  ALERT_PIN_CHANGED: 'আপনার টালিখাতা এবং টালিপে PIN পরিবর্তন সফল হয়েছে।',
+  ALERT_PIN_SET: 'আপনার PIN সেট সফল হয়েছে।',
+  ALERT_PIN_RESET: 'আপনার PIN সফলভাবে রিসেট করা হয়েছে।',
+  PROMPT_ENTER_CURRENT_PIN: 'বর্তমান PIN দিন',
+  PROMPT_ENTER_NEW_PIN: 'নতুন PIN দিন',
+  PROMPT_RETYPE_NEW_PIN: 'নতুন PIN পুনরায় লিখুন',
+  NOTICE_BIOMETRIC_FALLBACK: 'Failed to verify using Finger Print. Please do continue with PIN',
+  NOTICE_NO_BIOMETRIC_REGISTERED: 'কোন নিবন্ধিত ফিঙ্গারপ্রিন্ট পাওয়া যায়নি।',
+  CLAUSE_SINGLE_ACTIVE_DEVICE: 'বর্তমানে ব্যবহৃত ডিভাইস ব্যতিত নতুন কোন ডিভাইসে লগইন করলে বর্তমান ডিভাইসে টালিখাতা অ্যাপটি নিষ্ক্রিয় হয়ে যাবে',
+  NOTICE_OTP_SENT: 'ভেরিফিকেশন কোড পাঠানো হয়েছে।',
+  NOTICE_OTP_EXPIRED: 'ভেরিফিকেশন কোডের মেয়াদ শেষ হয়েছে।',
+  NOTICE_INVALID_OTP: 'সঠিক ভেরিফিকেশন কোড দিন।',
+  DEVICE_ACTIVATION_SUCCESS: 'নতুন ডিভাইসে সফলভাবে সক্রিয় করা হয়েছে।',
+};
+
+const PIN_STRENGTH_ERRORS = {
+  MUST_BE_4_DIGITS: '4 digit PIN and should be random numbers',
+  REPETITIVE_DIGITS: 'অনুগ্রহ করে ধারাবাহিক বা পুনরাবৃত্ত নম্বর ছাড়া একটি ভিন্ন PIN দিন।',
+  SEQUENTIAL_ASCENDING: 'অনুগ্রহ করে ধারাবাহিক বা পুনরাবৃত্ত নম্বর ছাড়া একটি ভিন্ন PIN দিন।',
+  SEQUENTIAL_DESCENDING: 'অনুগ্রহ করে ধারাবাহিক বা পুনরাবৃত্ত নম্বর ছাড়া একটি ভিন্ন PIN দিন।',
+};
+
+function hashPin(pin, salt = DEFAULT_PIN_SALT) {
+  if (!pin) return null;
+  return crypto.createHash('sha1').update(String(pin) + String(salt)).digest('hex');
+}
+
+function validatePinStrength(pin) {
+  if (!pin || typeof pin !== 'string' || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+    return { valid: false, reason: 'MUST_BE_4_DIGITS', message: PIN_STRENGTH_ERRORS.MUST_BE_4_DIGITS };
+  }
+
+  // Check repetitive digits (e.g. 1111, 2222)
+  if (/^(\d)\1{3}$/.test(pin)) {
+    return { valid: false, reason: 'REPETITIVE_DIGITS', message: PIN_STRENGTH_ERRORS.REPETITIVE_DIGITS };
+  }
+
+  // Check sequential ascending digits (e.g. 1234, 2345, 6789)
+  const d0 = parseInt(pin[0], 10);
+  const d1 = parseInt(pin[1], 10);
+  const d2 = parseInt(pin[2], 10);
+  const d3 = parseInt(pin[3], 10);
+  if (d1 === d0 + 1 && d2 === d1 + 1 && d3 === d2 + 1) {
+    return { valid: false, reason: 'SEQUENTIAL_ASCENDING', message: PIN_STRENGTH_ERRORS.SEQUENTIAL_ASCENDING };
+  }
+
+  // Check sequential descending digits (e.g. 4321, 9876)
+  if (d1 === d0 - 1 && d2 === d1 - 1 && d3 === d2 - 1) {
+    return { valid: false, reason: 'SEQUENTIAL_DESCENDING', message: PIN_STRENGTH_ERRORS.SEQUENTIAL_DESCENDING };
+  }
+
+  return { valid: true };
+}
+
+class ReconstructedSecurityPinAndAuthEngine {
+  constructor(config = {}) {
+    this.salt = config.salt || DEFAULT_PIN_SALT;
+    this.storedPinHash = config.storedPinHash || null;
+    this.previousPins = new Set(config.previousPins || []);
+    this.failedAttempts = Number(config.failedAttempts) || 0;
+    this.lockoutUntil = config.lockoutUntil || null;
+    this.tempLockoutMinutes = Number(config.tempLockoutMinutes) || 60; // 1 hour for 3 failed attempts
+    this.biometricEnabled = Boolean(config.biometricEnabled);
+    this.biometricPublicKey = config.biometricPublicKey || null;
+    this.activeDeviceId = config.activeDeviceId || 'DEV_INIT_001';
+    this.activeWalletNo = config.activeWalletNo || '01712345678';
+
+    // In-memory OTP storage
+    this.pendingOtps = new Map(); // mobile -> { otp, otpType, expiry }
+  }
+
+  // Hash PIN with reference salt
+  hashPin(pin) {
+    return hashPin(pin, this.salt);
+  }
+
+  // Validate PIN strength
+  validatePinStrength(pin) {
+    return validatePinStrength(pin);
+  }
+
+  // Setup initial PIN
+  setupPin(newPin, confirmPin) {
+    if (newPin !== confirmPin) {
+      return { success: false, reason: 'PIN_MISMATCH', message: PIN_ARSC_TOKENS.ALERT_PIN_MISMATCH };
+    }
+    const val = this.validatePinStrength(newPin);
+    if (!val.valid) return { success: false, reason: val.reason, message: val.message };
+
+    const hash = this.hashPin(newPin);
+    this.storedPinHash = hash;
+    this.previousPins.add(hash);
+    this.failedAttempts = 0;
+    this.lockoutUntil = null;
+
+    return { success: true, message: PIN_ARSC_TOKENS.ALERT_PIN_SET };
+  }
+
+  // Change existing PIN
+  changePin(oldPin, newPin, confirmPin) {
+    if (this.isLockedOut()) {
+      return { success: false, reason: 'LOCKED_OUT', message: PIN_ARSC_TOKENS.ALERT_ACCOUNT_LOCKED };
+    }
+
+    const oldHash = this.hashPin(oldPin);
+    if (oldHash !== this.storedPinHash) {
+      this.recordFailedAttempt();
+      return { success: false, reason: 'WRONG_OLD_PIN', message: 'বর্তমান PIN সঠিক নয়।' };
+    }
+
+    if (newPin !== confirmPin) {
+      return { success: false, reason: 'PIN_MISMATCH', message: PIN_ARSC_TOKENS.ALERT_PIN_MISMATCH };
+    }
+
+    const val = this.validatePinStrength(newPin);
+    if (!val.valid) return { success: false, reason: val.reason, message: val.message };
+
+    const newHash = this.hashPin(newPin);
+    if (this.previousPins.has(newHash)) {
+      return { success: false, reason: 'PREVIOUSLY_USED', message: PIN_ARSC_TOKENS.RULE_PREVIOUSLY_USED };
+    }
+
+    this.storedPinHash = newHash;
+    this.previousPins.add(newHash);
+    this.failedAttempts = 0;
+    return { success: true, message: PIN_ARSC_TOKENS.ALERT_PIN_CHANGED };
+  }
+
+  // Request Reset PIN OTP
+  requestResetPinOtp(mobileNumber, otpType = 'PIN_RESET') {
+    const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
+    const expiry = Date.now() + 5 * 60 * 1000; // 5 min expiry
+    this.pendingOtps.set(mobileNumber, { otp: generatedOtp, otpType, expiry });
+
+    return {
+      success: true,
+      mobileNumber,
+      otpType,
+      otpToken: generatedOtp,
+      message: PIN_ARSC_TOKENS.NOTICE_OTP_SENT,
+    };
+  }
+
+  // Verify OTP and Reset PIN
+  resetPinWithOtp(mobileNumber, otpInput, newPin, confirmPin) {
+    const record = this.pendingOtps.get(mobileNumber);
+    if (!record || record.otpType !== 'PIN_RESET') {
+      return { success: false, reason: 'NO_PENDING_OTP', message: 'কোনো ওটিপি অনুরোধ পাওয়া যায়নি।' };
+    }
+    if (Date.now() > record.expiry) {
+      return { success: false, reason: 'OTP_EXPIRED', message: PIN_ARSC_TOKENS.NOTICE_OTP_EXPIRED };
+    }
+    if (record.otp !== otpInput) {
+      return { success: false, reason: 'INVALID_OTP', message: PIN_ARSC_TOKENS.NOTICE_INVALID_OTP };
+    }
+
+    if (newPin !== confirmPin) {
+      return { success: false, reason: 'PIN_MISMATCH', message: PIN_ARSC_TOKENS.ALERT_PIN_MISMATCH };
+    }
+
+    const val = this.validatePinStrength(newPin);
+    if (!val.valid) return { success: false, reason: val.reason, message: val.message };
+
+    const newHash = this.hashPin(newPin);
+    if (this.previousPins.has(newHash)) {
+      return { success: false, reason: 'PREVIOUSLY_USED', message: PIN_ARSC_TOKENS.RULE_PREVIOUSLY_USED };
+    }
+
+    this.storedPinHash = newHash;
+    this.previousPins.add(newHash);
+    this.failedAttempts = 0;
+    this.lockoutUntil = null;
+    this.pendingOtps.delete(mobileNumber);
+
+    return { success: true, message: PIN_ARSC_TOKENS.ALERT_PIN_RESET };
+  }
+
+  // Validate PIN during transaction or login
+  validatePin(pinInput) {
+    if (this.isLockedOut()) {
+      return {
+        success: false,
+        lockedOut: true,
+        reason: 'LOCKED_OUT',
+        message: PIN_ARSC_TOKENS.ALERT_ACCOUNT_LOCKED,
+      };
+    }
+
+    const inputHash = this.hashPin(pinInput);
+    if (inputHash === this.storedPinHash) {
+      this.failedAttempts = 0;
+      return { success: true };
+    } else {
+      this.recordFailedAttempt();
+      if (this.failedAttempts === 2) {
+        return {
+          success: false,
+          warning: true,
+          failedAttempts: 2,
+          message: PIN_ARSC_TOKENS.ALERT_ATTEMPT_WARNING,
+        };
+      } else if (this.failedAttempts >= 3) {
+        return {
+          success: false,
+          lockedOut: true,
+          failedAttempts: 3,
+          message: PIN_ARSC_TOKENS.ALERT_ACCOUNT_LOCKED,
+        };
+      }
+      return { success: false, failedAttempts: this.failedAttempts, message: 'সঠিক PIN দিন।' };
+    }
+  }
+
+  recordFailedAttempt() {
+    this.failedAttempts++;
+    if (this.failedAttempts >= 3) {
+      this.lockoutUntil = Date.now() + this.tempLockoutMinutes * 60 * 1000;
+    }
+  }
+
+  isLockedOut() {
+    if (!this.lockoutUntil) return false;
+    if (Date.now() < this.lockoutUntil) return true;
+    // Lockout expired
+    this.lockoutUntil = null;
+    this.failedAttempts = 0;
+    return false;
+  }
+
+  // Biometric Enrollment & Validation
+  enrollBiometrics(keyPairPublicKey) {
+    this.biometricEnabled = true;
+    this.biometricPublicKey = keyPairPublicKey;
+    return { success: true, biometricEnabled: true };
+  }
+
+  validateCredentialWithBiometric(request = {}) {
+    const { walletNo, amount, fingerPrintTxn, fpSignature, pin } = request;
+
+    if (fingerPrintTxn) {
+      if (!this.biometricEnabled) {
+        return {
+          success: false,
+          reason: 'BIOMETRIC_NOT_ENROLLED',
+          message: PIN_ARSC_TOKENS.NOTICE_NO_BIOMETRIC_REGISTERED,
+        };
+      }
+      if (!fpSignature || fpSignature.length < 10) {
+        return {
+          success: false,
+          reason: 'BIOMETRIC_SIGNATURE_FAILED',
+          fallbackToPin: true,
+          message: PIN_ARSC_TOKENS.NOTICE_BIOMETRIC_FALLBACK,
+        };
+      }
+      return {
+        success: true,
+        authenticatedVia: 'BIOMETRIC_FINGERPRINT',
+        walletNo,
+        amount,
+      };
+    } else {
+      const pinResult = this.validatePin(pin);
+      if (!pinResult.success) {
+        return pinResult;
+      }
+      return {
+        success: true,
+        authenticatedVia: 'SECURITY_PIN',
+        walletNo,
+        amount,
+      };
+    }
+  }
+
+  // Device Binding: Activate new device & invalidate prior
+  bindDevice(newDeviceId, mobileNumber, otpInput) {
+    const record = this.pendingOtps.get(mobileNumber);
+    if (!record || record.otpType !== 'REGISTRATION') {
+      return { success: false, reason: 'NO_REGISTRATION_OTP', message: 'রেজিস্ট্রেশন ওটিপি পাওয়া যায়নি।' };
+    }
+    if (record.otp !== otpInput) {
+      return { success: false, reason: 'INVALID_OTP', message: PIN_ARSC_TOKENS.NOTICE_INVALID_OTP };
+    }
+
+    const previousDeviceId = this.activeDeviceId;
+    this.activeDeviceId = newDeviceId;
+    this.pendingOtps.delete(mobileNumber);
+
+    return {
+      success: true,
+      activeDeviceId: this.activeDeviceId,
+      previousDeviceInvalidated: previousDeviceId,
+      message: PIN_ARSC_TOKENS.DEVICE_ACTIVATION_SUCCESS,
+    };
+  }
+
+  getActiveDeviceId() {
+    return this.activeDeviceId;
+  }
+
+  revokeDevice(deviceId) {
+    if (this.activeDeviceId === deviceId) {
+      this.activeDeviceId = null;
+      return { success: true, revokedDeviceId: deviceId };
+    }
+    return { success: false, reason: 'DEVICE_NOT_ACTIVE' };
+  }
+}
+
+class PinSecurityEngine extends ReconstructedSecurityPinAndAuthEngine {}
+const pinSecurityEngine = new PinSecurityEngine();
+
+class TallyPaySecurityManager {
+  constructor(storageRepo = null) {
+    this.repo = storageRepo;
+    this.enginesByBiz = new Map(); // businessId -> PinSecurityEngine
+  }
+
+  getEngine(businessId = null) {
+    const bizId = String(businessId || '1');
+    if (!this.enginesByBiz.has(bizId)) {
+      let initialConfig = {};
+      if (this.repo && typeof this.repo.getWalletSecurityCredentials === 'function') {
+        const stored = this.repo.getWalletSecurityCredentials(bizId);
+        if (stored) {
+          initialConfig = {
+            salt: stored.salt || DEFAULT_PIN_SALT,
+            storedPinHash: stored.storedPinHash || null,
+            previousPins: stored.previousPins || [],
+            failedAttempts: stored.failedAttempts || 0,
+            lockoutUntil: stored.lockoutUntil || null,
+            tempLockoutMinutes: stored.tempLockoutMinutes || 60,
+            biometricEnabled: stored.biometricEnabled || false,
+            biometricPublicKey: stored.biometricPublicKey || null,
+            activeDeviceId: stored.activeDeviceId || 'DEV_INIT_001',
+            activeWalletNo: stored.activeWalletNo || '01712345678',
+          };
+        }
+      }
+      this.enginesByBiz.set(bizId, new PinSecurityEngine(initialConfig));
+    }
+    return this.enginesByBiz.get(bizId);
+  }
+
+  async persistEngineState(businessId = null) {
+    const bizId = String(businessId || '1');
+    const engine = this.getEngine(bizId);
+    if (this.repo && typeof this.repo.saveWalletSecurityCredentials === 'function') {
+      await this.repo.saveWalletSecurityCredentials(bizId, {
+        storedPinHash: engine.storedPinHash,
+        salt: engine.salt,
+        previousPins: Array.from(engine.previousPins),
+        failedAttempts: engine.failedAttempts,
+        lockoutUntil: engine.lockoutUntil,
+        tempLockoutMinutes: engine.tempLockoutMinutes,
+        biometricEnabled: engine.biometricEnabled,
+        biometricPublicKey: engine.biometricPublicKey,
+        activeDeviceId: engine.activeDeviceId,
+        activeWalletNo: engine.activeWalletNo,
+      });
+    }
+  }
+
+  async setupPin(newPin, confirmPin, businessId = null) {
+    const engine = this.getEngine(businessId);
+    const result = engine.setupPin(newPin, confirmPin);
+    if (result.success) {
+      await this.persistEngineState(businessId);
+    }
+    return result;
+  }
+
+  async changePin(oldPin, newPin, confirmPin, businessId = null) {
+    const engine = this.getEngine(businessId);
+    const result = engine.changePin(oldPin, newPin, confirmPin);
+    await this.persistEngineState(businessId);
+    return result;
+  }
+
+  async requestResetPinOtp(mobileNumber, otpType = 'PIN_RESET', businessId = null) {
+    const engine = this.getEngine(businessId);
+    return engine.requestResetPinOtp(mobileNumber, otpType);
+  }
+
+  async resetPinWithOtp(mobileNumber, otpInput, newPin, confirmPin, businessId = null) {
+    const engine = this.getEngine(businessId);
+    const result = engine.resetPinWithOtp(mobileNumber, otpInput, newPin, confirmPin);
+    if (result.success) {
+      await this.persistEngineState(businessId);
+    }
+    return result;
+  }
+
+  async validatePin(pinInput, businessId = null) {
+    const engine = this.getEngine(businessId);
+    const result = engine.validatePin(pinInput);
+    await this.persistEngineState(businessId);
+    return result;
+  }
+
+  async enrollBiometrics(keyPairPublicKey, businessId = null) {
+    const engine = this.getEngine(businessId);
+    const result = engine.enrollBiometrics(keyPairPublicKey);
+    await this.persistEngineState(businessId);
+    return result;
+  }
+
+  async validateCredentialWithBiometric(request = {}, businessId = null) {
+    const engine = this.getEngine(businessId);
+    const result = engine.validateCredentialWithBiometric(request);
+    await this.persistEngineState(businessId);
+    return result;
+  }
+
+  async bindDevice(newDeviceId, mobileNumber, otpInput, deviceName = 'Android Device', businessId = null) {
+    const bizId = String(businessId || '1');
+    const engine = this.getEngine(bizId);
+    const result = engine.bindDevice(newDeviceId, mobileNumber, otpInput);
+    if (result.success) {
+      if (this.repo && typeof this.repo.registerDeviceBinding === 'function') {
+        await this.repo.registerDeviceBinding(bizId, {
+          deviceId: newDeviceId,
+          mobileNumber,
+          deviceName,
+        });
+      }
+      await this.persistEngineState(bizId);
+    }
+    return result;
+  }
+
+  getSecurityStatus(businessId = null) {
+    const engine = this.getEngine(businessId);
+    return {
+      isPinSet: Boolean(engine.storedPinHash),
+      isLockedOut: engine.isLockedOut(),
+      failedAttempts: engine.failedAttempts,
+      biometricEnabled: engine.biometricEnabled,
+      activeDeviceId: engine.activeDeviceId,
+      activeWalletNo: engine.activeWalletNo,
+    };
+  }
+}
+
+const tallyPaySecurityManager = new TallyPaySecurityManager();
+
 class SettlementAndReconciliationEngine extends ReconstructedSettlementAndReconciliationEngine {}
 const settlementAndReconciliationEngine = new SettlementAndReconciliationEngine();
 
 module.exports = {
+  // Milestone REA-ITER-231 Exports
+  DEFAULT_PIN_SALT,
+  PIN_ARSC_TOKENS,
+  PIN_STRENGTH_ERRORS,
+  hashPin,
+  validatePinStrength,
+  ReconstructedSecurityPinAndAuthEngine,
+  PinSecurityEngine,
+  pinSecurityEngine,
+  TallyPaySecurityManager,
+  tallyPaySecurityManager,
+
   // Milestone REA-ITER-230 Exports
   BANK_TRANSFER_MODES,
   DISBURSEMENT_STATUSES,

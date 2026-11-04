@@ -365,8 +365,8 @@ async function runAsyncTest(name, fn) {
     const appSrc = fs.readFileSync("App.js", "utf8");
     const modals = appSrc.match(/<Modal\b/g) || [];
     const reqClose = appSrc.match(/onRequestClose=\{/g) || [];
-    assert.strictEqual(modals.length, 82);
-    assert.strictEqual(reqClose.length, 82);
+    assert.strictEqual(modals.length, 84);
+    assert.strictEqual(reqClose.length, 84);
   });
 
   runTest("A11y: WCAG 2.2 AA/AAA mathematical relative luminance contrast verification", () => {
