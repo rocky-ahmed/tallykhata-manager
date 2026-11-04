@@ -85,6 +85,21 @@ const {
   queryBeneficiaries: tpQueryBeneficiaries = tallyPayModule.queryBeneficiaries,
   BeneficiaryBookEngine: TP_BeneficiaryBookEngine = tallyPayModule.BeneficiaryBookEngine,
   beneficiaryBookEngine: tpBeneficiaryBookEngine = tallyPayModule.beneficiaryBookEngine,
+  // Milestone REA-ITER-229: QR Merchant Settlement & Direct Soundbox Audio Notification
+  SETTLEMENT_ACTION_TYPES: TP_SETTLEMENT_ACTION_TYPES = tallyPayModule.SETTLEMENT_ACTION_TYPES,
+  SETTLEMENT_ARSC_TOKENS: TP_SETTLEMENT_ARSC_TOKENS = tallyPayModule.SETTLEMENT_ARSC_TOKENS,
+  buildSettlementAction: tpBuildSettlementAction = tallyPayModule.buildSettlementAction,
+  checkSettlementIdempotency: tpCheckSettlementIdempotency = tallyPayModule.checkSettlementIdempotency,
+  processQrPaymentSettlement: tpProcessQrPaymentSettlement = tallyPayModule.processQrPaymentSettlement,
+  generatePaymentSpeechPrompt: tpGeneratePaymentSpeechPrompt = tallyPayModule.generatePaymentSpeechPrompt,
+  formatTtsSpeech: tpFormatTtsSpeech = tallyPayModule.formatTtsSpeech,
+  SoundboxConfigManager: TP_SoundboxConfigManager = tallyPayModule.SoundboxConfigManager,
+  soundboxConfigManager: tpSoundboxConfigManager = tallyPayModule.soundboxConfigManager,
+  getSoundboxNotificationConfig: tpGetSoundboxNotificationConfig = tallyPayModule.getSoundboxNotificationConfig,
+  updateSoundboxNotificationConfig: tpUpdateSoundboxNotificationConfig = tallyPayModule.updateSoundboxNotificationConfig,
+  SoundboxAudioDispatcher: TP_SoundboxAudioDispatcher = tallyPayModule.SoundboxAudioDispatcher,
+  ReconstructedSoundboxAudioDispatcher: TP_ReconstructedSoundboxAudioDispatcher = tallyPayModule.ReconstructedSoundboxAudioDispatcher,
+  QrSettlementEngine: TP_QrSettlementEngine = tallyPayModule.QrSettlementEngine,
 } = tallyPayModule;
 import * as soundboxModule from './src/soundboxService';
 const soundboxService = soundboxModule.soundboxService || soundboxModule.default || soundboxModule;
@@ -1152,6 +1167,20 @@ function TallyKhataApp() {
   const [newMfsMobile, setNewMfsMobile] = useState('');
   const [newMfsHolder, setNewMfsHolder] = useState('');
   const [pennyDepositInput, setPennyDepositInput] = useState('');
+
+  // --- ITERATION 229: TALLYPAY QR SETTLEMENT & SOUNDBOX NOTIFICATION DISPATCH ---
+  const [modalQrSettlement, setModalQrSettlement] = useState(false);
+  const [showQrSettlementModal, setShowQrSettlementModal] = useState(false);
+  const [qrSettlementTxn, setQrSettlementTxn] = useState(null);
+  const [qrSettlementActionType, setQrSettlementActionType] = useState('CREDIT_COLLECTION'); // 'CREDIT_COLLECTION' | 'DIGITAL_SALE' | 'NO_ACTION'
+  const [qrSettlementSelectedAccount, setQrSettlementSelectedAccount] = useState(null);
+  const [qrSettlementCustomerSearch, setQrSettlementCustomerSearch] = useState('');
+  const [qrSettlementStep, setQrSettlementStep] = useState('ACTION_SELECT'); // 'ACTION_SELECT' | 'CONFIRM'
+  const [showSoundboxSettingsModal, setShowSoundboxSettingsModal] = useState(false);
+  const [soundboxSoundChecked, setSoundboxSoundChecked] = useState(true);
+  const [soundboxTtsChecked, setSoundboxTtsChecked] = useState(true);
+  const [soundboxVoicePreviewText, setSoundboxVoicePreviewText] = useState('');
+  const [soundboxVoicePreviewPlaying, setSoundboxVoicePreviewPlaying] = useState(false);
 
   const [modalBackupRestore, setModalBackupRestore] = useState(false);
   const [modalInbox, setModalInbox] = useState(false);
@@ -2445,6 +2474,22 @@ function TallyKhataApp() {
         setModalAddMfsAccount(false);
         return true;
       }
+      if (showSoundboxSettingsModal) {
+        setShowSoundboxSettingsModal(false);
+        setSoundboxVoicePreviewPlaying(false);
+        return true;
+      }
+      if (modalQrSettlement) {
+        if (qrSettlementStep === 'CONFIRM') {
+          setQrSettlementStep('ACTION_SELECT');
+          return true;
+        }
+        setModalQrSettlement(false);
+        setShowQrSettlementModal(false);
+        setQrSettlementTxn(null);
+        setQrSettlementSelectedAccount(null);
+        return true;
+      }
       if (modalAccountManager) {
         setModalAccountManager(false);
         setSelectedBeneficiary(null);
@@ -2546,7 +2591,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -4952,6 +4997,148 @@ function TallyKhataApp() {
     return rawList;
   }, [activeBusinessId, beneficiaryTab, beneficiarySearchQuery, storageRepository, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit]);
 
+  // =========================================================================
+  // ITERATION 229: QR MERCHANT SETTLEMENT & SOUNDBOX NOTIFICATION HANDLERS
+  // =========================================================================
+  const handleOpenQrSettlement = (txn = null) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const targetTxn = txn || {
+      transactionNumber: 'TKQR' + Date.now().toString().slice(-8),
+      amount: 500,
+      amountPaisa: 50000,
+      senderName: 'করিম স্টোর',
+      senderMobile: '01711000000',
+      channel: 'Bangla QR',
+      time: new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toISOString().slice(0, 10),
+    };
+    setQrSettlementTxn(targetTxn);
+    setQrSettlementActionType('CREDIT_COLLECTION');
+    setQrSettlementSelectedAccount(null);
+    setQrSettlementCustomerSearch('');
+    setQrSettlementStep('ACTION_SELECT');
+    setModalQrSettlement(true);
+    setShowQrSettlementModal(true);
+  };
+
+  const handleCloseQrSettlement = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalQrSettlement(false);
+    setShowQrSettlementModal(false);
+    setQrSettlementTxn(null);
+    setQrSettlementSelectedAccount(null);
+    setQrSettlementStep('ACTION_SELECT');
+  };
+
+  const handleConfirmQrSettlement = async () => {
+    if (!qrSettlementTxn) return;
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      const payload = {
+        transactionNumber: qrSettlementTxn.transactionNumber || qrSettlementTxn.txnId || ('TKQR' + Date.now()),
+        actionType: qrSettlementActionType,
+        amount: qrSettlementTxn.amount || 0,
+        amountPaisa: qrSettlementTxn.amountPaisa || ((qrSettlementTxn.amount || 0) * 100),
+        senderName: qrSettlementTxn.senderName || 'Customer',
+        senderMobile: qrSettlementTxn.senderMobile || '',
+      };
+
+      if (qrSettlementActionType === 'CREDIT_COLLECTION') {
+        if (!qrSettlementSelectedAccount) {
+          Alert.alert(tStatic("সতর্কতা"), t('select_customer_for_credit'));
+          return;
+        }
+        payload.accountId = qrSettlementSelectedAccount.id;
+      }
+
+      if (typeof tpProcessQrPaymentSettlement === 'function') {
+        const result = await tpProcessQrPaymentSettlement(activeBusinessId, payload, storageRepository);
+        if (!result.success) {
+          Alert.alert(tStatic("ত্রুটি"), result.message || 'Settlement failed');
+          return;
+        }
+      }
+
+      // Reconcile in-memory state
+      if (qrSettlementActionType === 'CREDIT_COLLECTION' && qrSettlementSelectedAccount) {
+        const settleAmt = Number(qrSettlementTxn.amount) || 0;
+        setAccounts(prev => prev.map(acc => {
+          if (acc.id === qrSettlementSelectedAccount.id) {
+            const oldBal = Number(acc.balance) || 0;
+            return { ...acc, balance: Math.max(0, oldBal - settleAmt) };
+          }
+          return acc;
+        }));
+      }
+
+      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+      Alert.alert(t('qr_settlement'), t('settlement_success'));
+      handleCloseQrSettlement();
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Settlement error');
+    }
+  };
+
+  const handleOpenSoundboxVoiceSettings = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    if (typeof tpGetSoundboxNotificationConfig === 'function') {
+      const cfg = tpGetSoundboxNotificationConfig(activeBusinessId);
+      if (cfg) {
+        setSoundboxSoundChecked(!!cfg.isNotificationSoundChecked);
+        setSoundboxTtsChecked(!!cfg.isNotificationTTSChecked);
+      }
+    }
+    setSoundboxVoicePreviewText('');
+    setSoundboxVoicePreviewPlaying(false);
+    setShowSoundboxSettingsModal(true);
+  };
+
+  const handleCloseSoundboxVoiceSettings = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setShowSoundboxSettingsModal(false);
+    setSoundboxVoicePreviewPlaying(false);
+  };
+
+  const handleToggleSoundNotification = (val) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSoundboxSoundChecked(val);
+    if (typeof tpUpdateSoundboxNotificationConfig === 'function') {
+      tpUpdateSoundboxNotificationConfig(activeBusinessId, { isNotificationSoundChecked: val });
+    }
+  };
+
+  const handleToggleVoiceNotification = (val) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSoundboxTtsChecked(val);
+    if (typeof tpUpdateSoundboxNotificationConfig === 'function') {
+      tpUpdateSoundboxNotificationConfig(activeBusinessId, { isNotificationTTSChecked: val });
+    }
+  };
+
+  const handleTestSoundboxVoicePrompt = () => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      let promptText = '';
+      if (typeof tpGeneratePaymentSpeechPrompt === 'function') {
+        promptText = tpGeneratePaymentSpeechPrompt({
+          amount: 500,
+          senderName: 'করিম স্টোর',
+          txnId: 'TKQR-TEST-001',
+        }, 'bn');
+      } else {
+        promptText = 'আপনার টালিখাতা ওয়ালেটে ৫০০ টাকা গ্রহণ করা হয়েছে। প্রেরক - করিম স্টোর।';
+      }
+      setSoundboxVoicePreviewText(promptText);
+      setSoundboxVoicePreviewPlaying(true);
+      setTimeout(() => {
+        try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+        setSoundboxVoicePreviewPlaying(false);
+      }, 1500);
+    } catch (e) {
+      console.warn('Voice preview error:', e);
+    }
+  };
+
 
     // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
@@ -6211,6 +6398,52 @@ function TallyKhataApp() {
       handleDeleteBeneficiary,
       handleSendMoneyToBeneficiary,
       displayBeneficiaries,
+      tallyPayService,
+      storageRepository,
+    };
+
+    global.__QR_SETTLEMENT_TEST_HOOKS__ = {
+      modalQrSettlement,
+      setModalQrSettlement,
+      showQrSettlementModal,
+      setShowQrSettlementModal,
+      showSoundboxSettingsModal,
+      setShowSoundboxSettingsModal,
+      qrSettlementTxn,
+      setQrSettlementTxn,
+      qrSettlementActionType,
+      setQrSettlementActionType,
+      qrSettlementSelectedAccount,
+      setQrSettlementSelectedAccount,
+      qrSettlementCustomerSearch,
+      setQrSettlementCustomerSearch,
+      qrSettlementStep,
+      setQrSettlementStep,
+      soundboxSoundChecked,
+      setSoundboxSoundChecked,
+      soundboxTtsChecked,
+      setSoundboxTtsChecked,
+      soundboxVoicePreviewText,
+      setSoundboxVoicePreviewText,
+      soundboxVoicePreviewPlaying,
+      setSoundboxVoicePreviewPlaying,
+      handleOpenQrSettlement,
+      handleCloseQrSettlement,
+      handleConfirmQrSettlement,
+      handleOpenSoundboxVoiceSettings,
+      handleCloseSoundboxVoiceSettings,
+      handleToggleSoundNotification,
+      handleToggleVoiceNotification,
+      handleTestSoundboxVoicePrompt,
+      SETTLEMENT_ACTION_TYPES: TP_SETTLEMENT_ACTION_TYPES,
+      SETTLEMENT_ARSC_TOKENS: TP_SETTLEMENT_ARSC_TOKENS,
+      processQrPaymentSettlement: tpProcessQrPaymentSettlement,
+      generatePaymentSpeechPrompt: tpGeneratePaymentSpeechPrompt,
+      formatTtsSpeech: tpFormatTtsSpeech,
+      soundboxConfigManager: tpSoundboxConfigManager,
+      getSoundboxNotificationConfig: tpGetSoundboxNotificationConfig,
+      updateSoundboxNotificationConfig: tpUpdateSoundboxNotificationConfig,
+      SoundboxAudioDispatcher: TP_SoundboxAudioDispatcher,
       tallyPayService,
       storageRepository,
     };
@@ -9715,6 +9948,68 @@ accessibilityLabel={
               </View>
             </TouchableOpacity>
 
+            {/* Quick Action: QR Payment Settlement (Iteration 229) */}
+            <TouchableOpacity
+              style={[styles.analyticsTallypayBanner, { marginTop: 8 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+              onPress={() => handleOpenQrSettlement()}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('qr_settlement')}
+              testID="tp_qr_settlement_btn"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: isDark ? '#064E3B' : '#D1FAE5', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  <Text style={{ fontSize: 18 }}>📱</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('qr_settlement')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    {t('settle_as_credit')} • {t('settle_as_sale')}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#A7F3D0' : '#0D6E5C', marginRight: 4 }}>
+                  {tStatic("সমন্বয়")}
+                </Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 12, height: 12, tintColor: isDark ? '#A7F3D0' : '#0D6E5C' }} resizeMode="contain" />
+              </View>
+            </TouchableOpacity>
+
+            {/* Quick Action: Soundbox Notification Settings (Iteration 229) */}
+            <TouchableOpacity
+              style={[styles.analyticsTallypayBanner, { marginTop: 8 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+              onPress={handleOpenSoundboxVoiceSettings}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('soundbox_settings')}
+              testID="tp_soundbox_voice_settings_btn"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: isDark ? '#78350F' : '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  <Text style={{ fontSize: 18 }}>📢</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('soundbox_settings')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    {t('voice_alert_desc')}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#FCD34D' : '#D97706', marginRight: 4 }}>
+                  {tStatic("সেটিংস")}
+                </Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 12, height: 12, tintColor: isDark ? '#FCD34D' : '#D97706' }} resizeMode="contain" />
+              </View>
+            </TouchableOpacity>
+
             {/* Wallet Transaction History */}
             <View style={{ paddingHorizontal: 12, marginTop: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -9817,6 +10112,38 @@ accessibilityLabel={
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('beneficiary_management')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('no_saved_accounts_sub')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={() => handleOpenQrSettlement()}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('qr_settlement')}
+                testID="menu_tp_qr_settlement_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_bangla_qr.png')} variant="success" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('qr_settlement')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('settle_as_credit')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenSoundboxVoiceSettings}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('soundbox_settings')}
+                testID="menu_tp_soundbox_voice_settings_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_soundbox.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('soundbox_settings')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('voice_alert_desc')}</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
@@ -18691,6 +19018,396 @@ accessibilityLabel={
             </TouchableOpacity>
           </View>
         </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: TALLYPAY QR MERCHANT SETTLEMENT (Iteration 229)
+         =================================================================== */}
+      <Modal
+        visible={modalQrSettlement}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseQrSettlement}
+        testID="modal_qr_settlement"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseQrSettlement}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_qr_settlement"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Image source={require('./assets/icons/arrow_left.png')} style={styles.thBackIcon} resizeMode="contain" />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.thHeaderTitle}>{t('qr_settlement')}</Text>
+              <Text style={styles.thHeaderSub}>{tStatic("কিউআর পেমেন্ট সমন্বয় ও বাকি আদায়")}</Text>
+            </View>
+          </View>
+
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 46 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Transaction Details Card */}
+            {qrSettlementTxn && (
+              <View style={[styles.bmCard, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 24, marginRight: 8 }}>📱</Text>
+                    <View>
+                      <Text style={[styles.bmAccName, isDark && { color: currentTheme.textPrimary }]}>
+                        {qrSettlementTxn.senderName || 'Customer'}
+                      </Text>
+                      <Text style={[styles.bmBankMeta, isDark && { color: currentTheme.textSecondary }]}>
+                        {qrSettlementTxn.senderMobile || 'Bangla QR'} • {qrSettlementTxn.channel || 'QR'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.green }}>
+                      + ৳ {formatMoney(qrSettlementTxn.amount || 0)}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: '#64748B' }}>
+                      {qrSettlementTxn.transactionNumber || qrSettlementTxn.txnId || ''}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Action Type Selector */}
+            <Text style={[styles.bmFormLabel, { marginTop: 8, marginBottom: 8 }, isDark && { color: currentTheme.textPrimary }]}>
+              {tStatic("সমন্বয়ের ধরন নির্বাচন করুন:")}
+            </Text>
+            <View style={{ gap: 10, marginBottom: 16 }}>
+              {/* Option 1: Credit Collection */}
+              <TouchableOpacity
+                style={[
+                  styles.qrActionOptionCard,
+                  qrSettlementActionType === 'CREDIT_COLLECTION' && styles.qrActionOptionSelected,
+                  isDark && { backgroundColor: currentTheme.cardBg, borderColor: qrSettlementActionType === 'CREDIT_COLLECTION' ? '#0D6E5C' : currentTheme.cardBorder }
+                ]}
+                onPress={() => setQrSettlementActionType('CREDIT_COLLECTION')}
+                activeOpacity={0.8}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('settle_as_credit')}
+                testID="action_settle_credit"
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, marginRight: 10 }}>🤝</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.qrActionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                      {t('settle_as_credit')}
+                    </Text>
+                    <Text style={[styles.qrActionDesc, isDark && { color: currentTheme.textSecondary }]}>
+                      {tStatic("কাস্টমারের বকেয়া থেকে এই টাকা সমন্বয় করে হিসাব হালনাগাদ করুন")}
+                    </Text>
+                  </View>
+                  <View style={[styles.qrRadioCircle, qrSettlementActionType === 'CREDIT_COLLECTION' && styles.qrRadioCircleSelected]}>
+                    {qrSettlementActionType === 'CREDIT_COLLECTION' && <View style={styles.qrRadioDot} />}
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Option 2: Digital Sale */}
+              <TouchableOpacity
+                style={[
+                  styles.qrActionOptionCard,
+                  qrSettlementActionType === 'DIGITAL_SALE' && styles.qrActionOptionSelected,
+                  isDark && { backgroundColor: currentTheme.cardBg, borderColor: qrSettlementActionType === 'DIGITAL_SALE' ? '#0D6E5C' : currentTheme.cardBorder }
+                ]}
+                onPress={() => setQrSettlementActionType('DIGITAL_SALE')}
+                activeOpacity={0.8}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('settle_as_sale')}
+                testID="action_settle_sale"
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, marginRight: 10 }}>🛒</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.qrActionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                      {t('settle_as_sale')}
+                    </Text>
+                    <Text style={[styles.qrActionDesc, isDark && { color: currentTheme.textSecondary }]}>
+                      {tStatic("সরাসরি দোকানের ক্যাশ/বিক্রি হিসেবে জমা করুন")}
+                    </Text>
+                  </View>
+                  <View style={[styles.qrRadioCircle, qrSettlementActionType === 'DIGITAL_SALE' && styles.qrRadioCircleSelected]}>
+                    {qrSettlementActionType === 'DIGITAL_SALE' && <View style={styles.qrRadioDot} />}
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Option 3: No Action */}
+              <TouchableOpacity
+                style={[
+                  styles.qrActionOptionCard,
+                  qrSettlementActionType === 'NO_ACTION' && styles.qrActionOptionSelected,
+                  isDark && { backgroundColor: currentTheme.cardBg, borderColor: qrSettlementActionType === 'NO_ACTION' ? '#0D6E5C' : currentTheme.cardBorder }
+                ]}
+                onPress={() => setQrSettlementActionType('NO_ACTION')}
+                activeOpacity={0.8}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('settle_no_action')}
+                testID="action_settle_no_action"
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, marginRight: 10 }}>⏭️</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.qrActionTitle, isDark && { color: currentTheme.textPrimary }]}>
+                      {t('settle_no_action')}
+                    </Text>
+                    <Text style={[styles.qrActionDesc, isDark && { color: currentTheme.textSecondary }]}>
+                      {tStatic("হিসাব বা লেজারে পরিবর্তন ছাড়া লেনদেন সমাপ্ত করুন")}
+                    </Text>
+                  </View>
+                  <View style={[styles.qrRadioCircle, qrSettlementActionType === 'NO_ACTION' && styles.qrRadioCircleSelected]}>
+                    {qrSettlementActionType === 'NO_ACTION' && <View style={styles.qrRadioDot} />}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Customer Picker when CREDIT_COLLECTION is chosen */}
+            {qrSettlementActionType === 'CREDIT_COLLECTION' && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={[styles.bmFormLabel, { marginBottom: 6 }, isDark && { color: currentTheme.textPrimary }]}>
+                  {t('select_customer_for_credit')}
+                </Text>
+                <TextInput
+                  style={[styles.bmFormInput, { marginBottom: 10 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder, color: currentTheme.textPrimary }]}
+                  placeholder={tStatic("কাস্টমারের নাম বা ফোন দিয়ে খুঁজুন...")}
+                  placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                  value={qrSettlementCustomerSearch}
+                  onChangeText={setQrSettlementCustomerSearch}
+                  testID="input_settle_customer_search"
+                />
+
+                {/* Filtered Customer List */}
+                <View style={{ maxHeight: 220 }}>
+                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                    {accounts
+                      .filter(acc => (acc.type === 'customer' || !acc.type) && (Number(acc.balance) > 0 || acc.name.toLowerCase().includes((qrSettlementCustomerSearch || '').toLowerCase())))
+                      .slice(0, 10)
+                      .map(acc => {
+                        const isPicked = qrSettlementSelectedAccount && qrSettlementSelectedAccount.id === acc.id;
+                        return (
+                          <TouchableOpacity
+                            key={acc.id}
+                            style={[
+                              styles.qrCustomerPickerItem,
+                              isPicked && styles.qrCustomerPickerItemSelected,
+                              isDark && { backgroundColor: currentTheme.cardBg, borderColor: isPicked ? '#0D6E5C' : currentTheme.cardBorder }
+                            ]}
+                            onPress={() => setQrSettlementSelectedAccount(acc)}
+                            activeOpacity={0.7}
+                            hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                            accessibilityRole="button"
+                            accessibilityLabel={acc.name + ' বাকি ৳ ' + formatMoney(acc.balance)}
+                            testID={'settle_customer_item_' + acc.id}
+                          >
+                            <View style={styles.bulkCustomerAvatar}>
+                              <Text style={styles.bulkCustomerAvatarText}>{(acc.name || 'ক').charAt(0)}</Text>
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                              <Text style={[styles.bmAccName, isDark && { color: currentTheme.textPrimary }]}>{acc.name}</Text>
+                              <Text style={[styles.bmBankMeta, isDark && { color: currentTheme.textSecondary }]}>{acc.phone || tStatic("ফোন নেই")}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={{ fontSize: 11, color: '#64748B' }}>{t('current_baki')}</Text>
+                              <Text style={{ fontSize: 13, fontWeight: 'bold', color: COLORS.red }}>৳ {formatMoney(acc.balance)}</Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                  </ScrollView>
+                </View>
+
+                {/* Calculation Summary Card when customer selected */}
+                {qrSettlementSelectedAccount && (
+                  <View style={[styles.qrCalculationCard, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 6 }}>
+                      {t('settlement_details')}
+                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+                      <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B' }}>{t('current_baki')}:</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: COLORS.red }}>৳ {formatMoney(qrSettlementSelectedAccount.balance)}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+                      <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B' }}>{t('settlement_amount')}:</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: COLORS.green }}>- ৳ {formatMoney(qrSettlementTxn?.amount || 0)}</Text>
+                    </View>
+                    <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 4 }} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>{t('new_baki')}:</Text>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#0D6E5C' }}>
+                        ৳ {formatMoney(Math.max(0, (Number(qrSettlementSelectedAccount.balance) || 0) - (Number(qrSettlementTxn?.amount) || 0)))}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Confirm Settlement Button */}
+            <TouchableOpacity
+              style={[
+                styles.bmSubmitBtn,
+                { backgroundColor: '#0D6E5C', marginTop: 12, minHeight: 48 },
+                (qrSettlementActionType === 'CREDIT_COLLECTION' && !qrSettlementSelectedAccount) && { opacity: 0.6 }
+              ]}
+              onPress={handleConfirmQrSettlement}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('settle_payment_cta')}
+              testID="btn_confirm_qr_settlement"
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
+                ✅ {t('settle_payment_cta')}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: SOUNDBOX AUDIO & TTS VOICE NOTIFICATION SETTINGS (Iteration 229)
+         =================================================================== */}
+      <Modal
+        visible={showSoundboxSettingsModal}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseSoundboxVoiceSettings}
+        testID="modal_soundbox_voice_settings"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '85%', paddingBottom: 24 }]}>
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, marginRight: 8 }}>📢</Text>
+                  <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary]}>
+                    {t('soundbox_settings')}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                  {t('voice_alert_desc')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleCloseSoundboxVoiceSettings}
+                style={[styles.modalCloseCircle, isDark && tStyles.modalCloseCircle]}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("বন্ধ করুন")}
+                testID="btn_close_soundbox_voice_settings"
+              >
+                <Image
+                  source={require('./assets/icons/ic_close.png')}
+                  style={[styles.modalCloseIcon, isDark && tStyles.modalCloseIcon]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingVertical: 10, paddingBottom: 46 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Toggles Container */}
+              <View style={[styles.soundboxSectionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+                {/* Tone Notification Toggle */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                      🔔 {t('sound_notification')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                      {tStatic("পেমেন্ট আসার সাথে সাথে বিফ সাউন্ড বাজবে")}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={soundboxSoundChecked}
+                    onValueChange={handleToggleSoundNotification}
+                    trackColor={{ false: '#CBD5E1', true: '#A7F3D0' }}
+                    thumbColor={soundboxSoundChecked ? '#0D6E5C' : '#F1F5F9'}
+                    testID="switch_sound_notification"
+                  />
+                </View>
+
+                {/* Voice TTS Notification Toggle */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                      🗣️ {t('voice_notification')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                      {tStatic("পেমেন্টের পরিমাণ ও প্রেরকের নাম বাংলায় শোনাবে")}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={soundboxTtsChecked}
+                    onValueChange={handleToggleVoiceNotification}
+                    trackColor={{ false: '#CBD5E1', true: '#A7F3D0' }}
+                    thumbColor={soundboxTtsChecked ? '#0D6E5C' : '#F1F5F9'}
+                    testID="switch_voice_notification"
+                  />
+                </View>
+              </View>
+
+              {/* Test Voice Announcement Section */}
+              <View style={[styles.soundboxSectionCard, { marginTop: 12 }, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 8 }}>
+                  🔊 {t('test_voice_prompt')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 12 }}>
+                  {tStatic("সাউন্ডবক্স নোটিফিকেশনের নমুনা ভয়েস মেসেজ শুনুন এবং স্পিকারের কার্যকারিতা পরীক্ষা করুন।")}
+                </Text>
+
+                {soundboxVoicePreviewText ? (
+                  <View style={{ backgroundColor: isDark ? '#1E293B' : '#ECFDF5', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#A7F3D0', marginBottom: 12 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#A7F3D0' : '#065F46' }}>
+                      {soundboxVoicePreviewPlaying ? '🔊 ' + t('soundbox_voice_preview_playing') : '✅ ' + t('soundbox_voice_preview') + ':'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: isDark ? '#E2E8F0' : '#1E293B', marginTop: 4, lineHeight: 18 }}>
+                      {soundboxVoicePreviewText}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[
+                    styles.bmSubmitBtn,
+                    { backgroundColor: soundboxVoicePreviewPlaying ? '#059669' : '#0D6E5C', minHeight: 48 }
+                  ]}
+                  onPress={handleTestSoundboxVoicePrompt}
+                  activeOpacity={0.8}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('test_voice_prompt')}
+                  testID="btn_test_soundbox_voice"
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>
+                    {soundboxVoicePreviewPlaying ? '🔊 ' + t('soundbox_voice_preview_playing') : '▶️ ' + t('test_voice_prompt')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       {/* MODAL: BATCH TAGADA RESULT */}
@@ -33445,6 +34162,73 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
+  // =========================================================================
+  // ITERATION 229: QR SETTLEMENT & SOUNDBOX STYLES
+  // =========================================================================
+  qrActionOptionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  qrActionOptionSelected: {
+    borderColor: '#0D6E5C',
+    backgroundColor: '#F0FDF4',
+  },
+  qrActionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  qrActionDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  qrRadioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  qrRadioCircleSelected: {
+    borderColor: '#0D6E5C',
+  },
+  qrRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#0D6E5C',
+  },
+  qrCustomerPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  qrCustomerPickerItemSelected: {
+    borderColor: '#0D6E5C',
+    backgroundColor: '#F0FDF4',
+  },
+  qrCalculationCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+
   bmStatusPill: {
     paddingHorizontal: 8,
     paddingVertical: 3,

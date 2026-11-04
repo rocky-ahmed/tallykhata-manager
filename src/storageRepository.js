@@ -228,6 +228,7 @@ const VALID_COLLECTIONS = new Set([
   'savedBillers',
   'tallyPayTransactions',
   'tallyPayBeneficiaries',
+  'qrSettlementActions',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -348,6 +349,7 @@ function migrateLegacySampleCustomerNames(accounts) {
 function sanitizeState(state) {
   if (!state || typeof state !== 'object') return createDefaultState();
   const s = { ...state };
+  if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
   if (!Array.isArray(s.tallyPayBeneficiaries)) s.tallyPayBeneficiaries = [];
   if (!Array.isArray(s.tallyPayTransactions)) s.tallyPayTransactions = [];
   if (!Array.isArray(s.billPaymentTransactions)) s.billPaymentTransactions = [];
@@ -485,6 +487,7 @@ function createDefaultState() {
     savedBillers: [],
     tallyPayTransactions: [],
     tallyPayBeneficiaries: [],
+    qrSettlementActions: [],
     version: 6,
   };
 }
@@ -697,10 +700,10 @@ function decompressStoragePayload(payload) {
 
 class StorageRepository {
   constructor(storageAdapter = null) {
-    if (storageAdapter && typeof storageAdapter === 'object' && storageAdapter.customStore) {
-      this.adapter = storageAdapter.customStore;
-    } else if (storageAdapter && typeof storageAdapter === 'object' && typeof storageAdapter.getItem === 'function') {
+    if (storageAdapter && typeof storageAdapter === 'object' && typeof storageAdapter.getItem === 'function') {
       this.adapter = storageAdapter;
+    } else if (storageAdapter && typeof storageAdapter === 'object' && storageAdapter.customStore && typeof storageAdapter.customStore.getItem === 'function') {
+      this.adapter = storageAdapter.customStore;
     } else {
       this.adapter = this.createInMemoryAdapter();
     }
@@ -1581,6 +1584,15 @@ class StorageRepository {
       authoritative.tallyPayTransactions = [];
     }
 
+    if (authoritative.qrSettlementActions && Array.isArray(authoritative.qrSettlementActions)) {
+      authoritative.qrSettlementActions = authoritative.qrSettlementActions.map((q) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, ...rest } = q || {};
+        return rest;
+      });
+    } else {
+      authoritative.qrSettlementActions = [];
+    }
+
     if (authoritative.tallyPayBeneficiaries && Array.isArray(authoritative.tallyPayBeneficiaries)) {
       authoritative.tallyPayBeneficiaries = authoritative.tallyPayBeneficiaries.map((b) => {
         const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, ...rest } = b || {};
@@ -2130,6 +2142,7 @@ class StorageRepository {
         const savedBillers = (prevStore.savedBillers || []).filter((s) => getBizId(s) !== targetId);
         const tallyPayTransactions = (prevStore.tallyPayTransactions || []).filter((t) => getBizId(t) !== targetId);
         const tallyPayBeneficiaries = (prevStore.tallyPayBeneficiaries || []).filter((b) => getBizId(b) !== targetId);
+        const qrSettlementActions = (prevStore.qrSettlementActions || []).filter((q) => getBizId(q) !== targetId);
 
       // Clean up physical audio files of deleted business
       if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
@@ -2210,6 +2223,7 @@ class StorageRepository {
         savedBillers,
         tallyPayTransactions,
         tallyPayBeneficiaries,
+        qrSettlementActions,
         cashReconciliation,
       };
     });
@@ -2360,6 +2374,7 @@ class StorageRepository {
           const importedSavedBillers = (data.savedBillers || []).filter(s => String(s.businessId || '1') === selectedBizId);
           const importedTallyPay = (data.tallyPayTransactions || []).filter(t => String(t.businessId || '1') === selectedBizId);
           const importedBeneficiaries = (data.tallyPayBeneficiaries || []).filter(b => String(b.businessId || '1') === selectedBizId);
+          const importedQrSettlements = (data.qrSettlementActions || []).filter(q => String(q.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -2374,6 +2389,7 @@ class StorageRepository {
           const keptSavedBillers = (prevStore.savedBillers || []).filter(s => String(s.businessId || '1') !== selectedBizId);
           const keptTallyPay = (prevStore.tallyPayTransactions || []).filter(t => String(t.businessId || '1') !== selectedBizId);
         const keptBeneficiaries = (prevStore.tallyPayBeneficiaries || []).filter(b => String(b.businessId || '1') !== selectedBizId);
+        const keptQrSettlements = (prevStore.qrSettlementActions || []).filter(q => String(q.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2408,6 +2424,7 @@ class StorageRepository {
             savedBillers: [...keptSavedBillers, ...importedSavedBillers],
           tallyPayTransactions: [...keptTallyPay, ...importedTallyPay],
           tallyPayBeneficiaries: [...keptBeneficiaries, ...importedBeneficiaries],
+          qrSettlementActions: [...keptQrSettlements, ...importedQrSettlements],
           version: 6,
           lastRestoredAt: new Date().toISOString(),
           restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -2450,6 +2467,7 @@ class StorageRepository {
         savedBillers: Array.isArray(data.savedBillers) ? data.savedBillers : [],
         tallyPayTransactions: Array.isArray(data.tallyPayTransactions) ? data.tallyPayTransactions : [],
         tallyPayBeneficiaries: Array.isArray(data.tallyPayBeneficiaries) ? data.tallyPayBeneficiaries : [],
+        qrSettlementActions: Array.isArray(data.qrSettlementActions) ? data.qrSettlementActions : [],
         inventory: restoredInventory,
         stock: restoredInventory,
         pinEnabled: false,
@@ -6423,6 +6441,199 @@ class StorageRepository {
   /**
    * Sanitizes in-memory state ensuring all collections are well-formed arrays.
    */
+
+  /**
+   * Saves a TallyPay QR payment settlement action idempotently.
+   * Enforces unique constraint on transactionNumber per business / global.
+   */
+  async saveQrSettlementAction(businessId, actionData) {
+    if (!actionData || typeof actionData !== 'object') {
+      return { success: false, error: 'INVALID_PAYLOAD' };
+    }
+    const txnNumber = String(actionData.transactionNumber || actionData.transaction_number || actionData.txnNumber || '').trim();
+    if (!txnNumber) {
+      return { success: false, error: 'TRANSACTION_NUMBER_REQUIRED' };
+    }
+
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || actionData.businessId || store.activeBusinessId || '1');
+    const list = Array.isArray(store.qrSettlementActions) ? store.qrSettlementActions : [];
+
+    // Check unique constraint matching Room index_transaction_number
+    const existing = list.find((s) =>
+      String(s.transactionNumber) === txnNumber &&
+      String(s.businessId || '1') === targetBizId
+    );
+    if (existing) {
+      return {
+        success: false,
+        duplicate: true,
+        reason: 'ALREADY_SETTLED',
+        error: 'ALREADY_SETTLED',
+        message: 'Transaction already settled',
+        existingId: existing.id,
+        record: existing,
+      };
+    }
+
+    const actionType = String(actionData.actionType || actionData.action_type || 'NO_ACTION').toUpperCase();
+    const nowIso = new Date().toISOString();
+    const newId = actionData.id !== undefined && actionData.id !== null
+      ? (typeof actionData.id === 'number' ? actionData.id : String(actionData.id))
+      : (Date.now() + Math.floor(Math.random() * 1000));
+
+    const amountVal = Number(actionData.amount) || (actionData.amountPaisa ? Number(actionData.amountPaisa) / 100 : 0);
+    const amountPaisa = actionData.amountPaisa !== undefined
+      ? Math.round(Number(actionData.amountPaisa))
+      : Math.round(amountVal * 100);
+
+    const record = {
+      id: newId,
+      transactionNumber: txnNumber,
+      transaction_number: txnNumber,
+      actionType,
+      action_type: actionType,
+      synced: actionData.synced !== undefined ? Number(actionData.synced) : 0,
+      createDate: actionData.createDate || actionData.create_date || nowIso,
+      create_date: actionData.create_date || actionData.createDate || nowIso,
+      updateDate: actionData.updateDate || actionData.update_date || null,
+      update_date: actionData.update_date || actionData.updateDate || null,
+      businessId: targetBizId,
+      business_id: targetBizId,
+      accountId: actionData.accountId || actionData.account_id || null,
+      accountName: actionData.accountName || actionData.account_name || null,
+      amount: amountPaisa / 100,
+      amountPaisa,
+      senderMobile: actionData.senderMobile || actionData.sender_mobile || '',
+      senderName: actionData.senderName || actionData.sender_name || '',
+      note: actionData.note || '',
+    };
+
+    let savedRecord = null;
+    await this.mutateCollection('qrSettlementActions', (actions) => {
+      const dup = actions.find((s) =>
+        String(s.transactionNumber) === txnNumber &&
+        String(s.businessId || '1') === targetBizId
+      );
+      if (dup) {
+        return actions;
+      }
+      actions.push(record);
+      savedRecord = record;
+      return actions;
+    });
+
+    if (!savedRecord) {
+      return {
+        success: false,
+        duplicate: true,
+        reason: 'ALREADY_SETTLED',
+        error: 'ALREADY_SETTLED',
+        message: 'Transaction already settled',
+      };
+    }
+
+    return {
+      success: true,
+      duplicate: false,
+      action: savedRecord,
+      record: savedRecord,
+      id: savedRecord.id,
+    };
+  }
+
+  /**
+   * Retrieves QR settlement actions with optional filters and pagination.
+   */
+  getQrSettlementActions(businessId = null, options = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const list = Array.isArray(store.qrSettlementActions) ? store.qrSettlementActions : [];
+    let filtered = list.filter((a) => String(a.businessId || '1') === targetBizId);
+
+    if (options.actionType && options.actionType !== 'ALL') {
+      const typeStr = String(options.actionType).toUpperCase();
+      filtered = filtered.filter((a) => String(a.actionType || a.action_type).toUpperCase() === typeStr);
+    }
+
+    if (options.synced !== undefined && options.synced !== null && options.synced !== 'ALL') {
+      const synVal = Number(options.synced);
+      filtered = filtered.filter((a) => Number(a.synced) === synVal);
+    }
+
+    const query = options.search || options.searchQuery || options.query;
+    if (query && typeof query === 'string' && query.trim()) {
+      const q = query.trim().toLowerCase();
+      filtered = filtered.filter((a) => {
+        const txn = String(a.transactionNumber || '').toLowerCase();
+        const accName = String(a.accountName || '').toLowerCase();
+        const sender = String(a.senderName || a.senderMobile || '').toLowerCase();
+        const note = String(a.note || '').toLowerCase();
+        return txn.includes(q) || accName.includes(q) || sender.includes(q) || note.includes(q);
+      });
+    }
+
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.createDate || a.create_date || 0).getTime();
+      const dateB = new Date(b.createDate || b.create_date || 0).getTime();
+      return dateB - dateA;
+    });
+
+    const totalCount = filtered.length;
+    const offset = Math.max(0, parseInt(options.offset, 10) || 0);
+    const limit = Math.max(1, parseInt(options.limit, 10) || 50);
+    const paginated = filtered.slice(offset, offset + limit);
+    const hasMore = offset + paginated.length < totalCount;
+
+    return {
+      items: paginated,
+      actions: paginated,
+      settlements: paginated,
+      totalCount,
+      offset,
+      limit,
+      hasMore,
+    };
+  }
+
+  /**
+   * Retrieves a specific settlement action by transactionNumber.
+   */
+  getSettlementActionByTxnNumber(businessId = null, transactionNumber) {
+    if (!transactionNumber) return null;
+    const store = this.currentStore || {};
+    const targetBizId = businessId ? String(businessId) : null;
+    const list = Array.isArray(store.qrSettlementActions) ? store.qrSettlementActions : [];
+    const targetTxn = String(transactionNumber).trim();
+    return list.find((a) =>
+      String(a.transactionNumber) === targetTxn &&
+      (!targetBizId || String(a.businessId || '1') === targetBizId)
+    ) || null;
+  }
+
+  /**
+   * Marks batch settlement action IDs as synced (synced = 1).
+   */
+  async markQrSettlementActionsSynced(businessId = null, ids = []) {
+    const idSet = new Set((Array.isArray(ids) ? ids : [ids]).map(String));
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    let count = 0;
+    const nowIso = new Date().toISOString();
+    await this.mutateCollection('qrSettlementActions', (list) => {
+      for (const item of list) {
+        if (idSet.has(String(item.id)) && String(item.businessId || '1') === targetBizId) {
+          item.synced = 1;
+          item.updateDate = nowIso;
+          item.update_date = nowIso;
+          count++;
+        }
+      }
+      return list;
+    });
+    return { success: true, count };
+  }
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -7468,6 +7679,35 @@ async function deleteTallyPayBeneficiaryRepo(businessId, id, credential = null, 
 
 
 
+
+async function saveQrSettlementActionRepo(businessId, actionData, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveQrSettlementAction === 'function') {
+    return repo.saveQrSettlementAction(businessId, actionData, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getQrSettlementActionsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getQrSettlementActions === 'function') {
+    return repo.getQrSettlementActions(businessId, options);
+  }
+  return { items: [], actions: [], settlements: [], totalCount: 0, offset: 0, limit: 50, hasMore: false };
+}
+
+function getSettlementActionByTxnNumberRepo(businessId = null, txnNumber = null, repo = defaultRepository) {
+  if (repo && typeof repo.getSettlementActionByTxnNumber === 'function') {
+    return repo.getSettlementActionByTxnNumber(businessId, txnNumber);
+  }
+  return null;
+}
+
+async function markQrSettlementActionsSyncedRepo(businessId = null, ids = [], repo = defaultRepository) {
+  if (repo && typeof repo.markQrSettlementActionsSynced === 'function') {
+    return repo.markQrSettlementActionsSynced(businessId, ids);
+  }
+  return { success: false, count: 0 };
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -7599,6 +7839,10 @@ const repoExport = {
   getTallyPayBeneficiaryById: getTallyPayBeneficiaryByIdRepo,
   updateTallyPayBeneficiary: updateTallyPayBeneficiaryRepo,
   deleteTallyPayBeneficiary: deleteTallyPayBeneficiaryRepo,
+  saveQrSettlementAction: saveQrSettlementActionRepo,
+  getQrSettlementActions: getQrSettlementActionsRepo,
+  getSettlementActionByTxnNumber: getSettlementActionByTxnNumberRepo,
+  markQrSettlementActionsSynced: markQrSettlementActionsSyncedRepo,
   sanitizeState: sanitizeStateRepo,
   default: defaultRepository,
 };
@@ -7737,6 +7981,10 @@ if (typeof exports !== 'undefined') {
   exports.getTallyPayBeneficiaryById = getTallyPayBeneficiaryByIdRepo;
   exports.updateTallyPayBeneficiary = updateTallyPayBeneficiaryRepo;
   exports.deleteTallyPayBeneficiary = deleteTallyPayBeneficiaryRepo;
+  exports.saveQrSettlementAction = saveQrSettlementActionRepo;
+  exports.getQrSettlementActions = getQrSettlementActionsRepo;
+  exports.getSettlementActionByTxnNumber = getSettlementActionByTxnNumberRepo;
+  exports.markQrSettlementActionsSynced = markQrSettlementActionsSyncedRepo;
   exports.sanitizeState = sanitizeStateRepo;
   exports.default = defaultRepository;
 }

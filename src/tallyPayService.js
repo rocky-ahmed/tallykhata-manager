@@ -2117,7 +2117,715 @@ class BeneficiaryBookEngine {
 
 const ReconstructedBeneficiaryBookEngine = BeneficiaryBookEngine;
 const beneficiaryBookEngine = new BeneficiaryBookEngine();
+// =============================================================
+// MILESTONE REA-ITER-229: TALLYPAY QR MERCHANT SETTLEMENT &
+// DIRECT SOUNDBOX AUDIO NOTIFICATION DISPATCH SUBSYSTEM
+// =============================================================
+
+const SETTLEMENT_ACTION_TYPES = Object.freeze({
+  CREDIT_COLLECTION: 'CREDIT_COLLECTION',
+  DIGITAL_SALE: 'DIGITAL_SALE',
+  NO_ACTION: 'NO_ACTION',
+});
+
+const SETTLEMENT_ARSC_TOKENS = Object.freeze({
+  SETTLEMENT_CTA: 'পেমেন্ট সমন্বয় করি',
+  SETTLEMENT_SUCCESS: 'লেনদেনটি সমন্বয় করা হয়েছে।',
+  LEDGER_CREDIT_TAG: '(বাকি আদায় সমন্বয়)',
+  NOTIFICATION_SOUND: 'নোটিফিকেশন সাউন্ড',
+  VOICE_NOTIFICATION: 'ভয়েস নোটিফিকেশন',
+  VOICE_ALERT: 'ভয়েসের মাধ্যমে পেমেন্ট এলার্ট',
+  PAYMENT_RECEIVED_TALLYKHATA_TTS: 'আপনার টালিখাতা ওয়ালেটে %s টাকা গ্রহণ করা হয়েছে। প্রেরক - %s।',
+  PAYMENT_RECEIVED_SURECASH_TTS: 'আপনার শিওরক্যাশ ওয়ালেটে %1$s টাকা গ্রহণ করা হয়েছে। প্রেরক - %2$s। Txn ID: %3$s',
+});
+
+function buildSettlementAction(payload = {}) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Payload must be an object');
+  }
+
+  const txnNumber = String(
+    payload.transactionNumber || payload.transaction_number || payload.txnNumber || payload.txnId || ''
+  ).trim();
+  if (!txnNumber) {
+    throw new Error('Transaction number is required');
+  }
+
+  const rawActionType = payload.actionType || payload.action_type || SETTLEMENT_ACTION_TYPES.NO_ACTION;
+  const actionType = String(rawActionType).toUpperCase();
+  if (!Object.values(SETTLEMENT_ACTION_TYPES).includes(actionType)) {
+    throw new Error('Invalid settlement action type: ' + actionType);
+  }
+
+  const amountVal = payload.amount !== undefined
+    ? Number(payload.amount)
+    : (payload.amountPaisa !== undefined
+        ? Number(payload.amountPaisa) / 100
+        : (payload.amountTaka !== undefined ? Number(payload.amountTaka) : 0));
+  const amountPaisa = payload.amountPaisa !== undefined
+    ? Math.round(Number(payload.amountPaisa))
+    : Math.round(amountVal * 100);
+  const amountTaka = amountPaisa / 100;
+
+  const nowIso = new Date().toISOString();
+  const businessId = String(payload.businessId || '1');
+
+  return {
+    id: payload.id || Date.now(),
+    transactionNumber: txnNumber,
+    transaction_number: txnNumber,
+    actionType,
+    action_type: actionType,
+    amount: amountTaka,
+    amountPaisa,
+    amountTaka,
+    accountId: payload.accountId || payload.account_id || null,
+    account_id: payload.accountId || payload.account_id || null,
+    accountName: payload.accountName || payload.customerName || null,
+    senderMobile: payload.senderMobile || payload.sender_mobile || null,
+    senderName: payload.senderName || payload.sender_name || null,
+    note: payload.note || null,
+    synced: payload.synced !== undefined ? Number(payload.synced) : 0,
+    businessId,
+    business_id: businessId,
+    createDate: payload.createDate || payload.create_date || nowIso,
+    create_date: payload.createDate || payload.create_date || nowIso,
+    updateDate: payload.updateDate || payload.update_date || null,
+    update_date: payload.updateDate || payload.update_date || null,
+  };
+}
+
+function checkSettlementIdempotency(repo, txnNumber, targetBizId = null) {
+  if (!repo || !txnNumber) return false;
+  if (typeof repo.getSettlementActionByTxnNumber === 'function') {
+    return repo.getSettlementActionByTxnNumber(targetBizId, txnNumber) !== null;
+  }
+  if (typeof repo.existsByTransactionNumber === 'function') {
+    return repo.existsByTransactionNumber(txnNumber);
+  }
+  return false;
+}
+
+async function processQrPaymentSettlement(businessId, settlementPayload, storage) {
+  if (!settlementPayload || typeof settlementPayload !== 'object') {
+    throw new Error('Settlement payload must be an object');
+  }
+
+  const txnNumber = String(
+    settlementPayload.transactionNumber || settlementPayload.transaction_number || settlementPayload.txnNumber || ''
+  ).trim();
+  if (!txnNumber) {
+    throw new Error('Transaction number is required');
+  }
+
+  const actionType = String(
+    settlementPayload.actionType || settlementPayload.action_type || SETTLEMENT_ACTION_TYPES.NO_ACTION
+  ).toUpperCase();
+
+  if (!Object.values(SETTLEMENT_ACTION_TYPES).includes(actionType)) {
+    throw new Error('Invalid settlement action type: ' + actionType);
+  }
+
+  const targetBizId = String(businessId || settlementPayload.businessId || '1');
+  const targetRepo = storage;
+
+  // 1. Idempotency Check
+  if (targetRepo && checkSettlementIdempotency(targetRepo, txnNumber, targetBizId)) {
+    return {
+      success: false,
+      reason: 'ALREADY_SETTLED',
+      duplicate: true,
+      error: 'ALREADY_SETTLED',
+      message: 'Transaction already settled',
+    };
+  }
+
+  const amountVal = settlementPayload.amount !== undefined
+    ? Number(settlementPayload.amount)
+    : (settlementPayload.amountPaisa !== undefined
+        ? Number(settlementPayload.amountPaisa) / 100
+        : (settlementPayload.amountTaka !== undefined ? Number(settlementPayload.amountTaka) : 0));
+  const amountPaisa = settlementPayload.amountPaisa !== undefined
+    ? Math.round(Number(settlementPayload.amountPaisa))
+    : Math.round(amountVal * 100);
+  const amountTaka = amountPaisa / 100;
+
+  // 1. CREDIT_COLLECTION
+  if (actionType === SETTLEMENT_ACTION_TYPES.CREDIT_COLLECTION) {
+    const accountId = settlementPayload.accountId || settlementPayload.account_id;
+    if (!accountId) {
+      throw new Error('Account ID is required for CREDIT_COLLECTION settlement');
+    }
+
+    let accountName = settlementPayload.accountName || settlementPayload.customerName || 'গ্রাহক';
+    let oldBalance = 0;
+    let newBalance = 0;
+
+    // Simulation repository support (ReconstructedCreditSettlementEngine compatibility)
+    if (targetRepo && targetRepo.customerAccounts instanceof Map) {
+      let account = targetRepo.customerAccounts.get(accountId);
+      if (!account && (settlementPayload.currentBalance !== undefined || settlementPayload.openingBalance !== undefined)) {
+        targetRepo.registerAccount(accountId, settlementPayload.customerName || 'গ্রাহক', settlementPayload.currentBalance !== undefined ? settlementPayload.currentBalance : settlementPayload.openingBalance);
+        account = targetRepo.customerAccounts.get(accountId);
+      }
+      if (!account) {
+        throw new Error('Account not found: ' + accountId);
+      }
+      accountName = account.name || accountName;
+      oldBalance = account.currentBalance !== undefined ? account.currentBalance : (account.balance || 0);
+      newBalance = Math.round((oldBalance - amountTaka) * 100) / 100;
+      account.currentBalance = newBalance;
+      if (account.balance !== undefined) account.balance = newBalance;
+
+      const journalEntry = {
+        id: 'J_' + txnNumber,
+        accountId,
+        amount: amountTaka,
+        amountPaisa,
+        txnType: 'PAYMENT_RECEIVED',
+        note: settlementPayload.note ? (settlementPayload.note + ' (বাকি আদায় সমন্বয়)') : '(বাকি আদায় সমন্বয়)',
+        description: '(বাকি আদায় সমন্বয়)',
+        transactionNumber: txnNumber,
+        timestamp: new Date().toISOString(),
+      };
+      if (Array.isArray(account.journals)) {
+        account.journals.push(journalEntry);
+      }
+
+      if (typeof targetRepo.recordSettlementAction === 'function') {
+        targetRepo.recordSettlementAction(txnNumber, 'CREDIT_COLLECTION');
+      }
+
+      return {
+        success: true,
+        transactionNumber: txnNumber,
+        actionType: 'CREDIT_COLLECTION',
+        accountId,
+        accountName,
+        settledAmount: amountTaka,
+        settledAmountPaisa: amountPaisa,
+        previousBalance: oldBalance,
+        oldBalance,
+        newBalance,
+        remainingBalance: newBalance,
+        journalEntry,
+        journalNote: journalEntry.note,
+      };
+    }
+
+    // Full StorageRepository support
+    let createdJournal = null;
+    if (targetRepo && typeof targetRepo.mutateStore === 'function') {
+      const mutRes = await targetRepo.mutateStore((prevStore) => {
+        const accounts = Array.isArray(prevStore.accounts) ? [...prevStore.accounts] : [];
+        const accIdx = accounts.findIndex(
+          (a) => String(a.id) === String(accountId) && String(a.businessId || '1') === targetBizId
+        );
+        if (accIdx === -1) {
+          throw new Error('Account not found: ' + accountId);
+        }
+        const acc = { ...accounts[accIdx] };
+        accountName = acc.name || acc.accountName || accountName;
+        oldBalance = Number(acc.currentBalance !== undefined ? acc.currentBalance : (acc.balance !== undefined ? acc.balance : 0));
+        newBalance = Math.round((oldBalance - amountTaka) * 100) / 100;
+        acc.currentBalance = newBalance;
+        acc.balance = newBalance;
+        acc.updatedAt = new Date().toISOString();
+        accounts[accIdx] = acc;
+
+        createdJournal = {
+          id: 'J_' + txnNumber,
+          accountId,
+          account_id: accountId,
+          businessId: targetBizId,
+          business_id: targetBizId,
+          amount: amountTaka,
+          amountPaisa,
+          txnType: 'PAYMENT_RECEIVED',
+          type: 'credit',
+          tag: 'baki_aday',
+          note: settlementPayload.note ? (settlementPayload.note + ' (বাকি আদায় সমন্বয়)') : '(বাকি আদায় সমন্বয়)',
+          description: '(বাকি আদায় সমন্বয়)',
+          transactionNumber: txnNumber,
+          timestamp: new Date().toISOString(),
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toTimeString().split(' ')[0],
+        };
+
+        const journals = Array.isArray(prevStore.journals) ? [createdJournal, ...prevStore.journals] : [createdJournal];
+        return {
+          ...prevStore,
+          accounts,
+          journals,
+        };
+      });
+      if (mutRes && mutRes.success === false) {
+        throw mutRes.error || new Error('Failed to mutate store');
+      }
+    }
+
+    const actionRecord = buildSettlementAction({
+      transactionNumber: txnNumber,
+      actionType: 'CREDIT_COLLECTION',
+      accountId,
+      accountName,
+      amount: amountTaka,
+      amountPaisa,
+      senderMobile: settlementPayload.senderMobile,
+      senderName: settlementPayload.senderName,
+      businessId: targetBizId,
+      note: settlementPayload.note || '(বাকি আদায় সমন্বয়)',
+    });
+
+    if (targetRepo) {
+      if (typeof targetRepo.saveQrSettlementAction === 'function') {
+        await targetRepo.saveQrSettlementAction(targetBizId, actionRecord);
+      } else if (typeof targetRepo.recordSettlementAction === 'function') {
+        targetRepo.recordSettlementAction(txnNumber, 'CREDIT_COLLECTION');
+      }
+    }
+
+    return {
+      success: true,
+      transactionNumber: txnNumber,
+      actionType: 'CREDIT_COLLECTION',
+      accountId,
+      accountName,
+      settledAmount: amountTaka,
+      settledAmountPaisa: amountPaisa,
+      previousBalance: oldBalance,
+      oldBalance,
+      newBalance,
+      remainingBalance: newBalance,
+      journalEntry: createdJournal,
+      journalNote: createdJournal ? createdJournal.note : '(বাকি আদায় সমন্বয়)',
+      actionRecord,
+    };
+  }
+
+  // 2. DIGITAL_SALE
+  if (actionType === SETTLEMENT_ACTION_TYPES.DIGITAL_SALE) {
+    let cashEntry = null;
+    if (targetRepo && typeof targetRepo.mutateStore === 'function') {
+      const mutRes = await targetRepo.mutateStore((prevStore) => {
+        cashEntry = {
+          id: 'C_' + txnNumber,
+          businessId: targetBizId,
+          type: 'in',
+          category: 'digital_sale',
+          amount: amountTaka,
+          amountPaisa,
+          description: 'ডিজিটাল বিক্রি (QR Payment)',
+          transactionNumber: txnNumber,
+          timestamp: new Date().toISOString(),
+        };
+        const cashEntries = Array.isArray(prevStore.cashEntries) ? [cashEntry, ...prevStore.cashEntries] : [cashEntry];
+        return { ...prevStore, cashEntries };
+      });
+      if (mutRes && mutRes.success === false) {
+        throw mutRes.error || new Error('Failed to mutate store');
+      }
+    }
+
+    const actionRecord = buildSettlementAction({
+      transactionNumber: txnNumber,
+      actionType: 'DIGITAL_SALE',
+      amount: amountTaka,
+      amountPaisa,
+      senderMobile: settlementPayload.senderMobile,
+      senderName: settlementPayload.senderName,
+      businessId: targetBizId,
+      note: settlementPayload.note || 'ডিজিটাল বিক্রি',
+    });
+
+    if (targetRepo) {
+      if (typeof targetRepo.saveQrSettlementAction === 'function') {
+        await targetRepo.saveQrSettlementAction(targetBizId, actionRecord);
+      } else if (typeof targetRepo.recordSettlementAction === 'function') {
+        targetRepo.recordSettlementAction(txnNumber, 'DIGITAL_SALE');
+      }
+    }
+
+    return {
+      success: true,
+      transactionNumber: txnNumber,
+      actionType: 'DIGITAL_SALE',
+      settledAmount: amountTaka,
+      settledAmountPaisa: amountPaisa,
+      cashEntry,
+      actionRecord,
+    };
+  }
+
+  // 3. NO_ACTION
+  const actionRecord = buildSettlementAction({
+    transactionNumber: txnNumber,
+    actionType: 'NO_ACTION',
+    amount: amountTaka,
+    amountPaisa,
+    senderMobile: settlementPayload.senderMobile,
+    senderName: settlementPayload.senderName,
+    businessId: targetBizId,
+    note: settlementPayload.note || 'কোন পদক্ষেপ নেওয়া হয়নি',
+  });
+
+  if (targetRepo) {
+    if (typeof targetRepo.saveQrSettlementAction === 'function') {
+      await targetRepo.saveQrSettlementAction(targetBizId, actionRecord);
+    } else if (typeof targetRepo.recordSettlementAction === 'function') {
+      targetRepo.recordSettlementAction(txnNumber, 'NO_ACTION');
+    }
+  }
+
+  return {
+    success: true,
+    transactionNumber: txnNumber,
+    actionType: 'NO_ACTION',
+    actionRecord,
+  };
+}
+
+function generatePaymentSpeechPrompt(payload, lang = 'bn') {
+  if (!payload || typeof payload !== 'object') return '';
+  const amountVal = payload.amount !== undefined
+    ? Number(payload.amount)
+    : (payload.amountPaisa !== undefined
+        ? Number(payload.amountPaisa) / 100
+        : (payload.amountTaka !== undefined ? Number(payload.amountTaka) : 0));
+  const sender = payload.senderName || payload.sender || payload.fromName || payload.payerName || 'গ্রাহক';
+  const txnId = payload.txnId || payload.transactionNumber || '';
+
+  if (lang === 'en') {
+    const brand = (payload.walletBrand === 'SURECASH' || payload.walletName === 'SureCash') ? 'SureCash' : 'TallyKhata';
+    const enAmount = String(amountVal);
+    return 'Payment of ' + enAmount + ' Taka received in your ' + brand + ' wallet. Sender - ' + sender + '.' + (txnId ? (' Txn ID: ' + txnId) : '');
+  }
+
+  const bnAmount = toBengaliNumerals(amountVal);
+  const isSureCash = payload.walletBrand === 'SURECASH' || payload.walletName === 'শিওরক্যাশ' || payload.walletName === 'SureCash';
+
+  if (isSureCash && txnId) {
+    return 'আপনার শিওরক্যাশ ওয়ালেটে ' + bnAmount + ' টাকা গ্রহণ করা হয়েছে। প্রেরক - ' + sender + '। Txn ID: ' + txnId;
+  }
+
+  if (payload.includeTxnId && txnId) {
+    return 'আপনার টালিখাতা ওয়ালেটে ' + bnAmount + ' টাকা গ্রহণ করা হয়েছে। প্রেরক - ' + sender + '। Txn ID: ' + txnId;
+  }
+
+  return 'আপনার টালিখাতা ওয়ালেটে ' + bnAmount + ' টাকা গ্রহণ করা হয়েছে। প্রেরক - ' + sender + '।';
+}
+
+function formatTtsSpeech(amountTaka, senderName, txnId) {
+  const bnAmount = toBengaliNumerals(amountTaka);
+  return 'আপনার শিওরক্যাশ ওয়ালেটে ' + bnAmount + ' টাকা গ্রহণ করা হয়েছে। প্রেরক - ' + senderName + '। Txn ID: ' + txnId;
+}
+
+class SoundboxConfigManager {
+  constructor(initial = {}) {
+    this.configs = new Map();
+    this.defaultConfig = {
+      isNotificationSoundChecked: initial.isNotificationSoundChecked !== false,
+      isNotificationTTSChecked: initial.isNotificationTTSChecked !== false,
+      showTTSSetting: initial.showTTSSetting !== false,
+      engine: 'com.google.android.tts',
+      locale: 'bn-BD',
+    };
+  }
+
+  getConfig(businessId = '1') {
+    const key = String(businessId || '1');
+    if (!this.configs.has(key)) {
+      this.configs.set(key, { ...this.defaultConfig });
+    }
+    return { ...this.configs.get(key) };
+  }
+
+  updateConfig(businessId = '1', updates = {}) {
+    const key = String(businessId || '1');
+    const curr = this.getConfig(key);
+    const updated = {
+      ...curr,
+      ...updates,
+    };
+    if (updates.isNotificationSoundChecked !== undefined) {
+      updated.isNotificationSoundChecked = Boolean(updates.isNotificationSoundChecked);
+    }
+    if (updates.isNotificationTTSChecked !== undefined) {
+      updated.isNotificationTTSChecked = Boolean(updates.isNotificationTTSChecked);
+    }
+    this.configs.set(key, updated);
+    return { ...updated };
+  }
+}
+
+const soundboxConfigManager = new SoundboxConfigManager();
+
+function getSoundboxNotificationConfig(businessId = '1') {
+  return soundboxConfigManager.getConfig(businessId);
+}
+
+function updateSoundboxNotificationConfig(businessId = '1', updates = {}) {
+  return soundboxConfigManager.updateConfig(businessId, updates);
+}
+
+class SoundboxAudioDispatcher {
+  constructor(options = {}) {
+    this.isNotificationSoundChecked = options.isNotificationSoundChecked !== false;
+    this.isNotificationTTSChecked = options.isNotificationTTSChecked !== false;
+    this.targetEngine = 'com.google.android.tts';
+    this.targetLocale = 'bn-BD';
+    this.audioDispatches = [];
+  }
+
+  setToggles({ sound, tts }) {
+    if (sound !== undefined) this.isNotificationSoundChecked = Boolean(sound);
+    if (tts !== undefined) this.isNotificationTTSChecked = Boolean(tts);
+  }
+
+  formatTtsSpeech(amountTaka, senderName, txnId) {
+    return formatTtsSpeech(amountTaka, senderName, txnId);
+  }
+
+  dispatchPaymentNotification(paymentEvent = {}) {
+    const amountVal = paymentEvent.amountTaka !== undefined
+      ? paymentEvent.amountTaka
+      : (paymentEvent.amount !== undefined ? paymentEvent.amount : (paymentEvent.amountPaisa ? paymentEvent.amountPaisa / 100 : 0));
+    const sender = paymentEvent.senderName || paymentEvent.sender || 'গ্রাহক';
+    const txnId = paymentEvent.txnId || paymentEvent.transactionNumber || '';
+
+    const actionsTaken = [];
+
+    if (this.isNotificationSoundChecked) {
+      actionsTaken.push({
+        type: 'NOTIFICATION_TONE',
+        soundAsset: 'res/raw/zxing_beep.ogg',
+        played: true,
+      });
+    }
+
+    if (this.isNotificationTTSChecked) {
+      const speechText = generatePaymentSpeechPrompt({
+        amount: amountVal,
+        senderName: sender,
+        txnId,
+        walletBrand: paymentEvent.walletBrand,
+      }, 'bn');
+
+      actionsTaken.push({
+        type: 'TTS_SPEECH',
+        engine: this.targetEngine,
+        locale: this.targetLocale,
+        text: speechText,
+        synthesized: true,
+      });
+    }
+
+    const dispatchResult = {
+      txnId,
+      timestamp: new Date().toISOString(),
+      soundEnabled: this.isNotificationSoundChecked,
+      ttsEnabled: this.isNotificationTTSChecked,
+      actions: actionsTaken,
+    };
+
+    this.audioDispatches.push(dispatchResult);
+    return dispatchResult;
+  }
+}
+
+class ReconstructedSoundboxAudioDispatcher extends SoundboxAudioDispatcher {}
+
+class ReconstructedSettlementActionRepository {
+  constructor() {
+    this.settlements = [];
+    this.txnIndex = new Map();
+    this.nextId = 1;
+  }
+
+  recordSettlementAction(transactionNumber, actionType) {
+    const exists = this.txnIndex.get(transactionNumber);
+    if (exists) {
+      return { success: false, duplicate: true, existingId: exists.id };
+    }
+    const record = {
+      id: this.nextId++,
+      transactionNumber,
+      actionType,
+      synced: 0,
+      createDate: new Date().toISOString(),
+      updateDate: null,
+    };
+    this.settlements.push(record);
+    this.txnIndex.set(transactionNumber, record);
+    return { success: true, duplicate: false, record };
+  }
+
+  existsByTransactionNumber(transactionNumber) {
+    return this.txnIndex.has(transactionNumber);
+  }
+
+  getUnsyncedSettlements(limit = 100) {
+    return this.settlements.filter((s) => s.synced === 0).slice(0, limit);
+  }
+
+  markSynced(ids) {
+    let count = 0;
+    for (const s of this.settlements) {
+      if (ids.includes(s.id)) {
+        s.synced = 1;
+        s.updateDate = new Date().toISOString();
+        count++;
+      }
+    }
+    return count;
+  }
+
+  resetAllToDirty() {
+    this.settlements.forEach((s) => (s.synced = 0));
+  }
+}
+
+class ReconstructedCreditSettlementEngine {
+  constructor(settlementRepo) {
+    this.repo = settlementRepo;
+    this.customerAccounts = new Map();
+  }
+
+  registerAccount(id, name, openingBalance) {
+    this.customerAccounts.set(id, {
+      id,
+      name,
+      currentBalance: openingBalance,
+      journals: [],
+    });
+  }
+
+  settleCreditCollection(transactionNumber, accountId, amountPaisa, senderMobile, payload = {}) {
+    let account = this.customerAccounts.get(accountId);
+    if (!account && (payload.currentBalance !== undefined || payload.openingBalance !== undefined)) {
+      this.registerAccount(accountId, payload.customerName || 'গ্রাহক', payload.currentBalance !== undefined ? payload.currentBalance : payload.openingBalance);
+      account = this.customerAccounts.get(accountId);
+    }
+    if (!account) throw new Error('Account not found: ' + accountId);
+
+    const res = this.repo.recordSettlementAction(transactionNumber, 'CREDIT_COLLECTION');
+    if (!res.success) {
+      return { success: false, reason: 'ALREADY_SETTLED', duplicate: true };
+    }
+
+    const amountTaka = amountPaisa / 100;
+    const oldBalance = account.currentBalance !== undefined ? account.currentBalance : (account.balance || 0);
+    account.currentBalance = Math.round((oldBalance - amountTaka) * 100) / 100;
+    if (account.balance !== undefined) account.balance = account.currentBalance;
+
+    const journalEntry = {
+      id: 'J_' + transactionNumber,
+      accountId,
+      amount: amountTaka,
+      txnType: 'PAYMENT_RECEIVED',
+      note: '(বাকি আদায় সমন্বয়)',
+      transactionNumber,
+      timestamp: new Date().toISOString(),
+    };
+    account.journals.push(journalEntry);
+
+    return {
+      success: true,
+      transactionNumber,
+      actionType: 'CREDIT_COLLECTION',
+      accountName: account.name,
+      settledAmount: amountTaka,
+      previousBalance: oldBalance,
+      newBalance: account.currentBalance,
+      remainingBalance: account.currentBalance,
+      journalEntry,
+      journalNote: journalEntry.note,
+    };
+  }
+
+  settleDigitalSale(transactionNumber, amountPaisa) {
+    const res = this.repo.recordSettlementAction(transactionNumber, 'DIGITAL_SALE');
+    if (!res.success) {
+      return { success: false, reason: 'ALREADY_SETTLED', duplicate: true };
+    }
+    return {
+      success: true,
+      transactionNumber,
+      actionType: 'DIGITAL_SALE',
+      settledAmount: amountPaisa / 100,
+    };
+  }
+
+  settleNoAction(transactionNumber) {
+    const res = this.repo.recordSettlementAction(transactionNumber, 'NO_ACTION');
+    if (!res.success) {
+      return { success: false, reason: 'ALREADY_SETTLED', duplicate: true };
+    }
+    return {
+      success: true,
+      transactionNumber,
+      actionType: 'NO_ACTION',
+    };
+  }
+}
+
+class QrSettlementEngine {
+  constructor(options = {}) {
+    this.repo = new ReconstructedSettlementActionRepository();
+    this.settlementEngine = new ReconstructedCreditSettlementEngine(this.repo);
+    this.soundboxDispatcher = new SoundboxAudioDispatcher(options);
+  }
+
+  registerAccount(id, name, openingBalance) {
+    return this.settlementEngine.registerAccount(id, name, openingBalance);
+  }
+
+  settlePayment(type, txnNumber, payload = {}) {
+    const amountPaisa = payload.amountPaisa !== undefined
+      ? payload.amountPaisa
+      : (payload.amount !== undefined ? Math.round(Number(payload.amount) * 100) : 0);
+    if (type === 'CREDIT_COLLECTION') {
+      return this.settlementEngine.settleCreditCollection(
+        txnNumber,
+        payload.accountId,
+        amountPaisa,
+        payload.senderMobile,
+        payload
+      );
+    }
+    if (type === 'DIGITAL_SALE') {
+      return this.settlementEngine.settleDigitalSale(txnNumber, amountPaisa);
+    }
+    return this.settlementEngine.settleNoAction(txnNumber);
+  }
+
+  processSettlement(type, txnNumber, payload = {}) {
+    return this.settlePayment(type, txnNumber, payload);
+  }
+
+  dispatchSoundboxNotification(paymentEvent) {
+    return this.soundboxDispatcher.dispatchPaymentNotification(paymentEvent);
+  }
+}
+
 module.exports = {
+  // Milestone REA-ITER-229 Exports
+  SETTLEMENT_ACTION_TYPES,
+  SETTLEMENT_ARSC_TOKENS,
+  buildSettlementAction,
+  checkSettlementIdempotency,
+  processQrPaymentSettlement,
+  generatePaymentSpeechPrompt,
+  formatTtsSpeech,
+  SoundboxConfigManager,
+  soundboxConfigManager,
+  getSoundboxNotificationConfig,
+  updateSoundboxNotificationConfig,
+  SoundboxAudioDispatcher,
+  ReconstructedSoundboxAudioDispatcher,
+  ReconstructedSettlementActionRepository,
+  ReconstructedCreditSettlementEngine,
+  QrSettlementEngine,
   // Milestone REA-ITER-228 Exports
   BANK_VERIFICATION_STATUSES,
   BENEFICIARY_TARGET_TYPES,
