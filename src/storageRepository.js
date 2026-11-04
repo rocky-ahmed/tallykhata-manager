@@ -229,6 +229,8 @@ const VALID_COLLECTIONS = new Set([
   'tallyPayTransactions',
   'tallyPayBeneficiaries',
   'qrSettlementActions',
+  'merchantDisbursements',
+  'reconciliations',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -349,6 +351,9 @@ function migrateLegacySampleCustomerNames(accounts) {
 function sanitizeState(state) {
   if (!state || typeof state !== 'object') return createDefaultState();
   const s = { ...state };
+  if (!Array.isArray(s.merchantDisbursements)) s.merchantDisbursements = [];
+  if (!Array.isArray(s.reconciliations)) s.reconciliations = [];
+  if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
   if (!Array.isArray(s.tallyPayBeneficiaries)) s.tallyPayBeneficiaries = [];
   if (!Array.isArray(s.tallyPayTransactions)) s.tallyPayTransactions = [];
@@ -488,6 +493,9 @@ function createDefaultState() {
     tallyPayTransactions: [],
     tallyPayBeneficiaries: [],
     qrSettlementActions: [],
+    merchantDisbursements: [],
+    reconciliations: [],
+    autoDisbursementConfig: {},
     version: 6,
   };
 }
@@ -1593,6 +1601,35 @@ class StorageRepository {
       authoritative.qrSettlementActions = [];
     }
 
+    if (authoritative.merchantDisbursements && Array.isArray(authoritative.merchantDisbursements)) {
+      authoritative.merchantDisbursements = authoritative.merchantDisbursements.map((d) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, ...rest } = d || {};
+        return rest;
+      });
+    } else {
+      authoritative.merchantDisbursements = [];
+    }
+
+    if (authoritative.reconciliations && Array.isArray(authoritative.reconciliations)) {
+      authoritative.reconciliations = authoritative.reconciliations.map((r) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, ...rest } = r || {};
+        return rest;
+      });
+    } else {
+      authoritative.reconciliations = [];
+    }
+
+    if (authoritative.autoDisbursementConfig && typeof authoritative.autoDisbursementConfig === 'object') {
+      const cleanCfg = {};
+      for (const [bizId, cfg] of Object.entries(authoritative.autoDisbursementConfig)) {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, ...rest } = cfg || {};
+        cleanCfg[bizId] = rest;
+      }
+      authoritative.autoDisbursementConfig = cleanCfg;
+    } else {
+      authoritative.autoDisbursementConfig = {};
+    }
+
     if (authoritative.tallyPayBeneficiaries && Array.isArray(authoritative.tallyPayBeneficiaries)) {
       authoritative.tallyPayBeneficiaries = authoritative.tallyPayBeneficiaries.map((b) => {
         const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, ...rest } = b || {};
@@ -2143,6 +2180,10 @@ class StorageRepository {
         const tallyPayTransactions = (prevStore.tallyPayTransactions || []).filter((t) => getBizId(t) !== targetId);
         const tallyPayBeneficiaries = (prevStore.tallyPayBeneficiaries || []).filter((b) => getBizId(b) !== targetId);
         const qrSettlementActions = (prevStore.qrSettlementActions || []).filter((q) => getBizId(q) !== targetId);
+        const merchantDisbursements = (prevStore.merchantDisbursements || []).filter((d) => getBizId(d) !== targetId);
+        const reconciliations = (prevStore.reconciliations || []).filter((r) => getBizId(r) !== targetId);
+        const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
+        delete autoDisbursementConfig[targetId];
 
       // Clean up physical audio files of deleted business
       if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
@@ -2224,6 +2265,9 @@ class StorageRepository {
         tallyPayTransactions,
         tallyPayBeneficiaries,
         qrSettlementActions,
+        merchantDisbursements,
+        reconciliations,
+        autoDisbursementConfig,
         cashReconciliation,
       };
     });
@@ -2375,6 +2419,8 @@ class StorageRepository {
           const importedTallyPay = (data.tallyPayTransactions || []).filter(t => String(t.businessId || '1') === selectedBizId);
           const importedBeneficiaries = (data.tallyPayBeneficiaries || []).filter(b => String(b.businessId || '1') === selectedBizId);
           const importedQrSettlements = (data.qrSettlementActions || []).filter(q => String(q.businessId || '1') === selectedBizId);
+          const importedDisbursements = (data.merchantDisbursements || []).filter(d => String(d.businessId || '1') === selectedBizId);
+          const importedReconciliations = (data.reconciliations || []).filter(r => String(r.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -2390,6 +2436,8 @@ class StorageRepository {
           const keptTallyPay = (prevStore.tallyPayTransactions || []).filter(t => String(t.businessId || '1') !== selectedBizId);
         const keptBeneficiaries = (prevStore.tallyPayBeneficiaries || []).filter(b => String(b.businessId || '1') !== selectedBizId);
         const keptQrSettlements = (prevStore.qrSettlementActions || []).filter(q => String(q.businessId || '1') !== selectedBizId);
+        const keptDisbursements = (prevStore.merchantDisbursements || []).filter(d => String(d.businessId || '1') !== selectedBizId);
+        const keptReconciliations = (prevStore.reconciliations || []).filter(r => String(r.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2425,6 +2473,9 @@ class StorageRepository {
           tallyPayTransactions: [...keptTallyPay, ...importedTallyPay],
           tallyPayBeneficiaries: [...keptBeneficiaries, ...importedBeneficiaries],
           qrSettlementActions: [...keptQrSettlements, ...importedQrSettlements],
+          merchantDisbursements: [...keptDisbursements, ...importedDisbursements],
+          reconciliations: [...keptReconciliations, ...importedReconciliations],
+          autoDisbursementConfig: { ...(prevStore.autoDisbursementConfig || {}), ...(data.autoDisbursementConfig || {}) },
           version: 6,
           lastRestoredAt: new Date().toISOString(),
           restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -2468,6 +2519,9 @@ class StorageRepository {
         tallyPayTransactions: Array.isArray(data.tallyPayTransactions) ? data.tallyPayTransactions : [],
         tallyPayBeneficiaries: Array.isArray(data.tallyPayBeneficiaries) ? data.tallyPayBeneficiaries : [],
         qrSettlementActions: Array.isArray(data.qrSettlementActions) ? data.qrSettlementActions : [],
+        merchantDisbursements: Array.isArray(data.merchantDisbursements) ? data.merchantDisbursements : [],
+        reconciliations: Array.isArray(data.reconciliations) ? data.reconciliations : [],
+        autoDisbursementConfig: (data.autoDisbursementConfig && typeof data.autoDisbursementConfig === 'object') ? data.autoDisbursementConfig : {},
         inventory: restoredInventory,
         stock: restoredInventory,
         pinEnabled: false,
@@ -6634,6 +6688,363 @@ class StorageRepository {
     return { success: true, count };
   }
 
+
+  // ============================================================================
+  // MILESTONE REA-ITER-230: MERCHANT DISBURSEMENT, RECONCILIATION & AUTO-CONFIG
+  // ============================================================================
+
+  /**
+   * Saves a merchant bank disbursement record atomically.
+   */
+  async saveMerchantDisbursement(businessId = null, disbursement = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const nowIso = new Date().toISOString();
+    const id = disbursement.id || ('DISB_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
+    const amountVal = Number(disbursement.amountTaka !== undefined ? disbursement.amountTaka : (disbursement.amount || 0));
+    const amountPaisa = disbursement.amountPaisa !== undefined
+      ? Math.round(Number(disbursement.amountPaisa))
+      : Math.round(amountVal * 100);
+    const feeVal = Number(disbursement.fee !== undefined ? disbursement.fee : (disbursement.serviceCharge || 0));
+    const feePaisa = disbursement.feePaisa !== undefined
+      ? Math.round(Number(disbursement.feePaisa))
+      : Math.round(feeVal * 100);
+    const netAmountVal = Number(disbursement.netAmount !== undefined ? disbursement.netAmount : (amountVal - feeVal));
+    const netAmountPaisa = Math.round(amountPaisa - feePaisa);
+
+    const record = {
+      id,
+      _id: id,
+      businessId: targetBizId,
+      business_id: targetBizId,
+      amount: amountVal,
+      amountTaka: amountVal,
+      amountPaisa,
+      fee: feeVal,
+      feePaisa,
+      netAmount: netAmountVal,
+      netAmountPaisa,
+      bankRoutingNo: disbursement.bankRoutingNo || disbursement.routingNumber || '',
+      bankAccountNo: disbursement.bankAccountNo || disbursement.accountNumber || '',
+      recipientName: disbursement.recipientName || disbursement.accountName || '',
+      transferMode: disbursement.transferMode || 'BEFTN',
+      notice: disbursement.notice || '',
+      status: disbursement.status || 'SCHEDULED',
+      timestamp: disbursement.timestamp || nowIso,
+      createDate: disbursement.createDate || nowIso,
+      updateDate: nowIso,
+    };
+
+    let saved = null;
+    await this.mutateCollection('merchantDisbursements', (list) => {
+      saved = record;
+      return [record, ...list];
+    });
+
+    return { success: true, disbursement: saved };
+  }
+
+  /**
+   * Queries merchant bank disbursements with filtering and pagination.
+   */
+  getMerchantDisbursements(businessId = null, options = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = businessId ? String(businessId) : null;
+    const list = Array.isArray(store.merchantDisbursements) ? store.merchantDisbursements : [];
+
+    let filtered = list.filter((d) => {
+      if (targetBizId && String(d.businessId || '1') !== targetBizId) return false;
+      if (options.status && String(d.status).toUpperCase() !== String(options.status).toUpperCase()) return false;
+      if (options.transferMode && String(d.transferMode).toUpperCase() !== String(options.transferMode).toUpperCase()) return false;
+      if (options.startDate) {
+        const itemDate = new Date(d.createDate || d.timestamp || 0).getTime();
+        const start = new Date(options.startDate).getTime();
+        if (itemDate < start) return false;
+      }
+      if (options.endDate) {
+        const itemDate = new Date(d.createDate || d.timestamp || 0).getTime();
+        const end = new Date(options.endDate).getTime();
+        if (itemDate > end) return false;
+      }
+      return true;
+    });
+
+    if (options.query || options.search) {
+      const q = String(options.query || options.search).trim().toLowerCase();
+      filtered = filtered.filter((d) => {
+        const id = String(d.id || '').toLowerCase();
+        const rec = String(d.recipientName || '').toLowerCase();
+        const acc = String(d.bankAccountNo || '').toLowerCase();
+        const rout = String(d.bankRoutingNo || '').toLowerCase();
+        return id.includes(q) || rec.includes(q) || acc.includes(q) || rout.includes(q);
+      });
+    }
+
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.createDate || a.timestamp || 0).getTime();
+      const dateB = new Date(b.createDate || b.timestamp || 0).getTime();
+      return dateB - dateA;
+    });
+
+    const totalCount = filtered.length;
+    const totalAmount = filtered.reduce((acc, curr) => acc + Number(curr.amountTaka || curr.amount || 0), 0);
+    const totalAmountPaisa = filtered.reduce((acc, curr) => acc + Number(curr.amountPaisa || Math.round(Number(curr.amount || 0) * 100)), 0);
+    const offset = Math.max(0, parseInt(options.offset, 10) || 0);
+    const limit = Math.max(1, parseInt(options.limit, 10) || 50);
+    const paginated = filtered.slice(offset, offset + limit);
+    const hasMore = offset + paginated.length < totalCount;
+
+    return {
+      items: paginated,
+      disbursements: paginated,
+      totalCount,
+      totalAmount,
+      totalAmountPaisa,
+      offset,
+      limit,
+      hasMore,
+    };
+  }
+
+  /**
+   * Retrieves a specific disbursement by id.
+   */
+  getDisbursementById(businessId = null, id = null) {
+    if (!id) return null;
+    const store = this.currentStore || {};
+    const targetBizId = businessId ? String(businessId) : null;
+    const list = Array.isArray(store.merchantDisbursements) ? store.merchantDisbursements : [];
+    const targetId = String(id).trim();
+    return list.find((d) =>
+      (String(d.id) === targetId || String(d._id) === targetId) &&
+      (!targetBizId || String(d.businessId || '1') === targetBizId)
+    ) || null;
+  }
+
+  /**
+   * Saves an End-of-Day reconciliation record atomically.
+   */
+  async saveReconciliation(businessId = null, reconData = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const nowIso = new Date().toISOString();
+    const id = reconData._id !== undefined && reconData._id !== null
+      ? reconData._id
+      : (reconData.id !== undefined && reconData.id !== null ? reconData.id : ('RECON_' + Date.now() + '_' + Math.floor(Math.random() * 1000)));
+
+    const openingBalance = Number(reconData.opening_balance !== undefined ? reconData.opening_balance : (reconData.openingBalance || 0));
+    const otherCashSales = Number(reconData.other_cash_sales !== undefined ? reconData.other_cash_sales : (reconData.otherCashSale || 0));
+    const otherCreditSales = Number(reconData.other_credit_sales !== undefined ? reconData.other_credit_sales : (reconData.otherCreditSale || 0));
+    const digitalSettlements = Number(reconData.digital_settlements !== undefined ? reconData.digital_settlements : (reconData.digitalSettlementsTotal || 0));
+    const closingBalance = reconData.closing_balance !== undefined
+      ? Number(reconData.closing_balance)
+      : (reconData.closingBalance !== undefined ? Number(reconData.closingBalance) : (openingBalance + otherCashSales + digitalSettlements - otherCreditSales));
+
+    const syncStatus = reconData.sync_status !== undefined
+      ? Number(reconData.sync_status)
+      : (reconData.syncStatus !== undefined ? Number(reconData.syncStatus) : 0);
+
+    const record = {
+      _id: id,
+      id,
+      businessId: targetBizId,
+      business_id: targetBizId,
+      time: reconData.time || nowIso,
+      opening_balance: openingBalance,
+      openingBalance,
+      other_cash_sales: otherCashSales,
+      otherCashSale: otherCashSales,
+      other_credit_sales: otherCreditSales,
+      otherCreditSale: otherCreditSales,
+      digital_settlements: digitalSettlements,
+      digitalSettlements,
+      closing_balance: closingBalance,
+      closingBalance,
+      sync_status: syncStatus,
+      syncStatus,
+      createDate: reconData.createDate || nowIso,
+      updateDate: nowIso,
+    };
+
+    let saved = null;
+    await this.mutateCollection('reconciliations', (list) => {
+      saved = record;
+      return [record, ...list];
+    });
+
+    return { success: true, reconciliation: saved };
+  }
+
+  /**
+   * Queries reconciliations with optional filtering.
+   */
+  getReconciliations(businessId = null, options = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = businessId ? String(businessId) : null;
+    const list = Array.isArray(store.reconciliations) ? store.reconciliations : [];
+
+    let filtered = list.filter((r) => {
+      if (targetBizId && String(r.businessId || '1') !== targetBizId) return false;
+      if (options.sync_status !== undefined && options.sync_status !== null) {
+        const targetSync = Number(options.sync_status);
+        const itemSync = Number(r.sync_status !== undefined ? r.sync_status : r.syncStatus);
+        if (itemSync !== targetSync) return false;
+      }
+      if (options.startDate) {
+        const itemDate = new Date(r.time || r.createDate || 0).getTime();
+        const start = new Date(options.startDate).getTime();
+        if (itemDate < start) return false;
+      }
+      if (options.endDate) {
+        const itemDate = new Date(r.time || r.createDate || 0).getTime();
+        const end = new Date(options.endDate).getTime();
+        if (itemDate > end) return false;
+      }
+      return true;
+    });
+
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.time || a.createDate || 0).getTime();
+      const dateB = new Date(b.time || b.createDate || 0).getTime();
+      return dateB - dateA;
+    });
+
+    const totalCount = filtered.length;
+    const offset = Math.max(0, parseInt(options.offset, 10) || 0);
+    const limit = Math.max(1, parseInt(options.limit, 10) || 50);
+    const paginated = filtered.slice(offset, offset + limit);
+    const hasMore = offset + paginated.length < totalCount;
+
+    return {
+      items: paginated,
+      reconciliations: paginated,
+      totalCount,
+      offset,
+      limit,
+      hasMore,
+    };
+  }
+
+  /**
+   * Retrieves pending un-synced reconciliations (sync_status === 0).
+   */
+  getUnsyncedReconciliations(businessId = null) {
+    const store = this.currentStore || {};
+    const targetBizId = businessId ? String(businessId) : null;
+    const list = Array.isArray(store.reconciliations) ? store.reconciliations : [];
+    return list.filter((r) =>
+      Number(r.sync_status !== undefined ? r.sync_status : r.syncStatus) === 0 &&
+      (!targetBizId || String(r.businessId || '1') === targetBizId)
+    );
+  }
+
+  /**
+   * Marks batch reconciliation IDs as synced (sync_status = 1).
+   */
+  async markReconciliationsSynced(businessId = null, ids = []) {
+    const idSet = new Set((Array.isArray(ids) ? ids : [ids]).map(String));
+    const store = this.currentStore || {};
+    const targetBizId = businessId ? String(businessId) : null;
+    let count = 0;
+    const nowIso = new Date().toISOString();
+    await this.mutateCollection('reconciliations', (list) => {
+      for (const item of list) {
+        const itemId = String(item._id !== undefined ? item._id : item.id);
+        if (idSet.has(itemId) && (!targetBizId || String(item.businessId || '1') === targetBizId)) {
+          item.sync_status = 1;
+          item.syncStatus = 1;
+          item.updateDate = nowIso;
+          count++;
+        }
+      }
+      return list;
+    });
+    return { success: true, count };
+  }
+
+  /**
+   * Retrieves Auto-Disbursement configuration for a business.
+   */
+  getAutoDisbursementConfig(businessId = null) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const configMap = (store.autoDisbursementConfig && typeof store.autoDisbursementConfig === 'object')
+      ? store.autoDisbursementConfig
+      : {};
+    const existing = configMap[targetBizId];
+    if (existing) {
+      return {
+        businessId: targetBizId,
+        isAutoDisbursementEnabled: false,
+        linkedBankAccountId: null,
+        minThresholdPaisa: 50000,
+        minThresholdTaka: 500.0,
+        payoutTime: '23:00',
+        preferInstant: false,
+        ...existing,
+      };
+    }
+    return {
+      businessId: targetBizId,
+      isAutoDisbursementEnabled: false,
+      linkedBankAccountId: null,
+      minThresholdPaisa: 50000,
+      minThresholdTaka: 500.0,
+      payoutTime: '23:00',
+      preferInstant: false,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Saves Auto-Disbursement configuration for a business.
+   */
+  async saveAutoDisbursementConfig(businessId = null, config = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const nowIso = new Date().toISOString();
+    let updatedConfig = null;
+
+    const res = await this.mutateStore((prevStore) => {
+      const prevMap = (prevStore.autoDisbursementConfig && typeof prevStore.autoDisbursementConfig === 'object')
+        ? prevStore.autoDisbursementConfig
+        : {};
+      const current = prevMap[targetBizId] || {
+        businessId: targetBizId,
+        isAutoDisbursementEnabled: false,
+        linkedBankAccountId: null,
+        minThresholdPaisa: 50000,
+        minThresholdTaka: 500.0,
+        payoutTime: '23:00',
+        preferInstant: false,
+      };
+      const merged = {
+        ...current,
+        ...config,
+        businessId: targetBizId,
+        updatedAt: nowIso,
+      };
+      if (config.minThresholdPaisa !== undefined && config.minThresholdTaka === undefined) {
+        merged.minThresholdTaka = Number(config.minThresholdPaisa) / 100;
+      } else if (config.minThresholdTaka !== undefined && config.minThresholdPaisa === undefined) {
+        merged.minThresholdPaisa = Math.round(Number(config.minThresholdTaka) * 100);
+      }
+      updatedConfig = merged;
+      return {
+        ...prevStore,
+        autoDisbursementConfig: {
+          ...prevMap,
+          [targetBizId]: merged,
+        },
+      };
+    });
+
+    if (res && res.success !== false) {
+      return { success: true, config: updatedConfig };
+    }
+    return { success: false, error: res?.error || 'MUTATION_FAILED' };
+  }
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -7708,6 +8119,78 @@ async function markQrSettlementActionsSyncedRepo(businessId = null, ids = [], re
   return { success: false, count: 0 };
 }
 
+
+async function saveMerchantDisbursementRepo(businessId, disbursement, repo = defaultRepository) {
+  if (repo && typeof repo.saveMerchantDisbursement === 'function') {
+    return repo.saveMerchantDisbursement(businessId, disbursement);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getMerchantDisbursementsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantDisbursements === 'function') {
+    return repo.getMerchantDisbursements(businessId, options);
+  }
+  return { items: [], disbursements: [], totalCount: 0, totalAmount: 0, totalAmountPaisa: 0, offset: 0, limit: 50, hasMore: false };
+}
+
+function getDisbursementByIdRepo(businessId = null, id = null, repo = defaultRepository) {
+  if (repo && typeof repo.getDisbursementById === 'function') {
+    return repo.getDisbursementById(businessId, id);
+  }
+  return null;
+}
+
+async function saveReconciliationRepo(businessId, reconData, repo = defaultRepository) {
+  if (repo && typeof repo.saveReconciliation === 'function') {
+    return repo.saveReconciliation(businessId, reconData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getReconciliationsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getReconciliations === 'function') {
+    return repo.getReconciliations(businessId, options);
+  }
+  return { items: [], reconciliations: [], totalCount: 0, offset: 0, limit: 50, hasMore: false };
+}
+
+function getUnsyncedReconciliationsRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedReconciliations === 'function') {
+    return repo.getUnsyncedReconciliations(businessId);
+  }
+  return [];
+}
+
+async function markReconciliationsSyncedRepo(businessId = null, ids = [], repo = defaultRepository) {
+  if (repo && typeof repo.markReconciliationsSynced === 'function') {
+    return repo.markReconciliationsSynced(businessId, ids);
+  }
+  return { success: false, count: 0 };
+}
+
+function getAutoDisbursementConfigRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getAutoDisbursementConfig === 'function') {
+    return repo.getAutoDisbursementConfig(businessId);
+  }
+  return {
+    businessId: String(businessId || '1'),
+    isAutoDisbursementEnabled: false,
+    linkedBankAccountId: null,
+    minThresholdPaisa: 50000,
+    minThresholdTaka: 500.0,
+    payoutTime: '23:00',
+    preferInstant: false,
+  };
+}
+
+async function saveAutoDisbursementConfigRepo(businessId = null, config = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveAutoDisbursementConfig === 'function') {
+    return repo.saveAutoDisbursementConfig(businessId, config);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -7843,6 +8326,15 @@ const repoExport = {
   getQrSettlementActions: getQrSettlementActionsRepo,
   getSettlementActionByTxnNumber: getSettlementActionByTxnNumberRepo,
   markQrSettlementActionsSynced: markQrSettlementActionsSyncedRepo,
+  saveMerchantDisbursement: saveMerchantDisbursementRepo,
+  getMerchantDisbursements: getMerchantDisbursementsRepo,
+  getDisbursementById: getDisbursementByIdRepo,
+  saveReconciliation: saveReconciliationRepo,
+  getReconciliations: getReconciliationsRepo,
+  getUnsyncedReconciliations: getUnsyncedReconciliationsRepo,
+  markReconciliationsSynced: markReconciliationsSyncedRepo,
+  getAutoDisbursementConfig: getAutoDisbursementConfigRepo,
+  saveAutoDisbursementConfig: saveAutoDisbursementConfigRepo,
   sanitizeState: sanitizeStateRepo,
   default: defaultRepository,
 };
@@ -7985,6 +8477,15 @@ if (typeof exports !== 'undefined') {
   exports.getQrSettlementActions = getQrSettlementActionsRepo;
   exports.getSettlementActionByTxnNumber = getSettlementActionByTxnNumberRepo;
   exports.markQrSettlementActionsSynced = markQrSettlementActionsSyncedRepo;
+  exports.saveMerchantDisbursement = saveMerchantDisbursementRepo;
+  exports.getMerchantDisbursements = getMerchantDisbursementsRepo;
+  exports.getDisbursementById = getDisbursementByIdRepo;
+  exports.saveReconciliation = saveReconciliationRepo;
+  exports.getReconciliations = getReconciliationsRepo;
+  exports.getUnsyncedReconciliations = getUnsyncedReconciliationsRepo;
+  exports.markReconciliationsSynced = markReconciliationsSyncedRepo;
+  exports.getAutoDisbursementConfig = getAutoDisbursementConfigRepo;
+  exports.saveAutoDisbursementConfig = saveAutoDisbursementConfigRepo;
   exports.sanitizeState = sanitizeStateRepo;
   exports.default = defaultRepository;
 }

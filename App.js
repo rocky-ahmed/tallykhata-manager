@@ -1181,6 +1181,18 @@ function TallyKhataApp() {
   const [soundboxTtsChecked, setSoundboxTtsChecked] = useState(true);
   const [soundboxVoicePreviewText, setSoundboxVoicePreviewText] = useState('');
   const [soundboxVoicePreviewPlaying, setSoundboxVoicePreviewPlaying] = useState(false);
+  // --- ITERATION 230: TALLYPAY SETTLEMENT HISTORY & AUTO-DISBURSEMENT ---
+  const [modalSettlementHistory, setModalSettlementHistory] = useState(false);
+  const [modalAutoDisbursementSettings, setModalAutoDisbursementSettings] = useState(false);
+  const [settlementDateFilter, setSettlementDateFilter] = useState('ALL'); // 'ALL' | 'TODAY' | 'YESTERDAY' | 'THIS_WEEK' | 'THIS_MONTH'
+  const [autoDisbursementConfig, setAutoDisbursementConfig] = useState({
+    enabled: false,
+    minThreshold: 500,
+    bankAccountId: null,
+    schedule: '00:00',
+    preferInstant: true,
+  });
+  const [settlementHistoryList, setSettlementHistoryList] = useState([]);
 
   const [modalBackupRestore, setModalBackupRestore] = useState(false);
   const [modalInbox, setModalInbox] = useState(false);
@@ -2474,6 +2486,14 @@ function TallyKhataApp() {
         setModalAddMfsAccount(false);
         return true;
       }
+      if (modalAutoDisbursementSettings) {
+        setModalAutoDisbursementSettings(false);
+        return true;
+      }
+      if (modalSettlementHistory) {
+        setModalSettlementHistory(false);
+        return true;
+      }
       if (showSoundboxSettingsModal) {
         setShowSoundboxSettingsModal(false);
         setSoundboxVoicePreviewPlaying(false);
@@ -2591,7 +2611,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -5141,6 +5161,81 @@ function TallyKhataApp() {
 
 
     // =========================================================================
+  // SETTLEMENT HISTORY & AUTO-DISBURSEMENT HANDLERS (Iteration 230)
+  // =========================================================================
+  const handleOpenSettlementHistory = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSettlementDateFilter('ALL');
+    try {
+      if (storageRepository && typeof storageRepository.getMerchantDisbursements === 'function') {
+        const res = storageRepository.getMerchantDisbursements(activeBusinessId);
+        setSettlementHistoryList(res.disbursements || res.items || []);
+      }
+    } catch (e) {
+      console.warn('Error fetching disbursements:', e);
+    }
+    setModalSettlementHistory(true);
+  };
+
+  const handleCloseSettlementHistory = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalSettlementHistory(false);
+  };
+
+  const handleOpenAutoDisbursementSettings = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    try {
+      if (storageRepository && typeof storageRepository.getAutoDisbursementConfig === 'function') {
+        const cfg = storageRepository.getAutoDisbursementConfig(activeBusinessId);
+        if (cfg) {
+          setAutoDisbursementConfig({
+            enabled: !!cfg.isAutoDisbursementEnabled,
+            minThreshold: cfg.minThresholdTaka || 500,
+            bankAccountId: cfg.linkedBankAccountId || null,
+            schedule: cfg.payoutTime || '00:00',
+            preferInstant: cfg.preferInstant !== false,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading auto-disbursement config:', e);
+    }
+    setModalAutoDisbursementSettings(true);
+  };
+
+  const handleCloseAutoDisbursementSettings = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalAutoDisbursementSettings(false);
+  };
+
+  const handleToggleAutoDisbursement = (val) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setAutoDisbursementConfig(prev => ({ ...prev, enabled: val }));
+  };
+
+  const handleSaveAutoDisbursementConfig = async () => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      if (storageRepository && typeof storageRepository.saveAutoDisbursementConfig === 'function') {
+        await storageRepository.saveAutoDisbursementConfig(activeBusinessId, {
+          isAutoDisbursementEnabled: autoDisbursementConfig.enabled,
+          minThresholdTaka: Number(autoDisbursementConfig.minThreshold) || 500,
+          minThresholdPaisa: Math.round((Number(autoDisbursementConfig.minThreshold) || 500) * 100),
+          linkedBankAccountId: autoDisbursementConfig.bankAccountId,
+          payoutTime: autoDisbursementConfig.schedule || '00:00',
+          preferInstant: autoDisbursementConfig.preferInstant !== false,
+        });
+      }
+      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+      Alert.alert(t('auto_disbursement'), tStatic("অটো-ডিসবার্সমেন্ট সেটিংস সংরক্ষিত হয়েছে।"));
+      handleCloseAutoDisbursementSettings();
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to save settings');
+    }
+  };
+
+
+  // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
   // =========================================================================
   const handleOpenSoundboxSettings = () => {
@@ -6324,6 +6419,27 @@ function TallyKhataApp() {
       filteredBillersList,
       billPaymentService,
       storageRepository,
+    };
+
+    global.__SETTLEMENT_HISTORY_TEST_HOOKS__ = {
+      modalSettlementHistory,
+      setModalSettlementHistory,
+      modalAutoDisbursementSettings,
+      setModalAutoDisbursementSettings,
+      settlementDateFilter,
+      setSettlementDateFilter,
+      autoDisbursementConfig,
+      setAutoDisbursementConfig,
+      settlementHistoryList,
+      setSettlementHistoryList,
+      handleOpenSettlementHistory,
+      handleCloseSettlementHistory,
+      handleOpenAutoDisbursementSettings,
+      handleCloseAutoDisbursementSettings,
+      handleToggleAutoDisbursement,
+      handleSaveAutoDisbursementConfig,
+      storageRepository,
+      tallyPayService,
     };
 
     global.__TXN_HISTORY_TEST_HOOKS__ = {
@@ -10010,6 +10126,68 @@ accessibilityLabel={
               </View>
             </TouchableOpacity>
 
+            {/* Quick Action: Settlement History (Iteration 230) */}
+            <TouchableOpacity
+              style={[styles.analyticsTallypayBanner, { marginTop: 8 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+              onPress={handleOpenSettlementHistory}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('settlement_history')}
+              testID="tp_settlement_history_btn"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: isDark ? '#064E3B' : '#D1FAE5', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  <Text style={{ fontSize: 18 }}>📜</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('settlement_history')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    {t('gross_amount')} • {t('net_payout')} • {t('settlement_fee')}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#A7F3D0' : '#0D6E5C', marginRight: 4 }}>
+                  {tStatic("দেখুন")}
+                </Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 12, height: 12, tintColor: isDark ? '#A7F3D0' : '#0D6E5C' }} resizeMode="contain" />
+              </View>
+            </TouchableOpacity>
+
+            {/* Quick Action: Daily Auto-Disbursement (Iteration 230) */}
+            <TouchableOpacity
+              style={[styles.analyticsTallypayBanner, { marginTop: 8 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+              onPress={handleOpenAutoDisbursementSettings}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('auto_disbursement')}
+              testID="tp_auto_disbursement_settings_btn"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: isDark ? '#1E3A8A' : '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  <Text style={{ fontSize: 18 }}>🏦</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('auto_disbursement')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    {autoDisbursementConfig.enabled ? t('auto_disbursement_enabled') : t('auto_disbursement_disabled')}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#93C5FD' : '#2563EB', marginRight: 4 }}>
+                  {tStatic("সেটিংস")}
+                </Text>
+                <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 12, height: 12, tintColor: isDark ? '#93C5FD' : '#2563EB' }} resizeMode="contain" />
+              </View>
+            </TouchableOpacity>
+
             {/* Wallet Transaction History */}
             <View style={{ paddingHorizontal: 12, marginTop: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -10160,6 +10338,38 @@ accessibilityLabel={
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('transaction_statement')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{tStatic("মোট ")}{walletTxns.length}{tStatic(" টি ওয়ালেট লেনদেন")}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenSettlementHistory}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('settlement_history')}
+                testID="menu_tp_settlement_history_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_reports.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('settlement_history')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('gross_amount')} • {t('net_payout')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenAutoDisbursementSettings}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('auto_disbursement')}
+                testID="menu_tp_auto_disbursement_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_bank.png')} variant="success" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('auto_disbursement')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{autoDisbursementConfig.enabled ? t('auto_disbursement_enabled') : t('auto_disbursement_disabled')}</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
@@ -19408,6 +19618,379 @@ accessibilityLabel={
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: TALLYPAY SETTLEMENT HISTORY (Iteration 230)
+         =================================================================== */}
+      <Modal
+        visible={modalSettlementHistory}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseSettlementHistory}
+        testID="modal_settlement_history"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseSettlementHistory}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_settlement_history"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Image source={require('./assets/icons/arrow_left.png')} style={styles.thBackIcon} resizeMode="contain" />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.thHeaderTitle}>{t('settlement_history')}</Text>
+              <Text style={styles.thHeaderSub}>{tStatic("পেমেন্ট ও দৈনিক ডিসবার্সমেন্ট ইতিহাস")}</Text>
+            </View>
+          </View>
+
+          {/* Filter Chips */}
+          <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {[
+                { id: 'ALL', label: tStatic('সব'), testID: 'filter_settlement_all' },
+                { id: 'TODAY', label: tStatic('আজকে'), testID: 'filter_settlement_today' },
+                { id: 'YESTERDAY', label: tStatic('গতকাল'), testID: 'filter_settlement_yesterday' },
+                { id: 'THIS_WEEK', label: tStatic('এই সপ্তাহে'), testID: 'filter_settlement_this_week' },
+                { id: 'THIS_MONTH', label: tStatic('এই মাসে'), testID: 'filter_settlement_this_month' },
+              ].map(f => {
+                const isActive = settlementDateFilter === f.id;
+                return (
+                  <TouchableOpacity
+                    key={f.id}
+                    onPress={() => {
+                      try { hapticFeedbackService.selection(); } catch (e) {}
+                      setSettlementDateFilter(f.id);
+                    }}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 7,
+                      borderRadius: 20,
+                      backgroundColor: isActive ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                      marginRight: 8,
+                    }}
+                    testID={f.testID}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? '#FFFFFF' : (isDark ? '#CBD5E1' : '#475569') }}>
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 46 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* 3 Prominent KPI Summary Cards */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+              {/* Card 1: Gross Amount */}
+              <View style={[styles.bmCard, { flex: 1, marginRight: 6, padding: 12, alignItems: 'center' }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 4 }}>
+                  {t('gross_amount')}
+                </Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  ৳ {toBengaliNumerals(settlementHistoryList.reduce((acc, cur) => acc + (Number(cur.amountTaka || cur.grossAmount || cur.amount || 0)), 0).toFixed(0))}
+                </Text>
+              </View>
+
+              {/* Card 2: Fee / Charge */}
+              <View style={[styles.bmCard, { flex: 1, marginHorizontal: 3, padding: 12, alignItems: 'center' }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 4 }}>
+                  {t('settlement_fee')}
+                </Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: COLORS.red }}>
+                  ৳ {toBengaliNumerals(settlementHistoryList.reduce((acc, cur) => acc + (Number(cur.convenienceFee || cur.fee || 0)), 0).toFixed(0))}
+                </Text>
+              </View>
+
+              {/* Card 3: Net Payout */}
+              <View style={[styles.bmCard, { flex: 1, marginLeft: 6, padding: 12, alignItems: 'center' }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 4 }}>
+                  {t('net_payout')}
+                </Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: COLORS.green }}>
+                  ৳ {toBengaliNumerals(settlementHistoryList.reduce((acc, cur) => acc + (Number(cur.netDisbursedTaka || cur.netAmount || (cur.amountTaka || 0) - (cur.convenienceFee || 0))), 0).toFixed(0))}
+                </Text>
+              </View>
+            </View>
+
+            {/* List / Empty State */}
+            {settlementHistoryList.length === 0 ? (
+              <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }} testID="empty_settlement_history">
+                <Text style={{ fontSize: 40, marginBottom: 12 }}>📜</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  {tStatic("কোনো সেটেলমেন্ট ইতিহাস নেই")}
+                </Text>
+                <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 4, textAlign: 'center' }}>
+                  {tStatic("দৈনিক কালেকশন ও ব্যাংক ট্রান্সফার এখানে দেখতে পাবেন।")}
+                </Text>
+              </View>
+            ) : (
+              settlementHistoryList.map((item, idx) => {
+                const isCompleted = (item.status || 'COMPLETED').toUpperCase() === 'COMPLETED';
+                const isProcessing = (item.status || '').toUpperCase() === 'PROCESSING' || (item.status || '').toUpperCase() === 'PENDING';
+                const pillBg = isCompleted ? '#D1FAE5' : (isProcessing ? '#FEF3C7' : '#FEE2E2');
+                const pillColor = isCompleted ? '#0D6E5C' : (isProcessing ? '#78350F' : '#991B1B');
+                const statusLabel = isCompleted ? t('settlement_status_completed') : (isProcessing ? t('settlement_status_processing') : t('settlement_status_failed'));
+                const netAmount = Number(item.netDisbursedTaka || item.netAmount || item.amountTaka || item.amount || 0);
+                const grossAmount = Number(item.amountTaka || item.grossAmount || item.amount || 0);
+                const fee = Number(item.convenienceFee || item.fee || 0);
+
+                return (
+                  <View
+                    key={item.id || item.disbursementId || ('disb_' + idx)}
+                    style={[styles.bmCard, { marginBottom: 10, padding: 14 }, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+                    testID={'settlement_history_item_' + (item.id || idx)}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 20, marginRight: 8 }}>🏦</Text>
+                        <View>
+                          <Text style={[styles.bmAccName, isDark && { color: currentTheme.textPrimary }]}>
+                            {item.bankName || item.channel || tStatic("ব্যাংক ট্রান্সফার")}
+                          </Text>
+                          <Text style={[styles.bmBankMeta, isDark && { color: currentTheme.textSecondary }]}>
+                            {item.transferMode || 'NPSB'} • {item.accountNumber || item.accountNo || '****'}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={{ backgroundColor: pillBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: pillColor }}>
+                          {statusLabel}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ borderTopWidth: 1, borderTopColor: isDark ? '#334155' : '#E2E8F0', paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View>
+                        <Text style={{ fontSize: 10, color: '#64748B' }}>
+                          ID: {item.disbursementId || item.transactionNumber || ('TKDISB' + idx)}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: '#64748B' }}>
+                          {t('settlement_fee')}: ৳ {toBengaliNumerals(fee.toFixed(0))}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 15, fontWeight: 'bold', color: COLORS.green }}>
+                          ৳ {toBengaliNumerals(netAmount.toFixed(0))}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: '#64748B' }}>
+                          {t('gross_amount')}: ৳ {toBengaliNumerals(grossAmount.toFixed(0))}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL: TALLYPAY AUTO-DISBURSEMENT SETTINGS (Iteration 230)
+         =================================================================== */}
+      <Modal
+        visible={modalAutoDisbursementSettings}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseAutoDisbursementSettings}
+        testID="modal_auto_disbursement_settings"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseAutoDisbursementSettings}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_auto_disbursement_settings"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Image source={require('./assets/icons/arrow_left.png')} style={styles.thBackIcon} resizeMode="contain" />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.thHeaderTitle}>{t('auto_disbursement')}</Text>
+              <Text style={styles.thHeaderSub}>{t('auto_disbursement_desc')}</Text>
+            </View>
+          </View>
+
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 46 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Master Toggle Card */}
+            <View style={[styles.soundboxSectionCard, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    🏦 {t('auto_disbursement')}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 3 }}>
+                    {t('auto_disbursement_desc')}
+                  </Text>
+                  <View style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: autoDisbursementConfig.enabled ? '#D1FAE5' : '#F1F5F9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: autoDisbursementConfig.enabled ? '#0D6E5C' : '#64748B' }}>
+                      {autoDisbursementConfig.enabled ? t('auto_disbursement_enabled') : t('auto_disbursement_disabled')}
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={autoDisbursementConfig.enabled}
+                  onValueChange={handleToggleAutoDisbursement}
+                  trackColor={{ false: '#CBD5E1', true: '#A7F3D0' }}
+                  thumbColor={autoDisbursementConfig.enabled ? '#0D6E5C' : '#F1F5F9'}
+                  testID="toggle_auto_disbursement"
+                />
+              </View>
+            </View>
+
+            {/* Bank Account Selector */}
+            <View style={[styles.soundboxSectionCard, { marginTop: 14 }, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 8 }}>
+                💳 {t('select_payout_bank')}
+              </Text>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                testID="select_disbursement_bank"
+                accessibilityRole="button"
+                accessibilityLabel={t('select_payout_bank')}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, marginRight: 8 }}>🏦</Text>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                      {tStatic("সংযুক্ত ব্যাংক একাউন্ট")}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                      {tStatic("ইসলামী ব্যাংক বাংলাদেশ লিমিটেড (**** 4521)")}
+                    </Text>
+                  </View>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={{ width: 14, height: 14, tintColor: isDark ? '#94A3B8' : '#64748B' }} resizeMode="contain" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Minimum Threshold Input */}
+            <View style={[styles.soundboxSectionCard, { marginTop: 14 }, isDark && { backgroundColor: currentTheme.surfaceContainer, borderColor: currentTheme.cardBorder }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 4 }}>
+                💰 {t('min_disbursement_threshold')}
+              </Text>
+              <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 8 }}>
+                {tStatic("ব্যালেন্স এই পরিমাণের বেশি হলে স্বয়ংক্রিয় ট্রান্সফার হবে")}
+              </Text>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                borderWidth: 1,
+                borderColor: isDark ? '#334155' : '#CBD5E1',
+                borderRadius: 8,
+                paddingHorizontal: 12,
+              }}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginRight: 6 }}>৳</Text>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    height: 48,
+                    fontSize: 15,
+                    fontWeight: 'bold',
+                    color: isDark ? currentTheme.textPrimary : '#1E293B',
+                  }}
+                  value={String(autoDisbursementConfig.minThreshold || 500)}
+                  onChangeText={(val) => setAutoDisbursementConfig(prev => ({ ...prev, minThreshold: val }))}
+                  keyboardType="numeric"
+                  testID="input_min_threshold"
+                  accessibilityLabel={t('min_disbursement_threshold')}
+                />
+              </View>
+            </View>
+
+            {/* Schedule Summary Card */}
+            <View
+              style={[styles.soundboxSectionCard, { marginTop: 14, backgroundColor: isDark ? '#1E293B' : '#EFF6FF', borderColor: '#BFDBFE' }]}
+              testID="card_disbursement_schedule"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 18, marginRight: 8 }}>⏰</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#93C5FD' : '#1D4ED8' }}>
+                    {tStatic("ডিসবার্সমেন্ট শিডিউল")}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? '#CBD5E1' : '#1E40AF', marginTop: 2 }}>
+                    {t('disbursement_schedule')}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Transfer Mode Status & Notice Card */}
+            <View
+              style={[styles.soundboxSectionCard, { marginTop: 14, backgroundColor: isDark ? '#1E293B' : '#FEF3C7', borderColor: '#FDE68A' }]}
+              testID="card_transfer_mode_notice"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <Text style={{ fontSize: 18, marginRight: 8 }}>ℹ️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#FCD34D' : '#92400E' }}>
+                    {t('instant_transfer_npsb')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? '#E2E8F0' : '#78350F', marginTop: 3, lineHeight: 16 }}>
+                    {t('instant_transfer_unavailable_notice')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? '#CBD5E1' : '#92400E', marginTop: 4, fontWeight: '600' }}>
+                    {t('beftn_delivery_notice')}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Save Button */}
+            <TouchableOpacity
+              style={[
+                styles.bmSubmitBtn,
+                { backgroundColor: '#0D6E5C', minHeight: 48, marginTop: 20 }
+              ]}
+              onPress={handleSaveAutoDisbursementConfig}
+              activeOpacity={0.8}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("সংরক্ষণ করুন")}
+              testID="btn_save_auto_disbursement"
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>
+                💾 {tStatic("সংরক্ষণ করুন")}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
 
       {/* MODAL: BATCH TAGADA RESULT */}

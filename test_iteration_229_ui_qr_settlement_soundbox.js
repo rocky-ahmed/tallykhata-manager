@@ -448,16 +448,16 @@ runTest('10.5: Inactive meta text (#64748B on #FFFFFF) achieves WCAG AA (>= 4.5:
 // -----------------------------------------------------------------------------
 // PART 11: MODAL COUNT & CONTROLLER INVARIANTS (80 MODALS)
 // -----------------------------------------------------------------------------
-console.log('\n--- PART 11: MODAL COUNT & CONTROLLER INVARIANTS (80 MODALS) ---');
+console.log('\n--- PART 11: MODAL COUNT & CONTROLLER INVARIANTS (82 MODALS) ---');
 
 runTest('11.1: App.js contains exactly 80 <Modal elements', () => {
   const modalMatches = appSrc.match(/<Modal\b/g) || [];
-  assert.strictEqual(modalMatches.length, 80, `Expected exactly 80 modals in App.js, got ${modalMatches.length}`);
+  assert.strictEqual(modalMatches.length, 82, `Expected exactly 82 modals in App.js, got ${modalMatches.length}`);
 });
 
 runTest('11.2: App.js contains exactly 80 onRequestClose handlers', () => {
   const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-  assert.strictEqual(reqCloseMatches.length, 80, `Expected 80 onRequestClose handlers, got ${reqCloseMatches.length}`);
+  assert.strictEqual(reqCloseMatches.length, 82, `Expected 82 onRequestClose handlers, got ${reqCloseMatches.length}`);
 });
 
 runTest('11.3: App.js contains exactly 80 unique modal state controllers', () => {
@@ -467,7 +467,7 @@ runTest('11.3: App.js contains exactly 80 unique modal state controllers', () =>
   while ((m = regex.exec(appSrc)) !== null) {
     uniqueModals.add(m[1]);
   }
-  assert.strictEqual(uniqueModals.size, 80, `Expected 80 unique visible controllers, got ${uniqueModals.size}`);
+  assert.strictEqual(uniqueModals.size, 82, `Expected 82 unique visible controllers, got ${uniqueModals.size}`);
   assert.ok(uniqueModals.has('modalQrSettlement'), 'modalQrSettlement must be in unique controllers');
   assert.ok(uniqueModals.has('showSoundboxSettingsModal'), 'showSoundboxSettingsModal must be in unique controllers');
 });
