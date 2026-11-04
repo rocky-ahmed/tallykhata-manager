@@ -51,6 +51,20 @@ try {
   tallyPayService = require('./tallyPayService');
 } catch (e) {}
 
+const {
+  BALANCE_CHANGE_TYPES: TP_BALANCE_CHANGE_TYPES,
+  TXN_STATUSES: TP_TXN_STATUSES,
+  TXN_INCOMING_OUTGOING_FILTERS: TP_TXN_FILTERS,
+  TRANSACTION_TYPES: TP_TRANSACTION_TYPES,
+  formatTransactionStatementItem,
+  queryWalletTransactions,
+  calculateMonthlyTransactionSummary,
+  generateTransactionReceiptDetails,
+  generateShareText,
+  TransactionHistoryEngine,
+  transactionHistoryEngine,
+} = tallyPayService || {};
+
 let soundboxService = null;
 try {
   soundboxService = require('./soundboxService');
@@ -212,6 +226,7 @@ const VALID_COLLECTIONS = new Set([
   'soundboxLogs',
   'billPaymentTransactions',
   'savedBillers',
+  'tallyPayTransactions',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -327,6 +342,20 @@ function migrateLegacySampleCustomerNames(accounts) {
     return acc;
   });
   return { accounts: updatedAccounts, changed };
+}
+
+function sanitizeState(state) {
+  if (!state || typeof state !== 'object') return createDefaultState();
+  const s = { ...state };
+  if (!Array.isArray(s.tallyPayTransactions)) s.tallyPayTransactions = [];
+  if (!Array.isArray(s.billPaymentTransactions)) s.billPaymentTransactions = [];
+  if (!Array.isArray(s.savedBillers)) s.savedBillers = [];
+  if (!Array.isArray(s.banglaQrTransactions)) s.banglaQrTransactions = [];
+  if (!Array.isArray(s.tallyPayAddMoneyTxns)) s.tallyPayAddMoneyTxns = [];
+  if (!Array.isArray(s.accounts)) s.accounts = [];
+  if (!Array.isArray(s.journals)) s.journals = [];
+  if (!Array.isArray(s.businesses)) s.businesses = DEFAULT_BUSINESSES;
+  return s;
 }
 
 function createDefaultState() {
@@ -452,6 +481,7 @@ function createDefaultState() {
     soundboxDeviceSettings: {},
     billPaymentTransactions: [],
     savedBillers: [],
+    tallyPayTransactions: [],
     version: 6,
   };
 }
@@ -1539,6 +1569,15 @@ class StorageRepository {
       authoritative.savedBillers = [];
     }
 
+    if (authoritative.tallyPayTransactions && Array.isArray(authoritative.tallyPayTransactions)) {
+      authoritative.tallyPayTransactions = authoritative.tallyPayTransactions.map((tx) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, ...rest } = tx || {};
+        return rest;
+      });
+    } else {
+      authoritative.tallyPayTransactions = [];
+    }
+
     const domains = (extraState && Array.isArray(extraState.domains) && extraState.domains.length > 0)
       ? extraState.domains
       : ['all'];
@@ -2077,6 +2116,7 @@ class StorageRepository {
         delete soundboxDeviceSettings[targetId];
         const billPaymentTransactions = (prevStore.billPaymentTransactions || []).filter((b) => getBizId(b) !== targetId);
         const savedBillers = (prevStore.savedBillers || []).filter((s) => getBizId(s) !== targetId);
+        const tallyPayTransactions = (prevStore.tallyPayTransactions || []).filter((t) => getBizId(t) !== targetId);
 
       // Clean up physical audio files of deleted business
       if (audioNoteService && typeof audioNoteService.deleteAudioFile === 'function') {
@@ -2155,6 +2195,7 @@ class StorageRepository {
         soundboxDeviceSettings,
         billPaymentTransactions,
         savedBillers,
+        tallyPayTransactions,
         cashReconciliation,
       };
     });
@@ -2284,7 +2325,7 @@ class StorageRepository {
       }
 
       // If selective business restore is requested
-      const selectedBizId = options && options.selectedBusinessId ? String(options.selectedBusinessId) : null;
+      const selectedBizId = options && (options.selectedBusinessId || options.targetBusinessId || options.businessId) ? String(options.selectedBusinessId || options.targetBusinessId || options.businessId) : null;
       if (selectedBizId) {
         const importedAccounts = (data.accounts || []).filter(a => String(a.businessId || '1') === selectedBizId);
         const importedJournals = (data.journals || []).filter(j => String(j.businessId || '1') === selectedBizId);
@@ -2303,6 +2344,7 @@ class StorageRepository {
           const importedBanglaQr = (data.banglaQrTransactions || []).filter(b => String(b.businessId || '1') === selectedBizId);
           const importedBillPayments = (data.billPaymentTransactions || []).filter(b => String(b.businessId || '1') === selectedBizId);
           const importedSavedBillers = (data.savedBillers || []).filter(s => String(s.businessId || '1') === selectedBizId);
+          const importedTallyPay = (data.tallyPayTransactions || []).filter(t => String(t.businessId || '1') === selectedBizId);
 
         const keptAccounts = (prevStore.accounts || []).filter(a => String(a.businessId || '1') !== selectedBizId);
         const keptJournals = (prevStore.journals || []).filter(j => String(j.businessId || '1') !== selectedBizId);
@@ -2315,6 +2357,7 @@ class StorageRepository {
           const keptBanglaQr = (prevStore.banglaQrTransactions || []).filter(b => String(b.businessId || '1') !== selectedBizId);
           const keptBillPayments = (prevStore.billPaymentTransactions || []).filter(b => String(b.businessId || '1') !== selectedBizId);
           const keptSavedBillers = (prevStore.savedBillers || []).filter(s => String(s.businessId || '1') !== selectedBizId);
+          const keptTallyPay = (prevStore.tallyPayTransactions || []).filter(t => String(t.businessId || '1') !== selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2347,6 +2390,7 @@ class StorageRepository {
             banglaQrTransactions: [...keptBanglaQr, ...importedBanglaQr],
             billPaymentTransactions: [...keptBillPayments, ...importedBillPayments],
             savedBillers: [...keptSavedBillers, ...importedSavedBillers],
+          tallyPayTransactions: [...keptTallyPay, ...importedTallyPay],
           version: 6,
           lastRestoredAt: new Date().toISOString(),
           restoredFromOwner: manifest && manifest.backupOwner ? manifest.backupOwner.sub : null,
@@ -2387,6 +2431,7 @@ class StorageRepository {
         tallyMessageBalance: activeRestoredQuota.purchasedSmsCount !== undefined ? activeRestoredQuota.purchasedSmsCount : (data.tallyMessageBalance ?? 50),
         billPaymentTransactions: Array.isArray(data.billPaymentTransactions) ? data.billPaymentTransactions : [],
         savedBillers: Array.isArray(data.savedBillers) ? data.savedBillers : [],
+        tallyPayTransactions: Array.isArray(data.tallyPayTransactions) ? data.tallyPayTransactions : [],
         inventory: restoredInventory,
         stock: restoredInventory,
         pinEnabled: false,
@@ -6053,6 +6098,105 @@ class StorageRepository {
   getBillReceiptList(businessId = null, options = {}) {
     return this.getBillPaymentTransactions(businessId, options);
   }
+
+  /**
+   * Logs a TallyPay digital transaction atomically.
+   */
+  async logTallyPayTransaction(businessId, txnData, options = {}) {
+    if (!txnData || typeof txnData !== 'object') {
+      return { success: false, error: 'INVALID_TRANSACTION_PAYLOAD' };
+    }
+
+    const bizId = String(businessId || options.businessId || txnData.businessId || this.currentStore?.activeBusinessId || '1');
+    const normalizer = (tallyPayService && typeof tallyPayService.formatTransactionStatementItem === 'function')
+      ? tallyPayService.formatTransactionStatementItem
+      : formatTransactionStatementItem;
+
+    const normalizedTxn = normalizer ? normalizer({ ...txnData, businessId: bizId }) : { ...txnData, businessId: bizId };
+    if (!normalizedTxn) {
+      return { success: false, error: 'NORMALIZATION_FAILED' };
+    }
+
+    const res = await this.mutateCollection('tallyPayTransactions', (list) => {
+      const existingIndex = list.findIndex(
+        (l) => String(l.id) === String(normalizedTxn.id) || String(l.transactionNumber) === String(normalizedTxn.transactionNumber)
+      );
+      if (existingIndex >= 0) {
+        const updated = [...list];
+        updated[existingIndex] = normalizedTxn;
+        return updated;
+      }
+      return [normalizedTxn, ...list];
+    });
+
+    if (res.success) {
+      return { success: true, transaction: normalizedTxn };
+    }
+    return { success: false, error: res.error };
+  }
+
+  /**
+   * Retrieves TallyPay digital transactions for a given business with filters & pagination.
+   */
+  getTallyPayTransactions(businessId = null, options = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const queryFn = (tallyPayService && typeof tallyPayService.queryWalletTransactions === 'function')
+      ? tallyPayService.queryWalletTransactions
+      : queryWalletTransactions;
+
+    if (queryFn) {
+      return queryFn(store, { ...options, businessId: targetBizId });
+    }
+
+    const list = Array.isArray(store.tallyPayTransactions) ? store.tallyPayTransactions : [];
+    const items = list.filter((t) => String(t.businessId || '1') === targetBizId);
+    return {
+      items,
+      transactions: items,
+      totalCount: items.length,
+      offset: 0,
+      limit: 20,
+      hasMore: false,
+    };
+  }
+
+  /**
+   * Retrieves a specific TallyPay transaction by transactionNumber or ID.
+   */
+  getTallyPayTransactionById(businessId = null, txnId = null) {
+    if (!txnId) return null;
+    const res = this.getTallyPayTransactions(businessId, { limit: 100000 });
+    const target = String(txnId).trim();
+    return (res.items || []).find((tx) =>
+      String(tx.transactionNumber) === target ||
+      String(tx.id) === target ||
+      String(tx.txnNumber) === target ||
+      String(tx.transactionId) === target
+    ) || null;
+  }
+
+  /**
+   * Calculates monthly summary report for TallyPay transactions matching TxnReport.
+   */
+  getTallyPayMonthlySummary(businessId = null, month = null) {
+    const res = this.getTallyPayTransactions(businessId, { limit: 100000 });
+    const summaryFn = (tallyPayService && typeof tallyPayService.calculateMonthlyTransactionSummary === 'function')
+      ? tallyPayService.calculateMonthlyTransactionSummary
+      : calculateMonthlyTransactionSummary;
+
+    if (summaryFn) {
+      return summaryFn(res.items || [], month);
+    }
+    return null;
+  }
+
+  /**
+   * Sanitizes in-memory state ensuring all collections are well-formed arrays.
+   */
+  sanitizeState(state) {
+    return sanitizeState(state || this.currentStore);
+  }
 }
 
 // ============================================================================
@@ -7026,6 +7170,39 @@ function getBillReceiptListRepo(businessId = null, options = {}, repo = defaultR
   return [];
 }
 
+async function logTallyPayTransactionRepo(businessId, txnData, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.logTallyPayTransaction === 'function') {
+    return repo.logTallyPayTransaction(businessId, txnData, options);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getTallyPayTransactionsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getTallyPayTransactions === 'function') {
+    return repo.getTallyPayTransactions(businessId, options);
+  }
+  return { items: [], transactions: [], totalCount: 0, offset: 0, limit: 20, hasMore: false };
+}
+
+function getTallyPayTransactionByIdRepo(businessId = null, txnId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getTallyPayTransactionById === 'function') {
+    return repo.getTallyPayTransactionById(businessId, txnId);
+  }
+  return null;
+}
+
+function getTallyPayMonthlySummaryRepo(businessId = null, month = null, repo = defaultRepository) {
+  if (repo && typeof repo.getTallyPayMonthlySummary === 'function') {
+    return repo.getTallyPayMonthlySummary(businessId, month);
+  }
+  return null;
+}
+
+function sanitizeStateRepo(state) {
+  return sanitizeState(state);
+}
+
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -7148,6 +7325,11 @@ const repoExport = {
   getSavedBillers: getSavedBillersRepo,
   deleteSavedBiller: deleteSavedBillerRepo,
   getBillReceiptList: getBillReceiptListRepo,
+  logTallyPayTransaction: logTallyPayTransactionRepo,
+  getTallyPayTransactions: getTallyPayTransactionsRepo,
+  getTallyPayTransactionById: getTallyPayTransactionByIdRepo,
+  getTallyPayMonthlySummary: getTallyPayMonthlySummaryRepo,
+  sanitizeState: sanitizeStateRepo,
   default: defaultRepository,
 };
 
@@ -7276,5 +7458,10 @@ if (typeof exports !== 'undefined') {
   exports.getSavedBillers = getSavedBillersRepo;
   exports.deleteSavedBiller = deleteSavedBillerRepo;
   exports.getBillReceiptList = getBillReceiptListRepo;
+  exports.logTallyPayTransaction = logTallyPayTransactionRepo;
+  exports.getTallyPayTransactions = getTallyPayTransactionsRepo;
+  exports.getTallyPayTransactionById = getTallyPayTransactionByIdRepo;
+  exports.getTallyPayMonthlySummary = getTallyPayMonthlySummaryRepo;
+  exports.sanitizeState = sanitizeStateRepo;
   exports.default = defaultRepository;
 }

@@ -52,6 +52,19 @@ import * as banglaQrModule from './src/banglaQrService';
 const banglaQrService = banglaQrModule.banglaQrService || banglaQrModule.default || banglaQrModule;
 import * as tallyPayModule from './src/tallyPayService';
 const tallyPayService = tallyPayModule.tallyPayService || tallyPayModule.default || tallyPayModule;
+const {
+  BALANCE_CHANGE_TYPES: TP_BALANCE_CHANGE_TYPES = tallyPayModule.BALANCE_CHANGE_TYPES,
+  TXN_STATUSES: TP_TXN_STATUSES = tallyPayModule.TXN_STATUSES,
+  TXN_INCOMING_OUTGOING_FILTERS: TP_TXN_FILTERS = tallyPayModule.TXN_INCOMING_OUTGOING_FILTERS,
+  TRANSACTION_TYPES: TP_TRANSACTION_TYPES = tallyPayModule.TRANSACTION_TYPES,
+  formatTransactionStatementItem: tpFormatTransactionStatementItem = tallyPayModule.formatTransactionStatementItem,
+  queryWalletTransactions: tpQueryWalletTransactions = tallyPayModule.queryWalletTransactions,
+  calculateMonthlyTransactionSummary: tpCalculateMonthlyTransactionSummary = tallyPayModule.calculateMonthlyTransactionSummary,
+  generateTransactionReceiptDetails: tpGenerateTransactionReceiptDetails = tallyPayModule.generateTransactionReceiptDetails,
+  generateShareText: tpGenerateShareText = tallyPayModule.generateShareText,
+  TransactionHistoryEngine: TP_TransactionHistoryEngine = tallyPayModule.TransactionHistoryEngine,
+  transactionHistoryEngine: tpTransactionHistoryEngine = tallyPayModule.transactionHistoryEngine,
+} = tallyPayModule;
 import * as soundboxModule from './src/soundboxService';
 const soundboxService = soundboxModule.soundboxService || soundboxModule.default || soundboxModule;
 const {
@@ -1093,6 +1106,14 @@ function TallyKhataApp() {
   const [billInquiryLoading, setBillInquiryLoading] = useState(false);
   const [billPaymentProcessing, setBillPaymentProcessing] = useState(false);
   const [savedBillersList, setSavedBillersList] = useState([]);
+  // --- ITERATION 227: TALLYPAY DIGITAL TRANSACTION HISTORY & RECEIPT EXPLORER ---
+  const [modalTransactionHistory, setModalTransactionHistory] = useState(false);
+  const [txnHistoryTab, setTxnHistoryTab] = useState('ALL'); // 'ALL' | 'SUMMARY'
+  const [txnHistoryFilter, setTxnHistoryFilter] = useState('ALL'); // 'ALL' | 'INCOMING' | 'OUTGOING'
+  const [txnSearchQuery, setTxnSearchQuery] = useState('');
+  const [selectedTxnForDetails, setSelectedTxnForDetails] = useState(null);
+  const [modalTpTransactionDetails, setModalTpTransactionDetails] = useState(false);
+
   const [modalBackupRestore, setModalBackupRestore] = useState(false);
   const [modalInbox, setModalInbox] = useState(false);
   const [modalSupport, setModalSupport] = useState(false);
@@ -2367,6 +2388,15 @@ function TallyKhataApp() {
       if (modalTallyMessage) { setModalTallyMessage(false); return true; }
       if (modalSoundboxSettings) { setModalSoundboxSettings(false); return true; }
       if (modalDigitalAnalytics) { setModalDigitalAnalytics(false); return true; }
+      if (modalTpTransactionDetails) {
+        setModalTpTransactionDetails(false);
+        setSelectedTxnForDetails(null);
+        return true;
+      }
+      if (modalTransactionHistory) {
+        setModalTransactionHistory(false);
+        return true;
+      }
       if (showSampleBillModal) { setShowSampleBillModal(false); return true; }
       if (modalBillPayment) {
         if (billPaymentStep === 'RECEIPT' || billPaymentStep === 'SUCCESS') {
@@ -2459,7 +2489,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -4529,6 +4559,144 @@ function TallyKhataApp() {
   }, [selectedBillerCategory, billerSearchQuery]);
 
   // =========================================================================
+  // ITERATION 227: TALLYPAY TRANSACTION HISTORY & RECEIPT EXPLORER HANDLERS
+  // =========================================================================
+  const handleOpenTransactionHistory = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setTxnHistoryTab('ALL');
+    setTxnHistoryFilter('ALL');
+    setTxnSearchQuery('');
+    setModalTransactionHistory(true);
+  };
+
+  const handleCloseTransactionHistory = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalTransactionHistory(false);
+  };
+
+  const handleOpenTxnDetails = (txn) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    let details = txn;
+    if (typeof tpGenerateTransactionReceiptDetails === 'function') {
+      try {
+        details = tpGenerateTransactionReceiptDetails(txn);
+      } catch (e) {
+        details = txn;
+      }
+    }
+    if (!details || !details.txnID) {
+      if (typeof tpFormatTransactionStatementItem === 'function') {
+        try {
+          details = tpFormatTransactionStatementItem(txn);
+        } catch (e) {}
+      }
+    }
+    setSelectedTxnForDetails(details || txn);
+    setModalTpTransactionDetails(true);
+  };
+
+  const handleCloseTxnDetails = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalTpTransactionDetails(false);
+    setSelectedTxnForDetails(null);
+  };
+
+  const handleDownloadTxnVoucher = () => {
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    const fileName = (selectedTxnForDetails && selectedTxnForDetails.voucherPdfName)
+      ? selectedTxnForDetails.voucherPdfName
+      : ('TK_TXN_' + (selectedTxnForDetails ? (selectedTxnForDetails.txnID || selectedTxnForDetails.transactionNumber || 'VOUCHER') : 'VOUCHER') + '.pdf');
+    Alert.alert(t('download_voucher'), tStatic("লেনদেন ভাউচার PDF ডাউনলোড হয়েছে:") + ' ' + fileName);
+  };
+
+  const handleShareTxnVoucher = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    if (selectedTxnForDetails && (selectedTxnForDetails.shareText || typeof tpGenerateShareText === 'function')) {
+      const shareTxt = selectedTxnForDetails.shareText || (typeof tpGenerateShareText === 'function' ? tpGenerateShareText(selectedTxnForDetails) : '');
+      Alert.alert(t('share_voucher'), tStatic("লেনদেন রশিদ শেয়ার করা হয়েছে।"));
+    } else {
+      Alert.alert(t('share_voucher'), tStatic("লেনদেন রশিদ শেয়ার করা হয়েছে।"));
+    }
+  };
+
+  const displayWalletTxns = useMemo(() => {
+    let rawList = [];
+    if (storageRepository && typeof storageRepository.getTallyPayTransactions === 'function') {
+      const repoRes = storageRepository.getTallyPayTransactions(activeBusinessId, {
+        flow: txnHistoryFilter,
+        query: txnSearchQuery,
+        limit: 1000,
+      });
+      if (repoRes && Array.isArray(repoRes.items) && repoRes.items.length > 0) {
+        rawList = repoRes.items;
+      }
+    }
+    if (rawList.length === 0 && Array.isArray(walletTxns)) {
+      rawList = walletTxns.map((w, idx) => ({
+        id: w.id || `TXN_WT_${idx}`,
+        transactionNumber: w.transactionNumber || `TK${w.id || idx}`,
+        typeName: w.title || 'ওয়ালেট লেনদেন',
+        txnType: w.txnType || (w.type === 'in' ? 'ADD_MONEY' : 'SEND_MONEY'),
+        amount: Number(w.amount || 0),
+        amountPaisa: Math.round(Number(w.amount || 0) * 100),
+        fee: Number(w.fee || 0),
+        feePaisa: Math.round(Number(w.fee || 0) * 100),
+        netAmount: Number(w.amount || 0) + Number(w.fee || 0),
+        balanceChangeType: w.type === 'in' ? 'CREDIT' : 'DEBIT',
+        type: w.type || 'in',
+        txnStatus: 'COMPLETE',
+        txnTime: w.date ? `${w.date} ${w.time || '12:00:00'}` : new Date().toISOString(),
+        counterParty: w.counterParty || w.title,
+        businessId: activeBusinessId,
+      }));
+    }
+
+    let filtered = rawList;
+    if (txnHistoryFilter === 'INCOMING') {
+      filtered = filtered.filter(t => t.balanceChangeType === 'CREDIT' || t.type === 'in' || t.flow === 'in');
+    } else if (txnHistoryFilter === 'OUTGOING') {
+      filtered = filtered.filter(t => t.balanceChangeType === 'DEBIT' || t.type === 'out' || t.flow === 'out');
+    }
+
+    if (txnSearchQuery && txnSearchQuery.trim()) {
+      const q = txnSearchQuery.trim().toLowerCase();
+      filtered = filtered.filter(t => {
+        const title = (t.typeName || t.title || t.transactionTitle || '').toLowerCase();
+        const num = (t.transactionNumber || t.id || '').toLowerCase();
+        const party = (t.counterParty || t.fromName || t.toName || '').toLowerCase();
+        const phone = (t.counterPartyPhone || t.fromWallet || t.toWallet || '').toLowerCase();
+        return title.includes(q) || num.includes(q) || party.includes(q) || phone.includes(q);
+      });
+    }
+
+    return filtered;
+  }, [activeBusinessId, txnHistoryFilter, txnSearchQuery, walletTxns, storageRepository]);
+
+  const monthlySummaryData = useMemo(() => {
+    let summary = {};
+    if (typeof tpCalculateMonthlyTransactionSummary === 'function') {
+      try {
+        summary = tpCalculateMonthlyTransactionSummary(displayWalletTxns) || {};
+      } catch (e) {}
+    }
+    let totalPelam = summary.totalPelam !== undefined ? summary.totalPelam : 0;
+    let totalDilam = summary.totalDilam !== undefined ? summary.totalDilam : 0;
+    let totalFee = summary.totalFee !== undefined ? summary.totalFee : 0;
+    if (totalFee === 0) {
+      for (const tx of displayWalletTxns) {
+        totalFee += Number(tx.fee || (tx.feePaisa ? tx.feePaisa / 100 : 0));
+      }
+    }
+    return {
+      ...summary,
+      totalPelam,
+      totalDilam,
+      totalFee,
+      serviceBreakdown: summary.serviceBreakdown || {},
+    };
+  }, [displayWalletTxns]);
+
+  // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
   // =========================================================================
   const handleOpenSoundboxSettings = () => {
@@ -5711,6 +5879,31 @@ function TallyKhataApp() {
       handleDeleteSavedBiller: handleDeleteSavedBillerAccount,
       filteredBillersList,
       billPaymentService,
+      storageRepository,
+    };
+
+    global.__TXN_HISTORY_TEST_HOOKS__ = {
+      modalTransactionHistory,
+      setModalTransactionHistory,
+      txnHistoryTab,
+      setTxnHistoryTab,
+      txnHistoryFilter,
+      setTxnHistoryFilter,
+      txnSearchQuery,
+      setTxnSearchQuery,
+      selectedTxnForDetails,
+      setSelectedTxnForDetails,
+      modalTpTransactionDetails,
+      setModalTpTransactionDetails,
+      handleOpenTransactionHistory,
+      handleCloseTransactionHistory,
+      handleOpenTxnDetails,
+      handleCloseTxnDetails,
+      handleDownloadTxnVoucher,
+      handleShareTxnVoucher,
+      displayWalletTxns,
+      monthlySummaryData,
+      tallyPayService,
       storageRepository,
     };
   }
@@ -9185,9 +9378,32 @@ accessibilityLabel={
 
             {/* Wallet Transaction History */}
             <View style={{ paddingHorizontal: 12, marginTop: 16 }}>
-              <SectionHeader title={tStatic("সাম্প্রতিক ওয়ালেট লেনদেন")} count={walletTxns.length} />
-              {walletTxns.map((w) => (
-                <View key={w.id} style={styles.cashItemRow}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <SectionHeader title={tStatic("সাম্প্রতিক ওয়ালেট লেনদেন")} count={walletTxns.length} />
+                <TouchableOpacity
+                  onPress={handleOpenTransactionHistory}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('all_transactions')}
+                  testID="tp_see_all_txns_btn"
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 8 }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#A7F3D0' : '#0D6E5C' }}>
+                    {t('all_transactions')} {tStatic("দেখুন ›")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {walletTxns.map((w, idx) => (
+                <TouchableOpacity
+                  key={w.id || ('wt_' + idx)}
+                  style={[styles.cashItemRow, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+                  onPress={() => handleOpenTxnDetails(w)}
+                  activeOpacity={0.75}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={w.title + ' ' + (w.type === 'in' ? '+' : '-') + ' ' + formatMoney(w.amount)}
+                  testID={'wallet_txn_item_' + (w.id || idx)}
+                >
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.cashItemDesc, isDark && tStyles.textPrimary]}>{w.title}</Text>
                     <Text style={[styles.cashItemDate, isDark && tStyles.textSecondary]}>{formatDisplayDate(w.date)} • {w.time}</Text>
@@ -9195,8 +9411,13 @@ accessibilityLabel={
                   <Text style={[styles.cashItemAmount, { color: w.type === 'in' ? COLORS.green : COLORS.red }]}>
                     {w.type === 'in' ? '+' : '-'}{tStatic(" ৳ ")}{formatMoney(w.amount)}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))}
+              {walletTxns.length === 0 && (
+                <View style={[styles.emptyContainer, { paddingVertical: 18 }]}>
+                  <Text style={[styles.emptySubText, isDark && tStyles.textMuted]}>{t('no_transactions_found')}</Text>
+                </View>
+              )}
             </View>
           </ScrollView>
           </View>
@@ -9247,11 +9468,15 @@ accessibilityLabel={
 
               <TouchableOpacity
                 style={[styles.menuListItem, isDark && tStyles.menuListItem]}
-                onPress={() => setActiveTab('tallypay')}
+                onPress={handleOpenTransactionHistory}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('transaction_statement')}
+                testID="menu_tp_txn_statement_item"
               >
                 <AppIcon source={require('./assets/icons/ic_menu_payment_messaging.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{tStatic("লেনদেন বিবরণী")}</Text>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('transaction_statement')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{tStatic("মোট ")}{walletTxns.length}{tStatic(" টি ওয়ালেট লেনদেন")}</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
@@ -17155,6 +17380,495 @@ accessibilityLabel={
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* ===================================================================
+          ITERATION 227: TALLYPAY DIGITAL TRANSACTION HISTORY MODAL (TransactionHistoryActivity)
+         =================================================================== */}
+      <Modal
+        visible={modalTransactionHistory}
+        animationType="slide"
+        onRequestClose={handleCloseTransactionHistory}
+        testID="modal_transaction_history"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.bgPrimary }]}>
+          {/* Header */}
+          <View style={[styles.thHeader, isDark && { backgroundColor: '#064E3B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseTransactionHistory}
+              style={styles.reportHeaderBack}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+              testID="btn_back_transaction_history"
+            >
+              <Image
+                source={require("./assets/icons/arrow_left.png")}
+                style={{ width: 22, height: 22, tintColor: "#FFFFFF" }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.thHeaderTitle}>
+                {t('transaction_statement')}
+              </Text>
+              <Text style={styles.thHeaderSubtitle}>
+                {txnHistoryTab === 'ALL'
+                  ? (toBengaliNumerals(displayWalletTxns.length) + " " + tStatic("টি লেনদেন"))
+                  : t('statement_summary')}
+              </Text>
+            </View>
+          </View>
+
+          {/* Dual Tabs */}
+          <View style={[styles.thTabRow, isDark && { backgroundColor: currentTheme.cardBg, borderBottomColor: currentTheme.cardBorder }]}>
+            <TouchableOpacity
+              style={[
+                styles.thTabBtn,
+                txnHistoryTab === 'ALL' && styles.thTabBtnActive,
+                txnHistoryTab === 'ALL' && isDark && { borderBottomColor: '#34D399' }
+              ]}
+              onPress={() => {
+                try { hapticFeedbackService.selection(); } catch (e) {}
+                setTxnHistoryTab('ALL');
+              }}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="tab"
+              accessibilityLabel={t('all_transactions')}
+              testID="tab_all_transactions"
+            >
+              <Text
+                style={[
+                  styles.thTabBtnText,
+                  isDark && { color: currentTheme.textSecondary },
+                  txnHistoryTab === 'ALL' && styles.thTabBtnTextActive,
+                  txnHistoryTab === 'ALL' && isDark && { color: '#34D399' }
+                ]}
+              >
+                {t('all_transactions')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.thTabBtn,
+                txnHistoryTab === 'SUMMARY' && styles.thTabBtnActive,
+                txnHistoryTab === 'SUMMARY' && isDark && { borderBottomColor: '#34D399' }
+              ]}
+              onPress={() => {
+                try { hapticFeedbackService.selection(); } catch (e) {}
+                setTxnHistoryTab('SUMMARY');
+              }}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="tab"
+              accessibilityLabel={t('statement_summary')}
+              testID="tab_statement_summary"
+            >
+              <Text
+                style={[
+                  styles.thTabBtnText,
+                  isDark && { color: currentTheme.textSecondary },
+                  txnHistoryTab === 'SUMMARY' && styles.thTabBtnTextActive,
+                  txnHistoryTab === 'SUMMARY' && isDark && { color: '#34D399' }
+                ]}
+              >
+                {t('statement_summary')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {txnHistoryTab === 'ALL' ? (
+            <View style={{ flex: 1 }}>
+              {/* Search Box */}
+              <View style={[styles.thSearchBox, isDark && { backgroundColor: currentTheme.cardBgElevated, borderColor: currentTheme.cardBorder }]}>
+                <Image
+                  source={require('./assets/icons/ic_search.png')}
+                  style={{ width: 16, height: 16, tintColor: isDark ? currentTheme.textSecondary : '#64748B', marginRight: 8 }}
+                  resizeMode="contain"
+                />
+                <TextInput
+                  style={[styles.thSearchInput, isDark && { color: currentTheme.textPrimary }]}
+                  placeholder={t('search_transactions')}
+                  placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                  value={txnSearchQuery}
+                  onChangeText={setTxnSearchQuery}
+                  testID="input_search_transactions"
+                  accessibilityLabel={t('search_transactions')}
+                />
+                {txnSearchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setTxnSearchQuery('')}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    accessibilityRole="button"
+                    accessibilityLabel={tStatic("মুছুন")}
+                    testID="btn_clear_txn_search"
+                  >
+                    <Text style={{ fontSize: 16, color: '#94A3B8' }}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Filter Chips */}
+              <View style={styles.thFilterRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.thFilterChip,
+                    isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder },
+                    txnHistoryFilter === 'ALL' && styles.thFilterChipActive,
+                    txnHistoryFilter === 'ALL' && isDark && { backgroundColor: '#064E3B', borderColor: '#34D399' }
+                  ]}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setTxnHistoryFilter('ALL');
+                  }}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('filter_all')}
+                  testID="chip_filter_all"
+                >
+                  <Text
+                    style={[
+                      styles.thFilterChipText,
+                      isDark && { color: currentTheme.textSecondary },
+                      txnHistoryFilter === 'ALL' && styles.thFilterChipTextActive
+                    ]}
+                  >
+                    {t('filter_all')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.thFilterChip,
+                    isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder },
+                    txnHistoryFilter === 'INCOMING' && styles.thFilterChipActive,
+                    txnHistoryFilter === 'INCOMING' && isDark && { backgroundColor: '#064E3B', borderColor: '#34D399' }
+                  ]}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setTxnHistoryFilter('INCOMING');
+                  }}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('filter_inflow')}
+                  testID="chip_filter_inflow"
+                >
+                  <Text
+                    style={[
+                      styles.thFilterChipText,
+                      isDark && { color: currentTheme.textSecondary },
+                      txnHistoryFilter === 'INCOMING' && styles.thFilterChipTextActive
+                    ]}
+                  >
+                    {t('filter_inflow')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.thFilterChip,
+                    isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder },
+                    txnHistoryFilter === 'OUTGOING' && styles.thFilterChipActive,
+                    txnHistoryFilter === 'OUTGOING' && isDark && { backgroundColor: '#064E3B', borderColor: '#34D399' }
+                  ]}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setTxnHistoryFilter('OUTGOING');
+                  }}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('filter_outflow')}
+                  testID="chip_filter_outflow"
+                >
+                  <Text
+                    style={[
+                      styles.thFilterChipText,
+                      isDark && { color: currentTheme.textSecondary },
+                      txnHistoryFilter === 'OUTGOING' && styles.thFilterChipTextActive
+                    ]}
+                  >
+                    {t('filter_outflow')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Transactions List */}
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 46 }}>
+                {displayWalletTxns.map((tx, idx) => {
+                  const isInflow = tx.balanceChangeType === 'CREDIT' || tx.type === 'in' || tx.flow === 'in';
+                  const fee = Number(tx.fee || (tx.feePaisa ? tx.feePaisa / 100 : 0));
+                  const itemTitle = tx.typeName || tx.title || tx.transactionTitle || (isInflow ? t('money_received') : t('money_sent'));
+                  const itemSubtitle = tx.counterParty || tx.counterPartyPhone || tx.toWallet || tx.fromWallet || formatDisplayDate(tx.txnTime || tx.date);
+                  const itemRef = formatDisplayDate(tx.txnTime || tx.date) + ' • ' + t('txn_id') + ': ' + (tx.transactionNumber || tx.id);
+                  return (
+                    <TouchableOpacity
+                      key={tx.id || ('txn_' + idx)}
+                      style={[styles.thTxnCard, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}
+                      onPress={() => handleOpenTxnDetails(tx)}
+                      activeOpacity={0.75}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={itemTitle + ' ' + (isInflow ? '+' : '-') + ' ' + formatMoney(tx.amount)}
+                      testID={'txn_item_' + (tx.id || idx)}
+                    >
+                      <View style={[styles.thTxnIconContainer, { backgroundColor: isInflow ? (isDark ? '#064E3B' : '#DCFCE7') : (isDark ? '#7F1D1D' : '#FEE2E2') }]}>
+                        <Text style={{ fontSize: 18 }}>
+                          {isInflow ? '⬇️' : '⬆️'}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.thTxnTitle, isDark && { color: currentTheme.textPrimary }]}>
+                          {itemTitle}
+                        </Text>
+                        <Text style={[styles.thTxnSubtitle, isDark && { color: currentTheme.textSecondary }]} numberOfLines={1}>
+                          {itemSubtitle}
+                        </Text>
+                        <Text style={[styles.thTxnRef, isDark && { color: currentTheme.textMuted }]} numberOfLines={1}>
+                          {itemRef}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                        <Text style={[styles.thTxnAmount, { color: isInflow ? (isDark ? '#34D399' : '#059669') : (isDark ? '#F87171' : '#DC2626') }]}>
+                          {isInflow ? '+' : '-'}{tStatic(" ৳ ")}{formatMoney(tx.amount)}
+                        </Text>
+                        {fee > 0 && (
+                          <View style={[styles.thTxnFeePill, isDark && { backgroundColor: '#78350F' }]}>
+                            <Text style={[styles.thTxnFeeText, isDark && { color: '#FDE68A' }]}>
+                              {t('txn_fee')}: ৳{formatMoney(fee)}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={[styles.thStatusBadge, { backgroundColor: isDark ? '#064E3B' : '#DCFCE7' }]}>
+                          <Text style={[styles.thStatusBadgeText, { color: isDark ? '#34D399' : '#15803D' }]}>
+                            {t('txn_status_success')}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+                {displayWalletTxns.length === 0 && (
+                  <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
+                    <Text style={{ fontSize: 36, marginBottom: 12 }}>🧾</Text>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 4 }}>
+                      {t('no_transactions_found')}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: isDark ? currentTheme.textSecondary : '#64748B', textAlign: 'center' }}>
+                      {t('no_transactions_sub')}
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          ) : (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 14, paddingBottom: 46 }}>
+              {/* Inflow Hero Card */}
+              <View style={[styles.thSummaryHeroCard, { backgroundColor: isDark ? '#064E3B' : '#ECFDF5', borderColor: isDark ? '#047857' : '#A7F3D0', borderWidth: 1 }]}>
+                <Text style={{ fontSize: 13, color: isDark ? '#A7F3D0' : '#047857', fontWeight: '600' }}>
+                  {t('total_inflow')} ({tStatic("টাকা এসেছে")})
+                </Text>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: isDark ? '#34D399' : '#047857', marginTop: 4 }}>
+                  +{tStatic(" ৳ ")}{formatMoney(monthlySummaryData.totalPelam)}
+                </Text>
+              </View>
+
+              {/* Outflow Hero Card */}
+              <View style={[styles.thSummaryHeroCard, { backgroundColor: isDark ? '#7F1D1D' : '#FEF2F2', borderColor: isDark ? '#991B1B' : '#FECACA', borderWidth: 1 }]}>
+                <Text style={{ fontSize: 13, color: isDark ? '#FCA5A5' : '#B91C1C', fontWeight: '600' }}>
+                  {t('total_outflow')} ({tStatic("টাকা গেছে")})
+                </Text>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: isDark ? '#F87171' : '#B91C1C', marginTop: 4 }}>
+                  -{tStatic(" ৳ ")}{formatMoney(monthlySummaryData.totalDilam)}
+                </Text>
+              </View>
+
+              {/* Total Fee Card */}
+              <View style={[styles.thSummaryHeroCard, { backgroundColor: isDark ? '#78350F' : '#FFFBEB', borderColor: isDark ? '#92400E' : '#FDE68A', borderWidth: 1 }]}>
+                <Text style={{ fontSize: 13, color: isDark ? '#FDE68A' : '#92400E', fontWeight: '600' }}>
+                  {t('txn_fee')} ({tStatic("মোট সার্ভিস চার্জ")})
+                </Text>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? '#FBBF24' : '#B45309', marginTop: 4 }}>
+                  {tStatic("৳ ")}{formatMoney(monthlySummaryData.totalFee)}
+                </Text>
+              </View>
+
+              {/* Service Breakdown List */}
+              <View style={[{ backgroundColor: isDark ? currentTheme.cardBg : '#FFFFFF', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: isDark ? currentTheme.cardBorder : '#E2E8F0', marginTop: 6 }]}>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 10 }}>
+                  {tStatic("সার্ভিস ভিত্তিক বিস্তারিত")}
+                </Text>
+                {monthlySummaryData.serviceBreakdown && Object.keys(monthlySummaryData.serviceBreakdown).length > 0 ? (
+                  Object.entries(monthlySummaryData.serviceBreakdown).map(([srvKey, srvData]) => (
+                    <View key={srvKey} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: isDark ? currentTheme.cardBorder : '#F1F5F9' }}>
+                      <Text style={{ fontSize: 13, color: isDark ? currentTheme.textSecondary : '#475569' }}>{srvKey}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                        ৳ {formatMoney(srvData.totalAmount || srvData.amount || 0)}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <View style={{ paddingVertical: 8 }}>
+                    <Text style={{ fontSize: 12, color: isDark ? currentTheme.textMuted : '#94A3B8' }}>
+                      {tStatic("বর্তমান মাসে কোনো আলাদা সার্ভিস রেকর্ড নেই")}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          ITERATION 227: TALLYPAY INDIVIDUAL TRANSACTION DETAILS & RECEIPT (TpEachTransactionDetailsActivity)
+         =================================================================== */}
+      <Modal
+        visible={modalTpTransactionDetails}
+        animationType="slide"
+        onRequestClose={handleCloseTxnDetails}
+        testID="modal_tp_transaction_details"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.bgPrimary }]}>
+          {/* Header */}
+          <View style={[styles.thHeader, isDark && { backgroundColor: '#064E3B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseTxnDetails}
+              style={styles.reportHeaderBack}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+              testID="btn_back_txn_details"
+            >
+              <Image
+                source={require("./assets/icons/arrow_left.png")}
+                style={{ width: 22, height: 22, tintColor: "#FFFFFF" }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.thHeaderTitle}>
+                {t('transaction_details_title')}
+              </Text>
+              <Text style={styles.thHeaderSubtitle}>
+                {selectedTxnForDetails ? (selectedTxnForDetails.txnID || selectedTxnForDetails.transactionNumber || selectedTxnForDetails.id) : ''}
+              </Text>
+            </View>
+          </View>
+
+          {/* Receipt Body */}
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+            {selectedTxnForDetails && (() => {
+              const isInflow = selectedTxnForDetails.balanceChangeType === 'CREDIT' || selectedTxnForDetails.type === 'in' || selectedTxnForDetails.flow === 'in';
+              const fee = Number(selectedTxnForDetails.fee || (selectedTxnForDetails.feePaisa ? selectedTxnForDetails.feePaisa / 100 : 0));
+              const principal = Number(selectedTxnForDetails.amount || 0);
+              const net = isInflow ? (principal - fee) : (principal + fee);
+              const txnNum = selectedTxnForDetails.txnID || selectedTxnForDetails.transactionNumber || selectedTxnForDetails.id || 'N/A';
+              const timeStr = selectedTxnForDetails.txnTime || selectedTxnForDetails.txnDate || ((selectedTxnForDetails.date || '') + ' ' + (selectedTxnForDetails.time || '')).trim() || 'N/A';
+              const party = selectedTxnForDetails.counterParty || selectedTxnForDetails.toName || selectedTxnForDetails.fromName || selectedTxnForDetails.transactionSubtitle || selectedTxnForDetails.title || 'N/A';
+              const phone = selectedTxnForDetails.counterPartyPhone || selectedTxnForDetails.toWallet || selectedTxnForDetails.fromWallet || '';
+              const flowTitle = selectedTxnForDetails.flowTitleBn || (isInflow ? t('money_received') : t('money_sent'));
+              return (
+                <View style={[styles.thReceiptPaper, isDark && { backgroundColor: currentTheme.cardBg, borderColor: currentTheme.cardBorder }]}>
+                  {/* Shop Header / Seal */}
+                  <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                    <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: isInflow ? (isDark ? '#064E3B' : '#DCFCE7') : (isDark ? '#7F1D1D' : '#FEE2E2'), alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                      <Text style={{ fontSize: 26 }}>{isInflow ? '📥' : '📤'}</Text>
+                    </View>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                      {businessName || 'TallyKhata Merchant'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, backgroundColor: isDark ? '#064E3B' : '#DCFCE7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#34D399' : '#15803D' }}>
+                        ✓ {tStatic("ট্যালিপে ভেরিফাইড লেনদেন")}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Direction & Amount */}
+                  <View style={{ alignItems: 'center', marginVertical: 12 }}>
+                    <Text style={{ fontSize: 13, color: isDark ? currentTheme.textSecondary : '#64748B', fontWeight: '600' }}>
+                      {flowTitle}
+                    </Text>
+                    <Text style={{ fontSize: 28, fontWeight: 'bold', color: isInflow ? (isDark ? '#34D399' : '#059669') : (isDark ? '#F87171' : '#DC2626'), marginTop: 4 }}>
+                      {isInflow ? '+' : '-'}{tStatic(" ৳ ")}{formatMoney(principal)}
+                    </Text>
+                    <View style={[{ backgroundColor: isDark ? '#064E3B' : '#DCFCE7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginTop: 6 }]}>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#34D399' : '#15803D' }}>
+                        ● {t('txn_status_success')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Perforated divider */}
+                  <View style={{ borderBottomWidth: 1, borderBottomColor: isDark ? currentTheme.cardBorder : '#E2E8F0', borderStyle: 'dashed', marginVertical: 14 }} />
+
+                  {/* Detail Rows */}
+                  <View style={styles.thReceiptRow}>
+                    <Text style={[styles.thReceiptLabel, isDark && { color: currentTheme.textSecondary }]}>{t('txn_id')}</Text>
+                    <Text style={[styles.thReceiptValue, isDark && { color: currentTheme.textPrimary }]}>{txnNum}</Text>
+                  </View>
+                  <View style={styles.thReceiptRow}>
+                    <Text style={[styles.thReceiptLabel, isDark && { color: currentTheme.textSecondary }]}>{t('txn_date')}</Text>
+                    <Text style={[styles.thReceiptValue, isDark && { color: currentTheme.textPrimary }]}>{formatDisplayDate(timeStr)}</Text>
+                  </View>
+                  <View style={styles.thReceiptRow}>
+                    <Text style={[styles.thReceiptLabel, isDark && { color: currentTheme.textSecondary }]}>{tStatic("কাউন্টারপার্টি / প্রাপক")}</Text>
+                    <Text style={[styles.thReceiptValue, isDark && { color: currentTheme.textPrimary }]}>{party}</Text>
+                  </View>
+                  {phone ? (
+                    <View style={styles.thReceiptRow}>
+                      <Text style={[styles.thReceiptLabel, isDark && { color: currentTheme.textSecondary }]}>{tStatic("মোবাইল নম্বর")}</Text>
+                      <Text style={[styles.thReceiptValue, isDark && { color: currentTheme.textPrimary }]}>{phone}</Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.thReceiptRow}>
+                    <Text style={[styles.thReceiptLabel, isDark && { color: currentTheme.textSecondary }]}>{t('principal_amount')}</Text>
+                    <Text style={[styles.thReceiptValue, isDark && { color: currentTheme.textPrimary }]}>৳ {formatMoney(principal)}</Text>
+                  </View>
+                  <View style={styles.thReceiptRow}>
+                    <Text style={[styles.thReceiptLabel, isDark && { color: currentTheme.textSecondary }]}>{t('txn_fee')}</Text>
+                    <Text style={[styles.thReceiptValue, isDark && { color: currentTheme.textPrimary }]}>৳ {formatMoney(fee)}</Text>
+                  </View>
+                  <View style={[styles.thReceiptRow, { borderBottomWidth: 0, paddingTop: 12 }]}>
+                    <Text style={[{ fontSize: 14, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }]}>{t('net_amount')}</Text>
+                    <Text style={[{ fontSize: 16, fontWeight: 'bold', color: isInflow ? (isDark ? '#34D399' : '#059669') : (isDark ? '#F87171' : '#DC2626') }]}>
+                      ৳ {formatMoney(net)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
+          </ScrollView>
+
+          {/* Sticky Bottom Action Dock */}
+          <View style={[styles.thActionDock, isDark && { backgroundColor: currentTheme.cardBg, borderTopColor: currentTheme.cardBorder }]}>
+            <TouchableOpacity
+              style={[styles.thActionBtn, { backgroundColor: '#0D6E5C' }]}
+              onPress={handleDownloadTxnVoucher}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('download_voucher')}
+              testID="btn_download_voucher"
+            >
+              <Text style={[styles.thActionBtnText, { color: '#FFFFFF' }]}>
+                📥 {t('download_voucher')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.thActionBtn, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0', borderWidth: 1, borderColor: isDark ? '#334155' : '#CBD5E1' }]}
+              onPress={handleShareTxnVoucher}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('share_voucher')}
+              testID="btn_share_voucher"
+            >
+              <Text style={[styles.thActionBtnText, { color: isDark ? '#F1F5F9' : '#1E293B' }]}>
+                📤 {t('share_voucher')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </Modal>
 
       {/* MODAL: BATCH TAGADA RESULT */}
@@ -31607,6 +32321,233 @@ const styles = StyleSheet.create({
   mmSubmitBtnText: {
     color: '#FFFFFF',
     fontSize: 15,
+    fontWeight: 'bold',
+  },
+
+  // --- ITERATION 227: TALLYPAY DIGITAL TRANSACTION HISTORY & RECEIPT STYLES ---
+  thContainer: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  thHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0D6E5C',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  thHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  thHeaderSubtitle: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  thTabRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  thTabBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  thTabBtnActive: {
+    borderBottomColor: '#0D6E5C',
+  },
+  thTabBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  thTabBtnTextActive: {
+    color: '#0D6E5C',
+    fontWeight: 'bold',
+  },
+  thSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginHorizontal: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  thSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1E293B',
+    padding: 0,
+  },
+  thFilterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  thFilterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  thFilterChipActive: {
+    backgroundColor: '#0D6E5C',
+    borderColor: '#0D6E5C',
+  },
+  thFilterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  thFilterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  thTxnCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 14,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  thTxnIconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  thTxnTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  thTxnSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  thTxnRef: {
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  thTxnAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    textAlign: 'right',
+  },
+  thTxnFeePill: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 3,
+    alignSelf: 'flex-end',
+  },
+  thTxnFeeText: {
+    fontSize: 10,
+    color: '#B45309',
+    fontWeight: '600',
+  },
+  thStatusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 3,
+    alignSelf: 'flex-end',
+  },
+  thStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  thSummaryHeroCard: {
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  thReceiptPaper: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    margin: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  thReceiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  thReceiptLabel: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  thReceiptValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',
+    textAlign: 'right',
+  },
+  thActionDock: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 46,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 12,
+  },
+  thActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderRadius: 10,
+    minHeight: 48,
+  },
+  thActionBtnText: {
+    fontSize: 14,
     fontWeight: 'bold',
   },
 
