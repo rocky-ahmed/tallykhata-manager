@@ -1216,6 +1216,22 @@ function TallyKhataApp() {
   const [modalLinkedAccountsManager, setModalLinkedAccountsManager] = useState(false);
   const [modalAddNewBankAccount, setModalAddNewBankAccount] = useState(false);
   const [modalLinkMfsAccount, setModalLinkMfsAccount] = useState(false);
+  // --- ITERATION 233: TALLYPAY ADD MONEY FROM BANK / CARD / MFS SUBSYSTEM ---
+  const [modalAddMoneyMain, setModalAddMoneyMain] = useState(false);
+  const [modalAddMoneyBankForm, setModalAddMoneyBankForm] = useState(false);
+  const [modalAddMoneyCardForm, setModalAddMoneyCardForm] = useState(false);
+  const [modalAddMoneyReceiptVoucher, setModalAddMoneyReceiptVoucher] = useState(false);
+  const [addMoneyAmountInput, setAddMoneyAmountInput] = useState('1000');
+  const [selectedAddMoneyPreset, setSelectedAddMoneyPreset] = useState(1000);
+  const [selectedAddMoneyBankId, setSelectedAddMoneyBankId] = useState(null);
+  const [addMoneyCardNumber, setAddMoneyCardNumber] = useState('');
+  const [addMoneyCardHolder, setAddMoneyCardHolder] = useState('');
+  const [addMoneyCardExpiry, setAddMoneyCardExpiry] = useState('');
+  const [addMoneyCardCvv, setAddMoneyCardCvv] = useState('');
+  const [addMoneyCardType, setAddMoneyCardType] = useState('DEBIT');
+  const [addMoneySaveCardCheck, setAddMoneySaveCardCheck] = useState(false);
+  const [addMoneyPinInput, setAddMoneyPinInput] = useState('');
+  const [lastAddMoneyReceipt, setLastAddMoneyReceipt] = useState(null);
   const [linkedAccountTab, setLinkedAccountTab] = useState('ALL'); // 'ALL' | 'BANK' | 'MFS'
   const [newLinkedBankCode, setNewLinkedBankCode] = useState('085');
   const [newLinkedBankBranch, setNewLinkedBankBranch] = useState('Gulshan Head Office');
@@ -2540,6 +2556,25 @@ function TallyKhataApp() {
         setModalAddMfsAccount(false);
         return true;
       }
+      if (modalAddMoneyReceiptVoucher) {
+        setModalAddMoneyReceiptVoucher(false);
+        setLastAddMoneyReceipt(null);
+        return true;
+      }
+      if (modalAddMoneyBankForm) {
+        setModalAddMoneyBankForm(false);
+        setModalAddMoneyMain(true);
+        return true;
+      }
+      if (modalAddMoneyCardForm) {
+        setModalAddMoneyCardForm(false);
+        setModalAddMoneyMain(true);
+        return true;
+      }
+      if (modalAddMoneyMain) {
+        setModalAddMoneyMain(false);
+        return true;
+      }
       if (modalAddNewBankAccount) {
         setModalAddNewBankAccount(false);
         return true;
@@ -2687,7 +2722,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -5651,6 +5686,234 @@ function TallyKhataApp() {
 
 
   // =========================================================================
+  // ITERATION 233: TALLYPAY ADD MONEY HANDLERS
+  // =========================================================================
+  const handleOpenAddMoneyMain = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setAddMoneyAmountInput('1000');
+    setSelectedAddMoneyPreset(1000);
+    setModalAddMoneyMain(true);
+  };
+
+  const handleCloseAddMoneyMain = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalAddMoneyMain(false);
+  };
+
+  const handleSelectAddMoneyPreset = (amount) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSelectedAddMoneyPreset(amount);
+    setAddMoneyAmountInput(String(amount));
+  };
+
+  const handleSelectChannelBank = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const amt = Number(addMoneyAmountInput) || 0;
+    if (amt < 10 || amt > 50000) {
+      Alert.alert(tStatic("সতর্কতা"), tStatic("টাকার পরিমাণ সঠিক সীমার মধ্যে নয় (সর্বনিম্ন ৳১০, সর্বোচ্চ ৳৫০,০০০)"));
+      return;
+    }
+    const store = storageRepository?.currentStore || {};
+    const banks = (store.linkedBankAccounts || []).filter(
+      b => String(b.businessId || '1') === String(activeBusinessId || '1') && b.verificationStatus === 'VERIFIED'
+    );
+    if (banks.length > 0 && !selectedAddMoneyBankId) {
+      setSelectedAddMoneyBankId(banks[0].id || banks[0].accountId);
+    }
+    setAddMoneyPinInput('');
+    setModalAddMoneyMain(false);
+    setModalAddMoneyBankForm(true);
+  };
+
+  const handleBackFromBankForm = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalAddMoneyBankForm(false);
+    setModalAddMoneyMain(true);
+  };
+
+  const handleSelectChannelCard = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const amt = Number(addMoneyAmountInput) || 0;
+    if (amt < 10 || amt > 50000) {
+      Alert.alert(tStatic("সতর্কতা"), tStatic("টাকার পরিমাণ সঠিক সীমার মধ্যে নয় (সর্বনিম্ন ৳১০, সর্বোচ্চ ৳৫০,০০০)"));
+      return;
+    }
+    setModalAddMoneyMain(false);
+    setModalAddMoneyCardForm(true);
+  };
+
+  const handleBackFromCardForm = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalAddMoneyCardForm(false);
+    setModalAddMoneyMain(true);
+  };
+
+  const handleSelectChannelMfs = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const amt = Number(addMoneyAmountInput) || 0;
+    if (amt < 10 || amt > 50000) {
+      Alert.alert(tStatic("সতর্কতা"), tStatic("টাকার পরিমাণ সঠিক সীমার মধ্যে নয় (সর্বনিম্ন ৳১০, সর্বোচ্চ ৳৫০,০০০)"));
+      return;
+    }
+    const engine = tallyPayService?.addMoneyEngine;
+    if (engine && typeof engine.initiateMfsOrder === 'function') {
+      const order = engine.initiateMfsOrder({
+        operator: 'NAGAD',
+        mobileNumber: '01712345678',
+        amount: amt,
+      });
+      if (order && order.success) {
+        try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+        const receipt = {
+          ...order,
+          channel: 'MFS',
+          channelType: 'MFS',
+          channelLabel: 'Nagad MFS',
+        };
+        setLastAddMoneyReceipt(receipt);
+        setModalAddMoneyMain(false);
+        setModalAddMoneyReceiptVoucher(true);
+      }
+    }
+  };
+
+  const handleSubmitAddMoneyBank = async () => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      const amt = Number(addMoneyAmountInput) || 0;
+      if (amt < 10 || amt > 50000) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("টাকার পরিমাণ সঠিক সীমার মধ্যে নয়"));
+        return;
+      }
+      if (!addMoneyPinInput || addMoneyPinInput.length < 4) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("দয়া করে ৪-ডিজিট টালিপে পিন দিন"));
+        return;
+      }
+
+      const store = storageRepository?.currentStore || {};
+      const banks = (store.linkedBankAccounts || []).filter(
+        b => String(b.businessId || '1') === String(activeBusinessId || '1') && b.verificationStatus === 'VERIFIED'
+      );
+      if (banks.length === 0) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("কোনো ভেরিফাইড ব্যাংক একাউন্ট নেই"));
+        return;
+      }
+
+      const targetBank = banks.find(b => b.id === selectedAddMoneyBankId || b.accountId === selectedAddMoneyBankId) || banks[0];
+      const engine = tallyPayService?.addMoneyEngine;
+      if (engine && typeof engine.addMoneyFromBank === 'function') {
+        const res = engine.addMoneyFromBank({
+          businessId: activeBusinessId,
+          accountId: targetBank.id || targetBank.accountId,
+          bankAccount: targetBank,
+          amountPaisa: amt * 100,
+          pin: addMoneyPinInput,
+          storageRepo: storageRepository,
+        });
+
+        if (res && res.success) {
+          const newBal = (res.newBalancePaisa || 0) / 100;
+          setWalletBalance(newBal);
+          setLastAddMoneyReceipt({
+            ...res.transaction,
+            channelLabel: targetBank.bankName || 'Bank Account',
+          });
+          setModalAddMoneyBankForm(false);
+          setModalAddMoneyReceiptVoucher(true);
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+        } else {
+          Alert.alert(tStatic("ত্রুটি"), (res && (res.message || res.error || res.reason)) || 'Add money failed');
+        }
+      }
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Add money failed');
+    }
+  };
+
+  const handleSubmitAddMoneyCard = async () => {
+    try {
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      const amt = Number(addMoneyAmountInput) || 0;
+      if (amt < 10 || amt > 50000) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("টাকার পরিমাণ সঠিক সীমার মধ্যে নয়"));
+        return;
+      }
+      const rawCard = String(addMoneyCardNumber || "").replace(/[\s-]+/g, "");
+      if (!tallyPayService?.validateLuhn(rawCard)) {
+        Alert.alert(tStatic("ত্রুটি"), tStatic("কার্ড নম্বরটি সঠিক নয়। অনুগ্রহ করে সঠিক কার্ড নম্বর দিন।"));
+        return;
+      }
+
+      const engine = tallyPayService?.addMoneyEngine;
+      if (engine && typeof engine.addMoneyFromCard === 'function') {
+        const res = engine.addMoneyFromCard({
+          businessId: activeBusinessId,
+          cardNumber: rawCard,
+          cardHolderName: addMoneyCardHolder || 'Cardholder',
+          cardType: addMoneyCardType || 'DEBIT',
+          expiryMonth: (addMoneyCardExpiry && addMoneyCardExpiry.split('/')[0]) || '12',
+          expiryYear: (addMoneyCardExpiry && addMoneyCardExpiry.split('/')[1]) || '28',
+          amountPaisa: amt * 100,
+          saveCard: addMoneySaveCardCheck,
+          storageRepo: storageRepository,
+        });
+
+        if (res && res.success) {
+          if (addMoneySaveCardCheck && storageRepository && typeof storageRepository.saveCard === 'function') {
+            await storageRepository.saveCard(activeBusinessId, {
+              cardNumber: rawCard,
+              cardHolderName: addMoneyCardHolder || 'Cardholder',
+              cardType: addMoneyCardType || 'DEBIT',
+              expiryMonth: (addMoneyCardExpiry && addMoneyCardExpiry.split('/')[0]) || '12',
+              expiryYear: (addMoneyCardExpiry && addMoneyCardExpiry.split('/')[1]) || '28',
+            });
+          }
+          const newBal = (res.newBalancePaisa || 0) / 100;
+          setWalletBalance(newBal);
+          setLastAddMoneyReceipt({
+            ...res.transaction,
+            channelLabel: `${res.transaction?.cardNetwork || 'Card'} (${addMoneyCardType})`,
+          });
+          setModalAddMoneyCardForm(false);
+          setModalAddMoneyReceiptVoucher(true);
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+        } else {
+          Alert.alert(tStatic("ত্রুটি"), (res && (res.message || res.error || res.reason)) || 'Card transaction failed');
+        }
+      }
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Card transaction failed');
+    }
+  };
+
+  const handleCloseAddMoneyReceipt = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalAddMoneyReceiptVoucher(false);
+    setLastAddMoneyReceipt(null);
+  };
+
+  const handleDeleteSavedCard = async (cardId) => {
+    try {
+      try { hapticFeedbackService.selection(); } catch (e) {}
+      if (storageRepository && typeof storageRepository.deleteCard === 'function') {
+        const res = await storageRepository.deleteCard(activeBusinessId, cardId);
+        if (res && res.success) {
+          try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+          Alert.alert(tStatic("সফল"), tStatic("কার্ডটি মুছে ফেলা হয়েছে।"));
+        }
+      }
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || 'Failed to delete card');
+    }
+  };
+
+  const handleOpenLinkBankFromAddMoney = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalAddMoneyBankForm(false);
+    handleOpenAddNewBankAccount();
+  };
+
+  // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
   // =========================================================================
   const handleOpenSoundboxSettings = () => {
@@ -6892,6 +7155,54 @@ function TallyKhataApp() {
       handleToggleBiometrics,
       tallyPaySecurityManager: TP_tallyPaySecurityManager,
       pinSecurityEngine: TP_pinSecurityEngine,
+      storageRepository,
+    };
+
+    global.__ADD_MONEY_TEST_HOOKS__ = {
+      modalAddMoneyMain,
+      setModalAddMoneyMain,
+      modalAddMoneyBankForm,
+      setModalAddMoneyBankForm,
+      modalAddMoneyCardForm,
+      setModalAddMoneyCardForm,
+      modalAddMoneyReceiptVoucher,
+      setModalAddMoneyReceiptVoucher,
+      addMoneyAmountInput,
+      setAddMoneyAmountInput,
+      selectedAddMoneyPreset,
+      setSelectedAddMoneyPreset,
+      selectedAddMoneyBankId,
+      setSelectedAddMoneyBankId,
+      addMoneyCardNumber,
+      setAddMoneyCardNumber,
+      addMoneyCardHolder,
+      setAddMoneyCardHolder,
+      addMoneyCardExpiry,
+      setAddMoneyCardExpiry,
+      addMoneyCardCvv,
+      setAddMoneyCardCvv,
+      addMoneyCardType,
+      setAddMoneyCardType,
+      addMoneySaveCardCheck,
+      setAddMoneySaveCardCheck,
+      addMoneyPinInput,
+      setAddMoneyPinInput,
+      lastAddMoneyReceipt,
+      setLastAddMoneyReceipt,
+      handleOpenAddMoneyMain,
+      handleCloseAddMoneyMain,
+      handleSelectAddMoneyPreset,
+      handleSelectChannelBank,
+      handleBackFromBankForm,
+      handleSelectChannelCard,
+      handleBackFromCardForm,
+      handleSelectChannelMfs,
+      handleSubmitAddMoneyBank,
+      handleSubmitAddMoneyCard,
+      handleCloseAddMoneyReceipt,
+      handleDeleteSavedCard,
+      handleOpenLinkBankFromAddMoney,
+      addMoneyEngine: tallyPayService?.addMoneyEngine,
       storageRepository,
     };
 
@@ -10440,9 +10751,13 @@ accessibilityLabel={
             {/* Quick Service Actions */}
             <View style={styles.walletActionRow}>
               <TouchableOpacity
+                testID="tp_add_money_btn"
                 style={styles.walletServiceBtn}
-                onPress={() => setModalAddMoney(true)}
+                onPress={handleOpenAddMoneyMain}
                 activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('add_money_title')}
               >
                 <AppIcon
                   source={require("./assets/icons/ic_menu_accounts.png")}
@@ -10450,9 +10765,9 @@ accessibilityLabel={
                   shape="circle"
                   size={24}
                   containerSize={50}
-                  accessibilityLabel={tStatic("অ্যাড মানি")}
+                  accessibilityLabel={t('add_money_title')}
                 />
-                <Text style={styles.walletServiceLabel}>{tStatic("অ্যাড মানি")}</Text>
+                <Text style={styles.walletServiceLabel}>{t('add_money_title')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -21562,6 +21877,767 @@ accessibilityLabel={
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 88: TALLYPAY ADD MONEY MAIN (Iteration 233)
+         =================================================================== */}
+      <Modal
+        visible={modalAddMoneyMain}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseAddMoneyMain}
+        testID="modal_add_money_main"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleCloseAddMoneyMain}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_add_money_main"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Text style={[styles.thBackIcon, isDark && { color: currentTheme.textPrimary }]}>‹</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bmTitle, isDark && { color: currentTheme.textPrimary }]}>
+                {t('add_money_title')}
+              </Text>
+              <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                {t('add_money_subtitle')}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+            {/* Wallet Balance Card */}
+            <View style={[{ backgroundColor: isDark ? '#1E293B' : '#F0FDF4', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: isDark ? '#334155' : '#BBF7D0', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+              <View>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#166534', fontWeight: '600' }}>
+                  {tStatic("বর্তমান ওয়ালেট ব্যালেন্স")}
+                </Text>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? '#34D399' : '#0D6E5C', marginTop: 2 }}>
+                  ৳ {formatMoney(walletBalance)}
+                </Text>
+              </View>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isDark ? '#065F46' : '#DCFCE7', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 20 }}>💰</Text>
+              </View>
+            </View>
+
+            {/* Amount Input Card */}
+            <View style={[{ backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 8 }}>
+                {t('enter_amount')}
+              </Text>
+
+              <View style={[{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, height: 48, backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }, isDark && { borderColor: '#334155' }]}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#0D6E5C', marginRight: 8 }}>৳</Text>
+                <TextInput
+                  testID="input_add_money_amount"
+                  style={{ flex: 1, fontSize: 18, fontWeight: 'bold', color: isDark ? '#F8FAFC' : '#1E293B' }}
+                  value={addMoneyAmountInput}
+                  onChangeText={(val) => {
+                    setAddMoneyAmountInput(val);
+                    setSelectedAddMoneyPreset(Number(val) || null);
+                  }}
+                  keyboardType="numeric"
+                  placeholder="1000"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('min_amount_note')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('max_amount_note')}
+                </Text>
+              </View>
+
+              {/* Quick Amount Presets */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 }}>
+                {[500, 1000, 2000, 5000].map((preset) => {
+                  const isSelected = selectedAddMoneyPreset === preset;
+                  return (
+                    <TouchableOpacity
+                      key={preset}
+                      testID={`preset_chip_${preset}`}
+                      style={[{
+                        flex: 1,
+                        marginHorizontal: 3,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isSelected ? (isDark ? '#065F46' : '#DCFCE7') : (isDark ? '#0F172A' : '#F8FAFC'),
+                        borderColor: isSelected ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                      }]}
+                      onPress={() => handleSelectAddMoneyPreset(preset)}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={`৳${preset}`}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: isSelected ? '#0D6E5C' : (isDark ? currentTheme.textPrimary : '#334155') }}>
+                        ৳{preset}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Channels Header */}
+            <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 12 }}>
+              {tStatic("টাকা আনার মাধ্যম নির্বাচন করুন")}
+            </Text>
+
+            {/* Channel 1: Bank Account */}
+            <TouchableOpacity
+              testID="card_channel_bank"
+              style={[{ backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0', flexDirection: 'row', alignItems: 'center' }]}
+              onPress={handleSelectChannelBank}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('channel_bank')}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <Text style={{ fontSize: 22 }}>🏦</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginRight: 8 }}>
+                    {t('channel_bank')}
+                  </Text>
+                  <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#166534' }}>
+                      {t('fee_free')}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                  {tStatic("ভেরিফাইড ব্যাংক একাউন্ট থেকে সরাসরি ফ্রি ট্রান্সফার")}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 18, color: isDark ? currentTheme.textSecondary : '#94A3B8' }}>›</Text>
+            </TouchableOpacity>
+
+            {/* Channel 2: Visa / Mastercard */}
+            <TouchableOpacity
+              testID="card_channel_card"
+              style={[{ backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0', flexDirection: 'row', alignItems: 'center' }]}
+              onPress={handleSelectChannelCard}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('channel_card')}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <Text style={{ fontSize: 22 }}>💳</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginRight: 8 }}>
+                    {t('channel_card')}
+                  </Text>
+                  <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#92400E' }}>
+                      ১.০% - ১.৫% ফি
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                  {tStatic("যেকোনো ভিসা, মাস্টারকার্ড বা অ্যামেক্স কার্ড")}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 18, color: isDark ? currentTheme.textSecondary : '#94A3B8' }}>›</Text>
+            </TouchableOpacity>
+
+            {/* Channel 3: Nagad / Rocket / MFS */}
+            <TouchableOpacity
+              testID="card_channel_mfs"
+              style={[{ backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0', flexDirection: 'row', alignItems: 'center' }]}
+              onPress={handleSelectChannelMfs}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('channel_mfs')}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <Text style={{ fontSize: 22 }}>📱</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginRight: 8 }}>
+                    {t('channel_mfs')}
+                  </Text>
+                  <View style={{ backgroundColor: '#DBEAFE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#1E40AF' }}>
+                      {t('fee_debit_percent')}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                  {tStatic("নগদ, রকেট বা বিকাশ গেটওয়ের মাধ্যমে")}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 18, color: isDark ? currentTheme.textSecondary : '#94A3B8' }}>›</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 89: TALLYPAY ADD MONEY BANK FORM (Iteration 233)
+         =================================================================== */}
+      <Modal
+        visible={modalAddMoneyBankForm}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleBackFromBankForm}
+        testID="modal_add_money_bank_form"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleBackFromBankForm}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_add_money_bank"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Text style={[styles.thBackIcon, isDark && { color: currentTheme.textPrimary }]}>‹</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bmTitle, isDark && { color: currentTheme.textPrimary }]}>
+                {t('channel_bank')}
+              </Text>
+              <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                {t('fee_free')}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+            {/* Amount Summary Card */}
+            <View style={[{ backgroundColor: isDark ? '#1E293B' : '#F0FDF4', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: isDark ? '#334155' : '#BBF7D0' }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#166534', fontWeight: '600' }}>
+                  {t('enter_amount')}
+                </Text>
+                <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#166534' }}>
+                    {t('fee_free')}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: isDark ? '#34D399' : '#0D6E5C', marginTop: 4 }}>
+                ৳ {formatMoney(Number(addMoneyAmountInput) || 0)}
+              </Text>
+            </View>
+
+            {/* Select Bank Account */}
+            <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 8 }}>
+              {t('select_bank_account')}
+            </Text>
+
+            {(() => {
+              const store = storageRepository?.currentStore || {};
+              const verifiedBanks = (store.linkedBankAccounts || []).filter(
+                (b) => String(b.businessId || '1') === String(activeBusinessId || '1') && b.verificationStatus === 'VERIFIED'
+              );
+
+              if (verifiedBanks.length === 0) {
+                return (
+                  <View style={[{ backgroundColor: isDark ? '#1E293B' : '#FFFBEB', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: isDark ? '#334155' : '#FDE68A', alignItems: 'center' }]}>
+                    <Text style={{ fontSize: 28, marginBottom: 8 }}>⚠️</Text>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? '#FCD34D' : '#92400E', textAlign: 'center', marginBottom: 4 }}>
+                      {t('no_verified_bank')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#78350F', textAlign: 'center', marginBottom: 12 }}>
+                      {tStatic("ব্যাংক থেকে টাকা লোড করতে প্রথমে একটি ব্যাংক একাউন্ট ভেরিফাই করুন।")}
+                    </Text>
+                    <TouchableOpacity
+                      testID="btn_link_bank_now"
+                      style={{ height: 40, paddingHorizontal: 16, backgroundColor: '#0D6E5C', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={handleOpenLinkBankFromAddMoney}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('link_bank_now')}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' }}>
+                        {t('link_bank_now')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+
+              return verifiedBanks.map((bank) => {
+                const isSelected = (selectedAddMoneyBankId === bank.id || selectedAddMoneyBankId === bank.accountId) || (!selectedAddMoneyBankId && verifiedBanks[0].id === bank.id);
+                const rawAcc = String(bank.accountNumber || "");
+                const maskedAcc = rawAcc.length > 4 ? "****" + rawAcc.slice(-4) : "****";
+                return (
+                  <TouchableOpacity
+                    key={bank.id || bank.accountId}
+                    testID={`bank_account_item_${bank.id || bank.accountId}`}
+                    style={[{
+                      backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                      borderRadius: 12,
+                      padding: 14,
+                      marginBottom: 10,
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    }]}
+                    onPress={() => setSelectedAddMoneyBankId(bank.id || bank.accountId)}
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isDark ? '#065F46' : '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <Text style={{ fontSize: 20 }}>🏦</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                        {bank.bankName || 'Bank Account'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                        {bank.branchName || ''} • {maskedAcc}
+                      </Text>
+                    </View>
+                    <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: isSelected ? '#0D6E5C' : '#94A3B8', alignItems: 'center', justifyContent: 'center' }}>
+                      {isSelected && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#0D6E5C' }} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              });
+            })()}
+
+            {/* PIN Input */}
+            <View style={[{ backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderRadius: 12, padding: 16, marginTop: 8, marginBottom: 20, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 8 }}>
+                {t('enter_tp_pin')}
+              </Text>
+              <TextInput
+                testID="input_add_money_pin"
+                style={[{ height: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 20, color: '#1E293B', backgroundColor: isDark ? '#0F172A' : '#F8FAFC', textAlign: 'center', letterSpacing: 8 }, isDark && { borderColor: '#334155', color: '#F8FAFC' }]}
+                value={addMoneyPinInput}
+                onChangeText={setAddMoneyPinInput}
+                keyboardType="numeric"
+                maxLength={4}
+                secureTextEntry
+                placeholder="••••"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              testID="btn_submit_add_money_bank"
+              style={{ height: 48, backgroundColor: '#0D6E5C', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              onPress={handleSubmitAddMoneyBank}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("টাকা লোড নিশ্চিত করুন")}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {tStatic("টাকা লোড নিশ্চিত করুন")}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 90: TALLYPAY ADD MONEY CARD FORM (Iteration 233)
+         =================================================================== */}
+      <Modal
+        visible={modalAddMoneyCardForm}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleBackFromCardForm}
+        testID="modal_add_money_card_form"
+      >
+        <SafeAreaView style={[styles.thContainer, isDark && { backgroundColor: currentTheme.background }]}>
+          {/* Header */}
+          <View style={[styles.bmHeader, isDark && { backgroundColor: '#0F172A', borderBottomColor: '#1E293B' }]}>
+            <TouchableOpacity
+              onPress={handleBackFromCardForm}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              testID="btn_back_add_money_card"
+              style={styles.thBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পেছনে যান")}
+            >
+              <Text style={[styles.thBackIcon, isDark && { color: currentTheme.textPrimary }]}>‹</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bmTitle, isDark && { color: currentTheme.textPrimary }]}>
+                {t('channel_card')}
+              </Text>
+              <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                {addMoneyCardType === 'CREDIT' ? t('card_type_credit') : t('card_type_debit')}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+            {/* Amount & Fee Summary Card */}
+            {(() => {
+              const amt = Number(addMoneyAmountInput) || 0;
+              const feeRate = addMoneyCardType === 'CREDIT' ? 0.015 : 0.010;
+              const fee = Math.round(amt * feeRate);
+              const total = amt + fee;
+              return (
+                <View style={[{ backgroundColor: isDark ? '#1E293B' : '#FEF3C7', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: isDark ? '#334155' : '#FDE68A' }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#78350F' }}>
+                      {t('enter_amount')}:
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F8FAFC' : '#1E293B' }}>
+                      ৳ {formatMoney(amt)}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#78350F' }}>
+                      {t('convenience_fee')} ({addMoneyCardType === 'CREDIT' ? '১.৫%' : '১.০%'}):
+                    </Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#B45309' }}>
+                      ৳ {formatMoney(fee)}
+                    </Text>
+                  </View>
+                  <View style={{ height: 1, backgroundColor: isDark ? '#334155' : '#FCD34D', marginVertical: 4 }} />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? '#FCD34D' : '#92400E' }}>
+                      {t('total_debit_amount')}:
+                    </Text>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: isDark ? '#FCD34D' : '#92400E' }}>
+                      ৳ {formatMoney(total)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
+
+            {/* Saved Cards Section */}
+            {(() => {
+              const store = storageRepository?.currentStore || {};
+              const savedCards = (store.savedCards || []).filter(
+                (c) => String(c.businessId || '1') === String(activeBusinessId || '1')
+              );
+              if (savedCards.length === 0) return null;
+
+              return (
+                <View testID="saved_cards_container" style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 8 }}>
+                    {t('saved_cards_title')}
+                  </Text>
+                  {savedCards.map((c) => (
+                    <View
+                      key={c.id || c.cardId}
+                      style={[{
+                        backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                        borderRadius: 10,
+                        padding: 12,
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: isDark ? '#334155' : '#E2E8F0',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }]}
+                    >
+                      <TouchableOpacity
+                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                        onPress={() => {
+                          setAddMoneyCardHolder(c.cardHolderName || '');
+                          setAddMoneyCardType(c.cardType || 'DEBIT');
+                        }}
+                      >
+                        <Text style={{ fontSize: 20, marginRight: 10 }}>💳</Text>
+                        <View>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                            {c.cardNumber || c.maskedNumber || '**** **** **** ****'}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                            {c.cardNetwork || 'CARD'} • {c.cardHolderName || ''}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        testID="btn_delete_saved_card"
+                        onPress={() => handleDeleteSavedCard(c.id || c.cardId)}
+                        hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                        style={{ padding: 6 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={tStatic("কার্ড মুছুন")}
+                      >
+                        <Text style={{ color: '#EF4444', fontSize: 16 }}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
+
+            {/* Card Type Selector */}
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 6 }}>
+                {tStatic("কার্ডের ধরণ")}
+              </Text>
+              <View style={{ flexDirection: 'row' }}>
+                <TouchableOpacity
+                  testID="radio_card_type_debit"
+                  style={[{
+                    flex: 1,
+                    paddingVertical: 10,
+                    marginRight: 6,
+                    borderRadius: 8,
+                    borderWidth: 1.5,
+                    alignItems: 'center',
+                    backgroundColor: addMoneyCardType === 'DEBIT' ? (isDark ? '#065F46' : '#DCFCE7') : (isDark ? '#0F172A' : '#F8FAFC'),
+                    borderColor: addMoneyCardType === 'DEBIT' ? '#0D6E5C' : (isDark ? '#334155' : '#CBD5E1'),
+                  }]}
+                  onPress={() => setAddMoneyCardType('DEBIT')}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: addMoneyCardType === 'DEBIT' ? '#0D6E5C' : (isDark ? currentTheme.textPrimary : '#475569') }}>
+                    {t('card_type_debit')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  testID="radio_card_type_credit"
+                  style={[{
+                    flex: 1,
+                    paddingVertical: 10,
+                    marginLeft: 6,
+                    borderRadius: 8,
+                    borderWidth: 1.5,
+                    alignItems: 'center',
+                    backgroundColor: addMoneyCardType === 'CREDIT' ? (isDark ? '#78350F' : '#FEF3C7') : (isDark ? '#0F172A' : '#F8FAFC'),
+                    borderColor: addMoneyCardType === 'CREDIT' ? '#B45309' : (isDark ? '#334155' : '#CBD5E1'),
+                  }]}
+                  onPress={() => setAddMoneyCardType('CREDIT')}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: addMoneyCardType === 'CREDIT' ? '#B45309' : (isDark ? currentTheme.textPrimary : '#475569') }}>
+                    {t('card_type_credit')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Card Number Input with Network Badge */}
+            <View style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#334155' }}>
+                  {t('card_number')}
+                </Text>
+                {(() => {
+                  const net = tallyPayService?.detectCardNetwork ? tallyPayService.detectCardNetwork(addMoneyCardNumber) : 'UNKNOWN';
+                  if (net && net !== 'UNKNOWN') {
+                    return (
+                      <View testID="card_network_badge" style={{ backgroundColor: '#DBEAFE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1E40AF' }}>
+                          {net}
+                        </Text>
+                      </View>
+                    );
+                  }
+                  return null;
+                })()}
+              </View>
+              <TextInput
+                testID="input_card_number"
+                style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 15, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={addMoneyCardNumber}
+                onChangeText={setAddMoneyCardNumber}
+                placeholder="4111 2222 3333 4444"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={19}
+              />
+            </View>
+
+            {/* Cardholder Name */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 4 }}>
+                {t('card_holder_name')}
+              </Text>
+              <TextInput
+                testID="input_card_holder"
+                style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1E293B', backgroundColor: '#FFFFFF' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                value={addMoneyCardHolder}
+                onChangeText={setAddMoneyCardHolder}
+                placeholder="MOHAMMED RAHMAN"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="characters"
+              />
+            </View>
+
+            {/* Expiry and CVV Row */}
+            <View style={{ flexDirection: 'row', marginBottom: 14 }}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 4 }}>
+                  {t('card_expiry')}
+                </Text>
+                <TextInput
+                  testID="input_card_expiry"
+                  style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1E293B', backgroundColor: '#FFFFFF', textAlign: 'center' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                  value={addMoneyCardExpiry}
+                  onChangeText={setAddMoneyCardExpiry}
+                  placeholder="12/28"
+                  placeholderTextColor="#94A3B8"
+                  maxLength={5}
+                />
+              </View>
+
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 4 }}>
+                  {t('card_cvv')}
+                </Text>
+                <TextInput
+                  testID="input_card_cvv"
+                  style={[{ height: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1E293B', backgroundColor: '#FFFFFF', textAlign: 'center' }, isDark && { backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC' }]}
+                  value={addMoneyCardCvv}
+                  onChangeText={setAddMoneyCardCvv}
+                  placeholder="123"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="numeric"
+                  maxLength={4}
+                  secureTextEntry
+                />
+              </View>
+            </View>
+
+            {/* Save Card Checkbox */}
+            <TouchableOpacity
+              testID="checkbox_save_card"
+              style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}
+              onPress={() => setAddMoneySaveCardCheck(!addMoneySaveCardCheck)}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+            >
+              <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 1.5, borderColor: addMoneySaveCardCheck ? '#0D6E5C' : '#94A3B8', backgroundColor: addMoneySaveCardCheck ? '#0D6E5C' : 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                {addMoneySaveCardCheck && <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
+              </View>
+              <Text style={{ fontSize: 13, color: isDark ? currentTheme.textPrimary : '#334155' }}>
+                {t('save_card_checkbox')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              testID="btn_submit_add_money_card"
+              style={{ height: 48, backgroundColor: '#0D6E5C', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              onPress={handleSubmitAddMoneyCard}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("কার্ড থেকে টাকা লোড করুন")}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {tStatic("কার্ড থেকে টাকা লোড করুন")}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 91: TALLYPAY ADD MONEY RECEIPT VOUCHER (Iteration 233)
+         =================================================================== */}
+      <Modal
+        visible={modalAddMoneyReceiptVoucher}
+        animationType="fade"
+        transparent
+        onRequestClose={handleCloseAddMoneyReceipt}
+        testID="modal_add_money_receipt_voucher"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '85%', padding: 20 }]}>
+            {/* Success Icon & Header */}
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                <Text style={{ fontSize: 28 }}>✅</Text>
+              </View>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { textAlign: 'center', fontSize: 18 }]}>
+                {t('add_money_success')}
+              </Text>
+              <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                {lastAddMoneyReceipt?.channelLabel || 'TallyPay Wallet Inflow'}
+              </Text>
+            </View>
+
+            {/* Receipt Details Card */}
+            <View style={[{ backgroundColor: isDark ? '#0F172A' : '#F8FAFC', borderRadius: 10, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('enter_amount')}:
+                </Text>
+                <Text style={{ fontSize: 15, fontWeight: 'bold', color: isDark ? '#34D399' : '#0D6E5C' }}>
+                  ৳ {formatMoney(lastAddMoneyReceipt?.amount || 0)}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('convenience_fee')}:
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  ৳ {formatMoney(lastAddMoneyReceipt?.fee || 0)}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('transaction_id_label')}:
+                </Text>
+                <Text testID="receipt_txn_id" style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
+                  {lastAddMoneyReceipt?.txnNumber || lastAddMoneyReceipt?.id || 'TK-AM-001'}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {tStatic("তারিখ ও সময়")}:
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                  {lastAddMoneyReceipt?.txnTime || new Date().toLocaleString()}
+                </Text>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: isDark ? '#334155' : '#E2E8F0', marginVertical: 6 }} />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('new_balance_label')}:
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: isDark ? '#34D399' : '#0D6E5C' }}>
+                  ৳ {formatMoney(walletBalance)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Done CTA */}
+            <TouchableOpacity
+              testID="btn_close_add_money_receipt"
+              style={{ height: 44, backgroundColor: '#0D6E5C', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              onPress={handleCloseAddMoneyReceipt}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("ঠিক আছে")}
+            >
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {tStatic("ঠিক আছে")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* MODAL: BATCH TAGADA RESULT */}

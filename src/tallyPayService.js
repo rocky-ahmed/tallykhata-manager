@@ -4506,8 +4506,560 @@ class TallyPayAccountManager {
 const BankAccountManager = TallyPayAccountManager;
 const tallyPayAccountManager = new TallyPayAccountManager();
 
+// ============================================================================
+// MILESTONE REA-ITER-233: TALLYPAY ADD MONEY BACKEND ENGINE & SAVED CARDS
+// ============================================================================
+
+const ADD_MONEY_CHANNELS = Object.freeze({
+  BANK: "BANK",
+  CARD: "CARD",
+  NAGAD: "NAGAD",
+  ROCKET: "ROCKET",
+  BKASH: "BKASH",
+});
+
+const AddMoneyMethod = Object.freeze({
+  BANK: "BANK",
+  CARD: "CARD",
+  MFS: "MFS",
+  NAGAD: "NAGAD",
+  ROCKET: "ROCKET",
+  BKASH: "BKASH",
+});
+
+const CARD_NETWORKS = Object.freeze({
+  VISA: "VISA",
+  MASTERCARD: "MASTERCARD",
+  AMEX: "AMEX",
+  UNKNOWN: "UNKNOWN",
+});
+const CardNetwork = CARD_NETWORKS;
+
+const CARD_TYPES = Object.freeze({
+  DEBIT: "DEBIT",
+  CREDIT: "CREDIT",
+  PREPAID: "PREPAID",
+});
+const CardType = CARD_TYPES;
+
+const ADD_MONEY_PRESETS = Object.freeze([500, 1000, 2000, 5000]);
+const ADD_MONEY_PRESETS_PAISA = Object.freeze([50000, 100000, 200000, 500000]);
+
+const ADD_MONEY_LIMITS = Object.freeze({
+  minAmount: 10.00,
+  maxAmountPerTxn: 50000.00,
+  dailyMaxAmount: 100000.00,
+  monthlyMaxAmount: 500000.00,
+  minAmountPaisa: 1000,
+  maxAmountPerTxnPaisa: 5000000,
+  dailyMaxAmountPaisa: 10000000,
+  monthlyMaxAmountPaisa: 50000000,
+  minLimitPaisa: 1000,
+  maxTxnLimitPaisa: 5000000,
+  dailyLimitPaisa: 10000000,
+  monthlyLimitPaisa: 50000000,
+  maxDailyTxnCount: 25,
+});
+
+const ADD_MONEY_FEE_RATES = Object.freeze({
+  BANK: 0.00,
+  DEBIT_CARD: 0.010,
+  CREDIT_CARD: 0.015,
+  MFS: 0.010,
+  NAGAD: 0.010,
+  ROCKET: 0.010,
+  BKASH: 0.010,
+});
+
+const ADD_MONEY_ARSC_TOKENS = Object.freeze({
+  taka_ani_title: "টাকা আনি",
+  add_money_from_card: "কার্ড থেকে টাকা আনি",
+  add_money_from_bank: "ব্যাংক থেকে টাকা আনি",
+  add_money_from_nagad: "নগদ থেকে টাকা আনি",
+  add_money_from_rocket: "রকেট থেকে টাকা আনি",
+  label_card_number: "কার্ড নম্বর",
+  label_card_holder_name: "কার্ড হোল্ডারের নাম",
+  error_invalid_card: "কার্ড নম্বরটি সঠিক নয়। অনুগ্রহ করে সঠিক কার্ড নম্বর দিন।",
+  prompt_visa_debit: "অনুগ্রহ করে ভিসা ডেবিট কার্ড নম্বর দিন।",
+  promo_card_onboarding: "কার্ড থেকে অ্যাড মানি করে ব্যবহার শুরু করুন।",
+  header_saved_cards: "সেভ করা কার্ড",
+  btn_new_card: "নতুন কার্ড",
+  label_amount: "টাকার পরিমাণ",
+  label_min_amount: "সর্বনিম্ন",
+  label_max_amount: "সর্বোচ্চ",
+  label_charge: "চার্জ",
+  btn_next: "পরবর্তী",
+  btn_confirm: "নিশ্চিত",
+  msg_success_header: "টাকা সফলভাবে জমা হয়েছে",
+});
+
+function luhnCheck(cardNumber) {
+  const clean = String(cardNumber || "").replace(/[\s-]+/g, "");
+  if (!/^[0-9]{13,19}$/.test(clean)) return false;
+  let sum = 0;
+  let alt = false;
+  for (let i = clean.length - 1; i >= 0; i--) {
+    let n = parseInt(clean.charAt(i), 10);
+    if (alt) {
+      n *= 2;
+      if (n > 9) n = (n % 10) + 1;
+    }
+    sum += n;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+const validateLuhn = luhnCheck;
+
+function detectCardNetwork(cardNumber) {
+  const clean = String(cardNumber || "").replace(/[\s-]+/g, "");
+  if (/^4\d{12}(\d{3})?(\d{3})?$/.test(clean) || clean.startsWith("4")) {
+    return "VISA";
+  }
+  if (/^5[1-5]\d{14}$/.test(clean) || /^2[2-7]\d{14}$/.test(clean)) {
+    return "MASTERCARD";
+  }
+  if (/^3[47]\d{13}$/.test(clean)) {
+    return "AMEX";
+  }
+  return "UNKNOWN";
+}
+
+function maskCardNumber(cardNumber) {
+  const clean = String(cardNumber || "").replace(/[\s-]+/g, "");
+  if (clean.length < 4) return "**** **** **** ****";
+  return "**** **** **** " + clean.slice(-4);
+}
+
+function calculateAddMoneyFee(channel, amount, cardType = "DEBIT") {
+  const ch = String(channel || "").toUpperCase();
+  const ct = String(cardType || "DEBIT").toUpperCase();
+  let rate = 0;
+  if (ch === "BANK") {
+    rate = 0.00;
+  } else if (ch === "DEBIT_CARD" || (ch === "CARD" && ct === "DEBIT")) {
+    rate = 0.010;
+  } else if (ch === "CREDIT_CARD" || (ch === "CARD" && ct === "CREDIT")) {
+    rate = 0.015;
+  } else if (ch === "CARD") {
+    rate = ct === "CREDIT" ? 0.015 : 0.010;
+  } else if (["MFS", "NAGAD", "ROCKET", "BKASH"].includes(ch)) {
+    rate = 0.010;
+  }
+  return Math.round(Number(amount || 0) * rate);
+}
+
+class ReconstructedAddMoneyEngine {
+  constructor(options = {}) {
+    this.limits = {
+      minLimitPaisa: 1000,
+      maxTxnLimitPaisa: 5000000,
+      dailyLimitPaisa: 10000000,
+      monthlyLimitPaisa: 50000000,
+      minAmount: 10.00,
+      maxAmountPerTxn: 50000.00,
+      dailyMaxAmount: 100000.00,
+      monthlyMaxAmount: 500000.00,
+      ...options.limits,
+    };
+    this.walletBalancePaisa = options.walletBalancePaisa !== undefined ? options.walletBalancePaisa : 500000;
+    this.dailyUsedPaisa = options.dailyUsedPaisa || 0;
+    this.monthlyUsedPaisa = options.monthlyUsedPaisa || 0;
+    this.savedCards = Array.isArray(options.savedCards) ? [...options.savedCards] : [];
+    this.transactions = Array.isArray(options.transactions) ? [...options.transactions] : [];
+    this.repo = options.storageRepo || null;
+  }
+
+  getRepo() {
+    if (this.repo) return this.repo;
+    try {
+      this.repo = require("./storageRepository").storageRepository;
+    } catch (_) {}
+    return this.repo;
+  }
+
+  getQuickPresets() {
+    return [50000, 100000, 200000, 500000];
+  }
+
+  getQuickPresetsTaka() {
+    return [500, 1000, 2000, 5000];
+  }
+
+  validateAmount(amountPaisa) {
+    const amt = Number(amountPaisa || 0);
+    if (amt < this.limits.minLimitPaisa) {
+      return {
+        valid: false,
+        reason: "BELOW_MINIMUM",
+        minLimitPaisa: this.limits.minLimitPaisa,
+        minAmount: this.limits.minLimitPaisa / 100,
+      };
+    }
+    if (amt > this.limits.maxTxnLimitPaisa) {
+      return {
+        valid: false,
+        reason: "EXCEEDS_MAX_TXN",
+        maxTxnLimitPaisa: this.limits.maxTxnLimitPaisa,
+        maxAmount: this.limits.maxTxnLimitPaisa / 100,
+      };
+    }
+    if (this.dailyUsedPaisa + amt > this.limits.dailyLimitPaisa) {
+      return {
+        valid: false,
+        reason: "EXCEEDS_DAILY_LIMIT",
+        remainingDailyPaisa: Math.max(0, this.limits.dailyLimitPaisa - this.dailyUsedPaisa),
+      };
+    }
+    if (this.monthlyUsedPaisa + amt > this.limits.monthlyLimitPaisa) {
+      return {
+        valid: false,
+        reason: "EXCEEDS_MONTHLY_LIMIT",
+        remainingMonthlyPaisa: Math.max(0, this.limits.monthlyLimitPaisa - this.monthlyUsedPaisa),
+      };
+    }
+    return { valid: true };
+  }
+
+  validateAddMoneyAmount(amount, existingDailyTxns = []) {
+    const amountPaisa = Number(amount || 0);
+
+    let dailySumPaisa = this.dailyUsedPaisa;
+    if (Array.isArray(existingDailyTxns) && existingDailyTxns.length > 0) {
+      dailySumPaisa = existingDailyTxns.reduce((sum, tx) => {
+        const p = tx.amountPaisa !== undefined
+          ? tx.amountPaisa
+          : (tx.amount !== undefined ? Math.round(Number(tx.amount) * 100) : 0);
+        return sum + p;
+      }, 0);
+    }
+
+    const prevDaily = this.dailyUsedPaisa;
+    this.dailyUsedPaisa = dailySumPaisa;
+    const res = this.validateAmount(amountPaisa);
+    this.dailyUsedPaisa = prevDaily;
+    return res;
+  }
+
+  calculateFee(channel, amountPaisa, cardType = "DEBIT") {
+    return calculateAddMoneyFee(channel, amountPaisa, cardType);
+  }
+
+  detectCardNetwork(cardNumber) {
+    return detectCardNetwork(cardNumber);
+  }
+
+  validateLuhn(cardNumber) {
+    return luhnCheck(cardNumber);
+  }
+
+  luhnCheck(cardNumber) {
+    return luhnCheck(cardNumber);
+  }
+
+  maskCardNumber(cardNumber) {
+    return maskCardNumber(cardNumber);
+  }
+
+  addMoneyFromBank(options = {}) {
+    const bankAccount = options.bankAccount;
+    if (!bankAccount || bankAccount.status !== "VERIFIED") {
+      return {
+        success: false,
+        reason: "UNVERIFIED_BANK_ACCOUNT",
+        error: "UNVERIFIED_BANK_ACCOUNT",
+        message: "শুধুমাত্র যাচাইকৃত ব্যাংক একাউন্ট থেকে টাকা আনা যাবে।",
+      };
+    }
+
+    const amountPaisa = options.amountPaisa !== undefined
+      ? Number(options.amountPaisa)
+      : Math.round(Number(options.amount || 0) * 100);
+
+    const val = this.validateAmount(amountPaisa);
+    if (!val.valid) return { success: false, ...val };
+
+    const pin = options.pin ? String(options.pin).trim() : "";
+    if (!pin || pin.length !== 4) {
+      return { success: false, reason: "INVALID_PIN", error: "INVALID_PIN", message: "সঠিক ৪ ডিজিটের গোপন পিন দিন।" };
+    }
+
+    const feePaisa = this.calculateFee("BANK", amountPaisa);
+    const initialBalPaisa = this.walletBalancePaisa;
+    this.walletBalancePaisa += amountPaisa;
+    this.dailyUsedPaisa += amountPaisa;
+    this.monthlyUsedPaisa += amountPaisa;
+
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const txnNumber = "TP-AM-BNK-" + now;
+
+    const record = {
+      id: txnNumber,
+      txnId: txnNumber,
+      txnNumber,
+      orderId: txnNumber,
+      channel: "BANK",
+      channelType: "BANK",
+      bankName: bankAccount.bankName,
+      accountNumber: bankAccount.accountNumber,
+      amount: amountPaisa / 100,
+      amountPaisa,
+      fee: feePaisa / 100,
+      feePaisa,
+      creditedAmount: amountPaisa / 100,
+      netCreditedPaisa: amountPaisa,
+      balanceBefore: initialBalPaisa / 100,
+      balanceAfter: this.walletBalancePaisa / 100,
+      status: "SUCCESS",
+      timestamp: now,
+      txnTime: nowIso,
+      createdAt: nowIso,
+    };
+
+    this.transactions.push(record);
+    return {
+      success: true,
+      transaction: record,
+      receipt: record,
+      newBalancePaisa: this.walletBalancePaisa,
+    };
+  }
+
+  async processAddMoneyFromBank(businessId, options = {}) {
+    let bankAccount = options.bankAccount;
+    const repo = options.storageRepo || this.getRepo();
+    if (!bankAccount && options.bankAccountId && repo && typeof repo.getLinkedBankAccountById === "function") {
+      bankAccount = repo.getLinkedBankAccountById(businessId, options.bankAccountId);
+    }
+
+    const res = this.addMoneyFromBank({
+      ...options,
+      bankAccount,
+    });
+
+    if (res.success && repo && typeof repo.logTallyPayTransaction === "function") {
+      try {
+        await repo.logTallyPayTransaction(businessId, res.transaction);
+      } catch (_) {}
+    }
+    return res;
+  }
+
+  addMoneyFromCard(options = {}) {
+    const cardNumber = options.cardNumber;
+    const network = this.detectCardNetwork(cardNumber);
+    if (network === "UNKNOWN") {
+      return { success: false, reason: "UNSUPPORTED_CARD_NETWORK", error: "UNSUPPORTED_CARD_NETWORK" };
+    }
+    if (!this.validateLuhn(cardNumber)) {
+      return {
+        success: false,
+        reason: "INVALID_CARD_NUMBER",
+        error: "INVALID_CARD_NUMBER",
+        message: "কার্ড নম্বরটি সঠিক নয়। অনুগ্রহ করে সঠিক কার্ড নম্বর দিন।",
+      };
+    }
+
+    const amountPaisa = options.amountPaisa !== undefined
+      ? Number(options.amountPaisa)
+      : Math.round(Number(options.amount || 0) * 100);
+
+    const val = this.validateAmount(amountPaisa);
+    if (!val.valid) return { success: false, ...val };
+
+    const cardType = options.cardType || "DEBIT";
+    const feePaisa = this.calculateFee("CARD", amountPaisa, cardType);
+    const maskedNumber = this.maskCardNumber(cardNumber);
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const txnNumber = "TP-AM-CRD-" + now;
+
+    let savedCardRecord = null;
+    if (options.saveCard) {
+      const cardId = "CRD_" + Math.random().toString(36).substring(2, 8);
+      savedCardRecord = {
+        id: cardId,
+        cardId,
+        businessId: String(options.businessId || "1"),
+        cardHolderName: options.cardHolderName || "Cardholder",
+        cardNumber: maskedNumber,
+        maskedNumber,
+        maskedCardNumber: maskedNumber,
+        cardNetwork: network,
+        cardType,
+        expiryMonth: String(options.expiryMonth || "12"),
+        expiryYear: String(options.expiryYear || "28"),
+        createdAt: nowIso,
+      };
+      this.savedCards.push(savedCardRecord);
+    }
+
+    const initialBalPaisa = this.walletBalancePaisa;
+    this.walletBalancePaisa += amountPaisa;
+    this.dailyUsedPaisa += amountPaisa;
+    this.monthlyUsedPaisa += amountPaisa;
+
+    const record = {
+      id: txnNumber,
+      txnId: txnNumber,
+      txnNumber,
+      orderId: txnNumber,
+      channel: "CARD",
+      channelType: "CARD",
+      cardNetwork: network,
+      cardType,
+      maskedNumber,
+      maskedCardNumber: maskedNumber,
+      amount: amountPaisa / 100,
+      amountPaisa,
+      fee: feePaisa / 100,
+      feePaisa,
+      creditedAmount: amountPaisa / 100,
+      netCreditedPaisa: amountPaisa,
+      balanceBefore: initialBalPaisa / 100,
+      balanceAfter: this.walletBalancePaisa / 100,
+      status: "SUCCESS",
+      timestamp: now,
+      txnTime: nowIso,
+      createdAt: nowIso,
+    };
+
+    this.transactions.push(record);
+    return {
+      success: true,
+      transaction: record,
+      receipt: record,
+      newBalancePaisa: this.walletBalancePaisa,
+      savedCard: savedCardRecord,
+    };
+  }
+
+  async processAddMoneyFromCard(businessId, options = {}) {
+    const res = this.addMoneyFromCard({
+      ...options,
+      businessId,
+    });
+
+    const repo = options.storageRepo || this.getRepo();
+    if (res.success && options.saveCard && res.savedCard && repo && typeof repo.saveCard === "function") {
+      try {
+        await repo.saveCard(businessId, res.savedCard);
+      } catch (_) {}
+    }
+    if (res.success && repo && typeof repo.logTallyPayTransaction === "function") {
+      try {
+        await repo.logTallyPayTransaction(businessId, res.transaction);
+      } catch (_) {}
+    }
+    return res;
+  }
+
+  deleteSavedCard(cardId, businessId = null) {
+    const idx = this.savedCards.findIndex((c) => c.cardId === cardId || c.id === cardId);
+    let localRemoved = false;
+    if (idx !== -1) {
+      this.savedCards.splice(idx, 1);
+      localRemoved = true;
+    }
+
+    if (businessId) {
+      const repo = this.getRepo();
+      if (repo && typeof repo.deleteCard === "function") {
+        return repo.deleteCard(businessId, cardId);
+      }
+    }
+    if (!localRemoved) {
+      return { success: false, reason: "CARD_NOT_FOUND", error: "CARD_NOT_FOUND" };
+    }
+    return { success: true, deletedId: cardId };
+  }
+
+  initiateMfsOrder(options = {}) {
+    const operator = String(options.operator || options.channel || "").toUpperCase();
+    if (!["NAGAD", "ROCKET", "BKASH"].includes(operator)) {
+      return { success: false, reason: "INVALID_OPERATOR", error: "INVALID_OPERATOR" };
+    }
+
+    const mobileNumber = String(options.mobileNumber || options.mobile || "").trim();
+    if (!mobileNumber || !/^01[3-9]\d{8}$/.test(mobileNumber)) {
+      return { success: false, reason: "INVALID_MOBILE_NUMBER", error: "INVALID_MOBILE_NUMBER" };
+    }
+
+    const amountPaisa = options.amountPaisa !== undefined
+      ? Number(options.amountPaisa)
+      : Math.round(Number(options.amount || 0) * 100);
+
+    const val = this.validateAmount(amountPaisa);
+    if (!val.valid) return { success: false, ...val };
+
+    const orderId = "ORD_MFS_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    const feePaisa = this.calculateFee(operator, amountPaisa);
+    const gatewayUrl = "https://gateway.nobopay.net/mfs/checkout?orderId=" + orderId;
+
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+
+    return {
+      success: true,
+      id: orderId,
+      orderId,
+      txnNumber: orderId,
+      gatewayUrl,
+      operator,
+      channel: operator,
+      channelType: "MFS",
+      amount: amountPaisa / 100,
+      amountPaisa,
+      fee: feePaisa / 100,
+      feePaisa,
+      totalDebitPaisa: amountPaisa + feePaisa,
+      totalAmount: (amountPaisa + feePaisa) / 100,
+      creditedAmount: amountPaisa / 100,
+      status: "INITIATED",
+      timestamp: now,
+      txnTime: nowIso,
+      createdAt: nowIso,
+    };
+  }
+
+  processAddMoneyFromMfs(businessId, options = {}) {
+    return this.initiateMfsOrder({
+      ...options,
+      businessId,
+    });
+  }
+}
+
+const AddMoneyEngine = ReconstructedAddMoneyEngine;
+const addMoneyEngine = new ReconstructedAddMoneyEngine();
+const reconstructedAddMoneyEngine = addMoneyEngine;
+
+
 
 module.exports = {
+  // Milestone REA-ITER-233 Exports
+  ADD_MONEY_CHANNELS,
+  AddMoneyMethod,
+  CARD_NETWORKS,
+  CardNetwork,
+  CARD_TYPES,
+  CardType,
+  ADD_MONEY_PRESETS,
+  ADD_MONEY_PRESETS_PAISA,
+  ADD_MONEY_LIMITS,
+  ADD_MONEY_FEE_RATES,
+  ADD_MONEY_ARSC_TOKENS,
+  luhnCheck,
+  validateLuhn,
+  detectCardNetwork,
+  maskCardNumber,
+  calculateAddMoneyFee,
+  ReconstructedAddMoneyEngine,
+  AddMoneyEngine,
+  reconstructedAddMoneyEngine,
+  addMoneyEngine,
+
   // Milestone REA-ITER-232 Exports
   ACCOUNT_STATUSES,
   ACCOUNT_TYPES,

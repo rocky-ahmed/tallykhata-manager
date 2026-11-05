@@ -277,6 +277,7 @@ const VALID_COLLECTIONS = new Set([
   'deviceBindings',
     'linkedBankAccounts',
     'linkedMfsAccounts',
+    'savedCards',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -403,6 +404,7 @@ function sanitizeState(state) {
   if (!Array.isArray(s.deviceBindings)) s.deviceBindings = [];
   if (!Array.isArray(s.linkedBankAccounts)) s.linkedBankAccounts = [];
   if (!Array.isArray(s.linkedMfsAccounts)) s.linkedMfsAccounts = [];
+  if (!Array.isArray(s.savedCards)) s.savedCards = [];
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
   if (!Array.isArray(s.tallyPayBeneficiaries)) s.tallyPayBeneficiaries = [];
@@ -549,6 +551,7 @@ function createDefaultState() {
     deviceBindings: [],
       linkedBankAccounts: [],
       linkedMfsAccounts: [],
+      savedCards: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1693,6 +1696,17 @@ class StorageRepository {
       authoritative.linkedMfsAccounts = [];
     }
 
+    if (authoritative.savedCards && Array.isArray(authoritative.savedCards)) {
+      authoritative.savedCards = authoritative.savedCards.map((c) => {
+        const rawNum = String(c.cardNumber || c.maskedNumber || c.maskedCardNumber || "").replace(/[\s-]+/g, "");
+        const masked = rawNum.length > 4 ? "**** **** **** " + rawNum.slice(-4) : "**** **** **** ****";
+        const { cvv, cvc, pin, rawPin, sessionToken, token, apiKey, secretKey, credential, ...rest } = c || {};
+        return { ...rest, cardNumber: masked, maskedCardNumber: masked, maskedNumber: masked };
+      });
+    } else {
+      authoritative.savedCards = [];
+    }
+
     if (authoritative.deviceBindings && Array.isArray(authoritative.deviceBindings)) {
       authoritative.deviceBindings = authoritative.deviceBindings.map((b) => {
         const { pin, rawPin, sessionToken, token, secret, ...rest } = b || {};
@@ -2278,6 +2292,7 @@ class StorageRepository {
         const deviceBindings = (prevStore.deviceBindings || []).filter((b) => getBizId(b) !== targetId);
         const linkedBankAccounts = (prevStore.linkedBankAccounts || []).filter((b) => getBizId(b) !== targetId);
         const linkedMfsAccounts = (prevStore.linkedMfsAccounts || []).filter((m) => getBizId(m) !== targetId);
+        const savedCards = (prevStore.savedCards || []).filter((c) => getBizId(c) !== targetId);
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
         delete autoDisbursementConfig[targetId];
 
@@ -2367,6 +2382,7 @@ class StorageRepository {
         deviceBindings,
         linkedBankAccounts,
         linkedMfsAccounts,
+        savedCards,
         autoDisbursementConfig,
         cashReconciliation,
       };
@@ -2546,6 +2562,8 @@ class StorageRepository {
         const keptDeviceBindings = (prevStore.deviceBindings || []).filter(b => String(b.businessId || '1') !== selectedBizId);
           const keptLinkedBankAccounts = (prevStore.linkedBankAccounts || []).filter(b => String(b.businessId || '1') !== selectedBizId);
           const keptLinkedMfsAccounts = (prevStore.linkedMfsAccounts || []).filter(m => String(m.businessId || '1') !== selectedBizId);
+        const keptSavedCards = (prevStore.savedCards || []).filter(c => String(c.businessId || '1') !== selectedBizId);
+        const importedSavedCards = (data.savedCards || []).filter(c => String(c.businessId || '1') === selectedBizId);
 
         const mergedAccounts = [...keptAccounts, ...importedAccounts];
         const mergedJournals = [...keptJournals, ...importedJournals];
@@ -2587,6 +2605,7 @@ class StorageRepository {
           deviceBindings: [...keptDeviceBindings, ...importedDeviceBindings],
             linkedBankAccounts: [...keptLinkedBankAccounts, ...importedLinkedBankAccounts],
             linkedMfsAccounts: [...keptLinkedMfsAccounts, ...importedLinkedMfsAccounts],
+          savedCards: [...keptSavedCards, ...importedSavedCards],
           autoDisbursementConfig: { ...(prevStore.autoDisbursementConfig || {}), ...(data.autoDisbursementConfig || {}) },
           version: 6,
           lastRestoredAt: new Date().toISOString(),
@@ -2637,6 +2656,7 @@ class StorageRepository {
         deviceBindings: Array.isArray(data.deviceBindings) ? data.deviceBindings : [],
           linkedBankAccounts: Array.isArray(data.linkedBankAccounts) ? data.linkedBankAccounts : [],
           linkedMfsAccounts: Array.isArray(data.linkedMfsAccounts) ? data.linkedMfsAccounts : [],
+          savedCards: Array.isArray(data.savedCards) ? data.savedCards : [],
         autoDisbursementConfig: (data.autoDisbursementConfig && typeof data.autoDisbursementConfig === 'object') ? data.autoDisbursementConfig : {},
         inventory: restoredInventory,
         stock: restoredInventory,
@@ -7658,6 +7678,126 @@ class StorageRepository {
       return { success: removed, deletedId: id };
     }
 
+    /**
+     * REA-ITER-233: Saves or updates a tokenized card in savedCards collection.
+     */
+    async saveCard(businessId = null, cardData = {}) {
+      if (!cardData || typeof cardData !== "object") {
+        return { success: false, error: "INVALID_CARD_DATA" };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || "1");
+      const cardId = cardData.id || cardData.cardId || ("CRD_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8));
+
+      const rawNum = String(cardData.cardNumber || cardData.maskedNumber || cardData.maskedCardNumber || "").replace(/[\s-]+/g, "");
+      const maskedNumber = rawNum.length > 4 ? "**** **** **** " + rawNum.slice(-4) : "**** **** **** ****";
+
+      let cardNetwork = cardData.cardNetwork;
+      if (!cardNetwork || cardNetwork === "UNKNOWN") {
+        if (tallyPayService && typeof tallyPayService.detectCardNetwork === "function") {
+          cardNetwork = tallyPayService.detectCardNetwork(rawNum);
+        } else {
+          cardNetwork = "UNKNOWN";
+        }
+      }
+
+      const nowIso = new Date().toISOString();
+      const record = {
+        id: cardId,
+        cardId,
+        businessId: targetBizId,
+        cardHolderName: String(cardData.cardHolderName || "Cardholder").trim(),
+        cardNumber: maskedNumber,
+        maskedNumber,
+        maskedCardNumber: maskedNumber,
+        cardNetwork: cardNetwork || "UNKNOWN",
+        cardType: cardData.cardType || "DEBIT",
+        expiryMonth: String(cardData.expiryMonth || "12"),
+        expiryYear: String(cardData.expiryYear || "28"),
+        isDefault: Boolean(cardData.isDefault),
+        createdAt: cardData.createdAt || nowIso,
+        updatedAt: nowIso,
+      };
+
+      let saved = null;
+      await this.mutateCollection("savedCards", (list) => {
+        const withoutCurrent = (list || []).filter((c) => c.id !== cardId && c.cardId !== cardId);
+        let updatedList = withoutCurrent;
+        if (record.isDefault) {
+          updatedList = withoutCurrent.map((c) => {
+            if (String(c.businessId || "1") === targetBizId) {
+              return { ...c, isDefault: false };
+            }
+            return c;
+          });
+        }
+        saved = record;
+        return [record, ...updatedList];
+      });
+
+      return { success: true, card: saved };
+    }
+
+    /**
+     * REA-ITER-233: Retrieves saved cards for a business.
+     */
+    getSavedCards(businessId = null) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || "1");
+      const list = (store.savedCards || []).filter(
+        (c) => String(c.businessId || "1") === targetBizId
+      );
+
+      list.sort((a, b) => {
+        if (a.isDefault && !b.isDefault) return -1;
+        if (!a.isDefault && b.isDefault) return 1;
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      });
+
+      return {
+        items: list,
+        cards: list,
+        totalCount: list.length,
+      };
+    }
+
+    /**
+     * REA-ITER-233: Retrieves a saved card by ID for a business.
+     */
+    getSavedCardById(businessId = null, cardId = null) {
+      if (!cardId) return null;
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const found = (store.savedCards || []).find(
+        (c) => (c.id === cardId || c.cardId === cardId) && (!targetBizId || String(c.businessId || "1") === targetBizId)
+      );
+      return found ? { ...found } : null;
+    }
+
+    /**
+     * REA-ITER-233: Deletes a saved card for a business.
+     */
+    async deleteCard(businessId = null, cardId = null) {
+      if (!cardId) return { success: false, error: "CARD_ID_REQUIRED" };
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || "1");
+      let removed = false;
+
+      await this.mutateCollection("savedCards", (list) => {
+        const filtered = (list || []).filter(
+          (c) => !((c.id === cardId || c.cardId === cardId) && String(c.businessId || "1") === targetBizId)
+        );
+        if (filtered.length !== (list || []).length) removed = true;
+        return filtered;
+      });
+
+      if (!removed) {
+        return { success: false, reason: "CARD_NOT_FOUND", error: "CARD_NOT_FOUND", message: "কার্ডটি পাওয়া যায়নি।" };
+      }
+      return { success: true, deletedId: cardId };
+    }
+
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -8875,6 +9015,35 @@ async function deleteLinkedMfsAccountRepo(businessId = null, id = null, repo = d
   return { success: false, error: 'NO_REPOSITORY' };
 }
 
+async function saveCardRepo(businessId = null, cardData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveCard === "function") {
+    return repo.saveCard(businessId, cardData);
+  }
+  return { success: false, error: "NO_REPOSITORY" };
+}
+
+function getSavedCardsRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getSavedCards === "function") {
+    return repo.getSavedCards(businessId);
+  }
+  return { items: [], cards: [], totalCount: 0 };
+}
+
+function getSavedCardByIdRepo(businessId = null, cardId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getSavedCardById === "function") {
+    return repo.getSavedCardById(businessId, cardId);
+  }
+  return null;
+}
+
+async function deleteCardRepo(businessId = null, cardId = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteCard === "function") {
+    return repo.deleteCard(businessId, cardId);
+  }
+  return { success: false, error: "NO_REPOSITORY" };
+}
+
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -9035,6 +9204,10 @@ const repoExport = {
   getLinkedMfsAccounts: getLinkedMfsAccountsRepo,
   getLinkedMfsAccountById: getLinkedMfsAccountByIdRepo,
   deleteLinkedMfsAccount: deleteLinkedMfsAccountRepo,
+  saveCard: saveCardRepo,
+  getSavedCards: getSavedCardsRepo,
+  getSavedCardById: getSavedCardByIdRepo,
+  deleteCard: deleteCardRepo,
   sanitizeState: sanitizeStateRepo,
   default: defaultRepository,
 };
@@ -9202,6 +9375,10 @@ if (typeof exports !== 'undefined') {
   exports.getLinkedMfsAccounts = getLinkedMfsAccountsRepo;
   exports.getLinkedMfsAccountById = getLinkedMfsAccountByIdRepo;
   exports.deleteLinkedMfsAccount = deleteLinkedMfsAccountRepo;
+  exports.saveCard = saveCardRepo;
+  exports.getSavedCards = getSavedCardsRepo;
+  exports.getSavedCardById = getSavedCardByIdRepo;
+  exports.deleteCard = deleteCardRepo;
   exports.sanitizeState = sanitizeStateRepo;
   exports.default = defaultRepository;
 }

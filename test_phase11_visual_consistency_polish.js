@@ -129,7 +129,7 @@ runTest('All 53 Modals in App.js implement onRequestClose handlers', () => {
     const snippet = appSrc.substring(startIdx, startIdx + 600);
     assert.ok(snippet.includes('onRequestClose'), 'Modal #' + count + ' must have onRequestClose');
   }
-  assert.strictEqual(count, 87, 'Must have exactly 87 modals');
+  assert.strictEqual(count, 91, 'Must have exactly 91 modals');
 });
 
 console.log('\n--- PART 5: TOUCH TARGET PHYSICS & HIT SLOP ---');
