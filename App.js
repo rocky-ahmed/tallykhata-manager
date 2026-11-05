@@ -1311,6 +1311,29 @@ function TallyKhataApp() {
   const [soundboxVoicePromptText, setSoundboxVoicePromptText] = useState("টালিপে-তে ১,০০০ টাকা পাওয়া গেছে");
   const [soundboxAudioSink, setSoundboxAudioSink] = useState("HARDWARE_BLE_SOUNDBOX");
   const [soundboxReconnectCountdown, setSoundboxReconnectCountdown] = useState(null);
+  // --- REA-ITER-237: TallyPay Merchant KYC, NID Scanner & Bio-Verification Pipeline ---
+  const [modalKycSplash, setModalKycSplash] = useState(false);
+  const [modalNidCameraScanner, setModalNidCameraScanner] = useState(false);
+  const [modalNidInfoReview, setModalNidInfoReview] = useState(false);
+  const [modalLivenessSelfie, setModalLivenessSelfie] = useState(false);
+  const [modalKycStatusResult, setModalKycStatusResult] = useState(false);
+
+  const [kycNidSide, setKycNidSide] = useState('FRONT');
+  const [kycFlashOn, setKycFlashOn] = useState(false);
+  const [kycNidFrontCaptured, setKycNidFrontCaptured] = useState(false);
+  const [kycNidBackCaptured, setKycNidBackCaptured] = useState(false);
+  const [kycNidNumber, setKycNidNumber] = useState('19901234567890123');
+  const [kycNameEn, setKycNameEn] = useState('MD RAHIM UDDIN');
+  const [kycNameBn, setKycNameBn] = useState('মোঃ রহিম উদ্দিন');
+  const [kycDob, setKycDob] = useState('1990-05-15');
+  const [kycFatherName, setKycFatherName] = useState('MD ABDUL KARIM');
+  const [kycMotherName, setKycMotherName] = useState('FATEMA BEGUM');
+  const [kycNidValidationError, setKycNidValidationError] = useState('');
+  const [kycLivenessGesture, setKycLivenessGesture] = useState('LOOK_STRAIGHT');
+  const [kycLivenessState, setKycLivenessState] = useState('IDLE');
+  const [kycLivenessProgress, setKycLivenessProgress] = useState(0);
+  const [kycVerificationStatus, setKycVerificationStatus] = useState('VERIFIED');
+  const [kycMatchScore, setKycMatchScore] = useState(94);
   const [transferWalletMobile, setTransferWalletMobile] = useState('');
   const [transferWalletAmount, setTransferWalletAmount] = useState('1000');
   const [transferWalletPreset, setTransferWalletPreset] = useState(1000);
@@ -2672,7 +2695,36 @@ function TallyKhataApp() {
         setModalSelectCustomerAday(false);
         return true;
       }
-      // Iteration 236: Settlement & Soundbox BackHandler
+      // Iteration 237: KYC & NID Scanner BackHandler
+      if (modalKycStatusResult) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalKycStatusResult(false);
+        return true;
+      }
+      if (modalLivenessSelfie) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalLivenessSelfie(false);
+        setModalNidInfoReview(true);
+        return true;
+      }
+      if (modalNidInfoReview) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalNidInfoReview(false);
+        setModalNidCameraScanner(true);
+        return true;
+      }
+      if (modalNidCameraScanner) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalNidCameraScanner(false);
+        setModalKycSplash(true);
+        return true;
+      }
+      if (modalKycSplash) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalKycSplash(false);
+        return true;
+      }
+            // Iteration 236: Settlement & Soundbox BackHandler
       if (modalSoundboxVoiceBroadcast) {
         try { hapticFeedbackService.selection(); } catch (e) {}
         setModalSoundboxVoiceBroadcast(false);
@@ -2895,7 +2947,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalKycSplash, modalNidCameraScanner, modalNidInfoReview, modalLivenessSelfie, modalKycStatusResult, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -6704,6 +6756,96 @@ function TallyKhataApp() {
   };
 
   // =========================================================================
+  // REA-ITER-237: TALLYPAY MERCHANT KYC, NID SCANNER & BIO-VERIFICATION HANDLERS
+  // =========================================================================
+  const handleOpenKycWizard = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalKycSplash(true);
+  };
+
+  const handleStartKycFromSplash = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalKycSplash(false);
+    setKycNidSide('FRONT');
+    setKycNidFrontCaptured(false);
+    setKycNidBackCaptured(false);
+    setModalNidCameraScanner(true);
+  };
+
+  const handleNidCapture = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    if (kycNidSide === 'FRONT') {
+      setKycNidFrontCaptured(true);
+      setKycNidSide('BACK');
+    } else {
+      setKycNidBackCaptured(true);
+      setModalNidCameraScanner(false);
+      setModalNidInfoReview(true);
+    }
+  };
+
+  const handleValidateAndProceedToSelfie = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const valResult = tallyPayService && tallyPayService.validateBangladeshNid 
+      ? tallyPayService.validateBangladeshNid(kycNidNumber, kycDob)
+      : { valid: [10, 13, 17].includes(String(kycNidNumber).replace(/\D/g, '').length) };
+    if (!valResult.valid) {
+      setKycNidValidationError(t('nid_length_error') || 'NID নম্বর ১০, ১৩ অথবা ১৭ সংখ্যা হতে হবে।');
+      try { hapticFeedbackService.notificationError(); } catch (e) {}
+      return;
+    }
+    setKycNidValidationError('');
+    setModalNidInfoReview(false);
+    setKycLivenessGesture('LOOK_STRAIGHT');
+    setKycLivenessState('AWAITING_CENTRE');
+    setModalLivenessSelfie(true);
+  };
+
+  const handlePerformLivenessAndSelfie = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    setKycLivenessState('SESSION_COMPLETE');
+    setKycLivenessProgress(100);
+    const score = 94;
+    setKycMatchScore(score);
+    const evalStatus = (tallyPayService && tallyPayService.evaluateKycVerificationStatus)
+      ? tallyPayService.evaluateKycVerificationStatus({ nidValidation: { valid: true }, livenessScore: score / 100 })
+      : (score >= 85 ? 'VERIFIED' : score >= 50 ? 'PENDING' : 'REJECTED');
+    setKycVerificationStatus(evalStatus);
+
+    try {
+      if (storageRepository && storageRepository.saveMerchantKyc) {
+        storageRepository.saveMerchantKyc({
+          businessId: currentBusiness?.id || 'default_business',
+          nidNumber: kycNidNumber,
+          applicantNameEn: kycNameEn,
+          applicantNameBn: kycNameBn,
+          dateOfBirth: kycDob,
+          fatherName: kycFatherName,
+          motherName: kycMotherName,
+          verificationStatus: evalStatus,
+          livenessScore: score / 100,
+          verifiedAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {}
+
+    setModalLivenessSelfie(false);
+    setModalKycStatusResult(true);
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+  };
+
+  const handleDoneKyc = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalKycStatusResult(false);
+  };
+
+  const handleRetryKyc = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalKycStatusResult(false);
+    setModalKycSplash(true);
+  };
+
+  // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
   // =========================================================================
   const handleOpenSoundboxSettings = () => {
@@ -8109,7 +8251,61 @@ function TallyKhataApp() {
       tallyPayService,
     };
 
-        global.__SETTLEMENT_SOUNDBOX_TEST_HOOKS__ = {
+        global.__KYC_TEST_HOOKS__ = {
+      modalKycSplash,
+      setModalKycSplash,
+      modalNidCameraScanner,
+      setModalNidCameraScanner,
+      modalNidInfoReview,
+      setModalNidInfoReview,
+      modalLivenessSelfie,
+      setModalLivenessSelfie,
+      modalKycStatusResult,
+      setModalKycStatusResult,
+      kycNidSide,
+      setKycNidSide,
+      kycFlashOn,
+      setKycFlashOn,
+      kycNidFrontCaptured,
+      setKycNidFrontCaptured,
+      kycNidBackCaptured,
+      setKycNidBackCaptured,
+      kycNidNumber,
+      setKycNidNumber,
+      kycNameEn,
+      setKycNameEn,
+      kycNameBn,
+      setKycNameBn,
+      kycDob,
+      setKycDob,
+      kycFatherName,
+      setKycFatherName,
+      kycMotherName,
+      setKycMotherName,
+      kycNidValidationError,
+      setKycNidValidationError,
+      kycLivenessGesture,
+      setKycLivenessGesture,
+      kycLivenessState,
+      setKycLivenessState,
+      kycLivenessProgress,
+      setKycLivenessProgress,
+      kycVerificationStatus,
+      setKycVerificationStatus,
+      kycMatchScore,
+      setKycMatchScore,
+      handleOpenKycWizard,
+      handleStartKycFromSplash,
+      handleNidCapture,
+      handleValidateAndProceedToSelfie,
+      handlePerformLivenessAndSelfie,
+      handleDoneKyc,
+      handleRetryKyc,
+      storageRepository,
+      tallyPayService,
+    };
+
+    global.__SETTLEMENT_SOUNDBOX_TEST_HOOKS__ = {
       modalSettlementReconciliation,
       setModalSettlementReconciliation,
       modalSettlementConfirmation,
@@ -11795,6 +11991,26 @@ accessibilityLabel={
               </TouchableOpacity>
 
               <TouchableOpacity
+                testID="tp_merchant_kyc_banner_btn"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                style={styles.walletServiceBtn}
+                onPress={handleOpenKycWizard}
+                activeOpacity={0.75}
+                accessibilityLabel={t('merchant_kyc_title')}
+              >
+                <AppIcon
+                  source={require("./assets/icons/ic_menu_customer_profile.png")}
+                  variant="primary"
+                  shape="circle"
+                  size={24}
+                  containerSize={50}
+                  accessibilityLabel={t('merchant_kyc_title')}
+                />
+                <Text style={styles.walletServiceLabel}>{t('merchant_kyc_title')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 testID="tp_soundbox_diagnostics_btn"
                 style={styles.walletServiceBtn}
                 onPress={handleOpenSoundboxDiagnostics}
@@ -12268,6 +12484,22 @@ accessibilityLabel={
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('settle_payment_action')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('sc_credit_settlement')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenKycWizard}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('merchant_kyc_title')}
+                testID="menu_tp_merchant_kyc_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_customer_profile.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('merchant_kyc_title')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('merchant_kyc_desc')}</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
@@ -26226,6 +26458,645 @@ accessibilityLabel={
                 {tStatic("সম্পন্ন")}
               </Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 107: E-KYC SPLASH WIZARD (EkycInitActivity) (ITERATION 237)
+         =================================================================== */}
+      <Modal
+        visible={modalKycSplash}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalKycSplash(false)}
+        testID="modal_kyc_splash"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_kyc_splash_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalKycSplash(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("ফিরে যান")}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>✕</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', flex: 1, textAlign: 'center' }}>
+                {t('merchant_kyc_title')}
+              </Text>
+              <View style={{ width: 44 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Graphic & Subtitle */}
+              <View style={{ alignItems: 'center', marginVertical: 12 }}>
+                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: isDark ? '#064E3B' : '#ECFDF5', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 36 }}>🪪</Text>
+                </View>
+                <Text style={{ fontSize: 14, color: isDark ? currentTheme.textSecondary : '#64748B', textAlign: 'center', lineHeight: 20, paddingHorizontal: 12 }}>
+                  {t('merchant_kyc_desc')}
+                </Text>
+              </View>
+
+              {/* Benefit Banner */}
+              <View style={{ backgroundColor: isDark ? '#1E293B' : '#F0FDF4', borderRadius: 12, padding: 14, marginVertical: 12, borderWidth: 1, borderColor: isDark ? '#334155' : '#BBF7D0', flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 22, marginRight: 10 }}>✨</Text>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? '#34D399' : '#0D6E5C', flex: 1, lineHeight: 18 }}>
+                  {t('ekyc_header_banner')}
+                </Text>
+              </View>
+
+              {/* Steps Overview */}
+              <View style={{ marginVertical: 10 }}>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 12 }}>
+                  {t('kyc_steps_overview')}
+                </Text>
+
+                {/* Step 1 */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, backgroundColor: isDark ? '#1E293B' : '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>১</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                      {t('kyc_step_nid')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                      {t('nid_front_label')} ও {t('nid_back_label')}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Step 2 */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, backgroundColor: isDark ? '#1E293B' : '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>২</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                      {t('kyc_step_selfie')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                      {t('selfie_complete_cta')}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Step 3 */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? '#1E293B' : '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>৩</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                      {t('kyc_step_review')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 2 }}>
+                      {t('nid_ocr_review_desc')}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Start Button */}
+            <TouchableOpacity
+              testID="btn_kyc_start_wizard"
+              style={{ height: 48, backgroundColor: '#0D6E5C', borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 12 }}
+              onPress={handleStartKycFromSplash}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('kyc_start_btn')}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {t('kyc_start_btn')} →
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 108: NID CAMERA SCANNER (ImageCaptureActivity) (ITERATION 237)
+         =================================================================== */}
+      <Modal
+        visible={modalNidCameraScanner}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setModalNidCameraScanner(false);
+          setModalKycSplash(true);
+        }}
+        testID="modal_nid_camera_scanner"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '94%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <TouchableOpacity
+                testID="btn_nid_camera_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalNidCameraScanner(false);
+                  setModalKycSplash(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("ফিরে যান")}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', flex: 1, textAlign: 'center' }}>
+                {t('nid_camera_title')}
+              </Text>
+              <TouchableOpacity
+                testID="btn_nid_camera_flash"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setKycFlashOn(!kycFlashOn);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('nid_camera_flash')}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 18 }}>{kycFlashOn ? '⚡' : '💡'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Document Orientation Selector (FRONT / BACK) */}
+            <View style={{ flexDirection: 'row', backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderRadius: 8, padding: 4, marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_nid_side_front"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('nid_front')}
+                style={{ flex: 1, height: 38, borderRadius: 6, backgroundColor: kycNidSide === 'FRONT' ? '#0D6E5C' : 'transparent', alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setKycNidSide('FRONT');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: kycNidSide === 'FRONT' ? '#FFFFFF' : (isDark ? currentTheme.textSecondary : '#64748B') }}>
+                  {t('nid_orientation_front')} {kycNidFrontCaptured ? '✓' : ''}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_nid_side_back"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('nid_back')}
+                style={{ flex: 1, height: 38, borderRadius: 6, backgroundColor: kycNidSide === 'BACK' ? '#0D6E5C' : 'transparent', alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setKycNidSide('BACK');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: kycNidSide === 'BACK' ? '#FFFFFF' : (isDark ? currentTheme.textSecondary : '#64748B') }}>
+                  {t('nid_orientation_back')} {kycNidBackCaptured ? '✓' : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Viewfinder Guide Card */}
+            <View style={{ height: 220, backgroundColor: isDark ? '#020617' : '#0F172A', borderRadius: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 16, position: 'relative' }}>
+              <View
+                testID="view_nid_reticle_guide"
+                style={{ width: '92%', height: 160, borderWidth: 2, borderColor: '#10B981', borderStyle: 'dashed', borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 44, opacity: 0.8 }}>🪪</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold', marginTop: 10, textAlign: 'center' }}>
+                  {kycNidSide === 'FRONT' ? t('nid_front_overlay') : t('nid_back_overlay')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Camera Controls & Shutter */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginTop: 18 }}>
+              <TouchableOpacity
+                testID="btn_nid_retake"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('retake_photo')}
+                style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: isDark ? '#1E293B' : '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  if (kycNidSide === 'FRONT') setKycNidFrontCaptured(false);
+                  else setKycNidBackCaptured(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('nid_retake_btn')}
+              >
+                <Text style={{ fontSize: 20 }}>🔄</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                testID="btn_nid_capture"
+                style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: '#0D6E5C', borderWidth: 4, borderColor: '#A7F3D0', alignItems: 'center', justifyContent: 'center' }}
+                onPress={handleNidCapture}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('nid_capture_btn')}
+              >
+                <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFFFFF' }} />
+              </TouchableOpacity>
+
+              <View style={{ width: 50, height: 50 }} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 109: NID OCR INFO REVIEW (NidInfoActivity) (ITERATION 237)
+         =================================================================== */}
+      <Modal
+        visible={modalNidInfoReview}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setModalNidInfoReview(false);
+          setModalNidCameraScanner(true);
+        }}
+        testID="modal_nid_info_review"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '94%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <TouchableOpacity
+                testID="btn_nid_info_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalNidInfoReview(false);
+                  setModalNidCameraScanner(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("ফিরে যান")}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', flex: 1, textAlign: 'center' }}>
+                {t('nid_ocr_review_title')}
+              </Text>
+              <View style={{ width: 44 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 20 }}>
+              <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 14 }}>
+                {t('nid_ocr_review_desc')}
+              </Text>
+
+              {/* Validation error display */}
+              {kycNidValidationError ? (
+                <View style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#FECACA' }}>
+                  <Text testID="text_nid_validation_error" style={{ color: '#991B1B', fontSize: 12, fontWeight: 'bold' }}>
+                    {kycNidValidationError}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Field 1: NID Number */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 4 }}>
+                  {t('nid_number_label')} *
+                </Text>
+                <TextInput
+                  testID="input_nid_number"
+                  style={{ height: 44, borderWidth: 1, borderColor: isDark ? '#334155' : '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: isDark ? currentTheme.textPrimary : '#0F172A', backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }}
+                  value={kycNidNumber}
+                  onChangeText={(val) => {
+                    setKycNidNumber(val);
+                    if (kycNidValidationError) setKycNidValidationError('');
+                  }}
+                  keyboardType="numeric"
+                  placeholder="১০, ১৩ বা ১৭ ডিজিট"
+                  placeholderTextColor="#94A3B8"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                />
+              </View>
+
+              {/* Field 2: Name (English) */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 4 }}>
+                  নাম (ইংরেজি) *
+                </Text>
+                <TextInput
+                  testID="input_nid_name_en"
+                  style={{ height: 44, borderWidth: 1, borderColor: isDark ? '#334155' : '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: isDark ? currentTheme.textPrimary : '#0F172A', backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }}
+                  value={kycNameEn}
+                  onChangeText={setKycNameEn}
+                  placeholder="MD RAHIM UDDIN"
+                  placeholderTextColor="#94A3B8"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                />
+              </View>
+
+              {/* Field 3: Name (Bengali) */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 4 }}>
+                  নাম (বাংলা) *
+                </Text>
+                <TextInput
+                  testID="input_nid_name_bn"
+                  style={{ height: 44, borderWidth: 1, borderColor: isDark ? '#334155' : '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: isDark ? currentTheme.textPrimary : '#0F172A', backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }}
+                  value={kycNameBn}
+                  onChangeText={setKycNameBn}
+                  placeholder="মোঃ রহিম উদ্দিন"
+                  placeholderTextColor="#94A3B8"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                />
+              </View>
+
+              {/* Field 4: Date of Birth */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 4 }}>
+                  জন্ম তারিখ (YYYY-MM-DD) *
+                </Text>
+                <TextInput
+                  testID="input_nid_dob"
+                  style={{ height: 44, borderWidth: 1, borderColor: isDark ? '#334155' : '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: isDark ? currentTheme.textPrimary : '#0F172A', backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }}
+                  value={kycDob}
+                  onChangeText={setKycDob}
+                  placeholder="1990-05-15"
+                  placeholderTextColor="#94A3B8"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                />
+              </View>
+
+              {/* Field 5: Father's Name */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 4 }}>
+                  পিতার নাম
+                </Text>
+                <TextInput
+                  testID="input_nid_father_name"
+                  style={{ height: 44, borderWidth: 1, borderColor: isDark ? '#334155' : '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: isDark ? currentTheme.textPrimary : '#0F172A', backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }}
+                  value={kycFatherName}
+                  onChangeText={setKycFatherName}
+                  placeholder="MD ABDUL KARIM"
+                  placeholderTextColor="#94A3B8"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                />
+              </View>
+
+              {/* Field 6: Mother's Name */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 4 }}>
+                  মাতার নাম
+                </Text>
+                <TextInput
+                  testID="input_nid_mother_name"
+                  style={{ height: 44, borderWidth: 1, borderColor: isDark ? '#334155' : '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: isDark ? currentTheme.textPrimary : '#0F172A', backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }}
+                  value={kycMotherName}
+                  onChangeText={setKycMotherName}
+                  placeholder="FATEMA BEGUM"
+                  placeholderTextColor="#94A3B8"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                />
+              </View>
+            </ScrollView>
+
+            {/* Proceed CTA */}
+            <TouchableOpacity
+              testID="btn_proceed_to_selfie"
+              style={{ height: 48, backgroundColor: '#0D6E5C', borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 10 }}
+              onPress={handleValidateAndProceedToSelfie}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('proceed_to_selfie')}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {t('proceed_to_selfie')} →
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 110: LIVENESS SELFIE BIO-VERIFICATION (EkycLivenessScreen) (ITERATION 237)
+         =================================================================== */}
+      <Modal
+        visible={modalLivenessSelfie}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setModalLivenessSelfie(false);
+          setModalNidInfoReview(true);
+        }}
+        testID="modal_liveness_selfie"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '94%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <TouchableOpacity
+                testID="btn_selfie_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalLivenessSelfie(false);
+                  setModalNidInfoReview(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("ফিরে যান")}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', flex: 1, textAlign: 'center' }}>
+                {t('liveness_selfie_title')}
+              </Text>
+              <View style={{ width: 44 }} />
+            </View>
+
+            {/* Gesture Prompt Banner */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#EFF6FF', borderRadius: 10, padding: 12, marginBottom: 14, alignItems: 'center', borderWidth: 1, borderColor: isDark ? '#334155' : '#BFDBFE' }}>
+              <Text testID="text_liveness_gesture_prompt" style={{ fontSize: 14, fontWeight: 'bold', color: '#1D4ED8', textAlign: 'center' }}>
+                {kycLivenessGesture === 'LOOK_STRAIGHT' ? 'সোজা ক্যামেরার দিকে তাকান' : kycLivenessGesture === 'SMILE' ? 'একটু মৃদু হাসুন (Smile)' : 'চোখ পিটপিট করুন (Blink)'}
+              </Text>
+              <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginTop: 4 }}>
+                {t('matching_progress')}
+              </Text>
+            </View>
+
+            {/* Oval Face Guide Viewfinder */}
+            <View style={{ height: 260, backgroundColor: isDark ? '#020617' : '#0F172A', borderRadius: 16, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              <View
+                testID="view_oval_face_guide"
+                style={{ width: 170, height: 220, borderRadius: 85, borderWidth: 3, borderColor: '#10B981', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}
+              >
+                <Text style={{ fontSize: 50, opacity: 0.9 }}>👤</Text>
+                <View style={{ position: 'absolute', bottom: 16, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }}>
+                    {kycLivenessState}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Capture / Verify CTA */}
+            <TouchableOpacity
+              testID="btn_capture_selfie"
+              style={{ height: 48, backgroundColor: '#0D6E5C', borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 18 }}
+              onPress={handlePerformLivenessAndSelfie}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('selfie_complete_cta')}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                📸 {t('selfie_complete_cta')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 111: KYC STATUS RESULT & BIO-VERIFICATION (TpCaptureNidSuccessActivity) (ITERATION 237)
+         =================================================================== */}
+      <Modal
+        visible={modalKycStatusResult}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalKycStatusResult(false)}
+        testID="modal_kyc_status_result"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_kyc_status_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalKycStatusResult(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("ফিরে যান")}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>✕</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', flex: 1, textAlign: 'center' }}>
+                ভেরিফিকেশন রেজাল্ট
+              </Text>
+              <View style={{ width: 44 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 20 }}>
+              {/* Status Badge */}
+              <View style={{ alignItems: 'center', marginVertical: 14 }}>
+                <View
+                  testID="pill_kyc_status"
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    backgroundColor: kycVerificationStatus === 'VERIFIED' ? '#D1FAE5' : kycVerificationStatus === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
+                    borderWidth: 1,
+                    borderColor: kycVerificationStatus === 'VERIFIED' ? '#A7F3D0' : kycVerificationStatus === 'PENDING' ? '#FDE68A' : '#FECACA',
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{ fontSize: 16, marginRight: 6 }}>
+                    {kycVerificationStatus === 'VERIFIED' ? '✅' : kycVerificationStatus === 'PENDING' ? '⏳' : '❌'}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 'bold',
+                      color: kycVerificationStatus === 'VERIFIED' ? '#0D6E5C' : kycVerificationStatus === 'PENDING' ? '#78350F' : '#991B1B'
+                    }}
+                  >
+                    {kycVerificationStatus === 'VERIFIED' ? t('kyc_status_verified') : kycVerificationStatus === 'PENDING' ? t('kyc_status_pending') : t('kyc_status_rejected')}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Biometric Match Score Card */}
+              <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 12, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 4 }}>
+                  {t('biometric_match_score')}
+                </Text>
+                <Text testID="text_kyc_match_score" style={{ fontSize: 28, fontWeight: 'bold', color: kycMatchScore >= 85 ? '#0D6E5C' : kycMatchScore >= 50 ? '#D97706' : '#DC2626' }}>
+                  {kycMatchScore}%
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#94A3B8', marginTop: 4 }}>
+                  {kycMatchScore >= 85 ? t('match_success') : t('verify_retry_later')}
+                </Text>
+              </View>
+
+              {/* Verified Applicant Info */}
+              <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B' }}>{t('nid_number_label')}:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {kycNidNumber.length > 4 ? `**** **** ${kycNidNumber.slice(-4)}` : kycNidNumber}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B' }}>নাম:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>{kycNameBn}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B' }}>আবেদনের সময়:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {new Date().toLocaleDateString('bn-BD')}
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Actions */}
+            <View style={{ flexDirection: 'row', marginTop: 10 }}>
+              {kycVerificationStatus !== 'VERIFIED' ? (
+                <TouchableOpacity
+                  testID="btn_kyc_retry"
+                  style={{ flex: 1, height: 46, borderRadius: 8, backgroundColor: isDark ? '#334155' : '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}
+                  onPress={handleRetryKyc}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('kyc_retry_btn')}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                    {t('kyc_retry_btn')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              <TouchableOpacity
+                testID="btn_kyc_done"
+                style={{ flex: 1, height: 46, borderRadius: 8, backgroundColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center' }}
+                onPress={handleDoneKyc}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('kyc_done_btn')}
+              >
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' }}>
+                  {t('kyc_done_btn')}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

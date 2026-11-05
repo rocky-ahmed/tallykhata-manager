@@ -283,6 +283,7 @@ const VALID_COLLECTIONS = new Set([
   'settlementHistory',
   'transactionSettlementActions',
   'soundboxConfig',
+  'merchantKyc',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -414,6 +415,7 @@ function sanitizeState(state) {
   if (!Array.isArray(s.rechargeHistory)) s.rechargeHistory = [];
   if (!Array.isArray(s.settlementHistory)) s.settlementHistory = [];
   if (!Array.isArray(s.transactionSettlementActions)) s.transactionSettlementActions = [];
+  if (!Array.isArray(s.merchantKyc)) s.merchantKyc = [];
   if (!s.soundboxConfig || typeof s.soundboxConfig !== 'object') s.soundboxConfig = {};
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
@@ -567,6 +569,7 @@ function createDefaultState() {
     settlementHistory: [],
     transactionSettlementActions: [],
     soundboxConfig: {},
+    merchantKyc: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1749,6 +1752,23 @@ class StorageRepository {
       authoritative.rechargeHistory = [];
     }
 
+    if (authoritative.merchantKyc && Array.isArray(authoritative.merchantKyc)) {
+      authoritative.merchantKyc = authoritative.merchantKyc.map((k) => {
+        const { selfie_base64, selfieBase64, image_base64, imageBase64, nid_front_base64, nid_back_base64, frontBase64, backBase64, biometricPayload, faceEmbedding, rawFaceData, token, sessionToken, secret, ...rest } = k || {};
+        const rawNid = String(rest.nid_number || rest.nidNumber || '');
+        const maskedNid = rawNid.length >= 8
+          ? rawNid.slice(0, 3) + '****' + rawNid.slice(-4)
+          : '****';
+        return {
+          ...rest,
+          nid_number: maskedNid,
+          nidNumber: maskedNid,
+        };
+      });
+    } else {
+      authoritative.merchantKyc = [];
+    }
+
     if (authoritative.transactionSettlementActions && Array.isArray(authoritative.transactionSettlementActions)) {
       authoritative.transactionSettlementActions = authoritative.transactionSettlementActions.map((t) => {
         const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = t || {};
@@ -2404,6 +2424,7 @@ class StorageRepository {
         const rechargeHistory = (prevStore.rechargeHistory || []).filter((r) => getBizId(r) !== targetId);
         const settlementHistory = (prevStore.settlementHistory || []).filter((s) => getBizId(s) !== targetId);
         const transactionSettlementActions = (prevStore.transactionSettlementActions || []).filter((t) => getBizId(t) !== targetId);
+        const merchantKyc = (prevStore.merchantKyc || []).filter((k) => getBizId(k) !== targetId);
         const soundboxConfig = { ...(prevStore.soundboxConfig || {}) };
         delete soundboxConfig[targetId];
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
@@ -2500,6 +2521,7 @@ class StorageRepository {
         rechargeHistory,
         settlementHistory,
         transactionSettlementActions,
+        merchantKyc,
         soundboxConfig,
         autoDisbursementConfig,
         cashReconciliation,
@@ -2673,6 +2695,8 @@ class StorageRepository {
           const keptSavedBillers = (prevStore.savedBillers || []).filter(s => String(s.businessId || '1') !== selectedBizId);
           const keptTallyPay = (prevStore.tallyPayTransactions || []).filter(t => String(t.businessId || '1') !== selectedBizId);
         const keptBeneficiaries = (prevStore.tallyPayBeneficiaries || []).filter(b => String(b.businessId || '1') !== selectedBizId);
+        const keptMerchantKyc = (prevStore.merchantKyc || []).filter(k => String(k.businessId || k.business_id || '1') !== selectedBizId);
+        const importedMerchantKyc = (data.merchantKyc || []).filter(k => String(k.businessId || k.business_id || '1') === selectedBizId);
         const keptQrSettlements = (prevStore.qrSettlementActions || []).filter(q => String(q.businessId || '1') !== selectedBizId);
         const keptDisbursements = (prevStore.merchantDisbursements || []).filter(d => String(d.businessId || '1') !== selectedBizId);
         const keptReconciliations = (prevStore.reconciliations || []).filter(r => String(r.businessId || '1') !== selectedBizId);
@@ -2716,6 +2740,7 @@ class StorageRepository {
             savedBillers: [...keptSavedBillers, ...importedSavedBillers],
           tallyPayTransactions: [...keptTallyPay, ...importedTallyPay],
           tallyPayBeneficiaries: [...keptBeneficiaries, ...importedBeneficiaries],
+          merchantKyc: [...keptMerchantKyc, ...importedMerchantKyc],
           qrSettlementActions: [...keptQrSettlements, ...importedQrSettlements],
           merchantDisbursements: [...keptDisbursements, ...importedDisbursements],
           reconciliations: [...keptReconciliations, ...importedReconciliations],
@@ -2767,6 +2792,7 @@ class StorageRepository {
         savedBillers: Array.isArray(data.savedBillers) ? data.savedBillers : [],
         tallyPayTransactions: Array.isArray(data.tallyPayTransactions) ? data.tallyPayTransactions : [],
         tallyPayBeneficiaries: Array.isArray(data.tallyPayBeneficiaries) ? data.tallyPayBeneficiaries : [],
+        merchantKyc: Array.isArray(data.merchantKyc) ? data.merchantKyc : [],
         qrSettlementActions: Array.isArray(data.qrSettlementActions) ? data.qrSettlementActions : [],
         merchantDisbursements: Array.isArray(data.merchantDisbursements) ? data.merchantDisbursements : [],
         reconciliations: Array.isArray(data.reconciliations) ? data.reconciliations : [],
@@ -3065,6 +3091,7 @@ class StorageRepository {
           savedBillers: (fullState.savedBillers || []).length,
           transferHistory: (fullState.transferHistory || []).length,
           rechargeHistory: (fullState.rechargeHistory || []).length,
+          merchantKyc: (fullState.merchantKyc || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -8386,6 +8413,172 @@ class StorageRepository {
       };
     }
 
+    /**
+     * REA-ITER-237: Saves or updates merchant KYC record with uniqueness by business_id.
+     */
+    async saveMerchantKyc(businessId = null, kycRecord = {}) {
+      if (!kycRecord || typeof kycRecord !== 'object') {
+        return { success: false, error: 'INVALID_RECORD' };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || kycRecord.business_id || kycRecord.businessId || store.activeBusinessId || '1');
+      const entry = {
+        id: kycRecord.id || 'KYC_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        business_id: targetBizId,
+        businessId: targetBizId,
+        nid_number: String(kycRecord.nid_number || kycRecord.nidNumber || '').trim(),
+        dob: String(kycRecord.dob || ''),
+        name_bn: kycRecord.name_bn || kycRecord.nameBN || null,
+        name_en: kycRecord.name_en || kycRecord.name || null,
+        father_name: kycRecord.father_name || kycRecord.fatherName || null,
+        mother_name: kycRecord.mother_name || kycRecord.motherName || null,
+        nid_front_path: kycRecord.nid_front_path || kycRecord.nidFrontPath || null,
+        nid_back_path: kycRecord.nid_back_path || kycRecord.nidBackPath || null,
+        selfie_path: kycRecord.selfie_path || kycRecord.selfiePath || null,
+        verification_status: kycRecord.verification_status || kycRecord.verificationStatus || 'INCOMPLETE',
+        liveness_score: kycRecord.liveness_score !== undefined ? Number(kycRecord.liveness_score) : (kycRecord.livenessScore !== undefined ? Number(kycRecord.livenessScore) : null),
+        synced: kycRecord.synced !== undefined ? Number(kycRecord.synced) : 0,
+        create_date: kycRecord.create_date || kycRecord.createDate || new Date().toISOString(),
+        update_date: new Date().toISOString(),
+        ...kycRecord,
+      };
+      entry.business_id = targetBizId;
+      entry.businessId = targetBizId;
+
+      let saved = null;
+      await this.mutateCollection('merchantKyc', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((k) => String(k.business_id || k.businessId || '1') === targetBizId);
+        if (idx >= 0) {
+          entry.id = list[idx].id;
+          entry.create_date = list[idx].create_date || entry.create_date;
+          const updated = [...list];
+          updated[idx] = entry;
+          saved = entry;
+          return updated;
+        } else {
+          saved = entry;
+          return [...list, entry];
+        }
+      });
+      return { success: true, record: saved, id: entry.id };
+    }
+
+    /**
+     * REA-ITER-237: Retrieves merchant KYC record by business ID.
+     */
+    getMerchantKycByBusinessId(businessId = null) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const item = (store.merchantKyc || []).find(
+        (k) => String(k.business_id || k.businessId || '1') === targetBizId
+      );
+      return item ? { ...item } : null;
+    }
+
+    /**
+     * REA-ITER-237: Retrieves merchant KYC records with optional status or sync filter.
+     */
+    getMerchantKycList(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      let list = (store.merchantKyc || []);
+      if (targetBizId) {
+        list = list.filter((k) => String(k.business_id || k.businessId || '1') === targetBizId);
+      }
+      if (options.status || options.verification_status || options.verificationStatus) {
+        const st = String(options.status || options.verification_status || options.verificationStatus).toUpperCase();
+        list = list.filter((k) => String(k.verification_status || k.verificationStatus || '').toUpperCase() === st);
+      }
+      if (options.synced !== undefined && options.synced !== null) {
+        const syn = Number(options.synced);
+        list = list.filter((k) => Number(k.synced) === syn);
+      }
+      return list.map((k) => ({ ...k }));
+    }
+
+    /**
+     * REA-ITER-237: Updates verification status and liveness score of merchant KYC record.
+     */
+    async updateMerchantKycStatus(businessId = null, status = 'PENDING', livenessScore = null) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let updatedRecord = null;
+      await this.mutateCollection('merchantKyc', (col) => {
+        return (col || []).map((k) => {
+          if (String(k.business_id || k.businessId || '1') === targetBizId) {
+            const upd = {
+              ...k,
+              verification_status: status,
+              verificationStatus: status,
+              update_date: new Date().toISOString(),
+            };
+            if (livenessScore !== null && livenessScore !== undefined) {
+              upd.liveness_score = Number(livenessScore);
+              upd.livenessScore = Number(livenessScore);
+            }
+            updatedRecord = upd;
+            return upd;
+          }
+          return k;
+        });
+      });
+      return { success: Boolean(updatedRecord), record: updatedRecord };
+    }
+
+    /**
+     * REA-ITER-237: Retrieves unsynced merchant KYC records.
+     */
+    getUnsyncedMerchantKyc(businessId = null, limit = 100) {
+      return this.getMerchantKycList(businessId, { synced: 0 }).slice(0, limit);
+    }
+
+    /**
+     * REA-ITER-237: Updates sync status of merchant KYC record.
+     */
+    async updateMerchantKycSyncStatus(businessId = null, synced = 1) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let updatedCount = 0;
+      await this.mutateCollection('merchantKyc', (col) => {
+        return (col || []).map((k) => {
+          if (String(k.business_id || k.businessId || '1') === targetBizId) {
+            updatedCount++;
+            return {
+              ...k,
+              synced: Number(synced),
+              update_date: new Date().toISOString(),
+            };
+          }
+          return k;
+        });
+      });
+      return { success: true, updatedCount };
+    }
+
+    /**
+     * REA-ITER-237: Checks if merchant KYC record exists for business ID.
+     */
+        /**
+     * REA-ITER-237: Deletes merchant KYC record for business ID.
+     */
+    async deleteMerchantKyc(businessId = null) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let deleted = false;
+      await this.mutateCollection('merchantKyc', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const nextList = list.filter((k) => String(k.business_id || k.businessId || '1') !== targetBizId);
+        deleted = nextList.length < list.length;
+        return nextList;
+      });
+      return { success: deleted };
+    }
+
+    existsMerchantKyc(businessId = null) {
+      return Boolean(this.getMerchantKycByBusinessId(businessId));
+    }
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -9723,6 +9916,62 @@ function getSoundboxConfigRepo(businessId = null, repo = defaultRepository) {
   return null;
 }
 
+async function saveMerchantKycRepo(businessId = null, kycRecord = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveMerchantKyc === 'function') {
+    return repo.saveMerchantKyc(businessId, kycRecord);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getMerchantKycByBusinessIdRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantKycByBusinessId === 'function') {
+    return repo.getMerchantKycByBusinessId(businessId);
+  }
+  return null;
+}
+
+function getMerchantKycListRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantKycList === 'function') {
+    return repo.getMerchantKycList(businessId, options);
+  }
+  return [];
+}
+
+async function updateMerchantKycStatusRepo(businessId = null, status = 'PENDING', livenessScore = null, repo = defaultRepository) {
+  if (repo && typeof repo.updateMerchantKycStatus === 'function') {
+    return repo.updateMerchantKycStatus(businessId, status, livenessScore);
+  }
+  return { success: false };
+}
+
+function getUnsyncedMerchantKycRepo(businessId = null, limit = 100, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedMerchantKyc === 'function') {
+    return repo.getUnsyncedMerchantKyc(businessId, limit);
+  }
+  return [];
+}
+
+async function updateMerchantKycSyncStatusRepo(businessId = null, synced = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateMerchantKycSyncStatus === 'function') {
+    return repo.updateMerchantKycSyncStatus(businessId, synced);
+  }
+  return { success: false, updatedCount: 0 };
+}
+
+async function deleteMerchantKycRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteMerchantKyc === 'function') {
+    return repo.deleteMerchantKyc(businessId);
+  }
+  return { success: false };
+}
+
+function existsMerchantKycRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.existsMerchantKyc === 'function') {
+    return repo.existsMerchantKyc(businessId);
+  }
+  return false;
+}
+
 async function saveRechargeRecordRepo(businessId = null, recordData = {}, repo = defaultRepository) {
   if (repo && typeof repo.saveRechargeRecord === 'function') {
     return repo.saveRechargeRecord(businessId, recordData);
@@ -9938,6 +10187,14 @@ const repoExport = {
   getSettlementHistory: getSettlementHistoryRepo,
   saveSoundboxConfig: saveSoundboxConfigRepo,
   getSoundboxConfig: getSoundboxConfigRepo,
+  saveMerchantKyc: saveMerchantKycRepo,
+  getMerchantKycByBusinessId: getMerchantKycByBusinessIdRepo,
+  getMerchantKycList: getMerchantKycListRepo,
+  updateMerchantKycStatus: updateMerchantKycStatusRepo,
+  getUnsyncedMerchantKyc: getUnsyncedMerchantKycRepo,
+  updateMerchantKycSyncStatus: updateMerchantKycSyncStatusRepo,
+  existsMerchantKyc: existsMerchantKycRepo,
+  deleteMerchantKyc: deleteMerchantKycRepo,
   saveRechargeRecord: saveRechargeRecordRepo,
   getRechargeHistory: getRechargeHistoryRepo,
   getRechargeById: getRechargeByIdRepo,
@@ -10128,6 +10385,14 @@ if (typeof exports !== 'undefined') {
   exports.getSettlementHistory = getSettlementHistoryRepo;
   exports.saveSoundboxConfig = saveSoundboxConfigRepo;
   exports.getSoundboxConfig = getSoundboxConfigRepo;
+  exports.saveMerchantKyc = saveMerchantKycRepo;
+  exports.getMerchantKycByBusinessId = getMerchantKycByBusinessIdRepo;
+  exports.getMerchantKycList = getMerchantKycListRepo;
+  exports.updateMerchantKycStatus = updateMerchantKycStatusRepo;
+  exports.getUnsyncedMerchantKyc = getUnsyncedMerchantKycRepo;
+  exports.updateMerchantKycSyncStatus = updateMerchantKycSyncStatusRepo;
+  exports.existsMerchantKyc = existsMerchantKycRepo;
+  exports.deleteMerchantKyc = deleteMerchantKycRepo;
   exports.saveRechargeRecord = saveRechargeRecordRepo;
   exports.getRechargeHistory = getRechargeHistoryRepo;
   exports.getRechargeById = getRechargeByIdRepo;

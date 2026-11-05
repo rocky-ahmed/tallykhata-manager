@@ -6920,7 +6920,512 @@ class SoundboxBleDiagnosticsService {
   }
 }
 
+
+// ============================================================================
+// MILESTONE REA-ITER-237: TALLYPAY MERCHANT KYC, NID SCANNER OCR &
+// BIO-VERIFICATION PIPELINE SUBSYSTEM
+// Reference: classes4.dex, EkycActivity, TextRecognizedModel, LivenessGesture,
+// Room SQLite table `merchant_kyc`, index `index_merchant_kyc_business_id`
+// ============================================================================
+
+const MERCHANT_KYC_SCHEMA = Object.freeze({
+  tableName: 'merchant_kyc',
+  columns: Object.freeze([
+    'id',
+    'business_id',
+    'nid_number',
+    'dob',
+    'name_bn',
+    'name_en',
+    'father_name',
+    'mother_name',
+    'nid_front_path',
+    'nid_back_path',
+    'selfie_path',
+    'verification_status',
+    'liveness_score',
+    'synced',
+    'create_date',
+    'update_date'
+  ]),
+  uniqueIndex: 'index_merchant_kyc_business_id',
+  ddl: 'CREATE TABLE IF NOT EXISTS `merchant_kyc` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `business_id` TEXT NOT NULL, `nid_number` TEXT NOT NULL, `dob` TEXT NOT NULL, `name_bn` TEXT, `name_en` TEXT, `father_name` TEXT, `mother_name` TEXT, `nid_front_path` TEXT, `nid_back_path` TEXT, `selfie_path` TEXT, `verification_status` TEXT NOT NULL, `liveness_score` REAL, `synced` INTEGER NOT NULL DEFAULT 0, `create_date` TEXT NOT NULL, `update_date` TEXT);',
+  indexDdl: 'CREATE UNIQUE INDEX IF NOT EXISTS `index_merchant_kyc_business_id` ON `merchant_kyc` (`business_id`);',
+});
+
+const KYC_TABLE_SCHEMA = MERCHANT_KYC_SCHEMA.ddl;
+
+const KYC_STATUSES = Object.freeze({
+  INCOMPLETE: 'INCOMPLETE',
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED'
+});
+const EkycVerificationStatus = KYC_STATUSES;
+const MerchantKycStatus = KYC_STATUSES;
+
+const NID_TYPES = Object.freeze({
+  SMART_NID: 'SMART_NID',
+  LEGACY_13: 'LEGACY_13',
+  LEGACY_17: 'LEGACY_17',
+  UNKNOWN: 'UNKNOWN'
+});
+const BangladeshNidType = NID_TYPES;
+
+const NID_SIDES = Object.freeze({
+  FRONT: 'FRONT',
+  BACK: 'BACK'
+});
+const NidSide = NID_SIDES;
+
+const LIVENESS_GESTURES = Object.freeze({
+  LOOK_DOWN: 'LOOK_DOWN',
+  LOOK_LEFT: 'LOOK_LEFT',
+  LOOK_RIGHT: 'LOOK_RIGHT',
+  LOOK_UP: 'LOOK_UP',
+  SMILE: 'SMILE',
+  BLINK: 'BLINK'
+});
+const LivenessGesture = LIVENESS_GESTURES;
+
+const LIVENESS_STATES = Object.freeze({
+  IDLE: 'IDLE',
+  AWAITING_CENTRE: 'AWAITING_CENTRE',
+  AWAITING_GESTURE: 'AWAITING_GESTURE',
+  HOLDING: 'HOLDING',
+  GESTURE_PASSED: 'GESTURE_PASSED',
+  SESSION_COMPLETE: 'SESSION_COMPLETE',
+  GESTURE_TIMED_OUT: 'GESTURE_TIMED_OUT',
+  EXIT_OFFERED: 'EXIT_OFFERED'
+});
+const LivenessState = LIVENESS_STATES;
+
+const KYC_ARSC_TOKENS = Object.freeze({
+  NID_LENGTH_ERROR: 'NID নম্বর ১০, ১৩ অথবা ১৭ সংখ্যা হতে হবে।',
+  EKYC_HEADER_BANNER: 'NID ও সেলফি দিয়ে e-KYC সম্পন্ন করুন',
+  NID_FRONT_LABEL: 'NID-এর ছবি (সামনে)',
+  NID_BACK_LABEL: 'NID-এর ছবি (পেছনে)',
+  NID_FRONT_OVERLAY: 'NID-এর সামনের ছবি তুলুন।',
+  NID_BACK_OVERLAY: 'NID-এর পিছনের ছবি তুলুন।',
+  SELFIE_CONFIRM_TITLE: 'আপনার সেলফি নিশ্চিত করুন',
+  MATCHING_PROGRESS: 'আপনার সেলফিটি NID-এর সাথে মেলানো হচ্ছে…',
+  MATCH_SUCCESS: 'আপনার সেলফিটি NID-এর সাথে যাচাই হয়েছে।',
+  MATCH_FAILED: 'আপনার সেলফিটি NID-এর সাথে মেলেনি',
+  VERIFY_RETRY_LATER: 'সেলফি যাচাই করা যাচ্ছে না। আপনি পরে আবার চেষ্টা করতে পারেন।',
+  SELFIE_MISMATCH_BADGE: 'সেলফি মেলেনি',
+  SELFIE_INSTRUCTION: 'সেলফি নির্দেশনা',
+  CAMERA_PERMISSION_RATIONALE: 'সেলফি তুলতে ক্যামেরা ব্যবহারের অনুমতি দিন।',
+  SELFIE_COMPLETE_CTA: 'সেলফি তুলে e-KYC সম্পন্ন করুন।',
+  NID_INFO_VERIFYING: 'NID-এর তথ্য যাচাই করা হচ্ছে…',
+  NID_SERVER_ERROR: 'NID সার্ভারে সমস্যা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।',
+  BIRTH_YEAR_MISMATCH: '১৭ সংখ্যার এনআইডির প্রথম ৪ ডিজিট জন্ম সালের সাথে মিলতে হবে।',
+  UNDERAGE_ERROR: 'মার্চেন্ট একাউন্টের জন্য আবেদনকারীর বয়স কমপক্ষে ১৮ বছর হতে হবে।'
+});
+
+function validateBangladeshNid(nidNumber, dateOfBirth) {
+  if (typeof nidNumber !== 'string') {
+    return { valid: false, reason: 'INVALID_TYPE', type: NID_TYPES.UNKNOWN };
+  }
+  const cleaned = nidNumber.trim().replace(/[- ]/g, '');
+  
+  if (!/^\d+$/.test(cleaned)) {
+    return { valid: false, reason: 'NON_NUMERIC', type: NID_TYPES.UNKNOWN };
+  }
+
+  const len = cleaned.length;
+  if (len !== 10 && len !== 13 && len !== 17) {
+    return {
+      valid: false,
+      reason: 'INVALID_LENGTH',
+      message: KYC_ARSC_TOKENS.NID_LENGTH_ERROR,
+      type: NID_TYPES.UNKNOWN
+    };
+  }
+
+  let nidType = NID_TYPES.UNKNOWN;
+  if (len === 10) {
+    nidType = NID_TYPES.SMART_NID;
+  } else if (len === 13) {
+    nidType = NID_TYPES.LEGACY_13;
+  } else if (len === 17) {
+    nidType = NID_TYPES.LEGACY_17;
+    if (dateOfBirth) {
+      const birthYear = new Date(dateOfBirth).getFullYear().toString();
+      const prefixYear = cleaned.substring(0, 4);
+      if (prefixYear !== birthYear) {
+        return {
+          valid: false,
+          reason: 'BIRTH_YEAR_MISMATCH',
+          message: KYC_ARSC_TOKENS.BIRTH_YEAR_MISMATCH,
+          type: nidType
+        };
+      }
+    }
+  }
+
+  if (dateOfBirth) {
+    const dobDate = new Date(dateOfBirth);
+    if (isNaN(dobDate.getTime())) {
+      return { valid: false, reason: 'INVALID_DOB', type: nidType };
+    }
+    const today = new Date();
+    if (dobDate > today) {
+      return {
+        valid: false,
+        reason: 'FUTURE_DOB',
+        message: 'জন্ম তারিখ ভবিষ্যতের হতে পারে না।',
+        type: nidType
+      };
+    }
+    let age = today.getFullYear() - dobDate.getFullYear();
+    const m = today.getMonth() - dobDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      return {
+        valid: false,
+        reason: 'UNDERAGE',
+        message: KYC_ARSC_TOKENS.UNDERAGE_ERROR,
+        type: nidType,
+        age
+      };
+    }
+  }
+
+  return { valid: true, nidNumber: cleaned, type: nidType };
+}
+
+function extractAndNormalizeOcrFields(rawOcrData = {}, side = 'FRONT') {
+  if (!rawOcrData || typeof rawOcrData !== 'object') {
+    return { success: false, error: 'INVALID_OCR_INPUT' };
+  }
+
+  const normalizeBengaliDigits = (str) => {
+    if (!str) return '';
+    const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(str).replace(/[০-৯]/g, (d) => bnDigits.indexOf(d));
+  };
+
+  const trimUpper = (str) => (str ? String(str).trim().toUpperCase() : '');
+  const trimStr = (str) => (str ? String(str).trim() : '');
+
+  const sideUpper = String(side || 'FRONT').toUpperCase();
+  if (sideUpper === 'FRONT') {
+    const identificationNumber = normalizeBengaliDigits(
+      rawOcrData.identificationNumber || rawOcrData.nidNumber || rawOcrData.nid_number || ''
+    ).replace(/[- ]/g, '');
+    const name = trimUpper(rawOcrData.name || rawOcrData.name_en || rawOcrData.nameEn || '');
+    const nameBN = trimStr(rawOcrData.nameBN || rawOcrData.name_bn || rawOcrData.nameBn || '');
+    const dob = trimStr(rawOcrData.dob || rawOcrData.dateOfBirth || rawOcrData.date_of_birth || '');
+    const fatherName = trimStr(rawOcrData.fatherName || rawOcrData.father_name || '');
+    const motherName = trimStr(rawOcrData.motherName || rawOcrData.mother_name || '');
+
+    return {
+      success: true,
+      side: 'FRONT',
+      fields: {
+        identificationNumber,
+        name,
+        nameBN,
+        dob,
+        fatherName,
+        motherName
+      }
+    };
+  } else if (sideUpper === 'BACK') {
+    const address = trimStr(rawOcrData.address || '');
+    const postalCode = normalizeBengaliDigits(rawOcrData.postalCode || rawOcrData.postal_code || '');
+    const bloodGroup = trimUpper(rawOcrData.bloodGroup || rawOcrData.blood_group || '');
+    const issueDate = trimStr(rawOcrData.issueDate || rawOcrData.issue_date || '');
+
+    return {
+      success: true,
+      side: 'BACK',
+      fields: {
+        address,
+        postalCode,
+        bloodGroup,
+        issueDate
+      }
+    };
+  }
+
+  return { success: false, error: 'UNSUPPORTED_NID_SIDE' };
+}
+
+function transitionLivenessState(currentState, event) {
+  switch (currentState) {
+    case LIVENESS_STATES.IDLE:
+      if (event === 'START_SESSION') return LIVENESS_STATES.AWAITING_CENTRE;
+      break;
+    case LIVENESS_STATES.AWAITING_CENTRE:
+      if (event === 'FACE_CENTERED') return LIVENESS_STATES.AWAITING_GESTURE;
+      if (event === 'TIMEOUT') return LIVENESS_STATES.EXIT_OFFERED;
+      break;
+    case LIVENESS_STATES.AWAITING_GESTURE:
+      if (event === 'GESTURE_DETECTED') return LIVENESS_STATES.HOLDING;
+      if (event === 'GESTURE_TIMEOUT') return LIVENESS_STATES.GESTURE_TIMED_OUT;
+      break;
+    case LIVENESS_STATES.HOLDING:
+      if (event === 'HOLD_SUCCESS') return LIVENESS_STATES.GESTURE_PASSED;
+      if (event === 'HOLD_BROKEN') return LIVENESS_STATES.AWAITING_GESTURE;
+      break;
+    case LIVENESS_STATES.GESTURE_PASSED:
+      if (event === 'ALL_GESTURES_PASSED') return LIVENESS_STATES.SESSION_COMPLETE;
+      if (event === 'NEXT_GESTURE') return LIVENESS_STATES.AWAITING_GESTURE;
+      break;
+    case LIVENESS_STATES.GESTURE_TIMED_OUT:
+      if (event === 'RETRY') return LIVENESS_STATES.AWAITING_GESTURE;
+      if (event === 'CANCEL') return LIVENESS_STATES.EXIT_OFFERED;
+      break;
+  }
+  return currentState;
+}
+
+function assessSelfieQuality(faceRect, imageWidth, imageHeight, luminance, blurVariance) {
+  const centerX = faceRect.x + faceRect.width / 2;
+  const centerY = faceRect.y + faceRect.height / 2;
+  const xRatio = centerX / imageWidth;
+  const yRatio = centerY / imageHeight;
+  const centered = xRatio >= 0.35 && xRatio <= 0.65 && yRatio >= 0.35 && yRatio <= 0.65;
+  const wellLit = luminance >= 40 && luminance <= 240;
+  const sharp = blurVariance >= 100;
+
+  const passed = Boolean(centered && wellLit && sharp);
+  return {
+    passed,
+    metrics: { centered, wellLit, sharp, xRatio, yRatio, luminance, blurVariance }
+  };
+}
+
+function evaluateKycVerificationStatus(validNid, livenessScore) {
+  let isNidValid = false;
+  let score = 0;
+  if (typeof validNid === 'object' && validNid !== null) {
+    isNidValid = Boolean(validNid.validNid ?? validNid.nidValidation?.valid ?? validNid.valid);
+    score = Number(validNid.livenessScore ?? livenessScore) || 0;
+  } else {
+    isNidValid = Boolean(validNid);
+    score = Number(livenessScore) || 0;
+  }
+  if (!isNidValid) return KYC_STATUSES.REJECTED;
+  if (score >= 0.85) return KYC_STATUSES.VERIFIED;
+  if (score >= 0.50) return KYC_STATUSES.PENDING;
+  return KYC_STATUSES.REJECTED;
+}
+
+class MerchantKycRecord {
+  constructor(data = {}) {
+    this.id = data.id || null;
+    this.business_id = String(data.business_id || data.businessId || '1');
+    this.businessId = this.business_id;
+    this.nid_number = String(data.nid_number || data.nidNumber || '');
+    this.dob = String(data.dob || '');
+    this.name_bn = data.name_bn || data.nameBN || null;
+    this.name_en = data.name_en || data.name || null;
+    this.father_name = data.father_name || data.fatherName || null;
+    this.mother_name = data.mother_name || data.motherName || null;
+    this.nid_front_path = data.nid_front_path || data.nidFrontPath || null;
+    this.nid_back_path = data.nid_back_path || data.nidBackPath || null;
+    this.selfie_path = data.selfie_path || data.selfiePath || null;
+    this.verification_status = data.verification_status || data.verificationStatus || KYC_STATUSES.INCOMPLETE;
+    this.liveness_score = data.liveness_score !== undefined ? Number(data.liveness_score) : null;
+    this.synced = data.synced !== undefined ? Number(data.synced) : 0;
+    this.create_date = data.create_date || data.createDate || new Date().toISOString();
+    this.update_date = data.update_date || data.updateDate || null;
+  }
+}
+
+class MerchantKycDao {
+  constructor(initialRecords = []) {
+    this.records = new Map();
+    this.idCounter = 1;
+    if (Array.isArray(initialRecords)) {
+      initialRecords.forEach((r) => this.saveKyc(r));
+    }
+  }
+
+  saveKyc(record) {
+    const kyc = new MerchantKycRecord(record);
+    if (!kyc.id) {
+      kyc.id = this.idCounter++;
+    }
+    this.records.set(kyc.business_id, kyc);
+    return { ...kyc };
+  }
+
+  exists(businessId) {
+    return this.records.has(String(businessId));
+  }
+
+  getKycByBusinessId(businessId) {
+    const rec = this.records.get(String(businessId));
+    return rec ? { ...rec } : null;
+  }
+
+  updateKycStatus(businessId, status, livenessScore = null) {
+    const rec = this.records.get(String(businessId));
+    if (!rec) return null;
+    rec.verification_status = status;
+    if (livenessScore !== null && livenessScore !== undefined) {
+      rec.liveness_score = Number(livenessScore);
+    }
+    rec.update_date = new Date().toISOString();
+    return { ...rec };
+  }
+
+  getUnsyncedKyc(limit = 100) {
+    const results = [];
+    for (const rec of this.records.values()) {
+      if (Number(rec.synced) === 0) {
+        results.push({ ...rec });
+        if (results.length >= limit) break;
+      }
+    }
+    return results;
+  }
+
+  updateKycSyncStatus(businessId, synced = 1) {
+    const rec = this.records.get(String(businessId));
+    if (!rec) return false;
+    rec.synced = Number(synced);
+    rec.update_date = new Date().toISOString();
+    return true;
+  }
+}
+
+class MerchantKycPipelineEngine {
+  constructor(storage = null) {
+    this.storage = storage;
+    this.records = new Map();
+    this.idCounter = 1;
+  }
+
+  processNidFront(businessId, imageBase64, ocrResult, storage = null) {
+    const bizId = String(businessId || '1');
+    let rec = this.records.get(bizId) || {
+      id: this.idCounter++,
+      business_id: bizId,
+      verification_status: KYC_STATUSES.INCOMPLETE,
+      synced: 0,
+      create_date: new Date().toISOString(),
+      update_date: null
+    };
+
+    rec.nid_front_path = '/storage/emulated/0/TallyKhata/kyc/nid_front_' + bizId + '.jpg';
+    rec.nid_number = ocrResult.identificationNumber || ocrResult.nid_number || ocrResult.nidNumber || '';
+    rec.name_en = ocrResult.name || ocrResult.name_en || '';
+    rec.name_bn = ocrResult.nameBN || ocrResult.name_bn || '';
+    rec.dob = ocrResult.dob || ocrResult.dateOfBirth || '';
+    rec.father_name = ocrResult.fatherName || ocrResult.father_name || '';
+    rec.mother_name = ocrResult.motherName || ocrResult.mother_name || '';
+    rec.update_date = new Date().toISOString();
+
+    this.records.set(bizId, rec);
+
+    const targetStorage = storage || this.storage;
+    if (targetStorage && typeof targetStorage.saveMerchantKyc === 'function') {
+      targetStorage.saveMerchantKyc(bizId, rec);
+    }
+
+    return {
+      success: true,
+      step: 'NID_FRONT_SAVED',
+      nidNumber: rec.nid_number,
+      record: { ...rec }
+    };
+  }
+
+  processNidBack(businessId, imageBase64, ocrResult, storage = null) {
+    const bizId = String(businessId || '1');
+    const rec = this.records.get(bizId);
+    if (!rec) throw new Error('Front NID must be submitted first');
+
+    rec.nid_back_path = '/storage/emulated/0/TallyKhata/kyc/nid_back_' + bizId + '.jpg';
+    rec.address = ocrResult.address || '';
+    rec.blood_group = ocrResult.bloodGroup || ocrResult.blood_group || '';
+    rec.postal_code = ocrResult.postalCode || ocrResult.postal_code || '';
+    rec.update_date = new Date().toISOString();
+
+    const targetStorage = storage || this.storage;
+    if (targetStorage && typeof targetStorage.saveMerchantKyc === 'function') {
+      targetStorage.saveMerchantKyc(bizId, rec);
+    }
+
+    return {
+      success: true,
+      step: 'NID_BACK_SAVED',
+      record: { ...rec }
+    };
+  }
+
+  processLivenessAndSelfie(businessId, selfieBase64, livenessScore, storage = null) {
+    const bizId = String(businessId || '1');
+    const rec = this.records.get(bizId);
+    if (!rec) throw new Error('KYC session not initialized');
+
+    rec.selfie_path = '/storage/emulated/0/TallyKhata/kyc/selfie_' + bizId + '.jpg';
+    rec.liveness_score = Number(livenessScore);
+
+    const nidVal = validateBangladeshNid(rec.nid_number, rec.dob);
+    rec.verification_status = evaluateKycVerificationStatus(nidVal.valid, rec.liveness_score);
+    rec.update_date = new Date().toISOString();
+
+    const targetStorage = storage || this.storage;
+    if (targetStorage && typeof targetStorage.saveMerchantKyc === 'function') {
+      targetStorage.saveMerchantKyc(bizId, rec);
+    }
+
+    return {
+      success: true,
+      status: rec.verification_status,
+      livenessScore: rec.liveness_score,
+      nidNumber: rec.nid_number,
+      record: { ...rec }
+    };
+  }
+
+  getKycByBusinessId(businessId) {
+    return this.records.get(String(businessId)) || null;
+  }
+}
+
+const ReconstructedKycEngine = MerchantKycPipelineEngine;
+const KycPipelineEngine = MerchantKycPipelineEngine;
+const merchantKycPipelineEngine = new MerchantKycPipelineEngine();
+const reconstructedKycEngine = merchantKycPipelineEngine;
+
 module.exports = {
+
+  // Milestone REA-ITER-237 Exports
+  MERCHANT_KYC_SCHEMA,
+  KYC_TABLE_SCHEMA,
+  KYC_STATUSES,
+  EkycVerificationStatus,
+  MerchantKycStatus,
+  NID_TYPES,
+  BangladeshNidType,
+  NID_SIDES,
+  NidSide,
+  LIVENESS_GESTURES,
+  LivenessGesture,
+  LIVENESS_STATES,
+  LivenessState,
+  KYC_ARSC_TOKENS,
+  validateBangladeshNid,
+  extractAndNormalizeOcrFields,
+  transitionLivenessState,
+  assessSelfieQuality,
+  evaluateKycVerificationStatus,
+  MerchantKycRecord,
+  MerchantKycDao,
+  MerchantKycPipelineEngine,
+  ReconstructedKycEngine,
+  KycPipelineEngine,
+  merchantKycPipelineEngine,
+  reconstructedKycEngine,
+
 
   // Milestone REA-ITER-236 Exports
   TRANSACTION_SETTLEMENT_ACTION_SCHEMA,
