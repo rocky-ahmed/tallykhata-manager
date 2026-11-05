@@ -461,28 +461,28 @@ console.log("\n--- PART 10: WCAG 2.1 AA / AAA LUMINANCE CONTRAST VALIDATION ---"
 });
 
 // -----------------------------------------------------------------------------
-// PART 11: MODAL COUNT & CONTROLLER INVARIANTS (84 MODALS)
+// PART 11: MODAL COUNT & CONTROLLER INVARIANTS (101 MODALS)
 // -----------------------------------------------------------------------------
 console.log("\n--- PART 11: MODAL COUNT & CONTROLLER INVARIANTS (84 MODALS) ---");
 
-  await runTest("11.1: App.js contains exactly 96 <Modal elements", () => {
+  await runTest("11.1: App.js contains exactly 101 <Modal elements", () => {
   const modalMatches = appSrc.match(/<Modal\b/g) || [];
-  assert.strictEqual(modalMatches.length, 96, `Expected exactly 96 modals in App.js, got ${modalMatches.length}`);
+  assert.strictEqual(modalMatches.length, 101, `Expected exactly 101 modals in App.js, got ${modalMatches.length}`);
 });
 
-  await runTest("11.2: App.js contains exactly 84 onRequestClose handlers", () => {
+  await runTest("11.2: App.js contains exactly 101 onRequestClose handlers", () => {
   const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-  assert.strictEqual(reqCloseMatches.length, 96, `Expected 96 onRequestClose handlers, got ${reqCloseMatches.length}`);
+  assert.strictEqual(reqCloseMatches.length, 101, `Expected 101 onRequestClose handlers, got ${reqCloseMatches.length}`);
 });
 
-  await runTest("11.3: App.js contains exactly 96 unique modal state controllers", () => {
+  await runTest("11.3: App.js contains exactly 101 unique modal state controllers", () => {
   const regex = /visible=\{([a-zA-Z0-9_]+)\}/g;
   const uniqueModals = new Set();
   let m;
   while ((m = regex.exec(appSrc)) !== null) {
     uniqueModals.add(m[1]);
   }
-  assert.strictEqual(uniqueModals.size, 96, `Expected 96 unique visible controllers, got ${uniqueModals.size}`);
+  assert.strictEqual(uniqueModals.size, 101, `Expected 101 unique visible controllers, got ${uniqueModals.size}`);
   assert.ok(uniqueModals.has("modalTpChangePin"), "modalTpChangePin must be in unique controllers");
   assert.ok(uniqueModals.has("modalResetPin"), "modalResetPin must be in unique controllers");
 });

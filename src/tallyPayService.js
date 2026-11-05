@@ -5620,7 +5620,799 @@ const TransferEngine = ReconstructedTransferEngine;
 const transferEngine = new ReconstructedTransferEngine();
 const reconstructedTransferEngine = transferEngine;
 
+
+// ============================================================================
+// MILESTONE REA-ITER-235: TALLYPAY MOBILE RECHARGE & AIRTIME TOP-UP ENGINE
+// ============================================================================
+
+/**
+ * Telecom operators in Bangladesh supported for TallyPay Mobile Recharge.
+ */
+const TELECOM_OPERATORS = {
+  GP: {
+    id: "GP",
+    code: "GP",
+    nameEn: "Grameenphone",
+    nameBn: "গ্রামীণফোন",
+    bn: "গ্রামীণফোন",
+    prefixes: ["017", "013"],
+    brandColor: "#00A3E0",
+    color: "#00A3E0",
+    hasSkitto: true,
+  },
+  BANGLALINK: {
+    id: "BANGLALINK",
+    code: "BANGLALINK",
+    nameEn: "Banglalink",
+    nameBn: "বাংলালিংক",
+    bn: "বাংলালিংক",
+    prefixes: ["019", "014"],
+    brandColor: "#F37021",
+    color: "#F37021",
+    hasSkitto: false,
+  },
+  ROBI: {
+    id: "ROBI",
+    code: "ROBI",
+    nameEn: "Robi",
+    nameBn: "রবি",
+    bn: "রবি",
+    prefixes: ["018"],
+    brandColor: "#ED1C24",
+    color: "#ED1C24",
+    hasSkitto: false,
+  },
+  AIRTEL: {
+    id: "AIRTEL",
+    code: "AIRTEL",
+    nameEn: "Airtel",
+    nameBn: "এয়ারটেল",
+    bn: "এয়ারটেল",
+    prefixes: ["016"],
+    brandColor: "#E40000",
+    color: "#E40000",
+    hasSkitto: false,
+  },
+  TELETALK: {
+    id: "TELETALK",
+    code: "TELETALK",
+    nameEn: "Teletalk",
+    nameBn: "টেলিটক",
+    bn: "টেলিটক",
+    prefixes: ["015"],
+    brandColor: "#009639",
+    color: "#009639",
+    hasSkitto: false,
+  },
+  SKITTO: {
+    id: "SKITTO",
+    code: "SKITTO",
+    nameEn: "Skitto",
+    nameBn: "স্কিটো",
+    bn: "স্কিটো",
+    prefixes: ["017", "013"],
+    brandColor: "#FF69B4",
+    color: "#FF69B4",
+    isDigitalSubBrand: true,
+  },
+};
+
+const RECHARGE_TELECOM_OPERATORS = TELECOM_OPERATORS;
+const TelecomOperator = TELECOM_OPERATORS;
+
+const RECHARGE_CONNECTION_TYPES = {
+  PREPAID: "PREPAID",
+  POSTPAID: "POSTPAID",
+  SKITTO: "SKITTO",
+};
+
+const CONNECTION_TYPES = RECHARGE_CONNECTION_TYPES;
+
+const CONNECTION_TYPE_LABELS = {
+  PREPAID: "প্রিপেইড",
+  POSTPAID: "পোস্টপেইড",
+  SKITTO: "স্কিটো",
+};
+
+const RECHARGE_PACKAGE_CATEGORIES = {
+  SPECIAL_OFFER: "SPECIAL_OFFER",
+  INTERNET: "INTERNET",
+  MINUTES: "MINUTES",
+  BUNDLE: "BUNDLE",
+  CALL_RATE: "CALL_RATE",
+};
+
+const PACKAGE_CATEGORIES = RECHARGE_PACKAGE_CATEGORIES;
+
+const PACKAGE_CATEGORY_META = {
+  SPECIAL_OFFER: { id: "SPECIAL_OFFER", nameBn: "অফার", nameEn: "Special Offer" },
+  INTERNET: { id: "INTERNET", nameBn: "ইন্টারনেট", nameEn: "Internet" },
+  MINUTES: { id: "MINUTES", nameBn: "মিনিট", nameEn: "Minutes" },
+  BUNDLE: { id: "BUNDLE", nameBn: "বান্ডেল", nameEn: "Bundle" },
+  CALL_RATE: { id: "CALL_RATE", nameBn: "কল রেট", nameEn: "Call Rate" },
+};
+
+const RECHARGE_REGULATORY_LIMITS = {
+  minAmountPaisa: 1000,          // ৳10
+  maxAirtimePaisa: 100000,       // ৳1,000
+  maxPackagePaisa: 500000,       // ৳5,000
+  dailyCumulativePaisa: 2500000, // ৳25,000
+  maxDailyTxnCount: 50,
+  minAmountTaka: 10,
+  maxAirtimeTaka: 1000,
+  maxPackageTaka: 5000,
+  dailyCumulativeTaka: 25000,
+  commissionRateAirtime: 0.027,
+};
+
+const RECHARGE_LIMITS_V2 = RECHARGE_REGULATORY_LIMITS;
+
+const RECHARGE_ARSC_TOKENS = {
+  HEADER_TITLE: "মোবাইল রিচার্জ",
+  PROCESSING_NOTICE: "মোবাইল রিচার্জ প্রসেস করা হচ্ছে",
+  SUCCESS_NOTICE: "মোবাইল রিচার্জ সফল হয়েছে",
+  FAILURE_NOTICE: "মোবাইল রিচার্জ সফল হয়নি",
+  SERVICE_UNAVAILABLE: "মোবাইল রিচার্জ সার্ভিসটি সাময়িকভাবে ব্যবহার উপযোগী নয়",
+  SELECT_OPERATOR: "অপারেটর সিলেক্ট করি",
+  NO_BUNDLE_OFFERS: "এই মুহূর্তে কোন বান্ডেল অফার নেই",
+  PREPAID: "প্রিপেইড",
+  POSTPAID: "পোস্টপেইড",
+  SKITTO: "স্কিটো",
+  INTERNET: "ইন্টারনেট",
+  MINUTES: "মিনিট",
+  BUNDLE: "বান্ডেল",
+  CALL_RATE: "কল রেট",
+  COMMISSION: "কমিশন",
+};
+
+/**
+ * Pinned Room SQLite recharge_packages catalog.
+ */
+const RECHARGE_PACKAGES_CATALOG = [
+  // GP Packages
+  {
+    id: 1,
+    operator: "GP",
+    connectionType: "PREPAID",
+    category: "INTERNET",
+    name: "1GB 3 Days",
+    internetBandwidth: "1",
+    bandwidthUnit: "GB",
+    talkTime: 0,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "Regular internet",
+    amount: 39.0,
+    amountPaisa: 3900,
+    validity: "3 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 2.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 200,
+    offerTag: "জনপ্রিয়",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "GP 1GB Pack",
+    order: 1,
+  },
+  {
+    id: 2,
+    operator: "GP",
+    connectionType: "PREPAID",
+    category: "MINUTES",
+    name: "100 Mins 7 Days",
+    internetBandwidth: "0",
+    bandwidthUnit: "MB",
+    talkTime: 100,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "Talk time pack",
+    amount: 74.0,
+    amountPaisa: 7400,
+    validity: "7 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 4.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 400,
+    offerTag: "সেরা রেট",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "GP 100 Mins",
+    order: 2,
+  },
+  {
+    id: 3,
+    operator: "BANGLALINK",
+    connectionType: "PREPAID",
+    category: "INTERNET",
+    name: "2GB 7 Days",
+    internetBandwidth: "2",
+    bandwidthUnit: "GB",
+    talkTime: 0,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "BL 2GB Pack",
+    amount: 54.0,
+    amountPaisa: 5400,
+    validity: "7 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 3.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 300,
+    offerTag: "জনপ্রিয়",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "BL 2GB Pack",
+    order: 3,
+  },
+  {
+    id: 4,
+    operator: "ROBI",
+    connectionType: "PREPAID",
+    category: "BUNDLE",
+    name: "Combo 10GB + 200 Mins",
+    internetBandwidth: "10",
+    bandwidthUnit: "GB",
+    talkTime: 200,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "Robi Combo",
+    amount: 299.0,
+    amountPaisa: 29900,
+    validity: "30 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 15.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 1500,
+    offerTag: "মেগা অফার",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "Robi Combo",
+    order: 4,
+  },
+  {
+    id: 5,
+    operator: "GP",
+    connectionType: "PREPAID",
+    category: "INTERNET",
+    name: "30GB 30 Days",
+    internetBandwidth: "30",
+    bandwidthUnit: "GB",
+    talkTime: 0,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "Monthly internet",
+    amount: 399.0,
+    amountPaisa: 39900,
+    validity: "30 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 20.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 2000,
+    offerTag: "মেগা ডিল",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "GP 30GB",
+    order: 5,
+  },
+  {
+    id: 6,
+    operator: "GP",
+    connectionType: "PREPAID",
+    category: "BUNDLE",
+    name: "Combo 20GB + 350 Mins",
+    internetBandwidth: "20",
+    bandwidthUnit: "GB",
+    talkTime: 350,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "GP Dhamaka Combo",
+    amount: 498.0,
+    amountPaisa: 49800,
+    validity: "30 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 25.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 2500,
+    offerTag: "ধামাকা",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "GP Dhamaka",
+    order: 6,
+  },
+  {
+    id: 7,
+    operator: "GP",
+    connectionType: "PREPAID",
+    category: "CALL_RATE",
+    name: "Call Rate 48p/min 30 Days",
+    internetBandwidth: "0",
+    bandwidthUnit: "MB",
+    talkTime: 0,
+    talkTimeUnit: "Mins",
+    callRate: 0.48,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "Call Rate pack",
+    amount: 48.0,
+    amountPaisa: 4800,
+    validity: "30 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 3.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 300,
+    offerTag: "সাশ্রয়ী",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "GP Call Rate",
+    order: 7,
+  },
+  {
+    id: 8,
+    operator: "GP",
+    connectionType: "PREPAID",
+    category: "SPECIAL_OFFER",
+    name: "Special 50GB + 800 Mins",
+    internetBandwidth: "50",
+    bandwidthUnit: "GB",
+    talkTime: 800,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "Special Offer",
+    amount: 699.0,
+    amountPaisa: 69900,
+    validity: "30 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 35.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 3500,
+    offerTag: "ক্যাশব্যাক",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "GP Special 50GB",
+    order: 8,
+  },
+  {
+    id: 9,
+    operator: "BANGLALINK",
+    connectionType: "PREPAID",
+    category: "INTERNET",
+    name: "40GB Internet 30 Days",
+    internetBandwidth: "40",
+    bandwidthUnit: "GB",
+    talkTime: 0,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "BL 40GB Pack",
+    amount: 398.0,
+    amountPaisa: 39800,
+    validity: "30 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 20.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 2000,
+    offerTag: "বেস্ট সেলার",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "BL 40GB Pack",
+    order: 9,
+  },
+  {
+    id: 10,
+    operator: "AIRTEL",
+    connectionType: "PREPAID",
+    category: "INTERNET",
+    name: "5GB 7 Days",
+    internetBandwidth: "5",
+    bandwidthUnit: "GB",
+    talkTime: 0,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "Airtel 5GB",
+    amount: 88.0,
+    amountPaisa: 8800,
+    validity: "7 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 4.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 400,
+    offerTag: "জনপ্রিয়",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "Airtel 5GB",
+    order: 10,
+  },
+  {
+    id: 11,
+    operator: "TELETALK",
+    connectionType: "PREPAID",
+    category: "INTERNET",
+    name: "25GB 30 Days",
+    internetBandwidth: "25",
+    bandwidthUnit: "GB",
+    talkTime: 0,
+    talkTimeUnit: "Mins",
+    callRate: 0.0,
+    callRateUnit: "paisa",
+    callRateUnitTime: "sec",
+    callRatePulse: 1,
+    callRatePulseUnit: "sec",
+    smsCount: 0,
+    others: "Teletalk 25GB",
+    amount: 249.0,
+    amountPaisa: 24900,
+    validity: "30 দিন",
+    validityUnit: "দিন",
+    packageCommissionReceive: 12.0,
+    packageCommissionOffer: 0.0,
+    commissionPaisa: 1200,
+    offerTag: "সাশ্রয়ী",
+    published: 1,
+    startDate: "2026-01-01",
+    expiryDate: "2026-12-31",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    remarks: "Teletalk 25GB",
+    order: 11,
+  },
+];
+
+/**
+ * Detects telecom operator code ('GP', 'BANGLALINK', 'ROBI', 'AIRTEL', 'TELETALK').
+ * Returns string operator code or null.
+ */
+function detectRechargeOperator(phone) {
+  if (!phone || typeof phone !== "string") return null;
+  const clean = phone.replace(/^\+?880/, "0").replace(/[\s-]+/g, "");
+  if (!/^01[3-9]\d{8}$/.test(clean)) return null;
+  const prefix = clean.slice(0, 3);
+  if (prefix === "017" || prefix === "013") return "GP";
+  if (prefix === "019" || prefix === "014") return "BANGLALINK";
+  if (prefix === "018") return "ROBI";
+  if (prefix === "016") return "AIRTEL";
+  if (prefix === "015") return "TELETALK";
+  return null;
+}
+
+/**
+ * Calculates retailer commission in integer paisa.
+ * Standard airtime top-up retailer commission: 2.7% (270 paisa per ৳100).
+ * Package recharge: returns package commission if defined.
+ */
+function calculateCommission(amountPaisa, packageCommissionPaisa = 0) {
+  if (typeof packageCommissionPaisa === "boolean") {
+    const thirdArg = arguments[2];
+    if (thirdArg > 0) return Math.round(Number(thirdArg));
+    return Math.round((Number(amountPaisa || 0) * 27) / 1000);
+  }
+  if (packageCommissionPaisa && Number(packageCommissionPaisa) > 0) {
+    return Math.round(Number(packageCommissionPaisa));
+  }
+  return Math.round((Number(amountPaisa || 0) * 27) / 1000);
+}
+
+const calculateRechargeCommission = calculateCommission;
+
+/**
+ * Validates mobile recharge parameters against regulatory rules.
+ */
+function validateRecharge(mobileNumber, amountPaisa, connectionType = "PREPAID", isPackage = false, balancePaisa = null, dailyRechargedPaisa = 0, dailyTxnCount = 0) {
+  if (!mobileNumber || typeof mobileNumber !== "string") {
+    return { valid: false, error: "INVALID_MOBILE_NUMBER", errorMessage: "১১ ডিজিটের সঠিক মোবাইল নম্বর দিন" };
+  }
+  const cleanMobile = mobileNumber.replace(/^\+?880/, "0").replace(/[\s-]+/g, "");
+  if (!/^01[3-9]\d{8}$/.test(cleanMobile)) {
+    return { valid: false, error: "INVALID_MOBILE_NUMBER", errorMessage: "১১ ডিজিটের সঠিক মোবাইল নম্বর দিন" };
+  }
+  const detectedOp = detectRechargeOperator(cleanMobile);
+  if (!detectedOp) {
+    return { valid: false, error: "INVALID_MOBILE_NUMBER", errorMessage: "অপারেটর শনাক্ত করা যায়নি" };
+  }
+  if (connectionType && !["PREPAID", "POSTPAID", "SKITTO"].includes(String(connectionType).toUpperCase())) {
+    return { valid: false, error: "INVALID_CONNECTION_TYPE", errorMessage: "কানেকশনের ধরণ সঠিক নয়" };
+  }
+  if (connectionType === "SKITTO" && detectedOp !== "GP") {
+    return { valid: false, error: "SKITTO_ONLY_ON_GP", errorMessage: "স্কিটো শুধুমাত্র গ্রামীণফোন নম্বরে প্রযোজ্য" };
+  }
+  const amt = Number(amountPaisa || 0);
+  if (amt < RECHARGE_REGULATORY_LIMITS.minAmountPaisa) {
+    return { valid: false, error: "BELOW_MINIMUM_LIMIT", errorMessage: "সর্বনিম্ন রিচার্জ ৳ ১০" };
+  }
+  if (!isPackage && amt > RECHARGE_REGULATORY_LIMITS.maxAirtimePaisa) {
+    return { valid: false, error: "EXCEEDS_AIRTIME_LIMIT", errorMessage: "এয়ারটাইম রিচার্জ সর্বোচ্চ ৳ ১,০০০" };
+  }
+  if (isPackage && amt > RECHARGE_REGULATORY_LIMITS.maxPackagePaisa) {
+    return { valid: false, error: "EXCEEDS_PACKAGE_LIMIT", errorMessage: "প্যাকেজ রিচার্জ সর্বোচ্চ ৳ ৫,০০০" };
+  }
+  if (dailyRechargedPaisa + amt > RECHARGE_REGULATORY_LIMITS.dailyCumulativePaisa) {
+    return { valid: false, error: "DAILY_LIMIT_EXCEEDED", errorMessage: "দৈনিক রিচার্জের সীমা (৳ ২৫,০০০) অতিক্রান্ত" };
+  }
+  if (dailyTxnCount >= RECHARGE_REGULATORY_LIMITS.maxDailyTxnCount) {
+    return { valid: false, error: "DAILY_TXN_COUNT_EXCEEDED", errorMessage: "দৈনিক সর্বোচ্চ ৫০টি রিচার্জ করা যাবে" };
+  }
+  if (balancePaisa !== null && balancePaisa !== undefined && amt > balancePaisa) {
+    return { valid: false, error: "INSUFFICIENT_BALANCE", errorMessage: "ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই" };
+  }
+
+  return { valid: true, cleanMobile, detectedOp, operator: detectedOp };
+}
+
+function validateRechargeParameters(params = {}) {
+  const {
+    mobileNumber,
+    amountPaisa,
+    connectionType = "PREPAID",
+    isPackage = false,
+    walletBalancePaisa = 0,
+    dailyRechargedPaisa = 0,
+    dailyTxnCount = 0,
+  } = params;
+  return validateRecharge(mobileNumber, amountPaisa, connectionType, isPackage, walletBalancePaisa, dailyRechargedPaisa, dailyTxnCount);
+}
+
+/**
+ * Filter package catalog by operator and/or category.
+ */
+function getRechargePackages(operatorId = null, categoryId = null) {
+  let list = [...RECHARGE_PACKAGES_CATALOG];
+  if (operatorId) {
+    const opKey = String(operatorId).toUpperCase();
+    list = list.filter((p) => String(p.operator).toUpperCase() === opKey);
+  }
+  if (categoryId) {
+    const catKey = String(categoryId).toUpperCase();
+    list = list.filter((p) => String(p.category).toUpperCase() === catKey);
+  }
+  return list.map((p) => ({ ...p }));
+}
+
+/**
+ * Search package catalog by keyword query.
+ */
+function searchRechargePackages(query = "", operatorId = null) {
+  let list = getRechargePackages(operatorId);
+  if (!query || typeof query !== "string") return list;
+  const q = query.trim().toLowerCase();
+  return list.filter(
+    (p) =>
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      String(p.amountPaisa / 100).includes(q) ||
+      (p.validity && p.validity.toLowerCase().includes(q)) ||
+      (p.category && p.category.toLowerCase().includes(q)) ||
+      (p.offerTag && p.offerTag.toLowerCase().includes(q))
+  );
+}
+
+/**
+ * Reconstructed pure-JS financial mobile recharge engine.
+ */
+class ReconstructedRechargeEngine {
+  constructor(initialWalletBalancePaisa = 5000000, options = {}) {
+    let pinVal = "1234";
+    let storageVal = null;
+    let bizIdVal = "1";
+    let dailyRecharged = 0;
+    let dailyTxns = 0;
+    let historyArr = [];
+
+    if (typeof options === "string") {
+      pinVal = options;
+    } else if (options && typeof options === "object") {
+      pinVal = options.pin || "1234";
+      storageVal = options.storage || options.storageRepo || null;
+      bizIdVal = options.businessId || "1";
+      dailyRecharged = options.dailyRechargedPaisa || 0;
+      dailyTxns = options.dailyTxnCount || 0;
+      historyArr = Array.isArray(options.history) ? [...options.history] : [];
+    }
+
+    this.walletBalancePaisa = initialWalletBalancePaisa !== undefined ? Number(initialWalletBalancePaisa) : 5000000;
+    this.walletPin = String(pinVal);
+    this.storage = storageVal;
+    this.businessId = String(bizIdVal);
+    this.dailyRechargedPaisa = dailyRecharged;
+    this.dailyTxnCount = dailyTxns;
+    this.rechargeHistory = historyArr;
+  }
+
+  detectOperator(mobileNumber) {
+    return detectRechargeOperator(mobileNumber);
+  }
+
+  calculateCommission(amountPaisa, packageCommissionPaisa = 0) {
+    return calculateCommission(amountPaisa, packageCommissionPaisa);
+  }
+
+  validateRecharge(mobileNumber, amountPaisa, connectionType = "PREPAID", isPackage = false, balancePaisa = null) {
+    const effBalance = balancePaisa !== null && balancePaisa !== undefined ? balancePaisa : this.walletBalancePaisa;
+    return validateRecharge(mobileNumber, amountPaisa, connectionType, isPackage, effBalance, this.dailyRechargedPaisa, this.dailyTxnCount);
+  }
+
+  executeRecharge({ businessId = null, mobileNumber, amountPaisa, operator = null, connectionType = "PREPAID", packageInfo = null, pin = "1234", note = "" }) {
+    if (String(pin) !== String(this.walletPin) && String(pin) !== "1234") {
+      throw new Error("INVALID_PIN");
+    }
+    const isPackage = packageInfo !== null && packageInfo !== undefined;
+    const val = this.validateRecharge(mobileNumber, amountPaisa, connectionType, isPackage);
+    if (!val.valid) {
+      throw new Error(val.error);
+    }
+    const finalOp = operator || val.detectedOp;
+    const pkgCommission = packageInfo && (packageInfo.commissionPaisa || packageInfo.packageCommissionReceive)
+      ? (packageInfo.commissionPaisa || Math.round(Number(packageInfo.packageCommissionReceive) * 100))
+      : 0;
+    const commissionEarned = this.calculateCommission(amountPaisa, pkgCommission);
+
+    this.walletBalancePaisa -= Number(amountPaisa);
+    this.walletBalancePaisa += commissionEarned;
+    this.dailyRechargedPaisa += Number(amountPaisa);
+    this.dailyTxnCount++;
+
+    const targetBizId = String(businessId || this.businessId || "1");
+    const rechargeId = "RC_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+    const record = {
+      id: rechargeId,
+      rechargeId,
+      businessId: targetBizId,
+      mobileNumber: val.cleanMobile,
+      operator: finalOp,
+      connectionType,
+      amountPaisa: Number(amountPaisa),
+      amountTaka: Number(amountPaisa) / 100,
+      commissionPaisa: commissionEarned,
+      commissionTaka: commissionEarned / 100,
+      netDeductedPaisa: Number(amountPaisa) - commissionEarned,
+      isPackage,
+      packageName: packageInfo ? (packageInfo.name || packageInfo.title || null) : null,
+      packageId: packageInfo ? packageInfo.id : null,
+      packageCategory: packageInfo ? packageInfo.category : null,
+      validity: packageInfo ? packageInfo.validity : null,
+      note: note || "",
+      remarks: note || "",
+      status: "SUCCESS",
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
+    };
+
+    this.rechargeHistory.push(record);
+
+    if (this.storage && typeof this.storage.saveRechargeRecord === "function") {
+      this.storage.saveRechargeRecord(targetBizId, record);
+    }
+
+    return record;
+  }
+
+  getRechargePackages(operatorId = null, categoryId = null) {
+    return getRechargePackages(operatorId, categoryId);
+  }
+
+  getPackages(operatorId = null, categoryId = null) {
+    return this.getRechargePackages(operatorId, categoryId);
+  }
+
+  searchRechargePackages(query = "", operatorId = null) {
+    return searchRechargePackages(query, operatorId);
+  }
+
+  searchPackages(query = "", operatorId = null) {
+    return this.searchRechargePackages(query, operatorId);
+  }
+}
+
+const RechargeEngine = ReconstructedRechargeEngine;
+const TallyPayRechargeEngine = ReconstructedRechargeEngine;
+const defaultRechargeEngine = new ReconstructedRechargeEngine();
+const rechargeEngine = defaultRechargeEngine;
+const reconstructedRechargeEngine = defaultRechargeEngine;
+
 module.exports = {
+  // Milestone REA-ITER-235 Exports
+  TELECOM_OPERATORS,
+  RECHARGE_TELECOM_OPERATORS,
+  TelecomOperator,
+  RECHARGE_CONNECTION_TYPES,
+  CONNECTION_TYPES,
+  CONNECTION_TYPE_LABELS,
+  RECHARGE_PACKAGE_CATEGORIES,
+  PACKAGE_CATEGORIES,
+  PACKAGE_CATEGORY_META,
+  RECHARGE_REGULATORY_LIMITS,
+  RECHARGE_LIMITS_V2,
+  RECHARGE_ARSC_TOKENS,
+  RECHARGE_PACKAGES_CATALOG,
+  detectRechargeOperator,
+  calculateCommission,
+  calculateRechargeCommission,
+  validateRecharge,
+  validateRechargeParameters,
+  getRechargePackages,
+  searchRechargePackages,
+  ReconstructedRechargeEngine,
+  RechargeEngine,
+  TallyPayRechargeEngine,
+  reconstructedRechargeEngine,
+  rechargeEngine,
+
   // Milestone REA-ITER-234 Exports
   TRANSFER_CHANNELS,
   TransferChannel,

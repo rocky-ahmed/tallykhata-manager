@@ -474,26 +474,26 @@ runTest('10.6: Blue schedule notice card (#1E40AF on #EFF6FF) achieves WCAG AAA 
 // -----------------------------------------------------------------------------
 // PART 11: MODAL COUNT & CONTROLLER INVARIANTS (82 MODALS)
 // -----------------------------------------------------------------------------
-console.log('\n--- PART 11: MODAL COUNT & CONTROLLER INVARIANTS (84 MODALS) ---');
+console.log('\n--- PART 11: MODAL COUNT & CONTROLLER INVARIANTS (101 MODALS) ---');
 
-runTest('11.1: App.js contains exactly 96 <Modal elements', () => {
+runTest('11.1: App.js contains exactly 101 <Modal elements', () => {
   const modalMatches = appSrc.match(/<Modal\b/g) || [];
-  assert.strictEqual(modalMatches.length, 96, `Expected exactly 96 modals in App.js, got ${modalMatches.length}`);
+  assert.strictEqual(modalMatches.length, 101, `Expected exactly 101 modals in App.js, got ${modalMatches.length}`);
 });
 
-runTest('11.2: App.js contains exactly 84 onRequestClose handlers', () => {
+runTest('11.2: App.js contains exactly 101 onRequestClose handlers', () => {
   const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-  assert.strictEqual(reqCloseMatches.length, 96, `Expected 96 onRequestClose handlers, got ${reqCloseMatches.length}`);
+  assert.strictEqual(reqCloseMatches.length, 101, `Expected 101 onRequestClose handlers, got ${reqCloseMatches.length}`);
 });
 
-runTest('11.3: App.js contains exactly 96 unique modal state controllers', () => {
+runTest('11.3: App.js contains exactly 101 unique modal state controllers', () => {
   const regex = /visible=\{([a-zA-Z0-9_]+)\}/g;
   const uniqueModals = new Set();
   let m;
   while ((m = regex.exec(appSrc)) !== null) {
     uniqueModals.add(m[1]);
   }
-  assert.strictEqual(uniqueModals.size, 96, `Expected 96 unique visible controllers, got ${uniqueModals.size}`);
+  assert.strictEqual(uniqueModals.size, 101, `Expected 101 unique visible controllers, got ${uniqueModals.size}`);
   assert.ok(uniqueModals.has('modalSettlementHistory'), 'modalSettlementHistory must be in unique controllers');
   assert.ok(uniqueModals.has('modalAutoDisbursementSettings'), 'modalAutoDisbursementSettings must be in unique controllers');
 });

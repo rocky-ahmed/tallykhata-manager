@@ -134,6 +134,21 @@ const {
   generateAdaySmsText: tpGenerateAdaySmsText = tallyPayModule.generateAdaySmsText,
   recordAdayCollection: tpRecordAdayCollection = tallyPayModule.recordAdayCollection,
   transferEngine: tpTransferEngine = tallyPayModule.transferEngine,
+  // Milestone REA-ITER-235: Mobile Recharge & Packages Subsystem
+  RECHARGE_TELECOM_OPERATORS: TP_RECHARGE_TELECOM_OPERATORS = tallyPayModule.RECHARGE_TELECOM_OPERATORS,
+  RECHARGE_CONNECTION_TYPES: TP_RECHARGE_CONNECTION_TYPES = tallyPayModule.RECHARGE_CONNECTION_TYPES,
+  RECHARGE_PACKAGE_CATEGORIES: TP_RECHARGE_PACKAGE_CATEGORIES = tallyPayModule.RECHARGE_PACKAGE_CATEGORIES,
+  PACKAGE_CATEGORY_META: TP_PACKAGE_CATEGORY_META = tallyPayModule.PACKAGE_CATEGORY_META,
+  RECHARGE_REGULATORY_LIMITS: TP_RECHARGE_REGULATORY_LIMITS = tallyPayModule.RECHARGE_REGULATORY_LIMITS,
+  RECHARGE_PACKAGES_CATALOG: TP_RECHARGE_PACKAGES_CATALOG = tallyPayModule.RECHARGE_PACKAGES_CATALOG,
+  RECHARGE_ARSC_TOKENS: TP_RECHARGE_ARSC_TOKENS = tallyPayModule.RECHARGE_ARSC_TOKENS,
+  detectRechargeOperator: tpDetectRechargeOperator = tallyPayModule.detectRechargeOperator,
+  calculateRechargeCommission: tpCalculateRechargeCommission = tallyPayModule.calculateRechargeCommission,
+  validateRechargeParameters: tpValidateRechargeParameters = tallyPayModule.validateRechargeParameters,
+  validateRecharge: tpValidateRecharge = tallyPayModule.validateRecharge,
+  getRechargePackages: tpGetRechargePackages = tallyPayModule.getRechargePackages,
+  searchRechargePackages: tpSearchRechargePackages = tallyPayModule.searchRechargePackages,
+  rechargeEngine: tpRechargeEngine = tallyPayModule.rechargeEngine,
 } = tallyPayModule;
 import * as soundboxModule from './src/soundboxService';
 const soundboxService = soundboxModule.soundboxService || soundboxModule.default || soundboxModule;
@@ -1083,7 +1098,7 @@ function TallyKhataApp() {
   const [addMoneyAmount, setAddMoneyAmount] = useState('');
   const [addMoneyMethod, setAddMoneyMethod] = useState('bKash');
   const [rechargePhone, setRechargePhone] = useState('');
-  const [rechargeOperator, setRechargeOperator] = useState('Grameenphone');
+  const [legacyRechargeOperator, setLegacyRechargeOperator] = useState('Grameenphone');
   const [rechargeAmount, setRechargeAmount] = useState('');
 
   // Modals Visibility
@@ -1247,6 +1262,21 @@ function TallyKhataApp() {
   const [modalTransferBank, setModalTransferBank] = useState(false);
   const [modalTransferMfs, setModalTransferMfs] = useState(false);
   const [modalSelectCustomerAday, setModalSelectCustomerAday] = useState(false);
+  // --- ITERATION 235: TALLYPAY MOBILE RECHARGE SUBSYSTEM ---
+  const [modalRechargeNumber, setModalRechargeNumber] = useState(false);
+  const [modalRechargeAmount, setModalRechargeAmount] = useState(false);
+  const [modalRechargePackages, setModalRechargePackages] = useState(false);
+  const [modalRechargePin, setModalRechargePin] = useState(false);
+  const [modalRechargeVoucher, setModalRechargeVoucher] = useState(false);
+  const [rechargeMobile, setRechargeMobile] = useState("");
+  const [rechargeOperator, setRechargeOperator] = useState("GP");
+  const [rechargeConnectionType, setRechargeConnectionType] = useState("PREPAID");
+  const [rechargeAirtimeAmount, setRechargeAirtimeAmount] = useState("50");
+  const [rechargeSelectedPackage, setRechargeSelectedPackage] = useState(null);
+  const [rechargePackageCategory, setRechargePackageCategory] = useState("ALL");
+  const [rechargePackageSearch, setRechargePackageSearch] = useState("");
+  const [rechargePin, setRechargePin] = useState("");
+  const [rechargeVoucherData, setRechargeVoucherData] = useState(null);
   const [transferWalletMobile, setTransferWalletMobile] = useState('');
   const [transferWalletAmount, setTransferWalletAmount] = useState('1000');
   const [transferWalletPreset, setTransferWalletPreset] = useState(1000);
@@ -2608,6 +2638,34 @@ function TallyKhataApp() {
         setModalSelectCustomerAday(false);
         return true;
       }
+      if (modalRechargeVoucher) {
+        setModalRechargeVoucher(false);
+        setRechargeVoucherData(null);
+        return true;
+      }
+      if (modalRechargePin) {
+        setModalRechargePin(false);
+        if (rechargeSelectedPackage) {
+          setModalRechargePackages(true);
+        } else {
+          setModalRechargeAmount(true);
+        }
+        return true;
+      }
+      if (modalRechargePackages) {
+        setModalRechargePackages(false);
+        setModalRechargeAmount(true);
+        return true;
+      }
+      if (modalRechargeAmount) {
+        setModalRechargeAmount(false);
+        setModalRechargeNumber(true);
+        return true;
+      }
+      if (modalRechargeNumber) {
+        setModalRechargeNumber(false);
+        return true;
+      }
       if (modalAddMoneyReceiptVoucher) {
         setModalAddMoneyReceiptVoucher(false);
         setLastAddMoneyReceipt(null);
@@ -2774,7 +2832,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -3781,7 +3839,7 @@ function TallyKhataApp() {
     }
     const newTxn = {
       id: generateUniqueId('w_'),
-      title: `রিচার্জ (${rechargeOperator} - ${cleanPh})`,
+      title: `রিচার্জ (${legacyRechargeOperator} - ${cleanPh})`,
       amount: amt,
       type: 'out',
       date: getTodayDate(),
@@ -6255,6 +6313,197 @@ function TallyKhataApp() {
   };
 
   // =========================================================================
+  // TALLYPAY MOBILE RECHARGE HANDLERS (Iteration 235)
+  // =========================================================================
+  const handleOpenRechargeNumber = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setRechargeMobile("");
+    setRechargeOperator("GP");
+    setRechargeConnectionType("PREPAID");
+    setRechargeAirtimeAmount("50");
+    setRechargeSelectedPackage(null);
+    setRechargePackageCategory("ALL");
+    setRechargePackageSearch("");
+    setRechargePin("");
+    setModalRechargeNumber(true);
+  };
+
+  const handleCloseRechargeNumber = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalRechargeNumber(false);
+  };
+
+  const handleSelectRechargeOperator = (opId) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setRechargeOperator(opId);
+    if (opId !== "GP" && rechargeConnectionType === "SKITTO") {
+      setRechargeConnectionType("PREPAID");
+    }
+  };
+
+  const handleProceedFromNumberToAmount = () => {
+    const clean = String(rechargeMobile || "").replace(/^\+?880/, "0").replace(/[\s-]+/g, "");
+    if (!/^01[3-9]\d{8}$/.test(clean)) {
+      Alert.alert(tStatic("সতর্কতা"), tStatic("১১ ডিজিটের সঠিক মোবাইল নম্বর দিন"));
+      return;
+    }
+    const detected = tpDetectRechargeOperator ? tpDetectRechargeOperator(clean) : null;
+    if (detected) {
+      setRechargeOperator(detected);
+    }
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalRechargeNumber(false);
+    setModalRechargeAmount(true);
+  };
+
+  const handleOpenRechargePackages = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalRechargeAmount(false);
+    setModalRechargePackages(true);
+  };
+
+  const handleCloseRechargePackages = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalRechargePackages(false);
+    setModalRechargeAmount(true);
+  };
+
+  const handleSelectPackageItem = (pkg) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setRechargeSelectedPackage(pkg);
+    setRechargeAirtimeAmount(String(pkg.amountPaisa / 100));
+    setModalRechargePackages(false);
+    setModalRechargePin(true);
+  };
+
+  const handleProceedFromAmountToPin = () => {
+    const amt = parseFloat(rechargeAirtimeAmount);
+    if (!amt || amt < 10) {
+      Alert.alert(tStatic("সতর্কতা"), tStatic("সর্বনিম্ন রিচার্জ ৳ ১০"));
+      return;
+    }
+    if (amt > 1000) {
+      Alert.alert(tStatic("সতর্কতা"), tStatic("এয়ারটাইম রিচার্জ সর্বোচ্চ ৳ ১,০০০"));
+      return;
+    }
+    if (walletBalance < amt) {
+      Alert.alert(tStatic("ব্যর্থ"), tStatic("ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই।"));
+      return;
+    }
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setRechargeSelectedPackage(null);
+    setModalRechargeAmount(false);
+    setModalRechargePin(true);
+  };
+
+  const handleCloseRechargePin = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalRechargePin(false);
+    if (rechargeSelectedPackage) {
+      setModalRechargePackages(true);
+    } else {
+      setModalRechargeAmount(true);
+    }
+  };
+
+  const handleConfirmRecharge = async () => {
+    if (!rechargePin || rechargePin.length < 4) {
+      Alert.alert(tStatic("সতর্কতা"), tStatic("দয়া করে ৪-ডিজিট টালিপে পিন দিন"));
+      return;
+    }
+    if (rechargePin !== "1234") {
+      Alert.alert(tStatic("ত্রুটি"), tStatic("ভুল পিন নম্বর"));
+      return;
+    }
+    const cleanPh = String(rechargeMobile || "").replace(/^\+?880/, "0").replace(/[\s-]+/g, "");
+    const amt = parseFloat(rechargeAirtimeAmount) || 0;
+    const amtPaisa = Math.round(amt * 100);
+    const isPackage = Boolean(rechargeSelectedPackage);
+    const pkgComm = isPackage && rechargeSelectedPackage.commissionPaisa ? rechargeSelectedPackage.commissionPaisa : 0;
+    const commPaisa = tpCalculateRechargeCommission ? tpCalculateRechargeCommission(amtPaisa, pkgComm) : Math.round(amtPaisa * 0.027);
+    const commTaka = commPaisa / 100;
+    const netDeductTaka = (amtPaisa - commPaisa) / 100;
+
+    if (walletBalance < amt) {
+      Alert.alert(tStatic("ব্যর্থ"), tStatic("ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই।"));
+      return;
+    }
+
+    try {
+      const targetBizId = activeBusinessId || "1";
+      const record = {
+        id: "RC_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+        rechargeId: "RC_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+        businessId: String(targetBizId),
+        mobileNumber: cleanPh,
+        operator: rechargeOperator,
+        connectionType: rechargeConnectionType,
+        amountPaisa: amtPaisa,
+        amountTaka: amt,
+        commissionPaisa: commPaisa,
+        commissionTaka: commTaka,
+        netDeductedPaisa: amtPaisa - commPaisa,
+        netDeductedTaka: netDeductTaka,
+        isPackage,
+        packageId: isPackage ? rechargeSelectedPackage.id : null,
+        packageName: isPackage ? rechargeSelectedPackage.name : null,
+        packageCategory: isPackage ? rechargeSelectedPackage.category : null,
+        validity: isPackage ? rechargeSelectedPackage.validity : null,
+        status: "SUCCESS",
+        createdAt: new Date().toISOString(),
+        timestamp: Date.now(),
+        remarks: isPackage ? (rechargeSelectedPackage.name || "Package Recharge") : "Airtime Recharge",
+      };
+
+      if (storageRepository && typeof storageRepository.saveRechargeRecord === "function") {
+        await storageRepository.saveRechargeRecord(targetBizId, record);
+      }
+
+      const newBal = Math.max(0, walletBalance - netDeductTaka);
+      setWalletBalance(newBal);
+
+      const newTxn = {
+        id: generateUniqueId("rc_"),
+        title: "রিচার্জ (" + rechargeOperator + " - " + cleanPh + ")",
+        amount: amt,
+        commission: commTaka,
+        type: "out",
+        date: getTodayDate(),
+        time: getTimeString(),
+      };
+
+      if (storageRepository && typeof storageRepository.mutateStore === "function") {
+        await storageRepository.mutateStore((latestStore) => {
+          const curBal = Number(latestStore.walletBalance) || 0;
+          const curTxns = latestStore.walletTxns || [];
+          return {
+            ...latestStore,
+            walletBalance: curBal - netDeductTaka,
+            walletTxns: [newTxn, ...curTxns],
+          };
+        });
+      }
+
+      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+      setRechargeVoucherData(record);
+      setModalRechargePin(false);
+      setModalRechargeVoucher(true);
+    } catch (e) {
+      Alert.alert(tStatic("ত্রুটি"), e.message || tStatic("রিচার্জ সম্পন্ন করা যায়নি।"));
+    }
+  };
+
+  const handleCloseRechargeVoucher = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalRechargeVoucher(false);
+    setRechargeVoucherData(null);
+    setRechargeMobile("");
+    setRechargeAirtimeAmount("50");
+    setRechargeSelectedPackage(null);
+    setRechargePin("");
+  };
+
+  // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
   // =========================================================================
   const handleOpenSoundboxSettings = () => {
@@ -7607,6 +7856,55 @@ function TallyKhataApp() {
       generateAdayPaymentLink: tpGenerateAdayPaymentLink || tallyPayModule.generateAdayPaymentLink,
       generateAdaySmsText: tpGenerateAdaySmsText || tallyPayModule.generateAdaySmsText,
       recordAdayCollection: tpRecordAdayCollection || tallyPayModule.recordAdayCollection,
+      storageRepository,
+      tallyPayService,
+    };
+
+    global.__RECHARGE_TEST_HOOKS__ = {
+      modalRechargeNumber,
+      setModalRechargeNumber,
+      modalRechargeAmount,
+      setModalRechargeAmount,
+      modalRechargePackages,
+      setModalRechargePackages,
+      modalRechargePin,
+      setModalRechargePin,
+      modalRechargeVoucher,
+      setModalRechargeVoucher,
+      rechargeMobile,
+      setRechargeMobile,
+      rechargeOperator,
+      setRechargeOperator,
+      rechargeConnectionType,
+      setRechargeConnectionType,
+      rechargeAirtimeAmount,
+      setRechargeAirtimeAmount,
+      rechargeSelectedPackage,
+      setRechargeSelectedPackage,
+      rechargePackageCategory,
+      setRechargePackageCategory,
+      rechargePackageSearch,
+      setRechargePackageSearch,
+      rechargePin,
+      setRechargePin,
+      rechargeVoucherData,
+      setRechargeVoucherData,
+      handleOpenRechargeNumber,
+      handleCloseRechargeNumber,
+      handleSelectRechargeOperator,
+      handleProceedFromNumberToAmount,
+      handleOpenRechargePackages,
+      handleCloseRechargePackages,
+      handleSelectPackageItem,
+      handleProceedFromAmountToPin,
+      handleCloseRechargePin,
+      handleConfirmRecharge,
+      handleCloseRechargeVoucher,
+      detectRechargeOperator: tpDetectRechargeOperator || tallyPayModule.detectRechargeOperator,
+      calculateRechargeCommission: tpCalculateRechargeCommission || tallyPayModule.calculateRechargeCommission,
+      validateRechargeParameters: tpValidateRechargeParameters || tallyPayModule.validateRechargeParameters,
+      getRechargePackages: tpGetRechargePackages || tallyPayModule.getRechargePackages,
+      searchRechargePackages: tpSearchRechargePackages || tallyPayModule.searchRechargePackages,
       storageRepository,
       tallyPayService,
     };
@@ -11216,9 +11514,13 @@ accessibilityLabel={
               </TouchableOpacity>
 
               <TouchableOpacity
+                testID="tp_mobile_recharge_btn"
                 style={styles.walletServiceBtn}
-                onPress={() => setModalMobileRecharge(true)}
+                onPress={handleOpenRechargeNumber}
                 activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("মোবাইল রিচার্জ")}
               >
                 <AppIcon
                   source={require("./assets/icons/ic_call.png")}
@@ -15804,10 +16106,10 @@ accessibilityLabel={
               {['Grameenphone', 'Banglalink', 'Robi', 'Airtel', 'Teletalk'].map((op) => (
                 <TouchableOpacity
                   key={op}
-                  style={[styles.paymentMethodChip, rechargeOperator === op && styles.paymentMethodChipActive]}
-                  onPress={() => setRechargeOperator(op)}
+                  style={[styles.paymentMethodChip, legacyRechargeOperator === op && styles.paymentMethodChipActive]}
+                  onPress={() => setLegacyRechargeOperator(op)}
                 >
-                  <Text style={[styles.paymentMethodChipText, rechargeOperator === op && styles.paymentMethodChipTextActive]}>
+                  <Text style={[styles.paymentMethodChipText, legacyRechargeOperator === op && styles.paymentMethodChipTextActive]}>
                     {op}
                   </Text>
                 </TouchableOpacity>
@@ -23773,6 +24075,1044 @@ accessibilityLabel={
                 {tStatic("বন্ধ করুন")}
               </Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 97: TALLYPAY MOBILE RECHARGE - NUMBER SELECTION (Iteration 235)
+         =================================================================== */}
+      <Modal
+        visible={modalRechargeNumber}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseRechargeNumber}
+        testID="modal_recharge_number"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_back_recharge_number"
+                onPress={handleCloseRechargeNumber}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("ফিরে যান")}
+                style={{ marginRight: 12, padding: 4 }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <View>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { fontSize: 18, marginBottom: 2 }]}>
+                  {t('mobile_recharge_title')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                  {t('mobile_recharge_subtitle')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Mobile Number Input */}
+            <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 6 }}>
+              {t('recharge_mobile_number_label')}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: isDark ? '#475569' : '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, backgroundColor: isDark ? '#1E293B' : '#FFFFFF', marginBottom: 16 }}>
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: isDark ? '#94A3B8' : '#64748B', marginRight: 8 }}>+88</Text>
+              <TextInput
+                testID="input_recharge_mobile"
+                style={{ flex: 1, height: 46, fontSize: 16, color: isDark ? '#FFFFFF' : '#1E293B' }}
+                placeholder={t('recharge_mobile_placeholder')}
+                placeholderTextColor="#94A3B8"
+                keyboardType="phone-pad"
+                maxLength={11}
+                value={rechargeMobile}
+                onChangeText={(val) => {
+                  setRechargeMobile(val);
+                  const clean = String(val || '').replace(/^\+?880/, '0').replace(/[\s-]+/g, '');
+                  if (clean.length >= 3 && typeof tpDetectRechargeOperator === 'function') {
+                    const detected = tpDetectRechargeOperator(clean);
+                    if (detected) {
+                      setRechargeOperator(detected);
+                    }
+                  }
+                }}
+              />
+            </View>
+
+            {/* Operator Selection Grid */}
+            <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 8 }}>
+              {tStatic("টেলিকম অপারেটর")}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_operator_gp"
+                style={{
+                  width: '48%',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  borderWidth: rechargeOperator === 'GP' ? 2 : 1,
+                  borderColor: rechargeOperator === 'GP' ? '#00A3E0' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeOperator === 'GP' ? (isDark ? '#0F2942' : '#F0F9FF') : (isDark ? '#1E293B' : '#F8FAFC'),
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}
+                onPress={() => handleSelectRechargeOperator('GP')}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel="Grameenphone"
+              >
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#00A3E0', marginRight: 8 }} />
+                <Text style={{ fontSize: 12, fontWeight: rechargeOperator === 'GP' ? 'bold' : '500', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  Grameenphone
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_operator_banglalink"
+                style={{
+                  width: '48%',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  borderWidth: rechargeOperator === 'BANGLALINK' ? 2 : 1,
+                  borderColor: rechargeOperator === 'BANGLALINK' ? '#F37021' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeOperator === 'BANGLALINK' ? (isDark ? '#0F2942' : '#F0F9FF') : (isDark ? '#1E293B' : '#F8FAFC'),
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}
+                onPress={() => handleSelectRechargeOperator('BANGLALINK')}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel="Banglalink"
+              >
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#F37021', marginRight: 8 }} />
+                <Text style={{ fontSize: 12, fontWeight: rechargeOperator === 'BANGLALINK' ? 'bold' : '500', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  Banglalink
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_operator_robi"
+                style={{
+                  width: '48%',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  borderWidth: rechargeOperator === 'ROBI' ? 2 : 1,
+                  borderColor: rechargeOperator === 'ROBI' ? '#ED1C24' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeOperator === 'ROBI' ? (isDark ? '#0F2942' : '#F0F9FF') : (isDark ? '#1E293B' : '#F8FAFC'),
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}
+                onPress={() => handleSelectRechargeOperator('ROBI')}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel="Robi"
+              >
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#ED1C24', marginRight: 8 }} />
+                <Text style={{ fontSize: 12, fontWeight: rechargeOperator === 'ROBI' ? 'bold' : '500', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  Robi
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_operator_airtel"
+                style={{
+                  width: '48%',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  borderWidth: rechargeOperator === 'AIRTEL' ? 2 : 1,
+                  borderColor: rechargeOperator === 'AIRTEL' ? '#E40000' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeOperator === 'AIRTEL' ? (isDark ? '#0F2942' : '#F0F9FF') : (isDark ? '#1E293B' : '#F8FAFC'),
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}
+                onPress={() => handleSelectRechargeOperator('AIRTEL')}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel="Airtel"
+              >
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#E40000', marginRight: 8 }} />
+                <Text style={{ fontSize: 12, fontWeight: rechargeOperator === 'AIRTEL' ? 'bold' : '500', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  Airtel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_operator_teletalk"
+                style={{
+                  width: '48%',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  borderWidth: rechargeOperator === 'TELETALK' ? 2 : 1,
+                  borderColor: rechargeOperator === 'TELETALK' ? '#009639' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeOperator === 'TELETALK' ? (isDark ? '#0F2942' : '#F0F9FF') : (isDark ? '#1E293B' : '#F8FAFC'),
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}
+                onPress={() => handleSelectRechargeOperator('TELETALK')}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel="Teletalk"
+              >
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#009639', marginRight: 8 }} />
+                <Text style={{ fontSize: 12, fontWeight: rechargeOperator === 'TELETALK' ? 'bold' : '500', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  Teletalk
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_operator_skitto"
+                style={{
+                  width: '48%',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  borderWidth: rechargeOperator === 'SKITTO' ? 2 : 1,
+                  borderColor: rechargeOperator === 'SKITTO' ? '#FF69B4' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeOperator === 'SKITTO' ? (isDark ? '#0F2942' : '#F0F9FF') : (isDark ? '#1E293B' : '#F8FAFC'),
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}
+                onPress={() => handleSelectRechargeOperator('SKITTO')}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel="Skitto"
+              >
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#FF69B4', marginRight: 8 }} />
+                <Text style={{ fontSize: 12, fontWeight: rechargeOperator === 'SKITTO' ? 'bold' : '500', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  Skitto
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Contact Picker Helper */}
+            <TouchableOpacity
+              testID="btn_recharge_contact_picker"
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderRadius: 8, marginBottom: 16 }}
+              onPress={() => {
+                try { hapticFeedbackService.selection(); } catch (e) {}
+                Alert.alert(tStatic("কন্টাক্ট"), t("recharge_contact_picker"));
+              }}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+            >
+              <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#475569' }}>
+                📖 {t("recharge_contact_picker")}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Proceed CTA */}
+            <TouchableOpacity
+              testID="btn_proceed_recharge_amount"
+              style={{ height: 46, backgroundColor: '#0D6E5C', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              onPress={handleProceedFromNumberToAmount}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পরবর্তী")}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {tStatic("পরবর্তী")} →
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 98: TALLYPAY MOBILE RECHARGE - AMOUNT & AIRTIME (Iteration 235)
+         =================================================================== */}
+      <Modal
+        visible={modalRechargeAmount}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setModalRechargeAmount(false);
+          setModalRechargeNumber(true);
+        }}
+        testID="modal_recharge_amount"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_back_recharge_amount"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalRechargeAmount(false);
+                  setModalRechargeNumber(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("ফিরে যান")}
+                style={{ marginRight: 12, padding: 4 }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <View>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { fontSize: 18, marginBottom: 2 }]}>
+                  {t('recharge_amount_label')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                  {rechargeMobile} ({rechargeOperator})
+                </Text>
+              </View>
+            </View>
+
+            {/* Connection Type Switcher */}
+            <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 6 }}>
+              {tStatic("কানেকশন টাইপ")}
+            </Text>
+            <View
+              testID="segmented_recharge_connection_type"
+              style={{ flexDirection: 'row', backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderRadius: 8, padding: 4, marginBottom: 16 }}
+            >
+              <TouchableOpacity
+                testID="btn_conn_prepaid"
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: 'center',
+                  borderRadius: 6,
+                  backgroundColor: rechargeConnectionType === 'PREPAID' ? '#0D6E5C' : 'transparent',
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargeConnectionType('PREPAID');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: rechargeConnectionType === 'PREPAID' ? 'bold' : '500', color: rechargeConnectionType === 'PREPAID' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B') }}>
+                  {tStatic("প্রিপেইড")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_conn_postpaid"
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: 'center',
+                  borderRadius: 6,
+                  backgroundColor: rechargeConnectionType === 'POSTPAID' ? '#0D6E5C' : 'transparent',
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargeConnectionType('POSTPAID');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: rechargeConnectionType === 'POSTPAID' ? 'bold' : '500', color: rechargeConnectionType === 'POSTPAID' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B') }}>
+                  {tStatic("পোস্টপেইড")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_conn_skitto"
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: 'center',
+                  borderRadius: 6,
+                  backgroundColor: rechargeConnectionType === 'SKITTO' ? '#0D6E5C' : 'transparent',
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargeOperator('GP');
+                  setRechargeConnectionType('SKITTO');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: rechargeConnectionType === 'SKITTO' ? 'bold' : '500', color: rechargeConnectionType === 'SKITTO' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B') }}>
+                  {tStatic("স্কিটো")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Airtime Amount Input */}
+            <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 6 }}>
+              {tStatic("টাকার পরিমাণ")} (৳১০ - ৳১,০০০)
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: isDark ? '#475569' : '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, backgroundColor: isDark ? '#1E293B' : '#FFFFFF', marginBottom: 12 }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#0D6E5C', marginRight: 8 }}>৳</Text>
+              <TextInput
+                testID="input_recharge_amount"
+                style={{ flex: 1, height: 46, fontSize: 18, fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#1E293B' }}
+                placeholder="0.00"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                value={rechargeAirtimeAmount}
+                onChangeText={setRechargeAirtimeAmount}
+              />
+            </View>
+
+            {/* 5 Preset Chips */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_preset_20"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: rechargeAirtimeAmount === '20' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeAirtimeAmount === '20' ? (isDark ? '#064E3B' : '#DCFCE7') : (isDark ? '#1E293B' : '#F8FAFC'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargeAirtimeAmount('20');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: rechargeAirtimeAmount === '20' ? '#0D6E5C' : (isDark ? currentTheme.textPrimary : '#1E293B') }}>
+                  {t('recharge_preset_20')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_preset_50"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: rechargeAirtimeAmount === '50' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeAirtimeAmount === '50' ? (isDark ? '#064E3B' : '#DCFCE7') : (isDark ? '#1E293B' : '#F8FAFC'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargeAirtimeAmount('50');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: rechargeAirtimeAmount === '50' ? '#0D6E5C' : (isDark ? currentTheme.textPrimary : '#1E293B') }}>
+                  {t('recharge_preset_50')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_preset_100"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: rechargeAirtimeAmount === '100' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeAirtimeAmount === '100' ? (isDark ? '#064E3B' : '#DCFCE7') : (isDark ? '#1E293B' : '#F8FAFC'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargeAirtimeAmount('100');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: rechargeAirtimeAmount === '100' ? '#0D6E5C' : (isDark ? currentTheme.textPrimary : '#1E293B') }}>
+                  {t('recharge_preset_100')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_preset_200"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: rechargeAirtimeAmount === '200' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeAirtimeAmount === '200' ? (isDark ? '#064E3B' : '#DCFCE7') : (isDark ? '#1E293B' : '#F8FAFC'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargeAirtimeAmount('200');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: rechargeAirtimeAmount === '200' ? '#0D6E5C' : (isDark ? currentTheme.textPrimary : '#1E293B') }}>
+                  {t('recharge_preset_200')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_preset_500"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: rechargeAirtimeAmount === '500' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: rechargeAirtimeAmount === '500' ? (isDark ? '#064E3B' : '#DCFCE7') : (isDark ? '#1E293B' : '#F8FAFC'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargeAirtimeAmount('500');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: rechargeAirtimeAmount === '500' ? '#0D6E5C' : (isDark ? currentTheme.textPrimary : '#1E293B') }}>
+                  {t('recharge_preset_500')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 2.7% Retailer Commission Banner */}
+            <View
+              testID="banner_recharge_commission"
+              style={{ backgroundColor: isDark ? '#064E3B' : '#ECFDF5', borderRadius: 8, padding: 12, marginBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <View>
+                <Text style={{ fontSize: 11, color: isDark ? '#A7F3D0' : '#047857', fontWeight: '600' }}>
+                  {t('recharge_commission_label')} (২.৭%)
+                </Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#065F46' }}>
+                  + ৳ {((parseFloat(rechargeAirtimeAmount || 0) * 0.027) || 0).toFixed(2)}
+                </Text>
+              </View>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, backgroundColor: '#0D6E5C' }}>
+                <Text style={{ fontSize: 10, color: '#FFFFFF', fontWeight: 'bold' }}>রিটেইলার লাভ</Text>
+              </View>
+            </View>
+
+            {/* Switch to Packages Banner */}
+            <TouchableOpacity
+              testID="btn_switch_to_packages"
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: isDark ? '#1E293B' : '#F0FDF4', borderRadius: 8, borderWidth: 1, borderColor: isDark ? '#334155' : '#BBF7D0', marginBottom: 16 }}
+              onPress={handleOpenRechargePackages}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+            >
+              <View>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  📦 {t('recharge_packages_tab')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  ইন্টারনেট, মিনিট ও বান্ডেল অফার দেখুন
+                </Text>
+              </View>
+              <Text style={{ fontSize: 14, color: '#0D6E5C', fontWeight: 'bold' }}>→</Text>
+            </TouchableOpacity>
+
+            {/* Proceed CTA */}
+            <TouchableOpacity
+              testID="btn_proceed_recharge_pin"
+              style={{ height: 46, backgroundColor: '#0D6E5C', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              onPress={handleProceedFromAmountToPin}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={tStatic("পরবর্তী")}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {tStatic("পরবর্তী")} →
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 99: TALLYPAY MOBILE RECHARGE - PACKAGES CATALOG (Iteration 235)
+         =================================================================== */}
+      <Modal
+        visible={modalRechargePackages}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseRechargePackages}
+        testID="modal_recharge_packages"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <TouchableOpacity
+                testID="btn_back_recharge_packages"
+                onPress={handleCloseRechargePackages}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("ফিরে যান")}
+                style={{ marginRight: 12, padding: 4 }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { fontSize: 18, marginBottom: 2 }]}>
+                  {t('recharge_packages_tab')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                  {rechargeOperator} ({rechargeMobile})
+                </Text>
+              </View>
+              <TouchableOpacity
+                testID="btn_switch_to_amount"
+                onPress={handleCloseRechargePackages}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: isDark ? '#334155' : '#E2E8F0' }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                  {t('recharge_amount_tab')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Package Search Input */}
+            <TextInput
+              testID="input_search_packages"
+              style={{ height: 42, borderRadius: 8, borderWidth: 1, borderColor: isDark ? '#475569' : '#CBD5E1', paddingHorizontal: 12, fontSize: 13, color: isDark ? '#FFFFFF' : '#1E293B', backgroundColor: isDark ? '#1E293B' : '#FFFFFF', marginBottom: 10 }}
+              placeholder={tStatic("প্যাকেজ খুঁজুন...")}
+              placeholderTextColor="#94A3B8"
+              value={rechargePackageSearch}
+              onChangeText={setRechargePackageSearch}
+            />
+
+            {/* Category Filter Horizontal Scroll */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <TouchableOpacity
+                testID="tab_pkg_cat_all"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 16,
+                  marginRight: 8,
+                  backgroundColor: rechargePackageCategory === 'ALL' ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                  borderWidth: 1,
+                  borderColor: rechargePackageCategory === 'ALL' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargePackageCategory('ALL');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: rechargePackageCategory === 'ALL' ? 'bold' : '500', color: rechargePackageCategory === 'ALL' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                  {tStatic("সব")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="tab_pkg_cat_special"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 16,
+                  marginRight: 8,
+                  backgroundColor: rechargePackageCategory === 'SPECIAL' ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                  borderWidth: 1,
+                  borderColor: rechargePackageCategory === 'SPECIAL' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargePackageCategory('SPECIAL');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: rechargePackageCategory === 'SPECIAL' ? 'bold' : '500', color: rechargePackageCategory === 'SPECIAL' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                  {tStatic("স্পেশাল")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="tab_pkg_cat_internet"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 16,
+                  marginRight: 8,
+                  backgroundColor: rechargePackageCategory === 'INTERNET' ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                  borderWidth: 1,
+                  borderColor: rechargePackageCategory === 'INTERNET' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargePackageCategory('INTERNET');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: rechargePackageCategory === 'INTERNET' ? 'bold' : '500', color: rechargePackageCategory === 'INTERNET' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                  {tStatic("ইন্টারনেট")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="tab_pkg_cat_minutes"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 16,
+                  marginRight: 8,
+                  backgroundColor: rechargePackageCategory === 'MINUTES' ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                  borderWidth: 1,
+                  borderColor: rechargePackageCategory === 'MINUTES' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargePackageCategory('MINUTES');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: rechargePackageCategory === 'MINUTES' ? 'bold' : '500', color: rechargePackageCategory === 'MINUTES' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                  {tStatic("মিনিট")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="tab_pkg_cat_bundle"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 16,
+                  marginRight: 8,
+                  backgroundColor: rechargePackageCategory === 'BUNDLE' ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                  borderWidth: 1,
+                  borderColor: rechargePackageCategory === 'BUNDLE' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargePackageCategory('BUNDLE');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: rechargePackageCategory === 'BUNDLE' ? 'bold' : '500', color: rechargePackageCategory === 'BUNDLE' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                  {tStatic("বান্ডেল")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="tab_pkg_cat_call_rate"
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 16,
+                  marginRight: 8,
+                  backgroundColor: rechargePackageCategory === 'CALL_RATE' ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                  borderWidth: 1,
+                  borderColor: rechargePackageCategory === 'CALL_RATE' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setRechargePackageCategory('CALL_RATE');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: rechargePackageCategory === 'CALL_RATE' ? 'bold' : '500', color: rechargePackageCategory === 'CALL_RATE' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                  {tStatic("কল রেট")}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* Packages List */}
+            <ScrollView style={{ maxHeight: 340, marginBottom: 12 }} keyboardShouldPersistTaps="handled">
+              {(() => {
+                const catalog = TP_RECHARGE_PACKAGES_CATALOG || [];
+                const opFilter = (rechargeOperator === 'SKITTO') ? 'SKITTO' : (rechargeOperator || 'GP');
+                let list = catalog.filter((p) => {
+                  if (p.operator && p.operator !== opFilter && p.operator !== 'ALL') return false;
+                  if (rechargePackageCategory !== 'ALL' && p.category !== rechargePackageCategory) return false;
+                  if (rechargePackageSearch) {
+                    const q = rechargePackageSearch.toLowerCase();
+                    const matchName = p.name && p.name.toLowerCase().includes(q);
+                    const matchData = p.dataBandwidth && p.dataBandwidth.toLowerCase().includes(q);
+                    const matchTalk = p.talkTime && p.talkTime.toLowerCase().includes(q);
+                    const matchVal = p.validity && p.validity.toLowerCase().includes(q);
+                    if (!matchName && !matchData && !matchTalk && !matchVal) return false;
+                  }
+                  return true;
+                });
+
+                if (list.length === 0) {
+                  return (
+                    <View style={{ padding: 24, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 26, marginBottom: 8 }}>📦</Text>
+                      <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B', textAlign: 'center' }}>
+                        কোন প্যাকেজ পাওয়া যায়নি
+                      </Text>
+                    </View>
+                  );
+                }
+
+                return list.map((pkg) => {
+                  const commTaka = (pkg.commissionPaisa || Math.round(pkg.amountPaisa * 0.027)) / 100;
+                  return (
+                    <TouchableOpacity
+                      key={pkg.id}
+                      testID={'card_recharge_package_' + pkg.id}
+                      style={{
+                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                        borderRadius: 10,
+                        padding: 12,
+                        marginBottom: 10,
+                        borderWidth: 1,
+                        borderColor: isDark ? '#334155' : '#E2E8F0',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                      onPress={() => handleSelectPackageItem(pkg)}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                    >
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 2 }}>
+                          {pkg.name}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                          <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', marginRight: 8 }}>
+                            ⏳ {pkg.validity}
+                          </Text>
+                          {pkg.dataBandwidth ? (
+                            <Text style={{ fontSize: 11, color: '#2563EB', marginRight: 8, fontWeight: '600' }}>
+                              🌐 {pkg.dataBandwidth}
+                            </Text>
+                          ) : null}
+                          {pkg.talkTime ? (
+                            <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '600' }}>
+                              📞 {pkg.talkTime}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <View style={{ alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10, backgroundColor: isDark ? '#064E3B' : '#ECFDF5' }}>
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: isDark ? '#A7F3D0' : '#047857' }}>
+                            {t('recharge_commission_label')}: ৳ {commTaka.toFixed(2)}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#0D6E5C', marginBottom: 4 }}>
+                          ৳ {pkg.amountPaisa / 100}
+                        </Text>
+                        <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: '#0D6E5C' }}>
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#FFFFFF' }}>কিনুন</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                });
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 100: TALLYPAY MOBILE RECHARGE - PIN AUTHENTICATION (Iteration 235)
+         =================================================================== */}
+      <Modal
+        visible={modalRechargePin}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseRechargePin}
+        testID="modal_recharge_pin"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_back_recharge_pin"
+                onPress={handleCloseRechargePin}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("ফিরে যান")}
+                style={{ marginRight: 12, padding: 4 }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <View>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { fontSize: 18, marginBottom: 2 }]}>
+                  {t('recharge_confirm_title')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                  {t('recharge_pin_prompt')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Summary Card */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 10, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>নম্বর:</Text>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  {rechargeMobile} ({rechargeOperator} - {rechargeConnectionType})
+                </Text>
+              </View>
+              {rechargeSelectedPackage && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>প্যাকেজ:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {rechargeSelectedPackage.name}
+                  </Text>
+                </View>
+              )}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>পরিমাণ:</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  ৳ {parseFloat(rechargeAirtimeAmount || 0).toFixed(2)}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>কমিশন:</Text>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  + ৳ {(rechargeSelectedPackage && rechargeSelectedPackage.commissionPaisa ? (rechargeSelectedPackage.commissionPaisa / 100) : ((parseFloat(rechargeAirtimeAmount || 0) * 0.027) || 0)).toFixed(2)}
+                </Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: isDark ? '#334155' : '#E2E8F0', marginVertical: 6 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>নেট কর্তন:</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  ৳ {(parseFloat(rechargeAirtimeAmount || 0) - (rechargeSelectedPackage && rechargeSelectedPackage.commissionPaisa ? (rechargeSelectedPackage.commissionPaisa / 100) : (parseFloat(rechargeAirtimeAmount || 0) * 0.027))).toFixed(2)}
+                </Text>
+              </View>
+            </View>
+
+            {/* PIN Input Field */}
+            <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? currentTheme.textPrimary : '#334155', marginBottom: 6 }}>
+              {t('recharge_pin_prompt')}
+            </Text>
+            <TextInput
+              testID="input_recharge_pin"
+              style={{
+                height: 48,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: isDark ? '#475569' : '#CBD5E1',
+                paddingHorizontal: 16,
+                fontSize: 22,
+                textAlign: 'center',
+                letterSpacing: 8,
+                color: isDark ? '#FFFFFF' : '#1E293B',
+                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                marginBottom: 20,
+              }}
+              placeholder="••••"
+              placeholderTextColor="#94A3B8"
+              keyboardType="numeric"
+              maxLength={4}
+              secureTextEntry
+              value={rechargePin}
+              onChangeText={setRechargePin}
+            />
+
+            {/* Confirm Recharge CTA */}
+            <TouchableOpacity
+              testID="btn_confirm_recharge"
+              style={{ height: 48, backgroundColor: '#0D6E5C', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              onPress={handleConfirmRecharge}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('recharge_confirm_title')}
+            >
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {t('recharge_confirm_title')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 101: TALLYPAY MOBILE RECHARGE - VOUCHER / RECEIPT (Iteration 235)
+         =================================================================== */}
+      <Modal
+        visible={modalRechargeVoucher}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseRechargeVoucher}
+        testID="modal_recharge_voucher"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Success Icon & Header */}
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                <Text style={{ fontSize: 32 }}>✅</Text>
+              </View>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { textAlign: 'center', fontSize: 18, marginBottom: 4 }]}>
+                {t('recharge_success_title')}
+              </Text>
+              <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', textAlign: 'center' }}>
+                মোবাইল রিচার্জ সফলভাবে সম্পন্ন হয়েছে
+              </Text>
+            </View>
+
+            {/* Receipt Card */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>{t('recharge_trx_id')}:</Text>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  {rechargeVoucherData?.rechargeId || rechargeVoucherData?.id || 'RC_TXN'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>মোবাইল নম্বর:</Text>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  {rechargeVoucherData?.mobileNumber} ({rechargeVoucherData?.operator})
+                </Text>
+              </View>
+              {rechargeVoucherData?.packageName ? (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>প্যাকেজ:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {rechargeVoucherData?.packageName}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>{t('recharge_amount_label')}:</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  ৳ {formatMoney(rechargeVoucherData?.amountTaka || 0)}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>{t('recharge_commission_earned')}:</Text>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  + ৳ {formatMoney(rechargeVoucherData?.commissionTaka || 0)}
+                </Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: isDark ? '#334155' : '#E2E8F0', marginVertical: 6 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>মোট কর্তন:</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  ৳ {formatMoney(rechargeVoucherData?.netDeductedTaka || 0)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity
+                testID="btn_share_recharge_voucher"
+                style={{ flex: 1, height: 44, borderRadius: 8, borderWidth: 1, borderColor: isDark ? '#475569' : '#CBD5E1', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  Alert.alert(tStatic("শেয়ার"), tStatic("রিচার্জ ভাউচার কপি করা হয়েছে"));
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                  📤 {tStatic("শেয়ার করুন")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_close_recharge_voucher"
+                style={{ flex: 1, height: 44, backgroundColor: '#0D6E5C', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+                onPress={handleCloseRechargeVoucher}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("সম্পন্ন")}
+              >
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' }}>
+                  {tStatic("সম্পন্ন")}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

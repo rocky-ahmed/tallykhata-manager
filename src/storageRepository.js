@@ -279,6 +279,7 @@ const VALID_COLLECTIONS = new Set([
     'linkedMfsAccounts',
     'savedCards',
     'transferHistory',
+    'rechargeHistory',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -407,6 +408,7 @@ function sanitizeState(state) {
   if (!Array.isArray(s.linkedMfsAccounts)) s.linkedMfsAccounts = [];
   if (!Array.isArray(s.savedCards)) s.savedCards = [];
   if (!Array.isArray(s.transferHistory)) s.transferHistory = [];
+  if (!Array.isArray(s.rechargeHistory)) s.rechargeHistory = [];
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
   if (!Array.isArray(s.tallyPayBeneficiaries)) s.tallyPayBeneficiaries = [];
@@ -555,6 +557,7 @@ function createDefaultState() {
       linkedMfsAccounts: [],
       savedCards: [],
       transferHistory: [],
+      rechargeHistory: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -766,12 +769,32 @@ function decompressStoragePayload(payload) {
   return payload;
 }
 
+class MemoryStorageAdapter {
+  constructor(initialData = null) {
+    this.data = initialData ? JSON.stringify(initialData) : null;
+  }
+  async getItem(key) {
+    return this.data;
+  }
+  async setItem(key, value) {
+    this.data = value;
+  }
+  async removeItem(key) {
+    this.data = null;
+  }
+  async clear() {
+    this.data = null;
+  }
+}
+
 class StorageRepository {
   constructor(storageAdapter = null) {
     if (storageAdapter && typeof storageAdapter === 'object' && typeof storageAdapter.getItem === 'function') {
       this.adapter = storageAdapter;
     } else if (storageAdapter && typeof storageAdapter === 'object' && storageAdapter.customStore && typeof storageAdapter.customStore.getItem === 'function') {
       this.adapter = storageAdapter.customStore;
+    } else if (storageAdapter && typeof storageAdapter === 'object' && storageAdapter.adapter && typeof storageAdapter.adapter.getItem === 'function') {
+      this.adapter = storageAdapter.adapter;
     } else {
       this.adapter = this.createInMemoryAdapter();
     }
@@ -1699,6 +1722,24 @@ class StorageRepository {
       authoritative.linkedMfsAccounts = [];
     }
 
+        if (authoritative.rechargeHistory && Array.isArray(authoritative.rechargeHistory)) {
+      authoritative.rechargeHistory = authoritative.rechargeHistory.map((r) => {
+        const rawPhone = String(r.recipientMobile || r.mobileNumber || r.phone || "").replace(/[\s-]+/g, "");
+        let masked = rawPhone;
+        if (rawPhone.length >= 11) {
+          masked = rawPhone.slice(0, 3) + "****" + rawPhone.slice(7);
+        }
+        return {
+          ...r,
+          mobileNumber: masked,
+          recipientMobile: masked,
+          phone: masked,
+        };
+      });
+    } else {
+      authoritative.rechargeHistory = [];
+    }
+
         if (authoritative.transferHistory && Array.isArray(authoritative.transferHistory)) {
       authoritative.transferHistory = authoritative.transferHistory.map((t) => {
         const rawPhone = String(t.recipientMobile || t.recipient || t.receiverMobile || t.phone || "").replace(/[\s-]+/g, "");
@@ -2321,6 +2362,7 @@ class StorageRepository {
         const linkedMfsAccounts = (prevStore.linkedMfsAccounts || []).filter((m) => getBizId(m) !== targetId);
         const savedCards = (prevStore.savedCards || []).filter((c) => getBizId(c) !== targetId);
         const transferHistory = (prevStore.transferHistory || []).filter((t) => getBizId(t) !== targetId);
+        const rechargeHistory = (prevStore.rechargeHistory || []).filter((r) => getBizId(r) !== targetId);
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
         delete autoDisbursementConfig[targetId];
 
@@ -2412,6 +2454,7 @@ class StorageRepository {
         linkedMfsAccounts,
         savedCards,
         transferHistory,
+        rechargeHistory,
         autoDisbursementConfig,
         cashReconciliation,
       };
@@ -2975,6 +3018,7 @@ class StorageRepository {
           billPaymentTransactions: (fullState.billPaymentTransactions || []).length,
           savedBillers: (fullState.savedBillers || []).length,
           transferHistory: (fullState.transferHistory || []).length,
+          rechargeHistory: (fullState.rechargeHistory || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -7934,6 +7978,117 @@ class StorageRepository {
       return found ? { ...found } : null;
     }
 
+    /**
+     * REA-ITER-235: Saves a mobile recharge record to storage.
+     */
+    async saveRechargeRecord(businessId = null, record = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const rechargeId = record.id || record.rechargeId || `RC_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+      const entry = {
+        id: rechargeId,
+        rechargeId,
+        businessId: targetBizId,
+        mobileNumber: record.mobileNumber || '',
+        operator: record.operator || 'GP',
+        connectionType: record.connectionType || 'PREPAID',
+        amountPaisa: Number(record.amountPaisa || 0),
+        commissionPaisa: Number(record.commissionPaisa || 0),
+        isPackage: Boolean(record.isPackage),
+        packageId: record.packageId || null,
+        packageName: record.packageName || null,
+        packageCategory: record.packageCategory || null,
+        validity: record.validity || null,
+        status: record.status || 'SUCCESS',
+        createdAt: record.createdAt || new Date().toISOString(),
+        timestamp: record.timestamp || Date.now(),
+        remarks: record.remarks || record.note || '',
+      };
+
+      let saved = null;
+      await this.mutateCollection('rechargeHistory', (list) => {
+        const withoutCurrent = (list || []).filter((r) => r.id !== rechargeId && r.rechargeId !== rechargeId);
+        saved = entry;
+        return [entry, ...withoutCurrent];
+      });
+
+      const result = saved ? { ...saved } : { ...entry };
+      result.success = true;
+      result.recharge = saved || entry;
+      result.record = saved || entry;
+      return result;
+    }
+
+    /**
+     * REA-ITER-235: Retrieves recharge history with filtering and pagination.
+     */
+    getRechargeHistory(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.rechargeHistory || []).filter(
+        (r) => String(r.businessId || '1') === targetBizId
+      );
+
+      if (options.operator) {
+        list = list.filter((r) => String(r.operator).toUpperCase() === String(options.operator).toUpperCase());
+      }
+      if (options.connectionType) {
+        list = list.filter((r) => String(r.connectionType).toUpperCase() === String(options.connectionType).toUpperCase());
+      }
+      if (options.isPackage !== undefined) {
+        list = list.filter((r) => Boolean(r.isPackage) === Boolean(options.isPackage));
+      }
+      if (options.startDate) {
+        const sTime = new Date(options.startDate).getTime();
+        list = list.filter((r) => new Date(r.createdAt || r.timestamp).getTime() >= sTime);
+      }
+      if (options.endDate) {
+        const eTime = new Date(options.endDate).getTime();
+        list = list.filter((r) => new Date(r.createdAt || r.timestamp).getTime() <= eTime);
+      }
+
+      if (options.searchQuery || options.query || options.search) {
+        const q = String(options.searchQuery || options.query || options.search).toLowerCase();
+        list = list.filter((r) =>
+          String(r.mobileNumber || '').toLowerCase().includes(q) ||
+          String(r.packageName || '').toLowerCase().includes(q) ||
+          String(r.rechargeId || '').toLowerCase().includes(q) ||
+          String(r.remarks || r.note || '').toLowerCase().includes(q)
+        );
+      }
+
+      list.sort((a, b) => (b.timestamp || new Date(b.createdAt).getTime()) - (a.timestamp || new Date(a.createdAt).getTime()));
+
+      const offset = Math.max(0, parseInt(options.offset || 0, 10));
+      const limit = options.limit ? Math.max(1, parseInt(options.limit, 10)) : list.length;
+      const paginated = list.slice(offset, offset + limit).map((r) => ({ ...r }));
+      paginated.items = paginated;
+      paginated.recharges = paginated;
+      paginated.totalCount = list.length;
+      paginated.offset = offset;
+      paginated.limit = limit;
+      paginated.hasMore = offset + limit < list.length;
+      paginated.totalAmountPaisa = list.reduce((sum, r) => sum + Number(r.amountPaisa || 0), 0);
+      paginated.totalCommissionPaisa = list.reduce((sum, r) => sum + Number(r.commissionPaisa || 0), 0);
+      return paginated;
+    }
+
+    /**
+     * REA-ITER-235: Retrieves a single recharge record by ID.
+     */
+    getRechargeById(businessId = null, rechargeId = null) {
+      if (!rechargeId) return null;
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const found = (store.rechargeHistory || []).find(
+        (r) => (r.id === rechargeId || r.rechargeId === rechargeId) &&
+               (!targetBizId || String(r.businessId || '1') === targetBizId)
+      );
+      return found ? { ...found } : null;
+    }
+
+
 
 
   sanitizeState(state) {
@@ -9196,6 +9351,34 @@ function getTransferByIdRepo(businessId = null, transferId = null, repo = defaul
   return null;
 }
 
+async function saveRechargeRecordRepo(businessId = null, recordData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveRechargeRecord === 'function') {
+    return repo.saveRechargeRecord(businessId, recordData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getRechargeHistoryRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getRechargeHistory === 'function') {
+    return repo.getRechargeHistory(businessId, options);
+  }
+  return [];
+}
+
+function getRechargeByIdRepo(businessId = null, rechargeId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getRechargeById === 'function') {
+    return repo.getRechargeById(businessId, rechargeId);
+  }
+  return null;
+}
+
+function sanitizeForCloudBackupRepo(state = null, repo = defaultRepository) {
+  if (repo && typeof repo.getFullBackupState === 'function') {
+    return repo.getFullBackupState(state || repo.currentStore);
+  }
+  return null;
+}
+
 async function deleteCardRepo(businessId = null, cardId = null, repo = defaultRepository) {
   if (repo && typeof repo.deleteCard === "function") {
     return repo.deleteCard(businessId, cardId);
@@ -9208,6 +9391,7 @@ const repoExport = {
   V6_KEY,
   V5_KEY,
   StorageRepository,
+  MemoryStorageAdapter,
   storageRepository: defaultRepository,
   createDefaultState,
   SAMPLE_CUSTOMER_MAPPINGS,
@@ -9371,6 +9555,10 @@ const repoExport = {
   saveTransferRecord: saveTransferRecordRepo,
   getTransferHistory: getTransferHistoryRepo,
   getTransferById: getTransferByIdRepo,
+  saveRechargeRecord: saveRechargeRecordRepo,
+  getRechargeHistory: getRechargeHistoryRepo,
+  getRechargeById: getRechargeByIdRepo,
+  sanitizeForCloudBackup: sanitizeForCloudBackupRepo,
   sanitizeState: sanitizeStateRepo,
   default: defaultRepository,
 };
@@ -9380,6 +9568,7 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 if (typeof exports !== 'undefined') {
   exports.StorageRepository = StorageRepository;
+  exports.MemoryStorageAdapter = MemoryStorageAdapter;
   exports.storageRepository = defaultRepository;
   exports.createDefaultState = createDefaultState;
   exports.V6_KEY = V6_KEY;
@@ -9545,6 +9734,10 @@ if (typeof exports !== 'undefined') {
   exports.saveTransferRecord = saveTransferRecordRepo;
   exports.getTransferHistory = getTransferHistoryRepo;
   exports.getTransferById = getTransferByIdRepo;
+  exports.saveRechargeRecord = saveRechargeRecordRepo;
+  exports.getRechargeHistory = getRechargeHistoryRepo;
+  exports.getRechargeById = getRechargeByIdRepo;
+  exports.sanitizeForCloudBackup = sanitizeForCloudBackupRepo;
   exports.sanitizeState = sanitizeStateRepo;
   exports.default = defaultRepository;
 }
