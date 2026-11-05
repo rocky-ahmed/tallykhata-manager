@@ -1317,6 +1317,27 @@ function TallyKhataApp() {
   const [modalNidInfoReview, setModalNidInfoReview] = useState(false);
   const [modalLivenessSelfie, setModalLivenessSelfie] = useState(false);
   const [modalKycStatusResult, setModalKycStatusResult] = useState(false);
+  // --- REA-ITER-238: TallyPay Merchant QR Standee Order & POS Collateral Delivery Subsystem ---
+  const [modalQrOrderCatalog, setModalQrOrderCatalog] = useState(false);
+  const [modalQrStandeePreview, setModalQrStandeePreview] = useState(false);
+  const [modalDeliveryAddress, setModalDeliveryAddress] = useState(false);
+  const [modalOrderPaymentCheckout, setModalOrderPaymentCheckout] = useState(false);
+  const [modalOrderTracking, setModalOrderTracking] = useState(false);
+
+  const [selectedStandeeMaterial, setSelectedStandeeMaterial] = useState('ACRYLIC');
+  const [qrOrderQuantity, setQrOrderQuantity] = useState(1);
+  const [deliveryRecipientName, setDeliveryRecipientName] = useState(currentBusiness?.name || 'মার্চেন্ট স্বত্বাধিকারী');
+  const [deliveryMobile, setDeliveryMobile] = useState(currentBusiness?.mobile || '০১৭১২৩৪৫৬৭৮');
+  const [deliveryDivision, setDeliveryDivision] = useState('DHAKA');
+  const [deliveryDistrict, setDeliveryDistrict] = useState('ঢাকা');
+  const [deliveryThana, setDeliveryThana] = useState('মিরপুর');
+  const [deliveryStreetAddress, setDeliveryStreetAddress] = useState('দোকান নং ১২, রোড ৩, মিরপুর ১০');
+  const [deliveryPostalCode, setDeliveryPostalCode] = useState('১২১৬');
+  const [deliveryAddressError, setDeliveryAddressError] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('WALLET_PAY');
+  const [lastPlacedOrder, setLastPlacedOrder] = useState(null);
+  const [orderTrackingStep, setOrderTrackingStep] = useState('PLACED');
+
 
   const [kycNidSide, setKycNidSide] = useState('FRONT');
   const [kycFlashOn, setKycFlashOn] = useState(false);
@@ -2695,6 +2716,36 @@ function TallyKhataApp() {
         setModalSelectCustomerAday(false);
         return true;
       }
+      // Iteration 238: QR Standee Order & Collateral Tracking BackHandler
+      if (modalOrderTracking) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalOrderTracking(false);
+        return true;
+      }
+      if (modalOrderPaymentCheckout) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalOrderPaymentCheckout(false);
+        setModalDeliveryAddress(true);
+        return true;
+      }
+      if (modalDeliveryAddress) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalDeliveryAddress(false);
+        setModalQrOrderCatalog(true);
+        return true;
+      }
+      if (modalQrStandeePreview) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalQrStandeePreview(false);
+        setModalQrOrderCatalog(true);
+        return true;
+      }
+      if (modalQrOrderCatalog) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalQrOrderCatalog(false);
+        return true;
+      }
+
       // Iteration 237: KYC & NID Scanner BackHandler
       if (modalKycStatusResult) {
         try { hapticFeedbackService.selection(); } catch (e) {}
@@ -2947,7 +2998,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalKycSplash, modalNidCameraScanner, modalNidInfoReview, modalLivenessSelfie, modalKycStatusResult, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalKycSplash, modalNidCameraScanner, modalNidInfoReview, modalLivenessSelfie, modalKycStatusResult, modalQrOrderCatalog, modalQrStandeePreview, modalDeliveryAddress, modalOrderPaymentCheckout, modalOrderTracking, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -6846,6 +6897,124 @@ function TallyKhataApp() {
   };
 
   // =========================================================================
+  // QR STANDEE ORDER & COLLATERAL DELIVERY HANDLERS (Iteration 238)
+  // =========================================================================
+  const QR_STANDEE_CATALOG = [
+    {
+      id: 'ACRYLIC',
+      nameKey: 'standee_acrylic',
+      descKey: 'standee_acrylic_desc',
+      price: 250,
+      icon: '💎',
+      badge: 'সেরা পছন্দ'
+    },
+    {
+      id: 'WOODEN',
+      nameKey: 'standee_wooden',
+      descKey: 'standee_wooden_desc',
+      price: 350,
+      icon: '🪵',
+      badge: 'এলিগ্যান্ট'
+    },
+    {
+      id: 'METAL',
+      nameKey: 'standee_metal',
+      descKey: 'standee_metal_desc',
+      price: 450,
+      icon: '🛡️',
+      badge: 'ওয়াটারপ্রুফ'
+    },
+    {
+      id: 'STICKER',
+      nameKey: 'standee_sticker',
+      descKey: 'standee_sticker_desc',
+      price: 100,
+      icon: '🏷️',
+      badge: '৪ পিস প্যাক'
+    },
+    {
+      id: 'SOUNDBOX_STAND',
+      nameKey: 'standee_soundbox_stand',
+      descKey: 'standee_soundbox_stand_desc',
+      price: 300,
+      icon: '🔊',
+      badge: 'অল-ইন-ওয়ান'
+    }
+  ];
+
+  const handleOpenQrOrderCatalog = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalQrOrderCatalog(true);
+  };
+
+  const handleOpenStandeePreview = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalQrStandeePreview(true);
+  };
+
+  const handleProceedToAddress = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalQrOrderCatalog(false);
+    setModalDeliveryAddress(true);
+  };
+
+  const handleProceedToCheckout = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const cleanMobile = (deliveryMobile || '').replace(/[^0-9]/g, '');
+    if (cleanMobile.length < 11) {
+      setDeliveryAddressError(t('invalid_mobile') || '১১ ডিজিটের সঠিক মোবাইল নম্বর দিন');
+      return;
+    }
+    const cleanAddress = (deliveryStreetAddress || '').trim();
+    if (cleanAddress.length < 5) {
+      setDeliveryAddressError(t('street_address_req') || 'ব্যবসা প্রতিষ্ঠানের ঠিকানা ৫ থেকে ১০০ অক্ষরের মধ্যে হতে হবে');
+      return;
+    }
+    setDeliveryAddressError('');
+    setModalDeliveryAddress(false);
+    setModalOrderPaymentCheckout(true);
+  };
+
+  const handleConfirmPlaceOrder = () => {
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    const selItem = QR_STANDEE_CATALOG.find(i => i.id === selectedStandeeMaterial) || QR_STANDEE_CATALOG[0];
+    const subtotal = selItem.price * qrOrderQuantity;
+    const deliveryFee = subtotal >= 1000 ? 0 : (deliveryDivision === 'DHAKA' ? 60 : 120);
+    const grandTotal = subtotal + deliveryFee;
+    const orderId = `ORD-QR-${Date.now().toString().slice(-6)}`;
+
+    const orderData = {
+      orderId,
+      materialId: selectedStandeeMaterial,
+      itemName: t(selItem.nameKey),
+      unitPrice: selItem.price,
+      quantity: qrOrderQuantity,
+      subtotal,
+      deliveryFee,
+      grandTotal,
+      paymentMethod: selectedPaymentMethod,
+      recipientName: deliveryRecipientName || currentBusiness?.name || 'মার্চেন্ট',
+      mobile: deliveryMobile || currentBusiness?.mobile || '০১৭১২-৩৪৫৬৭৮',
+      address: `${deliveryStreetAddress}, ${deliveryThana}, ${deliveryDistrict}`,
+      division: deliveryDivision,
+      postalCode: deliveryPostalCode,
+      trackingStep: 'PLACED',
+      placedAt: new Date().toISOString()
+    };
+
+    setLastPlacedOrder(orderData);
+    setOrderTrackingStep('PLACED');
+    setModalOrderPaymentCheckout(false);
+    setModalOrderTracking(true);
+  };
+
+  const handleDoneOrderTracking = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalOrderTracking(false);
+  };
+
+
+  // =========================================================================
   // SOUNDBOX BLE & BATTERY TELEMETRY HANDLERS (Iteration 223)
   // =========================================================================
   const handleOpenSoundboxSettings = () => {
@@ -8251,7 +8420,53 @@ function TallyKhataApp() {
       tallyPayService,
     };
 
-        global.__KYC_TEST_HOOKS__ = {
+            global.__QR_ORDER_TEST_HOOKS__ = {
+      modalQrOrderCatalog,
+      setModalQrOrderCatalog,
+      modalQrStandeePreview,
+      setModalQrStandeePreview,
+      modalDeliveryAddress,
+      setModalDeliveryAddress,
+      modalOrderPaymentCheckout,
+      setModalOrderPaymentCheckout,
+      modalOrderTracking,
+      setModalOrderTracking,
+      selectedStandeeMaterial,
+      setSelectedStandeeMaterial,
+      qrOrderQuantity,
+      setQrOrderQuantity,
+      deliveryRecipientName,
+      setDeliveryRecipientName,
+      deliveryMobile,
+      setDeliveryMobile,
+      deliveryDivision,
+      setDeliveryDivision,
+      deliveryDistrict,
+      setDeliveryDistrict,
+      deliveryThana,
+      setDeliveryThana,
+      deliveryStreetAddress,
+      setDeliveryStreetAddress,
+      deliveryPostalCode,
+      setDeliveryPostalCode,
+      deliveryAddressError,
+      setDeliveryAddressError,
+      selectedPaymentMethod,
+      setSelectedPaymentMethod,
+      lastPlacedOrder,
+      setLastPlacedOrder,
+      orderTrackingStep,
+      setOrderTrackingStep,
+      handleOpenQrOrderCatalog,
+      handleOpenStandeePreview,
+      handleProceedToAddress,
+      handleProceedToCheckout,
+      handleConfirmPlaceOrder,
+      handleDoneOrderTracking,
+      QR_STANDEE_CATALOG
+    };
+
+    global.__KYC_TEST_HOOKS__ = {
       modalKycSplash,
       setModalKycSplash,
       modalNidCameraScanner,
@@ -11991,6 +12206,34 @@ accessibilityLabel={
               </TouchableOpacity>
 
               <TouchableOpacity
+                testID="tp_qr_standee_order_btn"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                style={styles.walletServiceBtn}
+                onPress={handleOpenQrOrderCatalog}
+                activeOpacity={0.75}
+                accessibilityLabel={t('qr_standee_order')}
+              >
+                <AppIcon
+                  source={require("./assets/icons/ic_bangla_qr.png")}
+                  variant="primary"
+                  shape="rounded"
+                  size={24}
+                  containerSize={44}
+                />
+                <Text
+                  style={[
+                    styles.walletServiceBtnText,
+                    isDark && tStyles.textPrimary,
+                    { fontSize: 11, marginTop: 4, textAlign: 'center' }
+                  ]}
+                  numberOfLines={2}
+                >
+                  {t('qr_standee_order')}
+                </Text>
+              </TouchableOpacity>
+
+                            <TouchableOpacity
                 testID="tp_merchant_kyc_banner_btn"
                 accessibilityRole="button"
                 hitSlop={STANDARD_TOUCH_HIT_SLOP}
@@ -12489,6 +12732,22 @@ accessibilityLabel={
               </TouchableOpacity>
 
               <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenQrOrderCatalog}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('qr_standee_order')}
+                testID="menu_tp_qr_standee_order_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_bangla_qr.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('qr_standee_order')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('qr_order_catalog_subtitle')}</Text>
+                </View>
+                <Text style={{ fontSize: 18, color: isDark ? '#64748B' : '#94A3B8' }}>›</Text>
+              </TouchableOpacity>
+
+                            <TouchableOpacity
                 style={[styles.menuListItem, isDark && tStyles.menuListItem]}
                 onPress={handleOpenKycWizard}
                 hitSlop={STANDARD_TOUCH_HIT_SLOP}
@@ -27100,6 +27359,996 @@ accessibilityLabel={
           </View>
         </View>
       </Modal>
+
+      {/* ===================================================================
+          MODAL 112: QR STANDEE CATALOG & COLLATERAL ORDERING (ITERATION 238)
+         =================================================================== */}
+      <Modal
+        visible={modalQrOrderCatalog}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalQrOrderCatalog(false)}
+        testID="modal_qr_order_catalog"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <TouchableOpacity
+                testID="btn_qr_catalog_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalQrOrderCatalog(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 22, color: isDark ? '#FFFFFF' : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                  {t('qr_order_catalog_title')}
+                </Text>
+                <Text style={[{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }]}>
+                  {t('qr_order_catalog_subtitle')}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Standee Material Cards */}
+              <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#E2E8F0' : '#1E293B', marginBottom: 10 }}>
+                {t('select_standee_material')}
+              </Text>
+
+              {QR_STANDEE_CATALOG.map((item) => {
+                const isSelected = selectedStandeeMaterial === item.id;
+                const cardTestId = `card_material_${item.id.toLowerCase()}`;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    testID={cardTestId}
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={() => {
+                      try { hapticFeedbackService.selection(); } catch (e) {}
+                      setSelectedStandeeMaterial(item.id);
+                    }}
+                    style={{
+                      borderWidth: isSelected ? 2 : 1,
+                      borderColor: isSelected ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                      backgroundColor: isSelected ? (isDark ? '#064E3B22' : '#ECFDF5') : (isDark ? '#1E293B' : '#FFFFFF'),
+                      borderRadius: 12,
+                      padding: 14,
+                      marginBottom: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: isDark ? '#0F172A' : '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <Text style={{ fontSize: 24 }}>{item.icon}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: isDark ? '#FFFFFF' : '#0F172A' }}>
+                          {t(item.nameKey)}
+                        </Text>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#0D6E5C' }}>
+                          ৳ {item.price}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B', marginTop: 2 }}>
+                        {t(item.descKey)}
+                      </Text>
+                      {item.badge && (
+                        <View style={{ alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isDark ? '#1E3A8A' : '#DBEAFE' }}>
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: '#2563EB' }}>
+                            {item.badge}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Quantity Stepper & Subtotal */}
+              <View style={{ marginTop: 10, padding: 14, borderRadius: 12, backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                    {t('quantity')}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity
+                      testID="btn_qr_qty_minus"
+                      accessibilityRole="button"
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      onPress={() => {
+                        try { hapticFeedbackService.selection(); } catch (e) {}
+                        setQrOrderQuantity(Math.max(1, qrOrderQuantity - 1));
+                      }}
+                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isDark ? '#334155' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#FFFFFF' : '#1E293B' }}>−</Text>
+                    </TouchableOpacity>
+                    <Text testID="text_qr_order_qty" style={{ fontSize: 16, fontWeight: '700', color: isDark ? '#FFFFFF' : '#1E293B', marginHorizontal: 16 }}>
+                      {qrOrderQuantity}
+                    </Text>
+                    <TouchableOpacity
+                      testID="btn_qr_qty_plus"
+                      accessibilityRole="button"
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      onPress={() => {
+                        try { hapticFeedbackService.selection(); } catch (e) {}
+                        setQrOrderQuantity(Math.min(20, qrOrderQuantity + 1));
+                      }}
+                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Text style={{ fontSize: 18, fontWeight: '700', color: '#FFFFFF' }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Subtotal Preview */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <Text style={{ fontSize: 14, color: isDark ? '#94A3B8' : '#64748B' }}>
+                    {t('item_subtotal')}:
+                  </Text>
+                  <Text testID="text_catalog_subtotal" style={{ fontSize: 16, fontWeight: '700', color: '#0D6E5C' }}>
+                    ৳ {((QR_STANDEE_CATALOG.find(i => i.id === selectedStandeeMaterial) || QR_STANDEE_CATALOG[0]).price * qrOrderQuantity)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Action Buttons: Preview & Proceed */}
+              <View style={{ flexDirection: 'row', marginTop: 16, marginBottom: 20 }}>
+                <TouchableOpacity
+                  testID="btn_view_standee_preview"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={handleOpenStandeePreview}
+                  style={{
+                    flex: 1,
+                    height: 48,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: '#0D6E5C',
+                    backgroundColor: 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 8
+                  }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#0D6E5C' }}>
+                    {t('preview_standee')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  testID="btn_proceed_to_address"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={handleProceedToAddress}
+                  style={{
+                    flex: 1,
+                    height: 48,
+                    borderRadius: 10,
+                    backgroundColor: '#0D6E5C',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginLeft: 8
+                  }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                    {t('এগিয়ে যান') || 'এগিয়ে যান'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 113: QR STANDEE PHOTOREALISTIC PREVIEW (ITERATION 238)
+         =================================================================== */}
+      <Modal
+        visible={modalQrStandeePreview}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalQrStandeePreview(false)}
+        testID="modal_qr_standee_preview"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_qr_preview_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalQrStandeePreview(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 22, color: isDark ? '#FFFFFF' : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700', marginLeft: 8 }]}>
+                {t('customize_preview')}
+              </Text>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Material indicator badge */}
+              <View style={{ alignItems: 'center', marginBottom: 14 }}>
+                <View testID="badge_selected_material" style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: isDark ? '#064E3B' : '#D1FAE5' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#0D6E5C' }}>
+                    {t((QR_STANDEE_CATALOG.find(i => i.id === selectedStandeeMaterial) || QR_STANDEE_CATALOG[0]).nameKey)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Photorealistic Standee Mockup Container */}
+              <View
+                testID="view_standee_mockup_card"
+                style={{
+                  alignSelf: 'center',
+                  width: 260,
+                  borderRadius: 16,
+                  borderWidth: 4,
+                  borderColor: selectedStandeeMaterial === 'WOODEN' ? '#B45309' : (selectedStandeeMaterial === 'METAL' ? '#64748B' : '#0D6E5C'),
+                  backgroundColor: '#FFFFFF',
+                  padding: 16,
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 8,
+                  elevation: 5
+                }}
+              >
+                {/* Standee Header */}
+                <View style={{ width: '100%', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 8, marginBottom: 10 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#0D6E5C', letterSpacing: 0.5 }}>
+                    {t('bangla_qr_merchant')}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}>
+                    TallyPay Merchant Partner
+                  </Text>
+                </View>
+
+                {/* Shop Name & Phone */}
+                <Text testID="text_standee_shop_name" style={{ fontSize: 17, fontWeight: '800', color: '#0F172A', textAlign: 'center', marginBottom: 2 }}>
+                  {currentBusiness?.name || 'মার্চেন্ট শপ'}
+                </Text>
+                <Text testID="text_standee_merchant_mobile" style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 10 }}>
+                  {currentBusiness?.mobile || '০১৭১২-৩৪৫৬৭৮'}
+                </Text>
+
+                {/* Authentic QR Display Box */}
+                <View
+                  testID="view_standee_qr_display"
+                  style={{
+                    width: 170,
+                    height: 170,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 2,
+                    borderColor: '#0D6E5C',
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 10,
+                    position: 'relative'
+                  }}
+                >
+                  {/* Corner Finder Patterns */}
+                  <View style={{ position: 'absolute', top: 8, left: 8, width: 34, height: 34, borderWidth: 3, borderColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 14, height: 14, backgroundColor: '#0D6E5C' }} />
+                  </View>
+                  <View style={{ position: 'absolute', top: 8, right: 8, width: 34, height: 34, borderWidth: 3, borderColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 14, height: 14, backgroundColor: '#0D6E5C' }} />
+                  </View>
+                  <View style={{ position: 'absolute', bottom: 8, left: 8, width: 34, height: 34, borderWidth: 3, borderColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 14, height: 14, backgroundColor: '#0D6E5C' }} />
+                  </View>
+                  {/* Central QR Logo */}
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 20, color: '#FFFFFF', fontWeight: '900' }}>৳</Text>
+                  </View>
+                </View>
+
+                {/* Prompt & Partner Badges */}
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#0D6E5C', textAlign: 'center', marginBottom: 8 }}>
+                  {t('scan_and_pay')}
+                </Text>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4 }}>
+                  {['bKash', 'Nagad', 'Rocket', 'Upay', 'Visa'].map((brand) => (
+                    <View key={brand} style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#F1F5F9' }}>
+                      <Text style={{ fontSize: 9, fontWeight: '700', color: '#334155' }}>{brand}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* Standee Base Mockup */}
+              <View
+                style={{
+                  alignSelf: 'center',
+                  width: 220,
+                  height: 16,
+                  borderRadius: 4,
+                  backgroundColor: selectedStandeeMaterial === 'WOODEN' ? '#78350F' : (selectedStandeeMaterial === 'METAL' ? '#475569' : '#047857'),
+                  marginTop: -2,
+                  marginBottom: 20
+                }}
+              />
+
+              {/* Confirm / Done Button */}
+              <TouchableOpacity
+                testID="btn_preview_confirm_proceed"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalQrStandeePreview(false);
+                }}
+                style={{
+                  height: 48,
+                  borderRadius: 10,
+                  backgroundColor: '#0D6E5C',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 16
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                  {t('ঠিক আছে') || 'ঠিক আছে'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 114: SHIPPING & DELIVERY ADDRESS SELECTION (ITERATION 238)
+         =================================================================== */}
+      <Modal
+        visible={modalDeliveryAddress}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalDeliveryAddress(false)}
+        testID="modal_delivery_address"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <TouchableOpacity
+                testID="btn_delivery_address_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalDeliveryAddress(false);
+                  setModalQrOrderCatalog(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 22, color: isDark ? '#FFFFFF' : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                  {t('delivery_address')}
+                </Text>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('delivery_address_desc')}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Recipient Name Input */}
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 4 }}>
+                {t('recipient_name')} *
+              </Text>
+              <TextInput
+                testID="input_delivery_recipient_name"
+                style={[styles.input, isDark && tStyles.inputDark, { marginBottom: 12 }]}
+                value={deliveryRecipientName}
+                onChangeText={setDeliveryRecipientName}
+                placeholder={t('recipient_name')}
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+              />
+
+              {/* Recipient Mobile Input */}
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 4 }}>
+                {t('recipient_mobile')} *
+              </Text>
+              <TextInput
+                testID="input_delivery_mobile"
+                style={[styles.input, isDark && tStyles.inputDark, { marginBottom: 12 }]}
+                value={deliveryMobile}
+                onChangeText={setDeliveryMobile}
+                placeholder="০১৭১২-৩৪৫৬৭৮"
+                keyboardType="phone-pad"
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+              />
+
+              {/* Division Selector Chips */}
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 6 }}>
+                {t('division')} *
+              </Text>
+              <View style={{ flexDirection: 'row', marginBottom: 12, gap: 8 }}>
+                <TouchableOpacity
+                  testID="chip_division_dhaka"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setDeliveryDivision('DHAKA');
+                    setDeliveryDistrict('ঢাকা');
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 40,
+                    borderRadius: 8,
+                    borderWidth: 1.5,
+                    borderColor: deliveryDivision === 'DHAKA' ? '#0D6E5C' : (isDark ? '#334155' : '#CBD5E1'),
+                    backgroundColor: deliveryDivision === 'DHAKA' ? (isDark ? '#064E3B22' : '#ECFDF5') : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: deliveryDivision === 'DHAKA' ? '#0D6E5C' : (isDark ? '#94A3B8' : '#475569') }}>
+                    {t('delivery_inside_dhaka')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  testID="chip_division_outside"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setDeliveryDivision('OUTSIDE');
+                    setDeliveryDistrict('চট্টগ্রাম');
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 40,
+                    borderRadius: 8,
+                    borderWidth: 1.5,
+                    borderColor: deliveryDivision === 'OUTSIDE' ? '#0D6E5C' : (isDark ? '#334155' : '#CBD5E1'),
+                    backgroundColor: deliveryDivision === 'OUTSIDE' ? (isDark ? '#064E3B22' : '#ECFDF5') : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: deliveryDivision === 'OUTSIDE' ? '#0D6E5C' : (isDark ? '#94A3B8' : '#475569') }}>
+                    {t('delivery_outside_dhaka')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* District & Thana Inputs */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 4 }}>
+                    {t('district')} *
+                  </Text>
+                  <TextInput
+                    testID="input_delivery_district"
+                    style={[styles.input, isDark && tStyles.inputDark]}
+                    value={deliveryDistrict}
+                    onChangeText={setDeliveryDistrict}
+                    placeholder={t('district')}
+                    placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 4 }}>
+                    {t('thana_area')} *
+                  </Text>
+                  <TextInput
+                    testID="input_delivery_thana"
+                    style={[styles.input, isDark && tStyles.inputDark]}
+                    value={deliveryThana}
+                    onChangeText={setDeliveryThana}
+                    placeholder={t('thana_area')}
+                    placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                  />
+                </View>
+              </View>
+
+              {/* Street / Business Address */}
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 4 }}>
+                {t('street_address')} *
+              </Text>
+              <TextInput
+                testID="input_delivery_address"
+                style={[styles.input, isDark && tStyles.inputDark, { height: 64, textAlignVertical: 'top', marginBottom: 12 }]}
+                value={deliveryStreetAddress}
+                onChangeText={setDeliveryStreetAddress}
+                placeholder={t('street_address')}
+                multiline
+                numberOfLines={2}
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+              />
+
+              {/* Postal Code */}
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 4 }}>
+                {t('postal_code')}
+              </Text>
+              <TextInput
+                testID="input_delivery_postal_code"
+                style={[styles.input, isDark && tStyles.inputDark, { marginBottom: 14 }]}
+                value={deliveryPostalCode}
+                onChangeText={setDeliveryPostalCode}
+                placeholder="১২১৬"
+                keyboardType="numeric"
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+              />
+
+              {/* Delivery Fee Notice Card */}
+              <View testID="card_delivery_fee_info" style={{ padding: 12, borderRadius: 10, backgroundColor: isDark ? '#1E293B' : '#EFF6FF', borderWidth: 1, borderColor: isDark ? '#1E3A8A' : '#BFDBFE', marginBottom: 14 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#93C5FD' : '#1E40AF' }}>
+                  🚚 {deliveryDivision === 'DHAKA' ? t('delivery_inside_dhaka') : t('delivery_outside_dhaka')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? '#60A5FA' : '#3B82F6', marginTop: 2 }}>
+                  {t('estimated_delivery')}
+                </Text>
+              </View>
+
+              {/* Error Banner */}
+              {!!deliveryAddressError && (
+                <View style={{ padding: 10, borderRadius: 8, backgroundColor: '#FEE2E2', marginBottom: 14 }}>
+                  <Text testID="text_delivery_address_error" style={{ fontSize: 12, fontWeight: '600', color: '#991B1B' }}>
+                    ⚠️ {deliveryAddressError}
+                  </Text>
+                </View>
+              )}
+
+              {/* Proceed to Checkout CTA */}
+              <TouchableOpacity
+                testID="btn_proceed_to_checkout"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleProceedToCheckout}
+                style={{
+                  height: 48,
+                  borderRadius: 10,
+                  backgroundColor: '#0D6E5C',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 16
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                  {t('এগিয়ে যান') || 'এগিয়ে যান'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 115: ORDER SUMMARY & PAYMENT CHECKOUT (ITERATION 238)
+         =================================================================== */}
+      <Modal
+        visible={modalOrderPaymentCheckout}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalOrderPaymentCheckout(false)}
+        testID="modal_order_payment_checkout"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_checkout_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalOrderPaymentCheckout(false);
+                  setModalDeliveryAddress(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 22, color: isDark ? '#FFFFFF' : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700', marginLeft: 8 }]}>
+                {t('order_checkout')}
+              </Text>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Order Breakdown Card */}
+              {(() => {
+                const selItem = QR_STANDEE_CATALOG.find(i => i.id === selectedStandeeMaterial) || QR_STANDEE_CATALOG[0];
+                const subtotal = selItem.price * qrOrderQuantity;
+                const deliveryFee = subtotal >= 1000 ? 0 : (deliveryDivision === 'DHAKA' ? 60 : 120);
+                const grandTotal = subtotal + deliveryFee;
+
+                return (
+                  <View
+                    testID="card_checkout_breakdown"
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: isDark ? '#334155' : '#E2E8F0',
+                      marginBottom: 16
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 12 }}>
+                      {t('order_summary')}
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B' }}>
+                        {t(selItem.nameKey)} (x{qrOrderQuantity}):
+                      </Text>
+                      <Text testID="text_checkout_subtotal" style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                        ৳ {subtotal}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B' }}>
+                        {t('delivery_charge')} ({deliveryDivision === 'DHAKA' ? 'ঢাকা' : 'ঢাকার বাইরে'}):
+                      </Text>
+                      <Text testID="text_checkout_delivery_fee" style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                        {deliveryFee === 0 ? t('free_delivery') : `৳ ${deliveryFee}`}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: isDark ? '#334155' : '#E2E8F0' }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: isDark ? '#FFFFFF' : '#0F172A' }}>
+                        {t('total_payable')}:
+                      </Text>
+                      <Text testID="text_checkout_grand_total" style={{ fontSize: 18, fontWeight: '800', color: '#0D6E5C' }}>
+                        ৳ {grandTotal}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* Shipping Address Summary */}
+              <View style={{ padding: 14, borderRadius: 10, backgroundColor: isDark ? '#1E293B' : '#F1F5F9', marginBottom: 16 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#94A3B8' : '#475569', marginBottom: 4 }}>
+                  {t('delivery_address')}:
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                  {deliveryRecipientName} ({deliveryMobile})
+                </Text>
+                <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B', marginTop: 2 }}>
+                  {deliveryStreetAddress}, {deliveryThana}, {deliveryDistrict}
+                </Text>
+              </View>
+
+              {/* Payment Method Selector */}
+              <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? '#E2E8F0' : '#1E293B', marginBottom: 10 }}>
+                {t('payment_method')}
+              </Text>
+
+              {/* Option 1: Wallet Pay */}
+              <TouchableOpacity
+                testID="radio_pay_wallet"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setSelectedPaymentMethod('WALLET_PAY');
+                }}
+                style={{
+                  padding: 14,
+                  borderRadius: 10,
+                  borderWidth: 1.5,
+                  borderColor: selectedPaymentMethod === 'WALLET_PAY' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: selectedPaymentMethod === 'WALLET_PAY' ? (isDark ? '#064E3B22' : '#ECFDF5') : 'transparent',
+                  marginBottom: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center'
+                }}
+              >
+                <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: selectedPaymentMethod === 'WALLET_PAY' ? '#0D6E5C' : '#94A3B8', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  {selectedPaymentMethod === 'WALLET_PAY' && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#0D6E5C' }} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? '#FFFFFF' : '#0F172A' }}>
+                    {t('pay_with_tp_wallet')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B' }}>
+                    ইনস্ট্যান্ট ওয়ালেট ডেবিট • কোনো অতিরিক্ত ফি নেই
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Option 2: Cash on Delivery */}
+              <TouchableOpacity
+                testID="radio_pay_cod"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setSelectedPaymentMethod('COD');
+                }}
+                style={{
+                  padding: 14,
+                  borderRadius: 10,
+                  borderWidth: 1.5,
+                  borderColor: selectedPaymentMethod === 'COD' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  backgroundColor: selectedPaymentMethod === 'COD' ? (isDark ? '#064E3B22' : '#ECFDF5') : 'transparent',
+                  marginBottom: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center'
+                }}
+              >
+                <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: selectedPaymentMethod === 'COD' ? '#0D6E5C' : '#94A3B8', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  {selectedPaymentMethod === 'COD' && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#0D6E5C' }} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? '#FFFFFF' : '#0F172A' }}>
+                    {t('cash_on_delivery')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B' }}>
+                    পণ্য হাতে পাওয়ার পর কুরিয়ার ম্যানকে টাকা দিন
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Confirm & Place Order CTA */}
+              <TouchableOpacity
+                testID="btn_confirm_place_order"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleConfirmPlaceOrder}
+                style={{
+                  height: 48,
+                  borderRadius: 10,
+                  backgroundColor: '#0D6E5C',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 16
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                  {t('place_order_btn')}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 116: COLLATERAL DELIVERY & FULFILLMENT TRACKING (ITERATION 238)
+         =================================================================== */}
+      <Modal
+        visible={modalOrderTracking}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalOrderTracking(false)}
+        testID="modal_order_tracking"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_order_tracking_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalOrderTracking(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 22, color: isDark ? '#FFFFFF' : '#1E293B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700', marginLeft: 8 }]}>
+                {t('order_tracking')}
+              </Text>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Order Info Card */}
+              <View
+                testID="card_order_info"
+                style={{
+                  padding: 16,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  marginBottom: 16
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B' }}>
+                    {t('order_id')}:
+                  </Text>
+                  <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: isDark ? '#064E3B' : '#D1FAE5' }}>
+                    <Text testID="text_order_id_badge" style={{ fontSize: 13, fontWeight: '700', color: '#0D6E5C' }}>
+                      {lastPlacedOrder?.orderId || 'ORD-QR-782190'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B' }}>
+                    {t('item_subtotal')}:
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                    {lastPlacedOrder?.itemName || 'এক্রিলিক স্ট্যান্ডি'} (x{lastPlacedOrder?.quantity || 1})
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B' }}>
+                    {t('payment_method')}:
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#0D6E5C' }}>
+                    {lastPlacedOrder?.paymentMethod === 'WALLET_PAY' ? 'ট্যালিপে ওয়ালেট (পেইড)' : 'ক্যাশ অন ডেলিভারি (COD)'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 5-Step Visual Tracking Stepper */}
+              <Text style={{ fontSize: 14, fontWeight: '700', color: isDark ? '#E2E8F0' : '#1E293B', marginBottom: 12 }}>
+                {t('track_order_timeline')}
+              </Text>
+
+              <View
+                testID="stepper_order_tracking"
+                style={{
+                  padding: 16,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  marginBottom: 16
+                }}
+              >
+                {[
+                  { step: 'PLACED', labelKey: 'step_placed', testId: 'step_item_placed', desc: 'আপনার অর্ডার সফলভাবে নথিভুক্ত হয়েছে' },
+                  { step: 'CONFIRMED', labelKey: 'step_confirmed', testId: 'step_item_confirmed', desc: 'অর্ডার অনুমোদন ও প্রিন্টিং প্রস্তুত' },
+                  { step: 'SHIPPED', labelKey: 'step_shipped', testId: 'step_item_shipped', desc: 'কুরিয়ার হাব-এ হস্তান্তর সম্পন্ন' },
+                  { step: 'OUT_FOR_DELIVERY', labelKey: 'step_out_for_delivery', testId: 'step_item_out_for_delivery', desc: 'রাইডার ডেলিভারির উদ্দেশ্যে রওনা দিয়েছেন' },
+                  { step: 'DELIVERED', labelKey: 'step_delivered', testId: 'step_item_delivered', desc: 'গ্রাহকের নিকট সফল হস্তান্তর' }
+                ].map((s, idx, arr) => {
+                  const stepOrder = ['PLACED', 'CONFIRMED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+                  const currentIdx = stepOrder.indexOf(orderTrackingStep);
+                  const thisIdx = stepOrder.indexOf(s.step);
+                  const isDone = thisIdx <= currentIdx;
+                  const isCurrent = thisIdx === currentIdx;
+
+                  return (
+                    <View key={s.step} testID={s.testId} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: idx === arr.length - 1 ? 0 : 16 }}>
+                      {/* Step Indicator & Line */}
+                      <View style={{ alignItems: 'center', marginRight: 12 }}>
+                        <View
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 12,
+                            backgroundColor: isDone ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: isDone ? '#FFFFFF' : '#94A3B8', fontWeight: '700' }}>
+                            {isDone ? '✓' : (idx + 1)}
+                          </Text>
+                        </View>
+                        {idx !== arr.length - 1 && (
+                          <View
+                            style={{
+                              width: 2,
+                              height: 28,
+                              backgroundColor: thisIdx < currentIdx ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                              marginTop: 2
+                            }}
+                          />
+                        )}
+                      </View>
+
+                      {/* Step Text */}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: isCurrent ? '800' : '600', color: isDone ? (isDark ? '#FFFFFF' : '#0F172A') : (isDark ? '#64748B' : '#94A3B8') }}>
+                          {t(s.labelKey)}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B', marginTop: 1 }}>
+                          {s.desc}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Courier & Logistics Card */}
+              <View
+                testID="card_courier_info"
+                style={{
+                  padding: 14,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                  marginBottom: 16
+                }}
+              >
+                <Text testID="text_courier_partner" style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#93C5FD' : '#1E40AF', marginBottom: 4 }}>
+                  {t('delivery_partner')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? '#60A5FA' : '#3B82F6', marginBottom: 8 }}>
+                  {t('estimated_delivery')}
+                </Text>
+
+                <TouchableOpacity
+                  testID="btn_call_delivery_man"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    borderRadius: 6,
+                    backgroundColor: isDark ? '#1E3A8A' : '#DBEAFE',
+                    alignSelf: 'flex-start'
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
+                    📞 {t('delivery_man_mobile')}: ০১৭১২-৯৮৭৬৫৪
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Done CTA */}
+              <TouchableOpacity
+                testID="btn_tracking_done"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleDoneOrderTracking}
+                style={{
+                  height: 48,
+                  borderRadius: 10,
+                  backgroundColor: '#0D6E5C',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 16
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                  {t('ঠিক আছে') || 'ঠিক আছে'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
 
       {/* MODAL: BATCH TAGADA RESULT */}
       <Modal

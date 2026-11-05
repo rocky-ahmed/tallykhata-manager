@@ -7396,7 +7396,705 @@ const KycPipelineEngine = MerchantKycPipelineEngine;
 const merchantKycPipelineEngine = new MerchantKycPipelineEngine();
 const reconstructedKycEngine = merchantKycPipelineEngine;
 
+// ============================================================================
+// MILESTONE REA-ITER-238: TALLYPAY MERCHANT QR STANDEE ORDER &
+// POS SOUNDBOX COLLATERAL DELIVERY SUBSYSTEM
+// Reference: classes4.dex, QrStandeeOrderActivity, SoundboxOrderActivity,
+// Room SQLite table `merchant_qr_order`, index `index_merchant_qr_order_order_id`
+// ============================================================================
+
+const MERCHANT_QR_ORDER_SCHEMA = Object.freeze({
+  tableName: 'merchant_qr_order',
+  columns: Object.freeze([
+    'id',
+    'order_id',
+    'business_id',
+    'item_type',
+    'item_name',
+    'quantity',
+    'unit_price_paisa',
+    'total_price_paisa',
+    'delivery_fee_paisa',
+    'payment_method',
+    'payment_status',
+    'order_status',
+    'recipient_name',
+    'recipient_phone',
+    'delivery_address',
+    'division',
+    'district',
+    'postal_code',
+    'courier_name',
+    'tracking_code',
+    'synced',
+    'create_date',
+    'update_date',
+  ]),
+  columnTypes: Object.freeze({
+    id: 'INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL',
+    order_id: 'TEXT NOT NULL',
+    business_id: 'TEXT NOT NULL',
+    item_type: 'TEXT NOT NULL',
+    item_name: 'TEXT NOT NULL',
+    quantity: 'INTEGER NOT NULL',
+    unit_price_paisa: 'INTEGER NOT NULL',
+    total_price_paisa: 'INTEGER NOT NULL',
+    delivery_fee_paisa: 'INTEGER NOT NULL',
+    payment_method: 'TEXT NOT NULL',
+    payment_status: 'TEXT NOT NULL',
+    order_status: 'TEXT NOT NULL',
+    recipient_name: 'TEXT NOT NULL',
+    recipient_phone: 'TEXT NOT NULL',
+    delivery_address: 'TEXT NOT NULL',
+    division: 'TEXT NOT NULL',
+    district: 'TEXT NOT NULL',
+    postal_code: 'TEXT',
+    courier_name: 'TEXT',
+    tracking_code: 'TEXT',
+    synced: 'INTEGER NOT NULL DEFAULT 0',
+    create_date: 'TEXT NOT NULL',
+    update_date: 'TEXT',
+  }),
+  primaryKey: 'id',
+  indices: Object.freeze([
+    {
+      name: 'index_merchant_qr_order_order_id',
+      unique: true,
+      columns: ['order_id'],
+      ddl: 'CREATE UNIQUE INDEX IF NOT EXISTS index_merchant_qr_order_order_id ON merchant_qr_order (order_id);',
+    },
+  ]),
+  ddl: `CREATE TABLE IF NOT EXISTS merchant_qr_order (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    order_id TEXT NOT NULL,
+    business_id TEXT NOT NULL,
+    item_type TEXT NOT NULL,
+    item_name TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    unit_price_paisa INTEGER NOT NULL,
+    total_price_paisa INTEGER NOT NULL,
+    delivery_fee_paisa INTEGER NOT NULL,
+    payment_method TEXT NOT NULL,
+    payment_status TEXT NOT NULL,
+    order_status TEXT NOT NULL,
+    recipient_name TEXT NOT NULL,
+    recipient_phone TEXT NOT NULL,
+    delivery_address TEXT NOT NULL,
+    division TEXT NOT NULL,
+    district TEXT NOT NULL,
+    postal_code TEXT,
+    courier_name TEXT,
+    tracking_code TEXT,
+    synced INTEGER NOT NULL DEFAULT 0,
+    create_date TEXT NOT NULL,
+    update_date TEXT
+  );`,
+});
+const QR_ORDER_TABLE_SCHEMA = MERCHANT_QR_ORDER_SCHEMA;
+
+const QR_ORDER_STATUSES = Object.freeze({
+  PLACED: 'PLACED',
+  CONFIRMED: 'CONFIRMED',
+  SHIPPED: 'SHIPPED',
+  OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
+  DELIVERED: 'DELIVERED',
+  CANCELLED: 'CANCELLED',
+});
+const QrOrderStatus = QR_ORDER_STATUSES;
+
+const QR_PAYMENT_METHODS = Object.freeze({
+  WALLET: 'WALLET',
+  CASH_ON_DELIVERY: 'CASH_ON_DELIVERY',
+  ONLINE_GATEWAY: 'ONLINE_GATEWAY',
+});
+const QrPaymentMethod = QR_PAYMENT_METHODS;
+
+const QR_PAYMENT_STATUSES = Object.freeze({
+  PAID: 'PAID',
+  PENDING: 'PENDING',
+  FAILED: 'FAILED',
+  REFUNDED: 'REFUNDED',
+});
+const QrPaymentStatus = QR_PAYMENT_STATUSES;
+
+const QR_ORDER_ITEM_TYPES = Object.freeze({
+  ACRYLIC_STANDEE: 'ACRYLIC_STANDEE',
+  WOODEN_STANDEE: 'WOODEN_STANDEE',
+  METAL_STANDEE: 'METAL_STANDEE',
+  COUNTER_STICKER: 'COUNTER_STICKER',
+  SOUNDBOX_STAND: 'SOUNDBOX_STAND',
+});
+
+const QR_ORDER_CATALOG = Object.freeze({
+  ACRYLIC_STANDEE: Object.freeze({
+    code: 'ACRYLIC_STANDEE',
+    name_bn: 'অ্যাক্রিলিক কিউআর স্ট্যান্ড',
+    name_en: 'Acrylic QR Standee',
+    unit_price_paisa: 25000,
+    material: 'High-grade Transparent Acrylic',
+    dimensions: 'A6 (105mm x 148mm)',
+  }),
+  WOODEN_STANDEE: Object.freeze({
+    code: 'WOODEN_STANDEE',
+    name_bn: 'কাঠের কিউআর স্ট্যান্ড',
+    name_en: 'Wooden QR Standee',
+    unit_price_paisa: 35000,
+    material: 'Premium Polished Mahogany Wood',
+    dimensions: '120mm x 160mm',
+  }),
+  METAL_STANDEE: Object.freeze({
+    code: 'METAL_STANDEE',
+    name_bn: 'মেটাল কিউআর স্ট্যান্ড',
+    name_en: 'Metal QR Standee',
+    unit_price_paisa: 50000,
+    material: 'Powder-coated Stainless Aluminum',
+    dimensions: '130mm x 180mm',
+  }),
+  COUNTER_STICKER: Object.freeze({
+    code: 'COUNTER_STICKER',
+    name_bn: 'কাউন্টার কিউআর স্টিকার',
+    name_en: 'Counter QR Sticker',
+    unit_price_paisa: 5000,
+    material: 'Waterproof Laminated Vinyl',
+    dimensions: '100mm x 100mm',
+  }),
+  SOUNDBOX_STAND: Object.freeze({
+    code: 'SOUNDBOX_STAND',
+    name_bn: 'সাউন্ডবক্স স্ট্যান্ড',
+    name_en: 'Soundbox Stand',
+    unit_price_paisa: 40000,
+    material: 'Heavy-duty ABS Plastic Holder',
+    dimensions: '150mm x 120mm x 90mm',
+  }),
+});
+
+const BANGLADESH_DIVISIONS = Object.freeze([
+  'Dhaka',
+  'Chattogram',
+  'Rajshahi',
+  'Khulna',
+  'Barishal',
+  'Sylhet',
+  'Rangpur',
+  'Mymensingh',
+]);
+
+const BANGLADESH_DIVISION_ALIASES = Object.freeze({
+  'dhaka': 'Dhaka',
+  'ঢাকা': 'Dhaka',
+  'chattogram': 'Chattogram',
+  'chittagong': 'Chattogram',
+  'চট্টগ্রাম': 'Chattogram',
+  'rajshahi': 'Rajshahi',
+  'রাজশাহী': 'Rajshahi',
+  'khulna': 'Khulna',
+  'খুলনা': 'Khulna',
+  'barishal': 'Barishal',
+  'barisal': 'Barishal',
+  'বরিশাল': 'Barishal',
+  'sylhet': 'Sylhet',
+  'সিলেট': 'Sylhet',
+  'rangpur': 'Rangpur',
+  'রংপুর': 'Rangpur',
+  'mymensingh': 'Mymensingh',
+  'ময়মনসিংহ': 'Mymensingh',
+});
+
+const QR_ORDER_ARSC_TOKENS = Object.freeze({
+  order_title: 'কিউআর ও সাউন্ডবক্স সামগ্রী অর্ডার',
+  standee_selection: 'স্ট্যান্ড নির্বাচন করুন',
+  delivery_address: 'ডেলিভারি ঠিকানা',
+  free_delivery_notice: '১,০০০ টাকার অর্ডারে ফ্রি ডেলিভারি!',
+  dhaka_inside_delivery: 'ঢাকা সিটির ভেতরে ডেলিভারি চার্জ ৬০ টাকা',
+  dhaka_outside_delivery: 'ঢাকা সিটির বাইরে ডেলিভারি চার্জ ১২০ টাকা',
+  order_placed_success: 'আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে!',
+  order_tracking_label: 'অর্ডার ট্র্যাকিং',
+  status_placed: 'অর্ডার নেওয়া হয়েছে',
+  status_confirmed: 'অর্ডার নিশ্চিত হয়েছে',
+  status_shipped: 'কুরিয়ারে হস্তান্তর করা হয়েছে',
+  status_out_for_delivery: 'ডেলিভারির জন্য বের হয়েছে',
+  status_delivered: 'ডেলিভারি সম্পন্ন',
+  status_cancelled: 'অর্ডার বাতিল করা হয়েছে',
+  btn_order_now: 'এখনই অর্ডার করুন',
+  btn_track_order: 'অর্ডার ট্র্যাক করুন',
+});
+
+function calculateQrOrderPricing(options = {}) {
+  const itemType = options.itemType || options.item_type;
+  if (!itemType || !QR_ORDER_CATALOG[itemType]) {
+    throw new Error(`Unknown QR collateral item type: ${itemType}`);
+  }
+  const item = QR_ORDER_CATALOG[itemType];
+  const rawQty = options.quantity !== undefined ? options.quantity : 1;
+  const quantity = parseInt(rawQty, 10);
+  if (isNaN(quantity) || quantity < 1) {
+    throw new Error('Quantity must be a positive integer >= 1');
+  }
+
+  const unitPricePaisa = item.unit_price_paisa;
+  const subtotalPaisa = quantity * unitPricePaisa;
+
+  // Free delivery threshold: >= ৳1,000 (100,000 paisa)
+  const FREE_DELIVERY_THRESHOLD_PAISA = 100000;
+  let deliveryFeePaisa = 0;
+
+  if (subtotalPaisa >= FREE_DELIVERY_THRESHOLD_PAISA) {
+    deliveryFeePaisa = 0;
+  } else {
+    const rawDivision = String(options.division || '').trim().toLowerCase();
+    const rawDistrict = String(options.district || '').trim().toLowerCase();
+    const isDhaka = rawDivision === 'dhaka' || rawDivision === 'ঢাকা' ||
+                    rawDistrict === 'dhaka' || rawDistrict === 'ঢাকা';
+    if (isDhaka) {
+      deliveryFeePaisa = 6000; // ৳60
+    } else {
+      deliveryFeePaisa = 12000; // ৳120
+    }
+  }
+
+  const totalPricePaisa = subtotalPaisa + deliveryFeePaisa;
+
+  return {
+    itemType: item.code,
+    itemName: item.name_bn,
+    itemNameEn: item.name_en,
+    quantity,
+    unitPricePaisa,
+    subtotalPaisa,
+    deliveryFeePaisa,
+    totalPricePaisa,
+    isFreeDelivery: deliveryFeePaisa === 0,
+    currency: 'BDT',
+  };
+}
+
+function validateDeliveryAddress(addressPayload = {}) {
+  if (!addressPayload || typeof addressPayload !== 'object') {
+    return { valid: false, error: 'Address payload must be a non-null object' };
+  }
+  const recipientName = String(addressPayload.recipientName || addressPayload.recipient_name || '').trim();
+  if (!recipientName || recipientName.length < 2) {
+    return { valid: false, error: 'Recipient name must be at least 2 characters' };
+  }
+
+  const rawPhone = String(addressPayload.recipientPhone || addressPayload.recipient_phone || '').replace(/[\s\-]/g, '');
+  if (!/^01[3-9]\d{8}$/.test(rawPhone)) {
+    return { valid: false, error: 'Invalid Bangladeshi mobile number' };
+  }
+
+  const deliveryAddress = String(addressPayload.deliveryAddress || addressPayload.delivery_address || '').trim();
+  if (!deliveryAddress || deliveryAddress.length < 5) {
+    return { valid: false, error: 'Delivery address must be at least 5 characters' };
+  }
+
+  const rawDivision = String(addressPayload.division || '').trim();
+  const canonicalDivision = BANGLADESH_DIVISION_ALIASES[rawDivision.toLowerCase()] ||
+    BANGLADESH_DIVISIONS.find(d => d.toLowerCase() === rawDivision.toLowerCase()) || null;
+  if (!canonicalDivision) {
+    return { valid: false, error: 'Invalid Bangladesh administrative division' };
+  }
+
+  const district = String(addressPayload.district || '').trim();
+  if (!district || district.length < 2) {
+    return { valid: false, error: 'District is required' };
+  }
+
+  const rawPostalCode = addressPayload.postalCode !== undefined && addressPayload.postalCode !== null
+    ? String(addressPayload.postalCode).trim()
+    : (addressPayload.postal_code !== undefined && addressPayload.postal_code !== null ? String(addressPayload.postal_code).trim() : '');
+  
+  let postalCode = null;
+  if (rawPostalCode) {
+    if (!/^\d{4}$/.test(rawPostalCode)) {
+      return { valid: false, error: 'Postal code must be a 4-digit number' };
+    }
+    postalCode = rawPostalCode;
+  }
+
+  return {
+    valid: true,
+    recipientName,
+    recipientPhone: rawPhone,
+    deliveryAddress,
+    division: canonicalDivision,
+    district,
+    postalCode,
+  };
+}
+
+function transitionQrOrderStatus(currentStatus, targetStatus, trackingInfo = null) {
+  const ALLOWED_TRANSITIONS = {
+    [QR_ORDER_STATUSES.PLACED]: [QR_ORDER_STATUSES.CONFIRMED, QR_ORDER_STATUSES.CANCELLED],
+    [QR_ORDER_STATUSES.CONFIRMED]: [QR_ORDER_STATUSES.SHIPPED, QR_ORDER_STATUSES.CANCELLED],
+    [QR_ORDER_STATUSES.SHIPPED]: [QR_ORDER_STATUSES.OUT_FOR_DELIVERY],
+    [QR_ORDER_STATUSES.OUT_FOR_DELIVERY]: [QR_ORDER_STATUSES.DELIVERED],
+    [QR_ORDER_STATUSES.DELIVERED]: [],
+    [QR_ORDER_STATUSES.CANCELLED]: [],
+  };
+
+  const curr = String(currentStatus || '').toUpperCase();
+  const target = String(targetStatus || '').toUpperCase();
+
+  const allowed = ALLOWED_TRANSITIONS[curr];
+  if (!allowed) {
+    throw new Error(`Invalid current QR order status: ${currentStatus}`);
+  }
+  if (!allowed.includes(target)) {
+    throw new Error(`Cannot transition QR order status from ${curr} to ${target}`);
+  }
+
+  let sanitizedTracking = null;
+  if (target === QR_ORDER_STATUSES.SHIPPED) {
+    if (!trackingInfo || typeof trackingInfo !== 'object') {
+      throw new Error('Courier name and tracking code are required when shipping an order');
+    }
+    const courierName = String(trackingInfo.courierName || trackingInfo.courier_name || '').trim();
+    const trackingCode = String(trackingInfo.trackingCode || trackingInfo.tracking_code || '').trim();
+    if (!courierName || !trackingCode) {
+      throw new Error('Courier name and tracking code are required when shipping an order');
+    }
+    sanitizedTracking = { courierName, trackingCode };
+  }
+
+  return {
+    success: true,
+    fromStatus: curr,
+    toStatus: target,
+    trackingInfo: sanitizedTracking,
+    transitionDate: new Date().toISOString(),
+  };
+}
+
+class MerchantQrOrderRecord {
+  constructor(data = {}) {
+    this.id = data.id || null;
+    this.order_id = data.order_id || data.orderId || ('TK-QRO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(100000 + Math.random() * 900000));
+    this.business_id = String(data.business_id || data.businessId || '1');
+    this.item_type = data.item_type || data.itemType;
+    this.item_name = data.item_name || data.itemName || (QR_ORDER_CATALOG[this.item_type] ? QR_ORDER_CATALOG[this.item_type].name_bn : '');
+    this.quantity = Number(data.quantity) || 1;
+    this.unit_price_paisa = Number(data.unit_price_paisa !== undefined ? data.unit_price_paisa : data.unitPricePaisa) || 0;
+    this.total_price_paisa = Number(data.total_price_paisa !== undefined ? data.total_price_paisa : data.totalPricePaisa) || 0;
+    this.delivery_fee_paisa = Number(data.delivery_fee_paisa !== undefined ? data.delivery_fee_paisa : data.deliveryFeePaisa) || 0;
+    this.payment_method = data.payment_method || data.paymentMethod || QR_PAYMENT_METHODS.WALLET;
+    this.payment_status = data.payment_status || data.paymentStatus || QR_PAYMENT_STATUSES.PENDING;
+    this.order_status = data.order_status || data.orderStatus || QR_ORDER_STATUSES.PLACED;
+    this.recipient_name = data.recipient_name || data.recipientName || '';
+    this.recipient_phone = data.recipient_phone || data.recipientPhone || '';
+    this.delivery_address = data.delivery_address || data.deliveryAddress || '';
+    this.division = data.division || '';
+    this.district = data.district || '';
+    this.postal_code = data.postal_code || data.postalCode || null;
+    this.courier_name = data.courier_name || data.courierName || null;
+    this.tracking_code = data.tracking_code || data.trackingCode || null;
+    this.synced = data.synced !== undefined ? Number(data.synced) : 0;
+    this.create_date = data.create_date || data.createDate || new Date().toISOString();
+    this.update_date = data.update_date || data.updateDate || new Date().toISOString();
+  }
+
+  toJSON() {
+    return {
+      id: this.id,
+      order_id: this.order_id,
+      business_id: this.business_id,
+      item_type: this.item_type,
+      item_name: this.item_name,
+      quantity: this.quantity,
+      unit_price_paisa: this.unit_price_paisa,
+      total_price_paisa: this.total_price_paisa,
+      delivery_fee_paisa: this.delivery_fee_paisa,
+      payment_method: this.payment_method,
+      payment_status: this.payment_status,
+      order_status: this.order_status,
+      recipient_name: this.recipient_name,
+      recipient_phone: this.recipient_phone,
+      delivery_address: this.delivery_address,
+      division: this.division,
+      district: this.district,
+      postal_code: this.postal_code,
+      courier_name: this.courier_name,
+      tracking_code: this.tracking_code,
+      synced: this.synced,
+      create_date: this.create_date,
+      update_date: this.update_date,
+    };
+  }
+}
+
+class MerchantQrOrderDao {
+  constructor() {
+    this._orders = new Map();
+    this._autoIncrementId = 1;
+  }
+
+  clear() {
+    this._orders.clear();
+    this._autoIncrementId = 1;
+  }
+
+  saveOrder(order) {
+    if (!order || typeof order !== 'object') {
+      throw new Error('Order must be a valid object');
+    }
+    const record = order instanceof MerchantQrOrderRecord ? order : new MerchantQrOrderRecord(order);
+    if (!record.id) {
+      record.id = this._autoIncrementId++;
+    }
+    this._orders.set(record.order_id, record);
+    return new MerchantQrOrderRecord(record.toJSON());
+  }
+
+  getOrderById(orderId) {
+    if (!orderId) return null;
+    const found = this._orders.get(orderId);
+    return found ? new MerchantQrOrderRecord(found.toJSON()) : null;
+  }
+
+  getOrdersByBusinessId(businessId, options = {}) {
+    const targetBizId = String(businessId || '1');
+    let list = Array.from(this._orders.values()).filter(o => String(o.business_id) === targetBizId);
+    
+    if (options.status || options.order_status) {
+      const st = String(options.status || options.order_status).toUpperCase();
+      list = list.filter(o => o.order_status.toUpperCase() === st);
+    }
+    if (options.itemType || options.item_type) {
+      const it = String(options.itemType || options.item_type);
+      list = list.filter(o => o.item_type === it);
+    }
+    
+    list.sort((a, b) => new Date(b.create_date).getTime() - new Date(a.create_date).getTime());
+
+    const offset = Number(options.offset) || 0;
+    const limit = options.limit !== undefined ? Number(options.limit) : list.length;
+    return list.slice(offset, offset + limit).map(o => new MerchantQrOrderRecord(o.toJSON()));
+  }
+
+  updateOrderStatus(orderId, status, trackingInfo = null) {
+    const existing = this._orders.get(orderId);
+    if (!existing) {
+      throw new Error(`Order not found: ${orderId}`);
+    }
+    transitionQrOrderStatus(existing.order_status, status, trackingInfo);
+
+    existing.order_status = status;
+    if (trackingInfo) {
+      if (trackingInfo.courierName || trackingInfo.courier_name) {
+        existing.courier_name = trackingInfo.courierName || trackingInfo.courier_name;
+      }
+      if (trackingInfo.trackingCode || trackingInfo.tracking_code) {
+        existing.tracking_code = trackingInfo.trackingCode || trackingInfo.tracking_code;
+      }
+    }
+    existing.update_date = new Date().toISOString();
+    existing.synced = 0;
+    return new MerchantQrOrderRecord(existing.toJSON());
+  }
+
+  getUnsyncedOrders(limit = 100) {
+    const lim = Number(limit) || 100;
+    return Array.from(this._orders.values())
+      .filter(o => Number(o.synced) === 0)
+      .slice(0, lim)
+      .map(o => new MerchantQrOrderRecord(o.toJSON()));
+  }
+
+  updateOrderSyncStatus(orderId, synced = 1) {
+    const existing = this._orders.get(orderId);
+    if (!existing) {
+      return { success: false, error: 'NOT_FOUND' };
+    }
+    existing.synced = Number(synced);
+    existing.update_date = new Date().toISOString();
+    return { success: true, record: new MerchantQrOrderRecord(existing.toJSON()) };
+  }
+
+  deleteOrder(orderId) {
+    return this._orders.delete(orderId);
+  }
+
+  exists(orderId) {
+    return this._orders.has(orderId);
+  }
+}
+
+class MerchantQrOrderEngine {
+  constructor(dao = null) {
+    this.dao = dao || new MerchantQrOrderDao();
+  }
+
+  createOrder(payload = {}) {
+    const {
+      businessId = '1',
+      itemType,
+      quantity = 1,
+      paymentMethod = QR_PAYMENT_METHODS.WALLET,
+      address,
+      walletBalancePaisa = 0,
+      storage = null,
+    } = payload;
+
+    const validatedAddress = validateDeliveryAddress(address);
+    if (!validatedAddress.valid) {
+      throw new Error(validatedAddress.error);
+    }
+
+    const pricing = calculateQrOrderPricing({
+      itemType,
+      quantity,
+      division: validatedAddress.division,
+      district: validatedAddress.district,
+    });
+
+    let paymentStatus = QR_PAYMENT_STATUSES.PENDING;
+    if (paymentMethod === QR_PAYMENT_METHODS.WALLET) {
+      if (Number(walletBalancePaisa) < pricing.totalPricePaisa) {
+        throw new Error(
+          `Insufficient wallet balance for QR collateral order: required ${pricing.totalPricePaisa} paisa, available ${walletBalancePaisa} paisa`
+        );
+      }
+      paymentStatus = QR_PAYMENT_STATUSES.PAID;
+    } else if (paymentMethod === QR_PAYMENT_METHODS.CASH_ON_DELIVERY) {
+      paymentStatus = QR_PAYMENT_STATUSES.PENDING;
+    } else if (paymentMethod === QR_PAYMENT_METHODS.ONLINE_GATEWAY) {
+      paymentStatus = QR_PAYMENT_STATUSES.PENDING;
+    }
+
+    const orderRecord = new MerchantQrOrderRecord({
+      business_id: String(businessId),
+      item_type: pricing.itemType,
+      item_name: pricing.itemName,
+      quantity: pricing.quantity,
+      unit_price_paisa: pricing.unitPricePaisa,
+      total_price_paisa: pricing.totalPricePaisa,
+      delivery_fee_paisa: pricing.deliveryFeePaisa,
+      payment_method: paymentMethod,
+      payment_status: paymentStatus,
+      order_status: QR_ORDER_STATUSES.PLACED,
+      recipient_name: validatedAddress.recipientName,
+      recipient_phone: validatedAddress.recipientPhone,
+      delivery_address: validatedAddress.deliveryAddress,
+      division: validatedAddress.division,
+      district: validatedAddress.district,
+      postal_code: validatedAddress.postalCode,
+      synced: 0,
+    });
+
+    const saved = this.dao.saveOrder(orderRecord);
+
+    if (storage && typeof storage.saveMerchantQrOrder === 'function') {
+      storage.saveMerchantQrOrder(businessId, saved.toJSON());
+    }
+
+    return {
+      success: true,
+      order: saved,
+      pricing,
+    };
+  }
+
+  trackOrder(orderId) {
+    const order = this.dao.getOrderById(orderId);
+    if (!order) {
+      throw new Error(`Order not found: ${orderId}`);
+    }
+
+    const STEPS = [
+      { status: QR_ORDER_STATUSES.PLACED, label_bn: QR_ORDER_ARSC_TOKENS.status_placed },
+      { status: QR_ORDER_STATUSES.CONFIRMED, label_bn: QR_ORDER_ARSC_TOKENS.status_confirmed },
+      { status: QR_ORDER_STATUSES.SHIPPED, label_bn: QR_ORDER_ARSC_TOKENS.status_shipped },
+      { status: QR_ORDER_STATUSES.OUT_FOR_DELIVERY, label_bn: QR_ORDER_ARSC_TOKENS.status_out_for_delivery },
+      { status: QR_ORDER_STATUSES.DELIVERED, label_bn: QR_ORDER_ARSC_TOKENS.status_delivered },
+    ];
+
+    const currentStatus = order.order_status;
+    const isCancelled = currentStatus === QR_ORDER_STATUSES.CANCELLED;
+    const currentIndex = isCancelled ? -1 : STEPS.findIndex(s => s.status === currentStatus);
+
+    const timeline = STEPS.map((step, idx) => ({
+      status: step.status,
+      label_bn: step.label_bn,
+      isCompleted: !isCancelled && idx <= currentIndex,
+      isCurrent: !isCancelled && idx === currentIndex,
+    }));
+
+    return {
+      orderId: order.order_id,
+      currentStatus,
+      isCancelled,
+      courierName: order.courier_name,
+      trackingCode: order.tracking_code,
+      timeline,
+      item_name: order.item_name,
+      total_price_paisa: order.total_price_paisa,
+      create_date: order.create_date,
+      update_date: order.update_date,
+    };
+  }
+
+  confirmOrder(orderId) {
+    return this.dao.updateOrderStatus(orderId, QR_ORDER_STATUSES.CONFIRMED);
+  }
+
+  shipOrder(orderId, trackingInfo) {
+    return this.dao.updateOrderStatus(orderId, QR_ORDER_STATUSES.SHIPPED, trackingInfo);
+  }
+
+  outForDelivery(orderId) {
+    return this.dao.updateOrderStatus(orderId, QR_ORDER_STATUSES.OUT_FOR_DELIVERY);
+  }
+
+  deliverOrder(orderId) {
+    const updated = this.dao.updateOrderStatus(orderId, QR_ORDER_STATUSES.DELIVERED);
+    if (updated.payment_method === QR_PAYMENT_METHODS.CASH_ON_DELIVERY && updated.payment_status !== QR_PAYMENT_STATUSES.PAID) {
+      updated.payment_status = QR_PAYMENT_STATUSES.PAID;
+      this.dao.saveOrder(updated);
+    }
+    return updated;
+  }
+
+  cancelOrder(orderId, reason = null) {
+    const updated = this.dao.updateOrderStatus(orderId, QR_ORDER_STATUSES.CANCELLED);
+    if (updated.payment_method === QR_PAYMENT_METHODS.WALLET && updated.payment_status === QR_PAYMENT_STATUSES.PAID) {
+      updated.payment_status = QR_PAYMENT_STATUSES.REFUNDED;
+      this.dao.saveOrder(updated);
+    }
+    return updated;
+  }
+}
+
+const ReconstructedQrOrderEngine = MerchantQrOrderEngine;
+const QrOrderEngine = MerchantQrOrderEngine;
+const merchantQrOrderEngine = new MerchantQrOrderEngine();
+const reconstructedQrOrderEngine = merchantQrOrderEngine;
+
+
 module.exports = {
+  // Milestone REA-ITER-238 Exports
+  MERCHANT_QR_ORDER_SCHEMA,
+  QR_ORDER_TABLE_SCHEMA,
+  QR_ORDER_STATUSES,
+  QrOrderStatus,
+  QR_PAYMENT_METHODS,
+  QrPaymentMethod,
+  QR_PAYMENT_STATUSES,
+  QrPaymentStatus,
+  QR_ORDER_ITEM_TYPES,
+  QR_ORDER_CATALOG,
+  BANGLADESH_DIVISIONS,
+  BANGLADESH_DIVISION_ALIASES,
+  QR_ORDER_ARSC_TOKENS,
+  calculateQrOrderPricing,
+  validateDeliveryAddress,
+  transitionQrOrderStatus,
+  MerchantQrOrderRecord,
+  MerchantQrOrderDao,
+  MerchantQrOrderEngine,
+  ReconstructedQrOrderEngine,
+  QrOrderEngine,
+  merchantQrOrderEngine,
+  reconstructedQrOrderEngine,
+
 
   // Milestone REA-ITER-237 Exports
   MERCHANT_KYC_SCHEMA,

@@ -284,6 +284,7 @@ const VALID_COLLECTIONS = new Set([
   'transactionSettlementActions',
   'soundboxConfig',
   'merchantKyc',
+  'merchantQrOrders',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -416,6 +417,7 @@ function sanitizeState(state) {
   if (!Array.isArray(s.settlementHistory)) s.settlementHistory = [];
   if (!Array.isArray(s.transactionSettlementActions)) s.transactionSettlementActions = [];
   if (!Array.isArray(s.merchantKyc)) s.merchantKyc = [];
+  if (!Array.isArray(s.merchantQrOrders)) s.merchantQrOrders = [];
   if (!s.soundboxConfig || typeof s.soundboxConfig !== 'object') s.soundboxConfig = {};
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
@@ -570,6 +572,7 @@ function createDefaultState() {
     transactionSettlementActions: [],
     soundboxConfig: {},
     merchantKyc: [],
+    merchantQrOrders: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1769,6 +1772,23 @@ class StorageRepository {
       authoritative.merchantKyc = [];
     }
 
+    if (authoritative.merchantQrOrders && Array.isArray(authoritative.merchantQrOrders)) {
+      authoritative.merchantQrOrders = authoritative.merchantQrOrders.map((o) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = o || {};
+        const rawPhone = String(rest.recipient_phone || rest.recipientPhone || '');
+        const maskedPhone = rawPhone.length === 11
+          ? rawPhone.slice(0, 3) + '****' + rawPhone.slice(-4)
+          : (rawPhone ? '****' : '');
+        return {
+          ...rest,
+          recipient_phone: maskedPhone,
+          recipientPhone: maskedPhone,
+        };
+      });
+    } else {
+      authoritative.merchantQrOrders = [];
+    }
+
     if (authoritative.transactionSettlementActions && Array.isArray(authoritative.transactionSettlementActions)) {
       authoritative.transactionSettlementActions = authoritative.transactionSettlementActions.map((t) => {
         const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = t || {};
@@ -2425,6 +2445,7 @@ class StorageRepository {
         const settlementHistory = (prevStore.settlementHistory || []).filter((s) => getBizId(s) !== targetId);
         const transactionSettlementActions = (prevStore.transactionSettlementActions || []).filter((t) => getBizId(t) !== targetId);
         const merchantKyc = (prevStore.merchantKyc || []).filter((k) => getBizId(k) !== targetId);
+        const merchantQrOrders = (prevStore.merchantQrOrders || []).filter((o) => getBizId(o) !== targetId);
         const soundboxConfig = { ...(prevStore.soundboxConfig || {}) };
         delete soundboxConfig[targetId];
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
@@ -2522,6 +2543,7 @@ class StorageRepository {
         settlementHistory,
         transactionSettlementActions,
         merchantKyc,
+        merchantQrOrders,
         soundboxConfig,
         autoDisbursementConfig,
         cashReconciliation,
@@ -2697,6 +2719,8 @@ class StorageRepository {
         const keptBeneficiaries = (prevStore.tallyPayBeneficiaries || []).filter(b => String(b.businessId || '1') !== selectedBizId);
         const keptMerchantKyc = (prevStore.merchantKyc || []).filter(k => String(k.businessId || k.business_id || '1') !== selectedBizId);
         const importedMerchantKyc = (data.merchantKyc || []).filter(k => String(k.businessId || k.business_id || '1') === selectedBizId);
+        const keptMerchantQrOrders = (prevStore.merchantQrOrders || []).filter(o => String(o.businessId || o.business_id || '1') !== selectedBizId);
+        const importedMerchantQrOrders = (data.merchantQrOrders || []).filter(o => String(o.businessId || o.business_id || '1') === selectedBizId);
         const keptQrSettlements = (prevStore.qrSettlementActions || []).filter(q => String(q.businessId || '1') !== selectedBizId);
         const keptDisbursements = (prevStore.merchantDisbursements || []).filter(d => String(d.businessId || '1') !== selectedBizId);
         const keptReconciliations = (prevStore.reconciliations || []).filter(r => String(r.businessId || '1') !== selectedBizId);
@@ -2741,6 +2765,7 @@ class StorageRepository {
           tallyPayTransactions: [...keptTallyPay, ...importedTallyPay],
           tallyPayBeneficiaries: [...keptBeneficiaries, ...importedBeneficiaries],
           merchantKyc: [...keptMerchantKyc, ...importedMerchantKyc],
+          merchantQrOrders: [...keptMerchantQrOrders, ...importedMerchantQrOrders],
           qrSettlementActions: [...keptQrSettlements, ...importedQrSettlements],
           merchantDisbursements: [...keptDisbursements, ...importedDisbursements],
           reconciliations: [...keptReconciliations, ...importedReconciliations],
@@ -2793,6 +2818,7 @@ class StorageRepository {
         tallyPayTransactions: Array.isArray(data.tallyPayTransactions) ? data.tallyPayTransactions : [],
         tallyPayBeneficiaries: Array.isArray(data.tallyPayBeneficiaries) ? data.tallyPayBeneficiaries : [],
         merchantKyc: Array.isArray(data.merchantKyc) ? data.merchantKyc : [],
+        merchantQrOrders: Array.isArray(data.merchantQrOrders) ? data.merchantQrOrders : [],
         qrSettlementActions: Array.isArray(data.qrSettlementActions) ? data.qrSettlementActions : [],
         merchantDisbursements: Array.isArray(data.merchantDisbursements) ? data.merchantDisbursements : [],
         reconciliations: Array.isArray(data.reconciliations) ? data.reconciliations : [],
@@ -3092,6 +3118,7 @@ class StorageRepository {
           transferHistory: (fullState.transferHistory || []).length,
           rechargeHistory: (fullState.rechargeHistory || []).length,
           merchantKyc: (fullState.merchantKyc || []).length,
+          merchantQrOrders: (fullState.merchantQrOrders || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -8579,6 +8606,277 @@ class StorageRepository {
       return Boolean(this.getMerchantKycByBusinessId(businessId));
     }
 
+    // ========================================================================
+    // REA-ITER-238: TallyPay Merchant QR Standee Order & Collateral Delivery
+    // ========================================================================
+
+    /**
+     * REA-ITER-238: Saves or updates a merchant QR collateral order.
+     */
+    async saveMerchantQrOrder(businessId = null, orderData = {}) {
+      if (!orderData || typeof orderData !== 'object') {
+        return { success: false, error: 'INVALID_ORDER_DATA' };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || orderData.business_id || orderData.businessId || store.activeBusinessId || '1');
+      const orderId = String(orderData.order_id || orderData.orderId || ('TK-QRO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(100000 + Math.random() * 900000)));
+      
+      const entry = {
+        id: orderData.id || ('QRO_' + Date.now() + '_' + Math.floor(Math.random() * 1000)),
+        order_id: orderId,
+        orderId: orderId,
+        business_id: targetBizId,
+        businessId: targetBizId,
+        item_type: orderData.item_type || orderData.itemType,
+        item_name: orderData.item_name || orderData.itemName,
+        quantity: Number(orderData.quantity) || 1,
+        unit_price_paisa: Number(orderData.unit_price_paisa !== undefined ? orderData.unit_price_paisa : orderData.unitPricePaisa) || 0,
+        total_price_paisa: Number(orderData.total_price_paisa !== undefined ? orderData.total_price_paisa : orderData.totalPricePaisa) || 0,
+        delivery_fee_paisa: Number(orderData.delivery_fee_paisa !== undefined ? orderData.delivery_fee_paisa : orderData.deliveryFeePaisa) || 0,
+        payment_method: orderData.payment_method || orderData.paymentMethod || 'WALLET',
+        payment_status: orderData.payment_status || orderData.paymentStatus || 'PENDING',
+        order_status: orderData.order_status || orderData.orderStatus || 'PLACED',
+        recipient_name: String(orderData.recipient_name || orderData.recipientName || '').trim(),
+        recipient_phone: String(orderData.recipient_phone || orderData.recipientPhone || '').trim(),
+        delivery_address: String(orderData.delivery_address || orderData.deliveryAddress || '').trim(),
+        division: String(orderData.division || '').trim(),
+        district: String(orderData.district || '').trim(),
+        postal_code: orderData.postal_code || orderData.postalCode || null,
+        courier_name: orderData.courier_name || orderData.courierName || null,
+        tracking_code: orderData.tracking_code || orderData.trackingCode || null,
+        synced: orderData.synced !== undefined ? Number(orderData.synced) : 0,
+        create_date: orderData.create_date || orderData.createDate || new Date().toISOString(),
+        update_date: new Date().toISOString(),
+      };
+
+      let saved = null;
+      await this.mutateCollection('merchantQrOrders', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((o) => String(o.order_id || o.orderId) === orderId);
+        if (idx >= 0) {
+          const prev = list[idx];
+          const merged = {
+            ...prev,
+            ...entry,
+            id: prev.id,
+            create_date: prev.create_date || entry.create_date,
+            update_date: new Date().toISOString(),
+          };
+          if (!orderData.item_type && !orderData.itemType && prev.item_type) {
+            merged.item_type = prev.item_type;
+          }
+          if (!orderData.item_name && !orderData.itemName && prev.item_name) {
+            merged.item_name = prev.item_name;
+          }
+          if (!orderData.recipient_name && !orderData.recipientName && prev.recipient_name) {
+            merged.recipient_name = prev.recipient_name;
+          }
+          if (!orderData.recipient_phone && !orderData.recipientPhone && prev.recipient_phone) {
+            merged.recipient_phone = prev.recipient_phone;
+          }
+          if (!orderData.delivery_address && !orderData.deliveryAddress && prev.delivery_address) {
+            merged.delivery_address = prev.delivery_address;
+          }
+          if (!orderData.division && prev.division) {
+            merged.division = prev.division;
+          }
+          if (!orderData.district && prev.district) {
+            merged.district = prev.district;
+          }
+          const updatedList = [...list];
+          updatedList[idx] = merged;
+          saved = merged;
+          return updatedList;
+        } else {
+          saved = entry;
+          return [...list, entry];
+        }
+      });
+      return { success: true, record: saved, id: entry.order_id };
+    }
+
+    /**
+     * REA-ITER-238: Retrieves a single merchant QR order by order ID.
+     */
+    getMerchantQrOrderById(businessId = null, orderId = null) {
+      if (!orderId) return null;
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const targetOrderId = String(orderId);
+      const item = (store.merchantQrOrders || []).find((o) => {
+        const matchesId = String(o.order_id || o.orderId) === targetOrderId;
+        if (!matchesId) return false;
+        if (targetBizId) {
+          return String(o.business_id || o.businessId || '1') === targetBizId;
+        }
+        return true;
+      });
+      return item ? { ...item } : null;
+    }
+
+    /**
+     * REA-ITER-238: Retrieves merchant QR orders for a business with optional filtering, sorting, and pagination.
+     */
+    getMerchantQrOrdersByBusinessId(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.merchantQrOrders || []).filter(
+        (o) => String(o.business_id || o.businessId || '1') === targetBizId
+      );
+
+      if (options.status || options.order_status || options.orderStatus) {
+        const st = String(options.status || options.order_status || options.orderStatus).toUpperCase();
+        list = list.filter((o) => String(o.order_status || o.orderStatus || '').toUpperCase() === st);
+      }
+      if (options.itemType || options.item_type) {
+        const it = String(options.itemType || options.item_type);
+        list = list.filter((o) => (o.item_type || o.itemType) === it);
+      }
+      if (options.paymentStatus || options.payment_status) {
+        const ps = String(options.paymentStatus || options.payment_status).toUpperCase();
+        list = list.filter((o) => String(o.payment_status || o.paymentStatus || '').toUpperCase() === ps);
+      }
+      if (options.synced !== undefined && options.synced !== null) {
+        const syn = Number(options.synced);
+        list = list.filter((o) => Number(o.synced) === syn);
+      }
+
+      list.sort((a, b) => new Date(b.create_date || 0).getTime() - new Date(a.create_date || 0).getTime());
+
+      const offset = Number(options.offset) || 0;
+      const limit = options.limit !== undefined ? Number(options.limit) : list.length;
+      return list.slice(offset, offset + limit).map((o) => ({ ...o }));
+    }
+
+    /**
+     * REA-ITER-238: Updates order status and tracking information with transition validation.
+     */
+    async updateMerchantQrOrderStatus(businessId = null, orderId = null, status = 'CONFIRMED', trackingInfo = null) {
+      if (!orderId) {
+        return { success: false, error: 'MISSING_ORDER_ID' };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const targetOrderId = String(orderId);
+
+      let existing = null;
+      (store.merchantQrOrders || []).forEach((o) => {
+        if (String(o.order_id || o.orderId) === targetOrderId) {
+          if (!targetBizId || String(o.business_id || o.businessId || '1') === targetBizId) {
+            existing = o;
+          }
+        }
+      });
+
+      if (!existing) {
+        return { success: false, error: 'ORDER_NOT_FOUND' };
+      }
+
+      if (tallyPayService && typeof tallyPayService.transitionQrOrderStatus === 'function') {
+        try {
+          tallyPayService.transitionQrOrderStatus(existing.order_status, status, trackingInfo);
+        } catch (err) {
+          return { success: false, error: err.message };
+        }
+      }
+
+      let updatedRecord = null;
+      await this.mutateCollection('merchantQrOrders', (col) => {
+        return (col || []).map((o) => {
+          if (String(o.order_id || o.orderId) === targetOrderId) {
+            const upd = {
+              ...o,
+              order_status: status,
+              orderStatus: status,
+              update_date: new Date().toISOString(),
+              synced: 0,
+            };
+            if (trackingInfo && typeof trackingInfo === 'object') {
+              if (trackingInfo.courierName || trackingInfo.courier_name) {
+                upd.courier_name = trackingInfo.courierName || trackingInfo.courier_name;
+              }
+              if (trackingInfo.trackingCode || trackingInfo.tracking_code) {
+                upd.tracking_code = trackingInfo.trackingCode || trackingInfo.tracking_code;
+              }
+            }
+            if (status === 'DELIVERED' && (upd.payment_method === 'CASH_ON_DELIVERY' || upd.payment_method === 'COD')) {
+              upd.payment_status = 'PAID';
+              upd.paymentStatus = 'PAID';
+            }
+            updatedRecord = upd;
+            return upd;
+          }
+          return o;
+        });
+      });
+      return { success: Boolean(updatedRecord), record: updatedRecord };
+    }
+
+    /**
+     * REA-ITER-238: Deletes an order by order ID and business ID.
+     */
+    async deleteMerchantQrOrder(businessId = null, orderId = null) {
+      if (!orderId) return { success: false };
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const targetOrderId = String(orderId);
+      let deleted = false;
+      await this.mutateCollection('merchantQrOrders', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const nextList = list.filter((o) => {
+          const matchId = String(o.order_id || o.orderId) === targetOrderId;
+          if (!matchId) return true;
+          if (targetBizId && String(o.business_id || o.businessId || '1') !== targetBizId) {
+            return true;
+          }
+          return false;
+        });
+        deleted = nextList.length < list.length;
+        return nextList;
+      });
+      return { success: deleted };
+    }
+
+    /**
+     * REA-ITER-238: Retrieves unsynced merchant QR orders.
+     */
+    getUnsyncedMerchantQrOrders(businessId = null, limit = 100) {
+      return this.getMerchantQrOrdersByBusinessId(businessId, { synced: 0 }).slice(0, limit);
+    }
+
+    /**
+     * REA-ITER-238: Updates sync status of merchant QR order.
+     */
+    async updateMerchantQrOrderSyncStatus(businessId = null, orderId = null, synced = 1) {
+      if (!orderId) return { success: false };
+      const targetOrderId = String(orderId);
+      const targetBizId = businessId ? String(businessId) : null;
+      let updatedCount = 0;
+      await this.mutateCollection('merchantQrOrders', (col) => {
+        return (col || []).map((o) => {
+          if (String(o.order_id || o.orderId) === targetOrderId) {
+            if (!targetBizId || String(o.business_id || o.businessId || '1') === targetBizId) {
+              updatedCount++;
+              return {
+                ...o,
+                synced: Number(synced),
+                update_date: new Date().toISOString(),
+              };
+            }
+          }
+          return o;
+        });
+      });
+      return { success: true, updatedCount };
+    }
+
+    /**
+     * REA-ITER-238: Checks if order exists by order ID.
+     */
+    existsMerchantQrOrder(businessId = null, orderId = null) {
+      return Boolean(this.getMerchantQrOrderById(businessId, orderId));
+    }
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -9965,6 +10263,63 @@ async function deleteMerchantKycRepo(businessId = null, repo = defaultRepository
   return { success: false };
 }
 
+// REA-ITER-238 Wrapper Functions
+async function saveMerchantQrOrderRepo(businessId = null, orderData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveMerchantQrOrder === 'function') {
+    return repo.saveMerchantQrOrder(businessId, orderData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getMerchantQrOrderByIdRepo(businessId = null, orderId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantQrOrderById === 'function') {
+    return repo.getMerchantQrOrderById(businessId, orderId);
+  }
+  return null;
+}
+
+function getMerchantQrOrdersByBusinessIdRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantQrOrdersByBusinessId === 'function') {
+    return repo.getMerchantQrOrdersByBusinessId(businessId, options);
+  }
+  return [];
+}
+
+async function updateMerchantQrOrderStatusRepo(businessId = null, orderId = null, status = 'CONFIRMED', trackingInfo = null, repo = defaultRepository) {
+  if (repo && typeof repo.updateMerchantQrOrderStatus === 'function') {
+    return repo.updateMerchantQrOrderStatus(businessId, orderId, status, trackingInfo);
+  }
+  return { success: false };
+}
+
+async function deleteMerchantQrOrderRepo(businessId = null, orderId = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteMerchantQrOrder === 'function') {
+    return repo.deleteMerchantQrOrder(businessId, orderId);
+  }
+  return { success: false };
+}
+
+function getUnsyncedMerchantQrOrdersRepo(businessId = null, limit = 100, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedMerchantQrOrders === 'function') {
+    return repo.getUnsyncedMerchantQrOrders(businessId, limit);
+  }
+  return [];
+}
+
+async function updateMerchantQrOrderSyncStatusRepo(businessId = null, orderId = null, synced = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateMerchantQrOrderSyncStatus === 'function') {
+    return repo.updateMerchantQrOrderSyncStatus(businessId, orderId, synced);
+  }
+  return { success: false };
+}
+
+function existsMerchantQrOrderRepo(businessId = null, orderId = null, repo = defaultRepository) {
+  if (repo && typeof repo.existsMerchantQrOrder === 'function') {
+    return repo.existsMerchantQrOrder(businessId, orderId);
+  }
+  return false;
+}
+
 function existsMerchantKycRepo(businessId = null, repo = defaultRepository) {
   if (repo && typeof repo.existsMerchantKyc === 'function') {
     return repo.existsMerchantKyc(businessId);
@@ -10195,6 +10550,14 @@ const repoExport = {
   updateMerchantKycSyncStatus: updateMerchantKycSyncStatusRepo,
   existsMerchantKyc: existsMerchantKycRepo,
   deleteMerchantKyc: deleteMerchantKycRepo,
+  saveMerchantQrOrder: saveMerchantQrOrderRepo,
+  getMerchantQrOrderById: getMerchantQrOrderByIdRepo,
+  getMerchantQrOrdersByBusinessId: getMerchantQrOrdersByBusinessIdRepo,
+  updateMerchantQrOrderStatus: updateMerchantQrOrderStatusRepo,
+  deleteMerchantQrOrder: deleteMerchantQrOrderRepo,
+  getUnsyncedMerchantQrOrders: getUnsyncedMerchantQrOrdersRepo,
+  updateMerchantQrOrderSyncStatus: updateMerchantQrOrderSyncStatusRepo,
+  existsMerchantQrOrder: existsMerchantQrOrderRepo,
   saveRechargeRecord: saveRechargeRecordRepo,
   getRechargeHistory: getRechargeHistoryRepo,
   getRechargeById: getRechargeByIdRepo,
@@ -10393,6 +10756,14 @@ if (typeof exports !== 'undefined') {
   exports.updateMerchantKycSyncStatus = updateMerchantKycSyncStatusRepo;
   exports.existsMerchantKyc = existsMerchantKycRepo;
   exports.deleteMerchantKyc = deleteMerchantKycRepo;
+  exports.saveMerchantQrOrder = saveMerchantQrOrderRepo;
+  exports.getMerchantQrOrderById = getMerchantQrOrderByIdRepo;
+  exports.getMerchantQrOrdersByBusinessId = getMerchantQrOrdersByBusinessIdRepo;
+  exports.updateMerchantQrOrderStatus = updateMerchantQrOrderStatusRepo;
+  exports.deleteMerchantQrOrder = deleteMerchantQrOrderRepo;
+  exports.getUnsyncedMerchantQrOrders = getUnsyncedMerchantQrOrdersRepo;
+  exports.updateMerchantQrOrderSyncStatus = updateMerchantQrOrderSyncStatusRepo;
+  exports.existsMerchantQrOrder = existsMerchantQrOrderRepo;
   exports.saveRechargeRecord = saveRechargeRecordRepo;
   exports.getRechargeHistory = getRechargeHistoryRepo;
   exports.getRechargeById = getRechargeByIdRepo;

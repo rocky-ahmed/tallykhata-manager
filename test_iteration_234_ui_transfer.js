@@ -18,7 +18,7 @@
  * Part 9: Hardware BackHandler safe stacked dismissal
  * Part 10: Touch target ergonomics & haptic feedback integration
  * Part 11: WCAG 2.1 AA / AAA luminance contrast validation
- * Part 12: Modal count & controller invariants (111 modals total)
+ * Part 12: Modal count & controller invariants (116 modals total)
  * Part 13: Babel AST compilation & performance benchmark
  */
 
@@ -530,26 +530,26 @@ const appSrc = fs.readFileSync(path.join(__dirname, "App.js"), "utf8");
   // -----------------------------------------------------------------------------
   // PART 12: MODAL COUNT & CONTROLLER INVARIANTS (111 MODALS)
   // -----------------------------------------------------------------------------
-  console.log("\n--- PART 12: MODAL COUNT & CONTROLLER INVARIANTS (111 MODALS) ---");
+  console.log("\n--- PART 12: MODAL COUNT & CONTROLLER INVARIANTS (116 MODALS) ---");
 
-  await runTest("12.1: App.js contains exactly 111 <Modal elements", () => {
+  await runTest("12.1: App.js contains exactly 116 <Modal elements", () => {
     const modalMatches = appSrc.match(/<Modal\b/g) || [];
-    assert.strictEqual(modalMatches.length, 111, "Expected exactly 111 modals in App.js, got " + modalMatches.length);
+    assert.strictEqual(modalMatches.length, 116, "Expected exactly 116 modals in App.js, got " + modalMatches.length);
   });
 
-  await runTest("12.2: App.js contains exactly 111 onRequestClose handlers", () => {
+  await runTest("12.2: App.js contains exactly 116 onRequestClose handlers", () => {
     const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-    assert.strictEqual(reqCloseMatches.length, 111, "Expected 111 onRequestClose handlers, got " + reqCloseMatches.length);
+    assert.strictEqual(reqCloseMatches.length, 116, "Expected 116 onRequestClose handlers, got " + reqCloseMatches.length);
   });
 
-  await runTest("12.3: App.js contains exactly 111 unique modal state controllers", () => {
+  await runTest("12.3: App.js contains exactly 116 unique modal state controllers", () => {
     const regex = /visible=\{([a-zA-Z0-9_]+)\}/g;
     const uniqueModals = new Set();
     let m;
     while ((m = regex.exec(appSrc)) !== null) {
       uniqueModals.add(m[1]);
     }
-    assert.strictEqual(uniqueModals.size, 111, "Expected 111 unique visible controllers, got " + uniqueModals.size);
+    assert.strictEqual(uniqueModals.size, 116, "Expected 116 unique visible controllers, got " + uniqueModals.size);
     assert.ok(uniqueModals.has("modalTransferHub"), "modalTransferHub must be in unique controllers");
     assert.ok(uniqueModals.has("modalTransferWallet"), "modalTransferWallet must be in unique controllers");
     assert.ok(uniqueModals.has("modalTransferBank"), "modalTransferBank must be in unique controllers");
