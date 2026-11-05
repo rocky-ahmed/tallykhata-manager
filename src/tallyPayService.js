@@ -9,6 +9,7 @@
  */
 
 const crypto = require('crypto');
+const rewardsSubsystem = require('./rewardsSubsystem');
 
 // -------------------------------------------------------------
 // 1. TRANSACTION LIMITS & THRESHOLDS (activity_transaction_limit.xml)
@@ -9117,6 +9118,46 @@ const merchantLoanEngine = new MerchantLoanEngine();
 const reconstructedLoanEngine = merchantLoanEngine;
 
 module.exports = {
+  // Milestone REA-ITER-240 Exports
+  ...rewardsSubsystem,
+  MERCHANT_REWARD_SCHEMA: rewardsSubsystem.MERCHANT_REWARD_SCHEMA,
+  REWARD_TABLE_SCHEMA: rewardsSubsystem.REWARD_TABLE_SCHEMA,
+  MERCHANT_REWARD_LEDGER_SCHEMA: rewardsSubsystem.MERCHANT_REWARD_LEDGER_SCHEMA,
+  REWARD_LEDGER_TABLE_SCHEMA: rewardsSubsystem.REWARD_LEDGER_TABLE_SCHEMA,
+  REWARD_TYPES: rewardsSubsystem.REWARD_TYPES,
+  RewardType: rewardsSubsystem.RewardType,
+  MerchantRewardType: rewardsSubsystem.MerchantRewardType,
+  REWARD_STATUSES: rewardsSubsystem.REWARD_STATUSES,
+  RewardStatus: rewardsSubsystem.RewardStatus,
+  MerchantRewardStatus: rewardsSubsystem.MerchantRewardStatus,
+  REWARD_LEDGER_SOURCE_EVENTS: rewardsSubsystem.REWARD_LEDGER_SOURCE_EVENTS,
+  RewardLedgerSourceEvent: rewardsSubsystem.RewardLedgerSourceEvent,
+  CASHBACK_VOLUME_TIERS: rewardsSubsystem.CASHBACK_VOLUME_TIERS,
+  LOYALTY_TIERS: rewardsSubsystem.LOYALTY_TIERS,
+  LOYALTY_POINTS_CONFIG: rewardsSubsystem.LOYALTY_POINTS_CONFIG,
+  REWARD_ARSC_TOKENS: rewardsSubsystem.REWARD_ARSC_TOKENS,
+  calculateVolumeCashback: rewardsSubsystem.calculateVolumeCashback,
+  getCashbackTier: rewardsSubsystem.getCashbackTier,
+  calculateCashback: rewardsSubsystem.calculateCashback,
+  applyMonthlyCap: rewardsSubsystem.applyMonthlyCap,
+  calculatePointsEarned: rewardsSubsystem.calculatePointsEarned,
+  calculateCoinsEarned: rewardsSubsystem.calculateCoinsEarned,
+  classifyMerchantTier: rewardsSubsystem.classifyMerchantTier,
+  calculatePointsRedemptionValue: rewardsSubsystem.calculatePointsRedemptionValue,
+  redeemCoinsToWallet: rewardsSubsystem.redeemCoinsToWallet,
+  validatePointsRedemption: rewardsSubsystem.validatePointsRedemption,
+  transitionRewardStatus: rewardsSubsystem.transitionRewardStatus,
+  generateSeededScratchCard: rewardsSubsystem.generateSeededScratchCard,
+  MerchantRewardRecord: rewardsSubsystem.MerchantRewardRecord,
+  MerchantRewardLedgerRecord: rewardsSubsystem.MerchantRewardLedgerRecord,
+  MerchantRewardDao: rewardsSubsystem.MerchantRewardDao,
+  MerchantRewardLedgerDao: rewardsSubsystem.MerchantRewardLedgerDao,
+  MerchantRewardEngine: rewardsSubsystem.MerchantRewardEngine,
+  ReconstructedRewardEngine: rewardsSubsystem.ReconstructedRewardEngine,
+  RewardEngine: rewardsSubsystem.RewardEngine,
+  TallyPayRewardsEngine: rewardsSubsystem.TallyPayRewardsEngine,
+  merchantRewardEngine: rewardsSubsystem.merchantRewardEngine,
+  reconstructedRewardEngine: rewardsSubsystem.reconstructedRewardEngine,
   // Milestone REA-ITER-239 Exports
   MERCHANT_LOAN_SCHEMA,
   LOAN_TABLE_SCHEMA,

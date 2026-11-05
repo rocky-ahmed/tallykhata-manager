@@ -287,6 +287,8 @@ const VALID_COLLECTIONS = new Set([
   'merchantQrOrders',
   'merchantLoans',
   'merchantLoanEmis',
+  'merchantRewards',
+  'merchantRewardLedger',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -422,6 +424,8 @@ function sanitizeState(state) {
   if (!Array.isArray(s.merchantQrOrders)) s.merchantQrOrders = [];
   if (!Array.isArray(s.merchantLoans)) s.merchantLoans = [];
   if (!Array.isArray(s.merchantLoanEmis)) s.merchantLoanEmis = [];
+  if (!Array.isArray(s.merchantRewards)) s.merchantRewards = [];
+  if (!Array.isArray(s.merchantRewardLedger)) s.merchantRewardLedger = [];
   if (!s.soundboxConfig || typeof s.soundboxConfig !== 'object') s.soundboxConfig = {};
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
@@ -579,6 +583,8 @@ function createDefaultState() {
     merchantQrOrders: [],
     merchantLoans: [],
     merchantLoanEmis: [],
+    merchantRewards: [],
+    merchantRewardLedger: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1799,6 +1805,24 @@ class StorageRepository {
     } else {
       authoritative.merchantLoanEmis = [];
     }
+    if (authoritative.merchantRewards && Array.isArray(authoritative.merchantRewards)) {
+      authoritative.merchantRewards = authoritative.merchantRewards.map((r) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, voucherCode, voucher_code, ...rest } = r || {};
+        return rest;
+      });
+    } else {
+      authoritative.merchantRewards = [];
+    }
+
+    if (authoritative.merchantRewardLedger && Array.isArray(authoritative.merchantRewardLedger)) {
+      authoritative.merchantRewardLedger = authoritative.merchantRewardLedger.map((e) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = e || {};
+        return rest;
+      });
+    } else {
+      authoritative.merchantRewardLedger = [];
+    }
+
 
     if (authoritative.merchantQrOrders && Array.isArray(authoritative.merchantQrOrders)) {
       authoritative.merchantQrOrders = authoritative.merchantQrOrders.map((o) => {
@@ -2476,6 +2500,8 @@ class StorageRepository {
         const merchantQrOrders = (prevStore.merchantQrOrders || []).filter((o) => getBizId(o) !== targetId);
         const merchantLoans = (prevStore.merchantLoans || []).filter((l) => getBizId(l) !== targetId);
         const merchantLoanEmis = (prevStore.merchantLoanEmis || []).filter((e) => getBizId(e) !== targetId);
+        const merchantRewards = (prevStore.merchantRewards || []).filter((r) => getBizId(r) !== targetId);
+        const merchantRewardLedger = (prevStore.merchantRewardLedger || []).filter((e) => getBizId(e) !== targetId);
         const soundboxConfig = { ...(prevStore.soundboxConfig || {}) };
         delete soundboxConfig[targetId];
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
@@ -2576,6 +2602,8 @@ class StorageRepository {
         merchantQrOrders,
         merchantLoans,
         merchantLoanEmis,
+        merchantRewards,
+        merchantRewardLedger,
         soundboxConfig,
         autoDisbursementConfig,
         cashReconciliation,
@@ -2757,6 +2785,10 @@ class StorageRepository {
         const importedMerchantLoans = (data.merchantLoans || []).filter(l => String(l.businessId || l.business_id || '1') === selectedBizId);
         const keptMerchantLoanEmis = (prevStore.merchantLoanEmis || []).filter(e => String(e.businessId || e.business_id || '1') !== selectedBizId);
         const importedMerchantLoanEmis = (data.merchantLoanEmis || []).filter(e => String(e.businessId || e.business_id || '1') === selectedBizId);
+        const keptMerchantRewards = (prevStore.merchantRewards || []).filter(r => String(r.businessId || r.business_id || '1') !== selectedBizId);
+        const importedMerchantRewards = (data.merchantRewards || []).filter(r => String(r.businessId || r.business_id || '1') === selectedBizId);
+        const keptMerchantRewardLedger = (prevStore.merchantRewardLedger || []).filter(e => String(e.businessId || e.business_id || '1') !== selectedBizId);
+        const importedMerchantRewardLedger = (data.merchantRewardLedger || []).filter(e => String(e.businessId || e.business_id || '1') === selectedBizId);
         const keptQrSettlements = (prevStore.qrSettlementActions || []).filter(q => String(q.businessId || '1') !== selectedBizId);
         const keptDisbursements = (prevStore.merchantDisbursements || []).filter(d => String(d.businessId || '1') !== selectedBizId);
         const keptReconciliations = (prevStore.reconciliations || []).filter(r => String(r.businessId || '1') !== selectedBizId);
@@ -2804,6 +2836,8 @@ class StorageRepository {
           merchantQrOrders: [...keptMerchantQrOrders, ...importedMerchantQrOrders],
           merchantLoans: [...keptMerchantLoans, ...importedMerchantLoans],
           merchantLoanEmis: [...keptMerchantLoanEmis, ...importedMerchantLoanEmis],
+          merchantRewards: [...keptMerchantRewards, ...importedMerchantRewards],
+          merchantRewardLedger: [...keptMerchantRewardLedger, ...importedMerchantRewardLedger],
           qrSettlementActions: [...keptQrSettlements, ...importedQrSettlements],
           merchantDisbursements: [...keptDisbursements, ...importedDisbursements],
           reconciliations: [...keptReconciliations, ...importedReconciliations],
@@ -2859,6 +2893,8 @@ class StorageRepository {
         merchantQrOrders: Array.isArray(data.merchantQrOrders) ? data.merchantQrOrders : [],
         merchantLoans: Array.isArray(data.merchantLoans) ? data.merchantLoans : [],
         merchantLoanEmis: Array.isArray(data.merchantLoanEmis) ? data.merchantLoanEmis : [],
+        merchantRewards: Array.isArray(data.merchantRewards) ? data.merchantRewards : [],
+        merchantRewardLedger: Array.isArray(data.merchantRewardLedger) ? data.merchantRewardLedger : [],
         qrSettlementActions: Array.isArray(data.qrSettlementActions) ? data.qrSettlementActions : [],
         merchantDisbursements: Array.isArray(data.merchantDisbursements) ? data.merchantDisbursements : [],
         reconciliations: Array.isArray(data.reconciliations) ? data.reconciliations : [],
@@ -3161,6 +3197,8 @@ class StorageRepository {
           merchantQrOrders: (fullState.merchantQrOrders || []).length,
           merchantLoans: (fullState.merchantLoans || []).length,
           merchantLoanEmis: (fullState.merchantLoanEmis || []).length,
+        merchantRewards: (fullState.merchantRewards || []).length,
+        merchantRewardLedger: (fullState.merchantRewardLedger || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -9331,6 +9369,414 @@ class StorageRepository {
       return Boolean(this.getMerchantLoanById(businessId, loanId));
     }
 
+    // =========================================================================
+    // REA-ITER-240: MERCHANT CASHBACK, SCRATCH CARDS & REWARDS METHODS
+    // =========================================================================
+
+    /**
+     * REA-ITER-240: Saves or updates a merchant reward (scratch card, cashback, etc.)
+     */
+    async saveMerchantReward(businessId = null, rewardData = {}) {
+      if (!rewardData || typeof rewardData !== 'object') {
+        return { success: false, error: 'INVALID_REWARD_DATA' };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || rewardData.business_id || rewardData.businessId || store.activeBusinessId || '1');
+      const rewardId = String(rewardData.reward_id || rewardData.rewardId || ('TK-RWD-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000)));
+
+      const entry = {
+        ...rewardData,
+        id: rewardData.id || ('RWD_' + Date.now() + '_' + Math.floor(Math.random() * 1000)),
+        reward_id: rewardId,
+        rewardId: rewardId,
+        business_id: targetBizId,
+        businessId: targetBizId,
+        reward_type: rewardData.reward_type || rewardData.rewardType || 'SCRATCH_CARD',
+        amount_paisa: Number(rewardData.amount_paisa !== undefined ? rewardData.amount_paisa : rewardData.amountPaisa) || 0,
+        points: Number(rewardData.points) || 0,
+        status: rewardData.status || 'UNLOCKED',
+        title: rewardData.title || 'রিওয়ার্ড',
+        description: rewardData.description || '',
+        expiry_date: rewardData.expiry_date || rewardData.expiryDate || null,
+        claimed_date: rewardData.claimed_date || rewardData.claimedDate || null,
+        created_at: rewardData.created_at || rewardData.createdAt || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        synced: rewardData.synced !== undefined ? Number(rewardData.synced) : 0,
+      };
+
+      let saved = null;
+      await this.mutateCollection('merchantRewards', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((r) => String(r.reward_id || r.rewardId) === rewardId);
+        if (idx >= 0) {
+          const prev = list[idx];
+          const merged = {
+            ...prev,
+            ...entry,
+            id: prev.id || entry.id,
+            created_at: prev.created_at || entry.created_at,
+            updated_at: new Date().toISOString(),
+          };
+          list[idx] = merged;
+          saved = { ...merged };
+        } else {
+          list.push(entry);
+          saved = { ...entry };
+        }
+        return list;
+      });
+
+      return { success: true, reward: saved };
+    }
+
+    /**
+     * REA-ITER-240: Retrieves merchant rewards with optional filters and pagination.
+     */
+    getMerchantRewards(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.merchantRewards || []).filter(
+        (r) => String(r.business_id || r.businessId || '1') === targetBizId
+      );
+
+      if (options.status) {
+        const st = String(options.status).toUpperCase();
+        list = list.filter((r) => String(r.status || '').toUpperCase() === st);
+      }
+      if (options.reward_type || options.rewardType) {
+        const rt = String(options.reward_type || options.rewardType).toUpperCase();
+        list = list.filter((r) => String(r.reward_type || r.rewardType || '').toUpperCase() === rt);
+      }
+      if (options.synced !== undefined) {
+        list = list.filter((r) => Number(r.synced) === Number(options.synced));
+      }
+
+      list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      const offset = Number(options.offset) || 0;
+      const limit = options.limit !== undefined ? Number(options.limit) : list.length;
+      return list.slice(offset, offset + limit).map((r) => ({ ...r }));
+    }
+
+    getMerchantRewardsByBusinessId(businessId = null, options = {}) {
+      return this.getMerchantRewards(businessId, options);
+    }
+
+    /**
+     * REA-ITER-240: Retrieves a single merchant reward by ID.
+     */
+    getMerchantRewardById(businessId = null, rewardId = null) {
+      if (!rewardId) return null;
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const item = (store.merchantRewards || []).find((r) => {
+        const matchId = String(r.reward_id || r.rewardId || r.id) === String(rewardId);
+        if (!matchId) return false;
+        if (targetBizId) {
+          return String(r.business_id || r.businessId || '1') === targetBizId;
+        }
+        return true;
+      });
+      return item ? { ...item } : null;
+    }
+
+    /**
+     * REA-ITER-240: Scratches a reward card. Transitions to SCRATCHED if progress >= 70%.
+     */
+    async scratchReward(businessId = null, rewardId = null, scratchPercentage = 100) {
+      const reward = this.getMerchantRewardById(businessId, rewardId);
+      if (!reward) return { success: false, error: 'REWARD_NOT_FOUND' };
+      if (reward.status === 'CLAIMED') return { success: false, error: 'ALREADY_CLAIMED' };
+      if (reward.status === 'EXPIRED') return { success: false, error: 'REWARD_EXPIRED' };
+
+      let updated = null;
+      if (scratchPercentage >= 70 && (reward.status === 'UNLOCKED' || reward.status === 'UNSCRATCHED')) {
+        await this.mutateCollection('merchantRewards', (col) => {
+          const list = Array.isArray(col) ? col : [];
+          const idx = list.findIndex((r) => String(r.reward_id || r.rewardId) === String(rewardId));
+          if (idx >= 0) {
+            list[idx] = {
+              ...list[idx],
+              status: 'SCRATCHED',
+              updated_at: new Date().toISOString(),
+              synced: 0
+            };
+            updated = { ...list[idx] };
+          }
+          return list;
+        });
+        return { success: true, reward: updated, revealed: true };
+      }
+      return { success: true, reward, revealed: false };
+    }
+
+    /**
+     * REA-ITER-240: Claims a revealed reward prize (cashback or loyalty points).
+     */
+    async claimReward(businessId = null, rewardId = null, currentWalletBalancePaisa = 0) {
+      const reward = this.getMerchantRewardById(businessId, rewardId);
+      if (!reward) return { success: false, error: 'REWARD_NOT_FOUND' };
+      if (reward.status === 'CLAIMED') return { success: false, error: 'ALREADY_CLAIMED' };
+      if (reward.status !== 'SCRATCHED' && reward.status !== 'REVEALED') {
+        return { success: false, error: 'CARD_NOT_REVEALED_YET' };
+      }
+
+      const claimedDate = new Date().toISOString();
+      let updatedReward = null;
+
+      await this.mutateCollection('merchantRewards', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((r) => String(r.reward_id || r.rewardId) === String(rewardId));
+        if (idx >= 0) {
+          list[idx] = {
+            ...list[idx],
+            status: 'CLAIMED',
+            claimed_date: claimedDate,
+            updated_at: claimedDate,
+            synced: 0
+          };
+          updatedReward = { ...list[idx] };
+        }
+        return list;
+      });
+
+      const targetBizId = String(reward.business_id || reward.businessId || '1');
+      const amountPaisa = Number(reward.amount_paisa !== undefined ? reward.amount_paisa : reward.amountPaisa) || 0;
+      const points = Number(reward.points) || 0;
+      const currentPoints = this.getMerchantRewardPointsBalance(targetBizId);
+      const newPoints = currentPoints + points;
+
+      await this.saveRewardLedgerEntry(targetBizId, {
+        points_change: points,
+        running_points_balance: newPoints,
+        cashback_paisa_change: amountPaisa,
+        source_event: 'SCRATCH_CARD_CLAIM',
+        reference_id: reward.reward_id || reward.rewardId
+      });
+
+      return {
+        success: true,
+        reward: updatedReward,
+        creditedPaisa: amountPaisa,
+        pointsAdded: points,
+        newWalletBalancePaisa: currentWalletBalancePaisa + amountPaisa,
+        newPointsBalance: newPoints
+      };
+    }
+
+    /**
+     * REA-ITER-240: Deletes a merchant reward.
+     */
+    async deleteMerchantReward(businessId = null, rewardId = null) {
+      if (!rewardId) return { success: false, error: 'MISSING_REWARD_ID' };
+      const targetBizId = businessId ? String(businessId) : null;
+      let deleted = false;
+      await this.mutateCollection('merchantRewards', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((r) => {
+          const matchId = String(r.reward_id || r.rewardId || r.id) === String(rewardId);
+          if (!matchId) return false;
+          if (targetBizId) {
+            return String(r.business_id || r.businessId || '1') === targetBizId;
+          }
+          return true;
+        });
+        if (idx >= 0) {
+          list.splice(idx, 1);
+          deleted = true;
+        }
+        return list;
+      });
+      return { success: deleted };
+    }
+
+    /**
+     * REA-ITER-240: Checks existence of a merchant reward.
+     */
+    existsMerchantReward(businessId = null, rewardId = null) {
+      return Boolean(this.getMerchantRewardById(businessId, rewardId));
+    }
+
+    /**
+     * REA-ITER-240: Gets unsynced merchant rewards.
+     */
+    getUnsyncedMerchantRewards(businessId = null, limit = 50) {
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      let list = (store.merchantRewards || []).filter((r) => Number(r.synced) === 0);
+      if (targetBizId) {
+        list = list.filter((r) => String(r.business_id || r.businessId || '1') === targetBizId);
+      }
+      return list.slice(0, limit).map((r) => ({ ...r }));
+    }
+
+    /**
+     * REA-ITER-240: Updates sync status of merchant rewards.
+     */
+    async updateMerchantRewardSyncStatus(businessId = null, ids = [], synced = 1) {
+      const idSet = new Set((ids || []).map(String));
+      const targetBizId = businessId ? String(businessId) : null;
+      let updated = 0;
+      await this.mutateCollection('merchantRewards', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        for (const r of list) {
+          if (targetBizId && String(r.business_id || r.businessId || '1') !== targetBizId) continue;
+          if (idSet.has(String(r.id)) || idSet.has(String(r.reward_id || r.rewardId))) {
+            r.synced = Number(synced);
+            updated++;
+          }
+        }
+        return list;
+      });
+      return updated;
+    }
+
+    /**
+     * REA-ITER-240: Saves an entry to the merchant reward ledger.
+     */
+    async saveRewardLedgerEntry(businessId = null, entryData = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || entryData.business_id || entryData.businessId || store.activeBusinessId || '1');
+      const entryId = String(entryData.entry_id || entryData.entryId || ('TK-RWL-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000)));
+
+      const entry = {
+        ...entryData,
+        id: entryData.id || ('RWL_' + Date.now() + '_' + Math.floor(Math.random() * 1000)),
+        entry_id: entryId,
+        entryId: entryId,
+        business_id: targetBizId,
+        businessId: targetBizId,
+        points_change: Number(entryData.points_change !== undefined ? entryData.points_change : entryData.pointsChange) || 0,
+        running_points_balance: Number(entryData.running_points_balance !== undefined ? entryData.running_points_balance : entryData.runningPointsBalance) || 0,
+        cashback_paisa_change: Number(entryData.cashback_paisa_change !== undefined ? entryData.cashback_paisa_change : entryData.cashbackPaisaChange) || 0,
+        source_event: entryData.source_event || entryData.sourceEvent || 'TRANSACTION_VOLUME',
+        reference_id: entryData.reference_id || entryData.referenceId || null,
+        created_at: entryData.created_at || entryData.createdAt || new Date().toISOString(),
+        synced: entryData.synced !== undefined ? Number(entryData.synced) : 0,
+      };
+
+      let saved = null;
+      await this.mutateCollection('merchantRewardLedger', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        list.push(entry);
+        saved = { ...entry };
+        return list;
+      });
+
+      return { success: true, entry: saved };
+    }
+
+    /**
+     * REA-ITER-240: Retrieves merchant reward ledger entries.
+     */
+    getRewardLedger(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.merchantRewardLedger || []).filter(
+        (e) => String(e.business_id || e.businessId || '1') === targetBizId
+      );
+
+      if (options.source_event || options.sourceEvent) {
+        const se = String(options.source_event || options.sourceEvent);
+        list = list.filter((e) => String(e.source_event || e.sourceEvent) === se);
+      }
+      if (options.synced !== undefined) {
+        list = list.filter((e) => Number(e.synced) === Number(options.synced));
+      }
+
+      list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      const offset = Number(options.offset) || 0;
+      const limit = options.limit !== undefined ? Number(options.limit) : list.length;
+      return list.slice(offset, offset + limit).map((e) => ({ ...e }));
+    }
+
+    /**
+     * REA-ITER-240: Computes the net loyalty points balance for a merchant.
+     */
+    getMerchantRewardPointsBalance(businessId = null) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const list = (store.merchantRewardLedger || []).filter(
+        (e) => String(e.business_id || e.businessId || '1') === targetBizId
+      );
+      if (list.length === 0) return 0;
+      return list.reduce((sum, e) => sum + (Number(e.points_change !== undefined ? e.points_change : e.pointsChange) || 0), 0);
+    }
+
+    /**
+     * REA-ITER-240: Redeems loyalty points to wallet balance (10 points = ৳1.00 = 100 paisa).
+     */
+    async redeemPointsToWallet(businessId = null, points = 0, currentWalletBalancePaisa = 0) {
+      const targetBizId = String(businessId || (this.currentStore && this.currentStore.activeBusinessId) || '1');
+      const currentPoints = this.getMerchantRewardPointsBalance(targetBizId);
+      if (points > currentPoints) {
+        return { success: false, error: 'INSUFFICIENT_POINTS', message: 'আপনার অ্যাকাউন্টে পর্যাপ্ত পয়েন্টস নেই।' };
+      }
+      if (points < 100) {
+        return { success: false, error: 'MINIMUM_THRESHOLD_NOT_MET', message: 'সর্বনিম্ন ১০০ পয়েন্টস রিডিম করা যাবে।' };
+      }
+
+      const takaCredit = Math.floor(points / 10);
+      const creditedPaisa = takaCredit * 100;
+      const leftoverPoints = points % 10;
+      const pointsDeducted = points - leftoverPoints;
+      const newPointsBalance = currentPoints - pointsDeducted;
+      const newWalletBalancePaisa = currentWalletBalancePaisa + creditedPaisa;
+
+      const entryResult = await this.saveRewardLedgerEntry(targetBizId, {
+        points_change: -pointsDeducted,
+        running_points_balance: newPointsBalance,
+        cashback_paisa_change: creditedPaisa,
+        source_event: 'POINTS_REDEMPTION',
+        reference_id: 'RED-' + Date.now()
+      });
+
+      return {
+        success: true,
+        pointsDeducted,
+        creditedPaisa,
+        newPointsBalance,
+        newWalletBalancePaisa,
+        entry: entryResult.entry
+      };
+    }
+
+    /**
+     * REA-ITER-240: Gets unsynced reward ledger entries.
+     */
+    getUnsyncedRewardLedgerEntries(businessId = null, limit = 50) {
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      let list = (store.merchantRewardLedger || []).filter((e) => Number(e.synced) === 0);
+      if (targetBizId) {
+        list = list.filter((e) => String(e.business_id || e.businessId || '1') === targetBizId);
+      }
+      return list.slice(0, limit).map((e) => ({ ...e }));
+    }
+
+    /**
+     * REA-ITER-240: Updates sync status of reward ledger entries.
+     */
+    async updateRewardLedgerSyncStatus(businessId = null, ids = [], synced = 1) {
+      const idSet = new Set((ids || []).map(String));
+      const targetBizId = businessId ? String(businessId) : null;
+      let updated = 0;
+      await this.mutateCollection('merchantRewardLedger', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        for (const e of list) {
+          if (targetBizId && String(e.business_id || e.businessId || '1') !== targetBizId) continue;
+          if (idSet.has(String(e.id)) || idSet.has(String(e.entry_id || e.entryId))) {
+            e.synced = Number(synced);
+            updated++;
+          }
+        }
+        return list;
+      });
+      return updated;
+    }
+
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -10880,6 +11326,113 @@ function existsMerchantLoanRepo(businessId = null, loanId = null, repo = default
   return false;
 }
 
+// REA-ITER-240 Wrapper Functions
+async function saveMerchantRewardRepo(businessId = null, rewardData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveMerchantReward === 'function') {
+    return repo.saveMerchantReward(businessId, rewardData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getMerchantRewardsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantRewards === 'function') {
+    return repo.getMerchantRewards(businessId, options);
+  }
+  return [];
+}
+
+function getMerchantRewardByIdRepo(businessId = null, rewardId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantRewardById === 'function') {
+    return repo.getMerchantRewardById(businessId, rewardId);
+  }
+  return null;
+}
+
+async function scratchRewardRepo(businessId = null, rewardId = null, scratchPercentage = 100, repo = defaultRepository) {
+  if (repo && typeof repo.scratchReward === 'function') {
+    return repo.scratchReward(businessId, rewardId, scratchPercentage);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function claimRewardRepo(businessId = null, rewardId = null, walletBalancePaisa = 0, repo = defaultRepository) {
+  if (repo && typeof repo.claimReward === 'function') {
+    return repo.claimReward(businessId, rewardId, walletBalancePaisa);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function deleteMerchantRewardRepo(businessId = null, rewardId = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteMerchantReward === 'function') {
+    return repo.deleteMerchantReward(businessId, rewardId);
+  }
+  return { success: false };
+}
+
+function existsMerchantRewardRepo(businessId = null, rewardId = null, repo = defaultRepository) {
+  if (repo && typeof repo.existsMerchantReward === 'function') {
+    return repo.existsMerchantReward(businessId, rewardId);
+  }
+  return false;
+}
+
+function getUnsyncedMerchantRewardsRepo(businessId = null, limit = 50, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedMerchantRewards === 'function') {
+    return repo.getUnsyncedMerchantRewards(businessId, limit);
+  }
+  return [];
+}
+
+async function updateMerchantRewardSyncStatusRepo(businessId = null, ids = [], synced = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateMerchantRewardSyncStatus === 'function') {
+    return repo.updateMerchantRewardSyncStatus(businessId, ids, synced);
+  }
+  return 0;
+}
+
+async function saveRewardLedgerEntryRepo(businessId = null, entryData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveRewardLedgerEntry === 'function') {
+    return repo.saveRewardLedgerEntry(businessId, entryData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getRewardLedgerRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getRewardLedger === 'function') {
+    return repo.getRewardLedger(businessId, options);
+  }
+  return [];
+}
+
+function getMerchantRewardPointsBalanceRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantRewardPointsBalance === 'function') {
+    return repo.getMerchantRewardPointsBalance(businessId);
+  }
+  return 0;
+}
+
+async function redeemPointsToWalletRepo(businessId = null, points = 0, currentWalletBalancePaisa = 0, repo = defaultRepository) {
+  if (repo && typeof repo.redeemPointsToWallet === 'function') {
+    return repo.redeemPointsToWallet(businessId, points, currentWalletBalancePaisa);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getUnsyncedRewardLedgerEntriesRepo(businessId = null, limit = 50, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedRewardLedgerEntries === 'function') {
+    return repo.getUnsyncedRewardLedgerEntries(businessId, limit);
+  }
+  return [];
+}
+
+async function updateRewardLedgerSyncStatusRepo(businessId = null, ids = [], synced = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateRewardLedgerSyncStatus === 'function') {
+    return repo.updateRewardLedgerSyncStatus(businessId, ids, synced);
+  }
+  return 0;
+}
+
+
 function existsMerchantKycRepo(businessId = null, repo = defaultRepository) {
   if (repo && typeof repo.existsMerchantKyc === 'function') {
     return repo.existsMerchantKyc(businessId);
@@ -11133,6 +11686,22 @@ const repoExport = {
   updateMerchantLoanEmiSyncStatus: updateMerchantLoanEmiSyncStatusRepo,
   deleteMerchantLoan: deleteMerchantLoanRepo,
   existsMerchantLoan: existsMerchantLoanRepo,
+  saveMerchantReward: saveMerchantRewardRepo,
+  getMerchantRewards: getMerchantRewardsRepo,
+  getMerchantRewardsByBusinessId: getMerchantRewardsRepo,
+  getMerchantRewardById: getMerchantRewardByIdRepo,
+  scratchReward: scratchRewardRepo,
+  claimReward: claimRewardRepo,
+  deleteMerchantReward: deleteMerchantRewardRepo,
+  existsMerchantReward: existsMerchantRewardRepo,
+  getUnsyncedMerchantRewards: getUnsyncedMerchantRewardsRepo,
+  updateMerchantRewardSyncStatus: updateMerchantRewardSyncStatusRepo,
+  saveRewardLedgerEntry: saveRewardLedgerEntryRepo,
+  getRewardLedger: getRewardLedgerRepo,
+  getMerchantRewardPointsBalance: getMerchantRewardPointsBalanceRepo,
+  redeemPointsToWallet: redeemPointsToWalletRepo,
+  getUnsyncedRewardLedgerEntries: getUnsyncedRewardLedgerEntriesRepo,
+  updateRewardLedgerSyncStatus: updateRewardLedgerSyncStatusRepo,
   saveRechargeRecord: saveRechargeRecordRepo,
   getRechargeHistory: getRechargeHistoryRepo,
   getRechargeById: getRechargeByIdRepo,
@@ -11354,6 +11923,22 @@ if (typeof exports !== 'undefined') {
   exports.updateMerchantLoanEmiSyncStatus = updateMerchantLoanEmiSyncStatusRepo;
   exports.deleteMerchantLoan = deleteMerchantLoanRepo;
   exports.existsMerchantLoan = existsMerchantLoanRepo;
+  exports.saveMerchantReward = saveMerchantRewardRepo;
+  exports.getMerchantRewards = getMerchantRewardsRepo;
+  exports.getMerchantRewardsByBusinessId = getMerchantRewardsRepo;
+  exports.getMerchantRewardById = getMerchantRewardByIdRepo;
+  exports.scratchReward = scratchRewardRepo;
+  exports.claimReward = claimRewardRepo;
+  exports.deleteMerchantReward = deleteMerchantRewardRepo;
+  exports.existsMerchantReward = existsMerchantRewardRepo;
+  exports.getUnsyncedMerchantRewards = getUnsyncedMerchantRewardsRepo;
+  exports.updateMerchantRewardSyncStatus = updateMerchantRewardSyncStatusRepo;
+  exports.saveRewardLedgerEntry = saveRewardLedgerEntryRepo;
+  exports.getRewardLedger = getRewardLedgerRepo;
+  exports.getMerchantRewardPointsBalance = getMerchantRewardPointsBalanceRepo;
+  exports.redeemPointsToWallet = redeemPointsToWalletRepo;
+  exports.getUnsyncedRewardLedgerEntries = getUnsyncedRewardLedgerEntriesRepo;
+  exports.updateRewardLedgerSyncStatus = updateRewardLedgerSyncStatusRepo;
   exports.saveRechargeRecord = saveRechargeRecordRepo;
   exports.getRechargeHistory = getRechargeHistoryRepo;
   exports.getRechargeById = getRechargeByIdRepo;

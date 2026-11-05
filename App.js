@@ -1366,6 +1366,34 @@ function TallyKhataApp() {
     status: 'ACTIVE',
   });
 
+  // --- REA-ITER-240: TallyPay Merchant Cashback, Scratch Card Rewards & Loyalty Points Subsystem ---
+  const [modalRewardsHub, setModalRewardsHub] = useState(false);
+  const [modalScratchCard, setModalScratchCard] = useState(false);
+  const [modalCashbackHistory, setModalCashbackHistory] = useState(false);
+  const [modalPointsRedeem, setModalPointsRedeem] = useState(false);
+  const [modalRewardTierDetails, setModalRewardTierDetails] = useState(false);
+
+  const [merchantLoyaltyPoints, setMerchantLoyaltyPoints] = useState(1250);
+  const [merchantLoyaltyTier, setMerchantLoyaltyTier] = useState('GOLD');
+  const [availableScratchCards, setAvailableScratchCards] = useState([
+    { id: 'SC-101', title: 'পহেলা বৈশাখ বোনাস', amount: 25, isScratched: false, isClaimed: false },
+    { id: 'SC-102', title: 'ডিজিটাল সেলস রিওয়ার্ড', amount: 50, isScratched: false, isClaimed: false },
+    { id: 'SC-103', title: 'কিউআর পেমেন্ট মাইলস্টোন', amount: 100, isScratched: false, isClaimed: false },
+  ]);
+  const [activeScratchCard, setActiveScratchCard] = useState(null);
+  const [isScratchRevealed, setIsScratchRevealed] = useState(false);
+  const [scratchRewardClaimed, setScratchRewardClaimed] = useState(false);
+  const [pointsToRedeemInput, setPointsToRedeemInput] = useState(500);
+  const [redeemSuccessToast, setRedeemSuccessToast] = useState(false);
+  const [cashbackFilterType, setCashbackFilterType] = useState('ALL');
+  const [cashbackHistoryList, setCashbackHistoryList] = useState([
+    { id: 'CB-201', date: '০৫ নভেম্বর ২০২৬', ref: 'কিউআর বিক্রি ক্যাশব্যাক', type: 'QR', amount: 25 },
+    { id: 'CB-202', date: '০৩ নভেম্বর ২০২৬', ref: 'বিল পে ক্যাশব্যাক', type: 'BILL', amount: 15 },
+    { id: 'CB-203', date: '২৮ অক্টোবর ২০২৬', ref: 'স্ক্র্যাচ কার্ড বোনাস', type: 'SCRATCH', amount: 50 },
+    { id: 'CB-204', date: '২০ অক্টোবর ২০২৬', ref: 'রিচার্জ ক্যাশব্যাক', type: 'RECHARGE', amount: 10 },
+    { id: 'CB-205', date: '১৫ অক্টোবর ২০২৬', ref: 'মার্চেন্ট সেলস বোনাস', type: 'QR', amount: 85 },
+  ]);
+
 
   const [kycNidSide, setKycNidSide] = useState('FRONT');
   const [kycFlashOn, setKycFlashOn] = useState(false);
@@ -2745,6 +2773,36 @@ function TallyKhataApp() {
         return true;
       }
       // Iteration 239: Merchant Digital Micro-Loan & Credit Scoring BackHandler
+      // Iteration 240: Merchant Rewards, Scratch Cards & Cashback BackHandler
+      if (modalScratchCard) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalScratchCard(false);
+        setModalRewardsHub(true);
+        return true;
+      }
+      if (modalCashbackHistory) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalCashbackHistory(false);
+        setModalRewardsHub(true);
+        return true;
+      }
+      if (modalPointsRedeem) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalPointsRedeem(false);
+        setModalRewardsHub(true);
+        return true;
+      }
+      if (modalRewardTierDetails) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalRewardTierDetails(false);
+        setModalRewardsHub(true);
+        return true;
+      }
+      if (modalRewardsHub) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalRewardsHub(false);
+        return true;
+      }
       if (modalLoanRepayment) {
         try { hapticFeedbackService.selection(); } catch (e) {}
         setModalLoanRepayment(false);
@@ -3056,7 +3114,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalKycSplash, modalNidCameraScanner, modalNidInfoReview, modalLivenessSelfie, modalKycStatusResult, modalQrOrderCatalog, modalQrStandeePreview, modalDeliveryAddress, modalOrderPaymentCheckout, modalOrderTracking, modalLoanEligibility, modalLoanApplication, modalLoanBreakdownTerms, modalLoanEmiSchedule, modalLoanRepayment, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalKycSplash, modalNidCameraScanner, modalNidInfoReview, modalLivenessSelfie, modalKycStatusResult, modalQrOrderCatalog, modalQrStandeePreview, modalDeliveryAddress, modalOrderPaymentCheckout, modalOrderTracking, modalLoanEligibility, modalLoanApplication, modalLoanBreakdownTerms, modalLoanEmiSchedule, modalLoanRepayment, modalRewardsHub, modalScratchCard, modalCashbackHistory, modalPointsRedeem, modalRewardTierDetails, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -7012,6 +7070,86 @@ function TallyKhataApp() {
   };
 
   // =========================================================================
+  // REA-ITER-240: MERCHANT REWARDS, SCRATCH CARD & CASHBACK HANDLERS
+  // =========================================================================
+  const handleOpenRewardsHub = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalRewardsHub(true);
+  };
+
+  const handleOpenScratchCard = (card) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const targetCard = card || availableScratchCards[0];
+    setActiveScratchCard(targetCard);
+    setIsScratchRevealed(targetCard ? targetCard.isScratched : false);
+    setScratchRewardClaimed(targetCard ? targetCard.isClaimed : false);
+    setModalRewardsHub(false);
+    setModalScratchCard(true);
+  };
+
+  const handleRevealScratchCard = () => {
+    try { hapticFeedbackService.impactMedium(); } catch (e) {}
+    setIsScratchRevealed(true);
+    if (activeScratchCard) {
+      setAvailableScratchCards(prev => prev.map(c => c.id === activeScratchCard.id ? { ...c, isScratched: true } : c));
+    }
+  };
+
+  const handleClaimScratchReward = () => {
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    setScratchRewardClaimed(true);
+    if (activeScratchCard) {
+      setAvailableScratchCards(prev => prev.map(c => c.id === activeScratchCard.id ? { ...c, isClaimed: true } : c));
+      const newEntry = {
+        id: 'CB-' + Date.now().toString().slice(-4),
+        date: '০৫ নভেম্বর ২০২৬',
+        ref: activeScratchCard.title || 'স্ক্র্যাচ কার্ড বোনাস',
+        type: 'SCRATCH',
+        amount: activeScratchCard.amount || 25,
+      };
+      setCashbackHistoryList(prev => [newEntry, ...prev]);
+    }
+  };
+
+  const handleOpenCashbackHistory = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalRewardsHub(false);
+    setModalCashbackHistory(true);
+  };
+
+  const handleOpenPointsRedeem = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setRedeemSuccessToast(false);
+    setModalRewardsHub(false);
+    setModalPointsRedeem(true);
+  };
+
+  const handleConfirmPointsRedeem = () => {
+    if (merchantLoyaltyPoints < pointsToRedeemInput || pointsToRedeemInput < 100) {
+      try { hapticFeedbackService.notificationError(); } catch (e) {}
+      return;
+    }
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    const cashValue = Math.floor(pointsToRedeemInput / 10);
+    setMerchantLoyaltyPoints(prev => Math.max(0, prev - pointsToRedeemInput));
+    setRedeemSuccessToast(true);
+    const newEntry = {
+      id: 'CB-' + Date.now().toString().slice(-4),
+      date: '০৫ নভেম্বর ২০২৬',
+      ref: 'পয়েন্ট ক্যাশ রূপান্তর',
+      type: 'REDEEM',
+      amount: cashValue,
+    };
+    setCashbackHistoryList(prev => [newEntry, ...prev]);
+  };
+
+  const handleOpenRewardTierDetails = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalRewardsHub(false);
+    setModalRewardTierDetails(true);
+  };
+
+  // =========================================================================
   // QR STANDEE ORDER & COLLATERAL DELIVERY HANDLERS (Iteration 238)
   // =========================================================================
   const QR_STANDEE_CATALOG = [
@@ -8535,7 +8673,48 @@ function TallyKhataApp() {
       tallyPayService,
     };
 
-            global.__LOAN_CREDIT_TEST_HOOKS__ = {
+            global.__REWARDS_CASHBACK_TEST_HOOKS__ = {
+      modalRewardsHub,
+      setModalRewardsHub,
+      modalScratchCard,
+      setModalScratchCard,
+      modalCashbackHistory,
+      setModalCashbackHistory,
+      modalPointsRedeem,
+      setModalPointsRedeem,
+      modalRewardTierDetails,
+      setModalRewardTierDetails,
+      merchantLoyaltyPoints,
+      setMerchantLoyaltyPoints,
+      merchantLoyaltyTier,
+      setMerchantLoyaltyTier,
+      availableScratchCards,
+      setAvailableScratchCards,
+      activeScratchCard,
+      setActiveScratchCard,
+      isScratchRevealed,
+      setIsScratchRevealed,
+      scratchRewardClaimed,
+      setScratchRewardClaimed,
+      pointsToRedeemInput,
+      setPointsToRedeemInput,
+      redeemSuccessToast,
+      setRedeemSuccessToast,
+      cashbackFilterType,
+      setCashbackFilterType,
+      cashbackHistoryList,
+      setCashbackHistoryList,
+      handleOpenRewardsHub,
+      handleOpenScratchCard,
+      handleRevealScratchCard,
+      handleClaimScratchReward,
+      handleOpenCashbackHistory,
+      handleOpenPointsRedeem,
+      handleConfirmPointsRedeem,
+      handleOpenRewardTierDetails,
+    };
+
+    global.__LOAN_CREDIT_TEST_HOOKS__ = {
       modalLoanEligibility,
       setModalLoanEligibility,
       modalLoanApplication,
@@ -12415,6 +12594,21 @@ accessibilityLabel={
                 </Text>
               </TouchableOpacity>
 
+              <TouchableOpacity
+                testID="tp_rewards_cashback_btn"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                style={styles.walletServiceBtn}
+                onPress={handleOpenRewardsHub}
+                activeOpacity={0.75}
+                accessibilityLabel={t('rewards_and_cashback')}
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_bechakena.png')} variant="primary" shape="rounded" size={26} containerSize={44} />
+                <Text style={[styles.walletServiceLabel, isDark && tStyles.textPrimary]}>
+                  {t('rewards_and_cashback')}
+                </Text>
+              </TouchableOpacity>
+
                             <TouchableOpacity
                 testID="tp_merchant_kyc_banner_btn"
                 accessibilityRole="button"
@@ -12943,6 +13137,22 @@ accessibilityLabel={
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('loan_subtitle')}</Text>
                 </View>
                 <Text style={{ fontSize: 18, color: isDark ? '#64748B' : '#94A3B8' }}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={handleOpenRewardsHub}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('rewards_and_cashback')}
+                testID="menu_tp_rewards_cashback_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_bechakena.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('rewards_and_cashback')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('rewards_hub_subtitle')}</Text>
+                </View>
+                <Text style={styles.menuListChevron}>›</Text>
               </TouchableOpacity>
 
                             <TouchableOpacity
@@ -29623,6 +29833,836 @@ accessibilityLabel={
                   </Text>
                 </TouchableOpacity>
               )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 122: REWARDS & CASHBACK HUB (modalRewardsHub)                       */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalRewardsHub}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalRewardsHub(false)}
+        testID="modal_rewards_hub"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                  {t('rewards_hub_title')}
+                </Text>
+                <Text style={[{ fontSize: 13, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                  {t('rewards_hub_subtitle')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                testID="btn_rewards_hub_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => setModalRewardsHub(false)}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Card 1: Points & Tier Balance Card */}
+              <View
+                testID="card_loyalty_points_balance"
+                style={{
+                  backgroundColor: isDark ? '#0F172A' : '#0D6E5C',
+                  borderRadius: 16,
+                  padding: 18,
+                  marginBottom: 16,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                  elevation: 3,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 13, color: '#D1FAE5', fontWeight: '500' }}>
+                    {t('loyalty_points_balance')}
+                  </Text>
+                  <View
+                    testID="badge_active_loyalty_tier"
+                    style={{
+                      backgroundColor: '#FEF3C7',
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, color: '#78350F', fontWeight: '700' }}>
+                      👑 {t('loyalty_tier_' + merchantLoyaltyTier.toLowerCase())}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 14 }}>
+                  <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF' }}>
+                    {merchantLoyaltyPoints.toLocaleString()}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: '#A7F3D0', marginLeft: 8 }}>
+                    {t('loyalty_points_label')} (৳{Math.floor(merchantLoyaltyPoints / 10)} {t('cash_equivalent_value')})
+                  </Text>
+                </View>
+
+                {/* Quick actions inside points card */}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    testID="btn_quick_redeem_points"
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={handleOpenPointsRedeem}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#FFFFFF',
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: '#0D6E5C', fontWeight: '700', fontSize: 13 }}>
+                      💰 {t('quick_redeem_btn')}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    testID="btn_view_tier_details"
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={handleOpenRewardTierDetails}
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                      📊 {t('view_tier_details_btn')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Section 2: Available Scratch Cards */}
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <Text style={[styles.sectionTitle, isDark && tStyles.textPrimary, { fontSize: 15, fontWeight: '700' }]}>
+                    🎁 {t('scratch_cards_section_title')}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#0D6E5C', fontWeight: '600' }}>
+                    {availableScratchCards.filter(c => !c.isClaimed).length} {t('scratch_cards_available_count')}
+                  </Text>
+                </View>
+
+                <View testID="grid_available_scratch_cards" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                  {availableScratchCards.map((card, idx) => (
+                    <TouchableOpacity
+                      key={card.id}
+                      testID={'card_scratch_item_' + idx}
+                      accessibilityRole="button"
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      onPress={() => handleOpenScratchCard(card)}
+                      style={{
+                        width: '48%',
+                        backgroundColor: card.isClaimed
+                          ? (isDark ? '#1E293B' : '#F1F5F9')
+                          : (isDark ? '#0F172A' : '#FEF3C7'),
+                        borderWidth: 1.5,
+                        borderColor: card.isClaimed ? '#CBD5E1' : '#F59E0B',
+                        borderRadius: 12,
+                        padding: 12,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 24, marginBottom: 4 }}>
+                        {card.isClaimed ? '✅' : (card.isScratched ? '🎉' : '✨')}
+                      </Text>
+                      <Text style={[{ fontSize: 13, fontWeight: '700', textAlign: 'center' }, isDark && tStyles.textPrimary]}>
+                        {card.title}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: card.isClaimed ? '#94A3B8' : '#D97706', fontWeight: '600', marginTop: 4 }}>
+                        {card.isClaimed ? t('scratch_card_claimed') : (card.isScratched ? '৳' + card.amount : t('scratch_card_unscratched'))}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Section 3: Recent Cashback Summary */}
+              <View
+                testID="card_recent_cashback_summary"
+                style={{
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderRadius: 14,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  marginBottom: 16,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={[styles.sectionTitle, isDark && tStyles.textPrimary, { fontSize: 14, fontWeight: '700' }]}>
+                    💸 {t('cashback_history_section_title')}
+                  </Text>
+                  <TouchableOpacity
+                    testID="btn_view_cashback_history"
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={handleOpenCashbackHistory}
+                  >
+                    <Text style={{ color: '#0D6E5C', fontWeight: '700', fontSize: 12 }}>
+                      {t('view_all_cashback_btn')} ›
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>{t('total_cashback_earned')}</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: '#0D6E5C', marginTop: 2 }}>৳ ৯৫০</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>{t('this_month_cashback')}</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: isDark ? '#F1F5F9' : '#0F172A', marginTop: 2 }}>৳ ১৮৫</Text>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 123: SCRATCH CARD & CLAIM REWARD (modalScratchCard)                 */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalScratchCard}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setModalScratchCard(false); setModalRewardsHub(true); }}
+        testID="modal_scratch_card"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '88%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_scratch_card_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => { setModalScratchCard(false); setModalRewardsHub(true); }}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                {t('scratch_cards_section_title')}
+              </Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center' }}>
+              <Text style={[{ fontSize: 15, fontWeight: '600', color: '#64748B', marginBottom: 16, textAlign: 'center' }, isDark && tStyles.textSecondary]}>
+                {activeScratchCard ? activeScratchCard.title : t('scratch_card_congrats')}
+              </Text>
+
+              {/* Interactive Scratch Surface Card */}
+              <View
+                testID="card_scratch_surface"
+                style={{
+                  width: '90%',
+                  aspectRatio: 1.2,
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isScratchRevealed
+                    ? (isDark ? '#0F172A' : '#D1FAE5')
+                    : (isDark ? '#334155' : '#F59E0B'),
+                  borderWidth: 2,
+                  borderColor: isScratchRevealed ? '#0D6E5C' : '#D97706',
+                  padding: 20,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 6,
+                  elevation: 5,
+                  marginBottom: 20,
+                }}
+              >
+                {!isScratchRevealed ? (
+                  <TouchableOpacity
+                    testID="btn_scratch_action_surface"
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={handleRevealScratchCard}
+                    activeOpacity={0.8}
+                    style={{ alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Text style={{ fontSize: 44, marginBottom: 8 }}>✨</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' }}>
+                      {t('scratch_now_prompt')}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.85)', marginTop: 4 }}>
+                      {t('scratch_card_unscratched')}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View testID="view_scratch_confetti" style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 32, marginBottom: 4 }}>🎉</Text>
+                    <Text testID="text_scratch_congrats" style={{ fontSize: 14, color: '#0D6E5C', fontWeight: '700', textAlign: 'center' }}>
+                      {t('scratch_card_scratched')}
+                    </Text>
+                    <View
+                      testID="badge_scratch_reward_amount"
+                      style={{
+                        backgroundColor: '#0D6E5C',
+                        paddingHorizontal: 20,
+                        paddingVertical: 8,
+                        borderRadius: 16,
+                        marginVertical: 10,
+                      }}
+                    >
+                      <Text style={{ fontSize: 26, fontWeight: '800', color: '#FFFFFF' }}>
+                        ৳ {activeScratchCard ? activeScratchCard.amount : 25}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      {t('destination_wallet_label')}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Claim Button */}
+              {isScratchRevealed && !scratchRewardClaimed && (
+                <TouchableOpacity
+                  testID="btn_claim_scratch_reward"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={handleClaimScratchReward}
+                  style={{
+                    width: '90%',
+                    backgroundColor: '#0D6E5C',
+                    paddingVertical: 14,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16 }}>
+                    {t('claim_reward_btn')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {scratchRewardClaimed && (
+                <View
+                  testID="text_scratch_claimed_feedback"
+                  style={{
+                    backgroundColor: '#D1FAE5',
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text style={{ color: '#0D6E5C', fontWeight: '700', fontSize: 13, textAlign: 'center' }}>
+                    ✓ {t('reward_claimed_success')}
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 124: CASHBACK HISTORY (modalCashbackHistory)                        */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalCashbackHistory}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setModalCashbackHistory(false); setModalRewardsHub(true); }}
+        testID="modal_cashback_history"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_cashback_history_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => { setModalCashbackHistory(false); setModalRewardsHub(true); }}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                {t('cashback_history_section_title')}
+              </Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            {/* Monthly Total Card */}
+            <View
+              testID="card_monthly_cashback_total"
+              style={{
+                backgroundColor: isDark ? '#0F172A' : '#F0FDF4',
+                borderRadius: 14,
+                padding: 16,
+                borderWidth: 1,
+                borderColor: '#86EFAC',
+                marginBottom: 14,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <View>
+                <Text style={{ fontSize: 12, color: '#166534', fontWeight: '600' }}>{t('total_cashback_earned')}</Text>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: '#15803D', marginTop: 2 }}>৳ ৯৫০</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 12, color: '#166534', fontWeight: '600' }}>{t('this_month_cashback')}</Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#166534', marginTop: 2 }}>৳ ১৮৫</Text>
+              </View>
+            </View>
+
+            {/* Filter Chips */}
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+              {[
+                { key: 'ALL', label: t('cashback_filter_all'), testID: 'chip_filter_all' },
+                { key: 'QR', label: t('cashback_filter_qr'), testID: 'chip_filter_qr' },
+                { key: 'BILL', label: t('cashback_filter_bill'), testID: 'chip_filter_bill' },
+                { key: 'SCRATCH', label: t('cashback_filter_scratch'), testID: 'chip_filter_scratch' },
+              ].map(chip => (
+                <TouchableOpacity
+                  key={chip.key}
+                  testID={chip.testID}
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => setCashbackFilterType(chip.key)}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 16,
+                    backgroundColor: cashbackFilterType === chip.key
+                      ? '#0D6E5C'
+                      : (isDark ? '#1E293B' : '#F1F5F9'),
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: cashbackFilterType === chip.key ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
+                  }}>
+                    {chip.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Transactions List */}
+            <ScrollView testID="list_cashback_history" showsVerticalScrollIndicator={false}>
+              {cashbackHistoryList
+                .filter(item => cashbackFilterType === 'ALL' || item.type === cashbackFilterType)
+                .map((item, idx) => (
+                  <View
+                    key={item.id}
+                    testID={'card_cashback_item_' + idx}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                      paddingHorizontal: 14,
+                      borderRadius: 12,
+                      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                      marginBottom: 8,
+                      borderWidth: 1,
+                      borderColor: isDark ? '#334155' : '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[{ fontSize: 14, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                        {item.ref}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                        {item.date} • {item.id}
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                      <Text style={{ color: '#0D6E5C', fontWeight: '800', fontSize: 14 }}>
+                        + ৳ {item.amount}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 125: REDEEM POINTS TO CASH (modalPointsRedeem)                      */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalPointsRedeem}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setModalPointsRedeem(false); setModalRewardsHub(true); }}
+        testID="modal_points_redeem"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_points_redeem_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => { setModalPointsRedeem(false); setModalRewardsHub(true); }}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                {t('redeem_points_title')}
+              </Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Conversion Rule Card */}
+              <View
+                testID="card_points_converter"
+                style={{
+                  backgroundColor: isDark ? '#0F172A' : '#EFF6FF',
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: '#93C5FD',
+                  marginBottom: 16,
+                  alignItems: 'center',
+                }}
+              >
+                <Text testID="text_conversion_rule" style={{ fontSize: 14, fontWeight: '700', color: '#1D4ED8' }}>
+                  💡 {t('conversion_rule_label')}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                  {t('loyalty_points_balance')}: {merchantLoyaltyPoints.toLocaleString()} {t('loyalty_points_label')}
+                </Text>
+              </View>
+
+              {/* Points Stepper Selector */}
+              <View
+                testID="stepper_redeem_points"
+                style={{
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderRadius: 16,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 10 }}>
+                  {t('points_to_redeem_label')}
+                </Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                  <TouchableOpacity
+                    testID="btn_redeem_points_minus"
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={() => setPointsToRedeemInput(prev => Math.max(100, prev - 100))}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: '#0D6E5C',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 22, color: '#FFFFFF', fontWeight: '700' }}>-</Text>
+                  </TouchableOpacity>
+
+                  <View style={{ alignItems: 'center', minWidth: 120 }}>
+                    <Text testID="text_points_to_redeem" style={[{ fontSize: 28, fontWeight: '800' }, isDark && tStyles.textPrimary]}>
+                      {pointsToRedeemInput}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>{t('loyalty_points_label')}</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    testID="btn_redeem_points_plus"
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={() => setPointsToRedeemInput(prev => Math.min(merchantLoyaltyPoints, prev + 100))}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: '#0D6E5C',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 22, color: '#FFFFFF', fontWeight: '700' }}>+</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'baseline' }}>
+                  <Text style={{ fontSize: 14, color: '#64748B' }}>{t('cash_value_received')}: </Text>
+                  <Text testID="text_redeem_cash_value" style={{ fontSize: 20, fontWeight: '800', color: '#0D6E5C' }}>
+                    ৳ {Math.floor(pointsToRedeemInput / 10)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Destination Card */}
+              <View
+                testID="card_wallet_credit_destination"
+                style={{
+                  backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 20, marginRight: 10 }}>💳</Text>
+                <View>
+                  <Text style={[{ fontSize: 13, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                    {t('destination_wallet_label')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>
+                    ইনস্ট্যান্ট ওয়ালেট ক্যাশ ক্রেডিট
+                  </Text>
+                </View>
+              </View>
+
+              {/* Success Banner */}
+              {redeemSuccessToast && (
+                <View
+                  testID="text_redeem_success_banner"
+                  style={{
+                    backgroundColor: '#D1FAE5',
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    marginBottom: 14,
+                  }}
+                >
+                  <Text style={{ color: '#0D6E5C', fontWeight: '700', fontSize: 13, textAlign: 'center' }}>
+                    ✓ {t('redeem_success_toast')}
+                  </Text>
+                </View>
+              )}
+
+              {/* Confirm CTA */}
+              <TouchableOpacity
+                testID="btn_confirm_points_redeem"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleConfirmPointsRedeem}
+                style={{
+                  backgroundColor: '#0D6E5C',
+                  paddingVertical: 14,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16 }}>
+                  {t('confirm_redeem_btn')}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 126: REWARD TIER DETAILS & BENEFITS (modalRewardTierDetails)        */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalRewardTierDetails}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setModalRewardTierDetails(false); setModalRewardsHub(true); }}
+        testID="modal_reward_tier_details"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_tier_details_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => { setModalRewardTierDetails(false); setModalRewardsHub(true); }}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                {t('tier_details_title')}
+              </Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Progress towards Next Tier */}
+              <View
+                style={{
+                  backgroundColor: isDark ? '#0F172A' : '#FEF3C7',
+                  borderRadius: 14,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: '#F59E0B',
+                  marginBottom: 16,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#B45309' }}>
+                    {t('next_tier_progress_label')}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#B45309' }}>
+                    ২৫%
+                  </Text>
+                </View>
+
+                {/* Progress Bar */}
+                <View
+                  testID="progress_next_tier"
+                  style={{
+                    height: 10,
+                    backgroundColor: isDark ? '#334155' : '#FDE68A',
+                    borderRadius: 5,
+                    overflow: 'hidden',
+                    marginBottom: 8,
+                  }}
+                >
+                  <View style={{ width: '25%', height: '100%', backgroundColor: '#D97706', borderRadius: 5 }} />
+                </View>
+
+                <Text testID="text_next_tier_progress" style={{ fontSize: 12, color: '#78350F' }}>
+                  {t('points_needed_for_next_tier')}: ৩,৭৫০ পয়েন্ট
+                </Text>
+              </View>
+
+              {/* Tier Ladder Card */}
+              <View
+                testID="card_tier_ladder"
+                style={{
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderRadius: 14,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={[styles.sectionTitle, isDark && tStyles.textPrimary, { fontSize: 14, fontWeight: '700', marginBottom: 12 }]}>
+                  🏆 {t('tier_ladder_title')}
+                </Text>
+
+                {/* Silver */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 20, marginRight: 8 }}>🥈</Text>
+                    <View>
+                      <Text style={[{ fontSize: 13, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                        {t('loyalty_tier_silver')}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>{t('tier_silver_range')}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Gold (Active) */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 10,
+                  backgroundColor: isDark ? '#0F172A' : '#FEF3C7',
+                  borderRadius: 10,
+                  paddingHorizontal: 8,
+                  marginVertical: 4,
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 20, marginRight: 8 }}>🥇</Text>
+                    <View>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#B45309' }}>
+                        {t('loyalty_tier_gold')}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#92400E' }}>{t('tier_gold_range')}</Text>
+                    </View>
+                  </View>
+                  <View style={{ backgroundColor: '#D97706', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>{t('current_tier_badge')}</Text>
+                  </View>
+                </View>
+
+                {/* Platinum */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 20, marginRight: 8 }}>💎</Text>
+                    <View>
+                      <Text style={[{ fontSize: 13, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                        {t('loyalty_tier_platinum')}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>{t('tier_platinum_range')}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Benefits Breakdown Card */}
+              <View
+                testID="card_tier_benefits"
+                style={{
+                  backgroundColor: isDark ? '#1E293B' : '#F0FDF4',
+                  borderRadius: 14,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: '#86EFAC',
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#166534', marginBottom: 10 }}>
+                  ✨ {t('tier_benefits_title')}
+                </Text>
+                {[
+                  t('tier_benefit_gold_1'),
+                  t('tier_benefit_gold_2'),
+                  t('tier_benefit_gold_3'),
+                ].map((b, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ color: '#0D6E5C', fontWeight: '800', marginRight: 8 }}>✓</Text>
+                    <Text style={{ fontSize: 13, color: '#15803D', fontWeight: '500' }}>{b}</Text>
+                  </View>
+                ))}
+              </View>
             </ScrollView>
           </View>
         </View>

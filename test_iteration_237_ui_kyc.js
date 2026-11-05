@@ -606,26 +606,26 @@ async function runAllTests() {
   // -----------------------------------------------------------------------------
   // PART 12: MODAL COUNT & CONTROLLER INVARIANTS (111 MODALS)
   // -----------------------------------------------------------------------------
-  console.log("\n--- PART 12: MODAL COUNT & CONTROLLER INVARIANTS (121 MODALS) ---");
+  console.log("\n--- PART 12: MODAL COUNT & CONTROLLER INVARIANTS (126 MODALS) ---");
 
-  await runTest("12.1: App.js contains exactly 121 <Modal elements", () => {
+  await runTest("12.1: App.js contains exactly 126 <Modal elements", () => {
     const modalMatches = appSrc.match(/<Modal\b/g) || [];
-    assert.strictEqual(modalMatches.length, 121, "Expected exactly 121 modals in App.js, got " + modalMatches.length);
+    assert.strictEqual(modalMatches.length, 126, "Expected exactly 126 modals in App.js, got " + modalMatches.length);
   });
 
-  await runTest("12.2: App.js contains exactly 121 onRequestClose handlers", () => {
+  await runTest("12.2: App.js contains exactly 126 onRequestClose handlers", () => {
     const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-    assert.strictEqual(reqCloseMatches.length, 121, "Expected 121 onRequestClose handlers, got " + reqCloseMatches.length);
+    assert.strictEqual(reqCloseMatches.length, 126, "Expected 126 onRequestClose handlers, got " + reqCloseMatches.length);
   });
 
-  await runTest("12.3: App.js contains exactly 121 unique modal state controllers", () => {
+  await runTest("12.3: App.js contains exactly 126 unique modal state controllers", () => {
     const regex = /visible=\{([a-zA-Z0-9_]+)\}/g;
     const uniqueModals = new Set();
     let m;
     while ((m = regex.exec(appSrc)) !== null) {
       uniqueModals.add(m[1]);
     }
-    assert.strictEqual(uniqueModals.size, 121, "Expected 121 unique visible controllers, got " + uniqueModals.size);
+    assert.strictEqual(uniqueModals.size, 126, "Expected 126 unique visible controllers, got " + uniqueModals.size);
     assert.ok(uniqueModals.has("modalKycSplash"), "modalKycSplash must be in unique controllers");
     assert.ok(uniqueModals.has("modalNidCameraScanner"), "modalNidCameraScanner must be in unique controllers");
     assert.ok(uniqueModals.has("modalNidInfoReview"), "modalNidInfoReview must be in unique controllers");
