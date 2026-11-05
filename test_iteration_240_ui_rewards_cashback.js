@@ -17,7 +17,7 @@
  * - Android Hardware BackHandler Safe Stacked Dismissal Sequence
  * - Touch Target Ergonomics (STANDARD_TOUCH_HIT_SLOP >= 10dp) & Haptics
  * - WCAG 2.1 AA / AAA Luminance Contrast Ratios across Light and Dark surfaces
- * - Strict Modal Count Invariant: Exactly 126 Modals, 126 onRequestClose handlers, 126 controllers
+ * - Strict Modal Count Invariant: Exactly 131 Modals, 131 onRequestClose handlers, 131 controllers
  * - Babel AST Parser Compilation & Latency Benchmark
  */
 
@@ -621,28 +621,28 @@ async function runSuite() {
   });
 
   // -----------------------------------------------------------------------------
-  // PART 12: MODAL COUNT & CONTROLLER INVARIANTS (126 MODALS)
+  // PART 12: MODAL COUNT & CONTROLLER INVARIANTS (131 MODALS)
   // -----------------------------------------------------------------------------
-  console.log("\n--- PART 12: MODAL COUNT & CONTROLLER INVARIANTS (126 MODALS) ---");
+  console.log("\n--- PART 12: MODAL COUNT & CONTROLLER INVARIANTS (131 MODALS) ---");
 
-  await runTest("12.1: App.js contains exactly 126 <Modal elements", () => {
+  await runTest("12.1: App.js contains exactly 131 <Modal elements", () => {
     const modalMatches = appSrc.match(/<Modal\b/g) || [];
-    assert.strictEqual(modalMatches.length, 126, "Expected exactly 126 modals in App.js, got " + modalMatches.length);
+    assert.strictEqual(modalMatches.length, 131, "Expected exactly 131 modals in App.js, got " + modalMatches.length);
   });
 
-  await runTest("12.2: App.js contains exactly 126 onRequestClose handlers", () => {
+  await runTest("12.2: App.js contains exactly 131 onRequestClose handlers", () => {
     const reqCloseMatches = appSrc.match(/onRequestClose\s*=\s*\{/g) || [];
-    assert.strictEqual(reqCloseMatches.length, 126, "Expected 126 onRequestClose handlers, got " + reqCloseMatches.length);
+    assert.strictEqual(reqCloseMatches.length, 131, "Expected 131 onRequestClose handlers, got " + reqCloseMatches.length);
   });
 
-  await runTest("12.3: App.js contains exactly 126 unique modal state controllers", () => {
+  await runTest("12.3: App.js contains exactly 131 unique modal state controllers", () => {
     const visibleRegex = /<Modal[\s\S]*?visible=\{([a-zA-Z0-9_]+)\}/g;
     let match;
     const uniqueModals = new Set();
     while ((match = visibleRegex.exec(appSrc)) !== null) {
       uniqueModals.add(match[1]);
     }
-    assert.strictEqual(uniqueModals.size, 126, "Expected 126 unique visible controllers, got " + uniqueModals.size);
+    assert.strictEqual(uniqueModals.size, 131, "Expected 131 unique visible controllers, got " + uniqueModals.size);
   });
 
   // -----------------------------------------------------------------------------

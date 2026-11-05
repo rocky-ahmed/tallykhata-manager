@@ -10,6 +10,7 @@
 
 const crypto = require('crypto');
 const rewardsSubsystem = require('./rewardsSubsystem');
+const analyticsSubsystem = require('./analyticsSubsystem');
 
 // -------------------------------------------------------------
 // 1. TRANSACTION LIMITS & THRESHOLDS (activity_transaction_limit.xml)
@@ -9118,6 +9119,36 @@ const merchantLoanEngine = new MerchantLoanEngine();
 const reconstructedLoanEngine = merchantLoanEngine;
 
 module.exports = {
+  // Milestone REA-ITER-241 Exports
+  ...analyticsSubsystem,
+  MERCHANT_ANALYTICS_SNAPSHOT_SCHEMA: analyticsSubsystem.MERCHANT_ANALYTICS_SNAPSHOT_SCHEMA,
+  ANALYTICS_SNAPSHOT_SCHEMA: analyticsSubsystem.ANALYTICS_SNAPSHOT_SCHEMA,
+  MERCHANT_SALES_FORECAST_SCHEMA: analyticsSubsystem.MERCHANT_SALES_FORECAST_SCHEMA,
+  SALES_FORECAST_SCHEMA: analyticsSubsystem.SALES_FORECAST_SCHEMA,
+  ANALYTICS_PERIOD_TYPES: analyticsSubsystem.ANALYTICS_PERIOD_TYPES,
+  FORECAST_MODEL_TYPES: analyticsSubsystem.FORECAST_MODEL_TYPES,
+  TREND_DIRECTIONS: analyticsSubsystem.TREND_DIRECTIONS,
+  BUSINESS_HEALTH_TIERS: analyticsSubsystem.BUSINESS_HEALTH_TIERS,
+  ANALYTICS_ARSC_TOKENS: analyticsSubsystem.ANALYTICS_ARSC_TOKENS,
+  calculateBusinessHealthScore: analyticsSubsystem.calculateBusinessHealthScore,
+  classifyHealthTier: analyticsSubsystem.classifyHealthTier,
+  calculateWeightedMovingAverage: analyticsSubsystem.calculateWeightedMovingAverage,
+  calculateExponentialSmoothing: analyticsSubsystem.calculateExponentialSmoothing,
+  calculateHoltWintersLinearTrend: analyticsSubsystem.calculateHoltWintersLinearTrend,
+  generateSalesForecast: analyticsSubsystem.generateSalesForecast,
+  calculateCustomerRankings: analyticsSubsystem.calculateCustomerRankings,
+  calculateCategoryExpenseBreakdown: analyticsSubsystem.calculateCategoryExpenseBreakdown,
+  calculateSalesMarginBreakdown: analyticsSubsystem.calculateSalesMarginBreakdown,
+  MerchantAnalyticsSnapshotRecord: analyticsSubsystem.MerchantAnalyticsSnapshotRecord,
+  MerchantSalesForecastRecord: analyticsSubsystem.MerchantSalesForecastRecord,
+  MerchantAnalyticsSnapshotDao: analyticsSubsystem.MerchantAnalyticsSnapshotDao,
+  MerchantSalesForecastDao: analyticsSubsystem.MerchantSalesForecastDao,
+  MerchantAnalyticsEngine: analyticsSubsystem.MerchantAnalyticsEngine,
+  ReconstructedAnalyticsEngine: analyticsSubsystem.ReconstructedAnalyticsEngine,
+  BusinessAnalyticsEngine: analyticsSubsystem.BusinessAnalyticsEngine,
+  merchantAnalyticsEngine: analyticsSubsystem.merchantAnalyticsEngine,
+  reconstructedAnalyticsEngine: analyticsSubsystem.reconstructedAnalyticsEngine,
+
   // Milestone REA-ITER-240 Exports
   ...rewardsSubsystem,
   MERCHANT_REWARD_SCHEMA: rewardsSubsystem.MERCHANT_REWARD_SCHEMA,

@@ -61,7 +61,7 @@ runTest('App.js contains exactly 53 unique modal state controllers', () => {
   while ((m = regex.exec(appSrc)) !== null) {
     modals.add(m[1]);
   }
-  assert.strictEqual(modals.size, 126, 'Expected exactly 126 unique modal states');
+  assert.strictEqual(modals.size, 131, 'Expected exactly 131 unique modal states');
 });
 
 runTest('Every one of the 53 Modals implements onRequestClose handler', () => {
@@ -74,7 +74,7 @@ runTest('Every one of the 53 Modals implements onRequestClose handler', () => {
     const snippet = appSrc.substring(startIdx, startIdx + 600);
     assert.ok(snippet.includes('onRequestClose'), 'Modal #' + count + ' must implement onRequestClose');
   }
-  assert.strictEqual(count, 126);
+  assert.strictEqual(count, 131);
 });
 
 console.log('\n--- PART 3: FORM USABILITY & KEYBOARD PERSISTENCE ---');

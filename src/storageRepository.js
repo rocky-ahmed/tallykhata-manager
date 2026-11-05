@@ -132,6 +132,28 @@ try {
   batchTagadaService = require('./batchTagadaService');
 } catch (e) {}
 
+let analyticsSubsystem = null;
+try {
+  analyticsSubsystem = require('./analyticsSubsystem');
+} catch (e) {}
+
+const {
+  calculateBusinessHealthScore,
+  classifyHealthTier,
+  calculateWeightedMovingAverage,
+  calculateExponentialSmoothing,
+  calculateHoltWintersLinearTrend,
+  generateSalesForecast,
+  calculateCustomerRankings,
+  calculateCategoryExpenseBreakdown,
+  calculateSalesMarginBreakdown,
+  MerchantAnalyticsSnapshotRecord,
+  MerchantSalesForecastRecord,
+  MerchantAnalyticsSnapshotDao,
+  MerchantSalesForecastDao,
+  merchantAnalyticsEngine,
+} = analyticsSubsystem || {};
+
 let billPaymentService = null;
 try {
   billPaymentService = require('./billPaymentService');
@@ -289,6 +311,8 @@ const VALID_COLLECTIONS = new Set([
   'merchantLoanEmis',
   'merchantRewards',
   'merchantRewardLedger',
+  'merchantAnalyticsSnapshots',
+  'merchantSalesForecasts',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -426,6 +450,8 @@ function sanitizeState(state) {
   if (!Array.isArray(s.merchantLoanEmis)) s.merchantLoanEmis = [];
   if (!Array.isArray(s.merchantRewards)) s.merchantRewards = [];
   if (!Array.isArray(s.merchantRewardLedger)) s.merchantRewardLedger = [];
+  if (!Array.isArray(s.merchantAnalyticsSnapshots)) s.merchantAnalyticsSnapshots = [];
+  if (!Array.isArray(s.merchantSalesForecasts)) s.merchantSalesForecasts = [];
   if (!s.soundboxConfig || typeof s.soundboxConfig !== 'object') s.soundboxConfig = {};
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
@@ -585,6 +611,8 @@ function createDefaultState() {
     merchantLoanEmis: [],
     merchantRewards: [],
     merchantRewardLedger: [],
+    merchantAnalyticsSnapshots: [],
+    merchantSalesForecasts: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1823,6 +1851,24 @@ class StorageRepository {
       authoritative.merchantRewardLedger = [];
     }
 
+    if (authoritative.merchantAnalyticsSnapshots && Array.isArray(authoritative.merchantAnalyticsSnapshots)) {
+      authoritative.merchantAnalyticsSnapshots = authoritative.merchantAnalyticsSnapshots.map((s) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = s || {};
+        return rest;
+      });
+    } else {
+      authoritative.merchantAnalyticsSnapshots = [];
+    }
+
+    if (authoritative.merchantSalesForecasts && Array.isArray(authoritative.merchantSalesForecasts)) {
+      authoritative.merchantSalesForecasts = authoritative.merchantSalesForecasts.map((f) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = f || {};
+        return rest;
+      });
+    } else {
+      authoritative.merchantSalesForecasts = [];
+    }
+
 
     if (authoritative.merchantQrOrders && Array.isArray(authoritative.merchantQrOrders)) {
       authoritative.merchantQrOrders = authoritative.merchantQrOrders.map((o) => {
@@ -2502,6 +2548,8 @@ class StorageRepository {
         const merchantLoanEmis = (prevStore.merchantLoanEmis || []).filter((e) => getBizId(e) !== targetId);
         const merchantRewards = (prevStore.merchantRewards || []).filter((r) => getBizId(r) !== targetId);
         const merchantRewardLedger = (prevStore.merchantRewardLedger || []).filter((e) => getBizId(e) !== targetId);
+        const merchantAnalyticsSnapshots = (prevStore.merchantAnalyticsSnapshots || []).filter((s) => getBizId(s) !== targetId);
+        const merchantSalesForecasts = (prevStore.merchantSalesForecasts || []).filter((f) => getBizId(f) !== targetId);
         const soundboxConfig = { ...(prevStore.soundboxConfig || {}) };
         delete soundboxConfig[targetId];
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
@@ -2604,6 +2652,8 @@ class StorageRepository {
         merchantLoanEmis,
         merchantRewards,
         merchantRewardLedger,
+        merchantAnalyticsSnapshots,
+        merchantSalesForecasts,
         soundboxConfig,
         autoDisbursementConfig,
         cashReconciliation,
@@ -2789,6 +2839,10 @@ class StorageRepository {
         const importedMerchantRewards = (data.merchantRewards || []).filter(r => String(r.businessId || r.business_id || '1') === selectedBizId);
         const keptMerchantRewardLedger = (prevStore.merchantRewardLedger || []).filter(e => String(e.businessId || e.business_id || '1') !== selectedBizId);
         const importedMerchantRewardLedger = (data.merchantRewardLedger || []).filter(e => String(e.businessId || e.business_id || '1') === selectedBizId);
+        const keptMerchantAnalyticsSnapshots = (prevStore.merchantAnalyticsSnapshots || []).filter(s => String(s.businessId || s.business_id || '1') !== selectedBizId);
+        const importedMerchantAnalyticsSnapshots = (data.merchantAnalyticsSnapshots || []).filter(s => String(s.businessId || s.business_id || '1') === selectedBizId);
+        const keptMerchantSalesForecasts = (prevStore.merchantSalesForecasts || []).filter(f => String(f.businessId || f.business_id || '1') !== selectedBizId);
+        const importedMerchantSalesForecasts = (data.merchantSalesForecasts || []).filter(f => String(f.businessId || f.business_id || '1') === selectedBizId);
         const keptQrSettlements = (prevStore.qrSettlementActions || []).filter(q => String(q.businessId || '1') !== selectedBizId);
         const keptDisbursements = (prevStore.merchantDisbursements || []).filter(d => String(d.businessId || '1') !== selectedBizId);
         const keptReconciliations = (prevStore.reconciliations || []).filter(r => String(r.businessId || '1') !== selectedBizId);
@@ -2838,6 +2892,8 @@ class StorageRepository {
           merchantLoanEmis: [...keptMerchantLoanEmis, ...importedMerchantLoanEmis],
           merchantRewards: [...keptMerchantRewards, ...importedMerchantRewards],
           merchantRewardLedger: [...keptMerchantRewardLedger, ...importedMerchantRewardLedger],
+          merchantAnalyticsSnapshots: [...keptMerchantAnalyticsSnapshots, ...importedMerchantAnalyticsSnapshots],
+          merchantSalesForecasts: [...keptMerchantSalesForecasts, ...importedMerchantSalesForecasts],
           qrSettlementActions: [...keptQrSettlements, ...importedQrSettlements],
           merchantDisbursements: [...keptDisbursements, ...importedDisbursements],
           reconciliations: [...keptReconciliations, ...importedReconciliations],
@@ -2895,6 +2951,8 @@ class StorageRepository {
         merchantLoanEmis: Array.isArray(data.merchantLoanEmis) ? data.merchantLoanEmis : [],
         merchantRewards: Array.isArray(data.merchantRewards) ? data.merchantRewards : [],
         merchantRewardLedger: Array.isArray(data.merchantRewardLedger) ? data.merchantRewardLedger : [],
+        merchantAnalyticsSnapshots: Array.isArray(data.merchantAnalyticsSnapshots) ? data.merchantAnalyticsSnapshots : [],
+        merchantSalesForecasts: Array.isArray(data.merchantSalesForecasts) ? data.merchantSalesForecasts : [],
         qrSettlementActions: Array.isArray(data.qrSettlementActions) ? data.qrSettlementActions : [],
         merchantDisbursements: Array.isArray(data.merchantDisbursements) ? data.merchantDisbursements : [],
         reconciliations: Array.isArray(data.reconciliations) ? data.reconciliations : [],
@@ -3199,6 +3257,8 @@ class StorageRepository {
           merchantLoanEmis: (fullState.merchantLoanEmis || []).length,
         merchantRewards: (fullState.merchantRewards || []).length,
         merchantRewardLedger: (fullState.merchantRewardLedger || []).length,
+          merchantAnalyticsSnapshots: (fullState.merchantAnalyticsSnapshots || []).length,
+          merchantSalesForecasts: (fullState.merchantSalesForecasts || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -9777,6 +9837,453 @@ class StorageRepository {
     }
 
 
+
+    // ============================================================================
+    // REA-ITER-241: BUSINESS HEALTH ANALYTICS & REVENUE FORECASTING METHODS
+    // ============================================================================
+
+    /**
+     * REA-ITER-241: Saves or updates an analytics snapshot for a business.
+     * Idempotent by snapshot_id or business_id + period_key.
+     */
+    async saveAnalyticsSnapshot(businessId = null, snapshotData = {}) {
+      if (!snapshotData || typeof snapshotData !== 'object') {
+        return { success: false, error: 'INVALID_SNAPSHOT_DATA' };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || snapshotData.business_id || snapshotData.businessId || store.activeBusinessId || '1');
+      const snapshotId = String(snapshotData.snapshot_id || snapshotData.snapshotId || ('TK-SNAP-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000)));
+      const periodKey = String(snapshotData.period_key || snapshotData.periodKey || '');
+
+      const entry = {
+        ...snapshotData,
+        id: snapshotData.id || ('SNAP_' + Date.now() + '_' + Math.floor(Math.random() * 1000)),
+        snapshot_id: snapshotId,
+        snapshotId: snapshotId,
+        business_id: targetBizId,
+        businessId: targetBizId,
+        period_type: snapshotData.period_type || snapshotData.periodType || 'MONTHLY',
+        periodType: snapshotData.period_type || snapshotData.periodType || 'MONTHLY',
+        period_key: periodKey,
+        periodKey: periodKey,
+        total_sales_paisa: Math.max(0, Math.floor(Number(snapshotData.total_sales_paisa !== undefined ? snapshotData.total_sales_paisa : (snapshotData.totalSalesPaisa || 0)))),
+        totalSalesPaisa: Math.max(0, Math.floor(Number(snapshotData.total_sales_paisa !== undefined ? snapshotData.total_sales_paisa : (snapshotData.totalSalesPaisa || 0)))),
+        total_expense_paisa: Math.max(0, Math.floor(Number(snapshotData.total_expense_paisa !== undefined ? snapshotData.total_expense_paisa : (snapshotData.totalExpensePaisa || 0)))),
+        totalExpensePaisa: Math.max(0, Math.floor(Number(snapshotData.total_expense_paisa !== undefined ? snapshotData.total_expense_paisa : (snapshotData.totalExpensePaisa || 0)))),
+        net_profit_paisa: Math.floor(Number(snapshotData.net_profit_paisa !== undefined ? snapshotData.net_profit_paisa : (snapshotData.netProfitPaisa !== undefined ? snapshotData.netProfitPaisa : ((snapshotData.total_sales_paisa || 0) - (snapshotData.total_expense_paisa || 0))))),
+        netProfitPaisa: Math.floor(Number(snapshotData.net_profit_paisa !== undefined ? snapshotData.net_profit_paisa : (snapshotData.netProfitPaisa !== undefined ? snapshotData.netProfitPaisa : ((snapshotData.total_sales_paisa || 0) - (snapshotData.total_expense_paisa || 0))))),
+        digital_inflow_paisa: Math.max(0, Math.floor(Number(snapshotData.digital_inflow_paisa !== undefined ? snapshotData.digital_inflow_paisa : (snapshotData.digitalInflowPaisa || 0)))),
+        digitalInflowPaisa: Math.max(0, Math.floor(Number(snapshotData.digital_inflow_paisa !== undefined ? snapshotData.digital_inflow_paisa : (snapshotData.digitalInflowPaisa || 0)))),
+        cash_inflow_paisa: Math.max(0, Math.floor(Number(snapshotData.cash_inflow_paisa !== undefined ? snapshotData.cash_inflow_paisa : (snapshotData.cashInflowPaisa || 0)))),
+        cashInflowPaisa: Math.max(0, Math.floor(Number(snapshotData.cash_inflow_paisa !== undefined ? snapshotData.cash_inflow_paisa : (snapshotData.cashInflowPaisa || 0)))),
+        customer_count: Math.max(0, Math.floor(Number(snapshotData.customer_count !== undefined ? snapshotData.customer_count : (snapshotData.customerCount || 0)))),
+        customerCount: Math.max(0, Math.floor(Number(snapshotData.customer_count !== undefined ? snapshotData.customer_count : (snapshotData.customerCount || 0)))),
+        health_score: Math.max(0, Math.min(100, Math.floor(Number(snapshotData.health_score !== undefined ? snapshotData.health_score : (snapshotData.healthScore || 0))))),
+        healthScore: Math.max(0, Math.min(100, Math.floor(Number(snapshotData.health_score !== undefined ? snapshotData.health_score : (snapshotData.healthScore || 0))))),
+        created_at: snapshotData.created_at || snapshotData.createdAt || new Date().toISOString(),
+        createdAt: snapshotData.created_at || snapshotData.createdAt || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        synced: snapshotData.synced !== undefined ? Number(snapshotData.synced) : 0,
+      };
+
+      let saved = null;
+      await this.mutateCollection('merchantAnalyticsSnapshots', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((s) => {
+          if (String(s.snapshot_id || s.snapshotId) === snapshotId) return true;
+          if (periodKey && String(s.business_id || s.businessId) === targetBizId && String(s.period_key || s.periodKey) === periodKey) return true;
+          return false;
+        });
+
+        if (idx >= 0) {
+          const prev = list[idx];
+          const merged = {
+            ...prev,
+            ...entry,
+            id: prev.id || entry.id,
+            snapshot_id: prev.snapshot_id || entry.snapshot_id,
+            snapshotId: prev.snapshotId || entry.snapshotId,
+            created_at: prev.created_at || entry.created_at,
+            createdAt: prev.createdAt || entry.createdAt,
+            updated_at: new Date().toISOString(),
+          };
+          list[idx] = merged;
+          saved = { ...merged };
+        } else {
+          list.push(entry);
+          saved = { ...entry };
+        }
+        return list;
+      });
+
+      return { success: true, snapshot: saved };
+    }
+
+    /**
+     * REA-ITER-241: Gets analytics snapshots for a business.
+     */
+    getAnalyticsSnapshots(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      let list = Array.isArray(store.merchantAnalyticsSnapshots) ? [...store.merchantAnalyticsSnapshots] : [];
+
+      if (targetBizId) {
+        list = list.filter((s) => String(s.business_id || s.businessId || '1') === targetBizId);
+      }
+      if (options.periodType || options.period_type) {
+        const pType = String(options.periodType || options.period_type);
+        list = list.filter((s) => String(s.period_type || s.periodType) === pType);
+      }
+      if (options.periodKey || options.period_key) {
+        const pKey = String(options.periodKey || options.period_key);
+        list = list.filter((s) => String(s.period_key || s.periodKey) === pKey);
+      }
+
+      list.sort((a, b) => new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime());
+
+      if (options.offset || options.limit) {
+        const offset = Number(options.offset) || 0;
+        const limit = Number(options.limit) || list.length;
+        list = list.slice(offset, offset + limit);
+      }
+
+      return list.map((s) => ({ ...s }));
+    }
+
+    /**
+     * REA-ITER-241: Gets analytics snapshot by period key.
+     */
+    getAnalyticsSnapshotByKey(businessId = null, periodKey = '') {
+      if (!periodKey) return null;
+      const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+      const store = this.currentStore || {};
+      const list = Array.isArray(store.merchantAnalyticsSnapshots) ? store.merchantAnalyticsSnapshots : [];
+      const match = list.find((s) => String(s.business_id || s.businessId || '1') === targetBizId && String(s.period_key || s.periodKey) === String(periodKey));
+      return match ? { ...match } : null;
+    }
+
+    /**
+     * REA-ITER-241: Deletes an analytics snapshot.
+     */
+    async deleteAnalyticsSnapshot(businessId = null, snapshotId = null) {
+      if (!snapshotId) return { success: false, error: 'MISSING_SNAPSHOT_ID' };
+      const targetBizId = businessId ? String(businessId) : null;
+      let deleted = false;
+      await this.mutateCollection('merchantAnalyticsSnapshots', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((s) => {
+          const matchId = String(s.snapshot_id || s.snapshotId || s.id) === String(snapshotId);
+          if (!matchId) return false;
+          if (targetBizId) {
+            return String(s.business_id || s.businessId || '1') === targetBizId;
+          }
+          return true;
+        });
+        if (idx >= 0) {
+          list.splice(idx, 1);
+          deleted = true;
+        }
+        return list;
+      });
+      return { success: deleted };
+    }
+
+    /**
+     * REA-ITER-241: Gets unsynced analytics snapshots.
+     */
+    getUnsyncedAnalyticsSnapshots(businessId = null, limit = 50) {
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      let list = (store.merchantAnalyticsSnapshots || []).filter((s) => Number(s.synced) === 0);
+      if (targetBizId) {
+        list = list.filter((s) => String(s.business_id || s.businessId || '1') === targetBizId);
+      }
+      return list.slice(0, limit).map((s) => ({ ...s }));
+    }
+
+    /**
+     * REA-ITER-241: Updates sync status of analytics snapshots.
+     */
+    async updateAnalyticsSnapshotSyncStatus(businessId = null, ids = [], synced = 1) {
+      const idSet = new Set((ids || []).map(String));
+      const targetBizId = businessId ? String(businessId) : null;
+      let updated = 0;
+      await this.mutateCollection('merchantAnalyticsSnapshots', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        for (const s of list) {
+          if (targetBizId && String(s.business_id || s.businessId || '1') !== targetBizId) continue;
+          if (idSet.has(String(s.id)) || idSet.has(String(s.snapshot_id || s.snapshotId))) {
+            s.synced = Number(synced);
+            updated++;
+          }
+        }
+        return list;
+      });
+      return updated;
+    }
+
+    /**
+     * REA-ITER-241: Saves or updates a sales revenue forecast.
+     * Idempotent by forecast_id or business_id + forecast_period.
+     */
+    async saveSalesForecast(businessId = null, forecastData = {}) {
+      if (!forecastData || typeof forecastData !== 'object') {
+        return { success: false, error: 'INVALID_FORECAST_DATA' };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || forecastData.business_id || forecastData.businessId || store.activeBusinessId || '1');
+      const forecastId = String(forecastData.forecast_id || forecastData.forecastId || ('TK-FCST-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000)));
+      const forecastPeriod = String(forecastData.forecast_period || forecastData.forecastPeriod || 'NEXT_30_DAYS');
+
+      const entry = {
+        ...forecastData,
+        id: forecastData.id || ('FCST_' + Date.now() + '_' + Math.floor(Math.random() * 1000)),
+        forecast_id: forecastId,
+        forecastId: forecastId,
+        business_id: targetBizId,
+        businessId: targetBizId,
+        forecast_period: forecastPeriod,
+        forecastPeriod: forecastPeriod,
+        predicted_revenue_paisa: Math.max(0, Math.floor(Number(forecastData.predicted_revenue_paisa !== undefined ? forecastData.predicted_revenue_paisa : (forecastData.predictedRevenuePaisa || 0)))),
+        predictedRevenuePaisa: Math.max(0, Math.floor(Number(forecastData.predicted_revenue_paisa !== undefined ? forecastData.predicted_revenue_paisa : (forecastData.predictedRevenuePaisa || 0)))),
+        confidence_score_bps: Math.max(0, Math.min(10000, Math.floor(Number(forecastData.confidence_score_bps !== undefined ? forecastData.confidence_score_bps : (forecastData.confidenceScoreBps || 0))))),
+        confidenceScoreBps: Math.max(0, Math.min(10000, Math.floor(Number(forecastData.confidence_score_bps !== undefined ? forecastData.confidence_score_bps : (forecastData.confidenceScoreBps || 0))))),
+        trend_direction: forecastData.trend_direction || forecastData.trendDirection || 'STABLE',
+        trendDirection: forecastData.trend_direction || forecastData.trendDirection || 'STABLE',
+        growth_rate_bps: Math.floor(Number(forecastData.growth_rate_bps !== undefined ? forecastData.growth_rate_bps : (forecastData.growthRateBps || 0))),
+        growthRateBps: Math.floor(Number(forecastData.growth_rate_bps !== undefined ? forecastData.growth_rate_bps : (forecastData.growthRateBps || 0))),
+        model_type: forecastData.model_type || forecastData.modelType || 'LINEAR_TREND',
+        modelType: forecastData.model_type || forecastData.modelType || 'LINEAR_TREND',
+        created_at: forecastData.created_at || forecastData.createdAt || new Date().toISOString(),
+        createdAt: forecastData.created_at || forecastData.createdAt || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        synced: forecastData.synced !== undefined ? Number(forecastData.synced) : 0,
+      };
+
+      let saved = null;
+      await this.mutateCollection('merchantSalesForecasts', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((f) => {
+          if (String(f.forecast_id || f.forecastId) === forecastId) return true;
+          if (forecastPeriod && String(f.business_id || f.businessId) === targetBizId && String(f.forecast_period || f.forecastPeriod) === forecastPeriod) return true;
+          return false;
+        });
+
+        if (idx >= 0) {
+          const prev = list[idx];
+          const merged = {
+            ...prev,
+            ...entry,
+            id: prev.id || entry.id,
+            forecast_id: prev.forecast_id || entry.forecast_id,
+            forecastId: prev.forecastId || entry.forecastId,
+            created_at: prev.created_at || entry.created_at,
+            createdAt: prev.createdAt || entry.createdAt,
+            updated_at: new Date().toISOString(),
+          };
+          list[idx] = merged;
+          saved = { ...merged };
+        } else {
+          list.push(entry);
+          saved = { ...entry };
+        }
+        return list;
+      });
+
+      return { success: true, forecast: saved };
+    }
+
+    /**
+     * REA-ITER-241: Gets sales forecasts for a business.
+     */
+    getSalesForecasts(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      let list = Array.isArray(store.merchantSalesForecasts) ? [...store.merchantSalesForecasts] : [];
+
+      if (targetBizId) {
+        list = list.filter((f) => String(f.business_id || f.businessId || '1') === targetBizId);
+      }
+      if (options.forecastPeriod || options.forecast_period) {
+        const p = String(options.forecastPeriod || options.forecast_period);
+        list = list.filter((f) => String(f.forecast_period || f.forecastPeriod) === p);
+      }
+      if (options.modelType || options.model_type) {
+        const m = String(options.modelType || options.model_type);
+        list = list.filter((f) => String(f.model_type || f.modelType) === m);
+      }
+
+      list.sort((a, b) => new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime());
+
+      if (options.offset || options.limit) {
+        const offset = Number(options.offset) || 0;
+        const limit = Number(options.limit) || list.length;
+        list = list.slice(offset, offset + limit);
+      }
+
+      return list.map((f) => ({ ...f }));
+    }
+
+    /**
+     * REA-ITER-241: Gets the latest sales forecast for a business.
+     */
+    getLatestSalesForecast(businessId = null) {
+      const forecasts = this.getSalesForecasts(businessId);
+      return forecasts.length > 0 ? { ...forecasts[0] } : null;
+    }
+
+    /**
+     * REA-ITER-241: Deletes a sales forecast.
+     */
+    async deleteSalesForecast(businessId = null, forecastId = null) {
+      if (!forecastId) return { success: false, error: 'MISSING_FORECAST_ID' };
+      const targetBizId = businessId ? String(businessId) : null;
+      let deleted = false;
+      await this.mutateCollection('merchantSalesForecasts', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((f) => {
+          const matchId = String(f.forecast_id || f.forecastId || f.id) === String(forecastId);
+          if (!matchId) return false;
+          if (targetBizId) {
+            return String(f.business_id || f.businessId || '1') === targetBizId;
+          }
+          return true;
+        });
+        if (idx >= 0) {
+          list.splice(idx, 1);
+          deleted = true;
+        }
+        return list;
+      });
+      return { success: deleted };
+    }
+
+    /**
+     * REA-ITER-241: Gets unsynced sales forecasts.
+     */
+    getUnsyncedSalesForecasts(businessId = null, limit = 50) {
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      let list = (store.merchantSalesForecasts || []).filter((f) => Number(f.synced) === 0);
+      if (targetBizId) {
+        list = list.filter((f) => String(f.business_id || f.businessId || '1') === targetBizId);
+      }
+      return list.slice(0, limit).map((f) => ({ ...f }));
+    }
+
+    /**
+     * REA-ITER-241: Updates sync status of sales forecasts.
+     */
+    async updateSalesForecastSyncStatus(businessId = null, ids = [], synced = 1) {
+      const idSet = new Set((ids || []).map(String));
+      const targetBizId = businessId ? String(businessId) : null;
+      let updated = 0;
+      await this.mutateCollection('merchantSalesForecasts', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        for (const f of list) {
+          if (targetBizId && String(f.business_id || f.businessId || '1') !== targetBizId) continue;
+          if (idSet.has(String(f.id)) || idSet.has(String(f.forecast_id || f.forecastId))) {
+            f.synced = Number(synced);
+            updated++;
+          }
+        }
+        return list;
+      });
+      return updated;
+    }
+
+    /**
+     * REA-ITER-241: Computes business health metrics from store or input parameters.
+     */
+    computeBusinessHealthMetrics(businessId = null, options = {}) {
+      const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+      const store = this.currentStore || {};
+
+      // If explicit metrics provided, compute directly
+      if (options && typeof options === 'object' && (options.totalSalesPaisa !== undefined || options.salesPaisa !== undefined)) {
+        const calcFn = calculateBusinessHealthScore || (analyticsSubsystem && analyticsSubsystem.calculateBusinessHealthScore);
+        if (typeof calcFn === 'function') {
+          return calcFn(options);
+        }
+      }
+
+      // Aggregate from store for targetBizId
+      const journals = (store.journals || []).filter((j) => String(j.businessId || j.business_id || '1') === targetBizId);
+      const accounts = (store.accounts || []).filter((a) => String(a.businessId || a.business_id || '1') === targetBizId);
+      const cashEntries = (store.cashEntries || []).filter((c) => String(c.businessId || c.business_id || '1') === targetBizId);
+      const digitalTxns = (store.tallyPayTransactions || []).filter((t) => String(t.businessId || t.business_id || '1') === targetBizId);
+
+      let totalSalesPaisa = 0;
+      let totalExpensePaisa = 0;
+      let creditGivenPaisa = 0;
+      let creditCollectedPaisa = 0;
+
+      for (const j of journals) {
+        const amountPaisa = Number(j.amountPaisa !== undefined ? j.amountPaisa : (Number(j.amount || 0) * 100)) || 0;
+        const type = String(j.type || j.journalType || '').toUpperCase();
+        if (type === 'SALE' || type === 'CREDIT_SALE') {
+          totalSalesPaisa += amountPaisa;
+        }
+        if (type === 'CREDIT_SALE' || type === 'DILAM') {
+          creditGivenPaisa += amountPaisa;
+        }
+        if (type === 'CREDIT_COLLECTION' || type === 'PELAM') {
+          creditCollectedPaisa += amountPaisa;
+        }
+        if (type === 'EXPENSE') {
+          totalExpensePaisa += amountPaisa;
+        }
+      }
+
+      let cashInflowPaisa = 0;
+      for (const c of cashEntries) {
+        const amountPaisa = Number(c.amountPaisa !== undefined ? c.amountPaisa : (Number(c.amount || 0) * 100)) || 0;
+        const type = String(c.type || '').toUpperCase();
+        if (type === 'CASH_IN') {
+          cashInflowPaisa += amountPaisa;
+          if (c.tag === 'SALE' || c.category === 'SALE') {
+            totalSalesPaisa += amountPaisa;
+          }
+        } else if (type === 'CASH_OUT') {
+          totalExpensePaisa += amountPaisa;
+        }
+      }
+
+      let digitalInflowPaisa = 0;
+      for (const t of digitalTxns) {
+        const amountPaisa = Number(t.amountPaisa !== undefined ? t.amountPaisa : (Number(t.amount || 0) * 100)) || 0;
+        if (t.balanceChangeType === 'CREDIT' || t.direction === 'INCOMING') {
+          digitalInflowPaisa += amountPaisa;
+        }
+      }
+
+      const customers = accounts.filter((a) => !a.type || String(a.type).toUpperCase() === 'CUSTOMER');
+      const totalCustomers = customers.length;
+      const customerIdsWithTxn = new Set(journals.map((j) => String(j.accountId || j.account_id || '')));
+      const activeCustomers = customers.filter((c) => customerIdsWithTxn.has(String(c.id || c.accountId))).length;
+
+      const calcFn = calculateBusinessHealthScore || (analyticsSubsystem && analyticsSubsystem.calculateBusinessHealthScore);
+      if (typeof calcFn === 'function') {
+        return calcFn({
+          totalSalesPaisa,
+          totalExpensePaisa,
+          digitalInflowPaisa,
+          cashInflowPaisa,
+          creditGivenPaisa,
+          creditCollectedPaisa,
+          totalCustomers,
+          activeCustomers,
+        });
+      }
+
+      return {
+        healthScore: 75,
+        tier: { code: 'GOOD', labelBn: 'ভালো' },
+        pillars: {}
+      };
+    }
+
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -11476,6 +11983,98 @@ async function deleteCardRepo(businessId = null, cardId = null, repo = defaultRe
 }
 
 
+
+async function saveAnalyticsSnapshotRepo(businessId = null, snapshotData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveAnalyticsSnapshot === 'function') {
+    return repo.saveAnalyticsSnapshot(businessId, snapshotData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getAnalyticsSnapshotsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getAnalyticsSnapshots === 'function') {
+    return repo.getAnalyticsSnapshots(businessId, options);
+  }
+  return [];
+}
+
+function getAnalyticsSnapshotByKeyRepo(businessId = null, periodKey = '', repo = defaultRepository) {
+  if (repo && typeof repo.getAnalyticsSnapshotByKey === 'function') {
+    return repo.getAnalyticsSnapshotByKey(businessId, periodKey);
+  }
+  return null;
+}
+
+async function deleteAnalyticsSnapshotRepo(businessId = null, snapshotId = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteAnalyticsSnapshot === 'function') {
+    return repo.deleteAnalyticsSnapshot(businessId, snapshotId);
+  }
+  return { success: false };
+}
+
+function getUnsyncedAnalyticsSnapshotsRepo(businessId = null, limit = 50, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedAnalyticsSnapshots === 'function') {
+    return repo.getUnsyncedAnalyticsSnapshots(businessId, limit);
+  }
+  return [];
+}
+
+async function updateAnalyticsSnapshotSyncStatusRepo(businessId = null, ids = [], synced = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateAnalyticsSnapshotSyncStatus === 'function') {
+    return repo.updateAnalyticsSnapshotSyncStatus(businessId, ids, synced);
+  }
+  return 0;
+}
+
+async function saveSalesForecastRepo(businessId = null, forecastData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveSalesForecast === 'function') {
+    return repo.saveSalesForecast(businessId, forecastData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getSalesForecastsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getSalesForecasts === 'function') {
+    return repo.getSalesForecasts(businessId, options);
+  }
+  return [];
+}
+
+function getLatestSalesForecastRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getLatestSalesForecast === 'function') {
+    return repo.getLatestSalesForecast(businessId);
+  }
+  return null;
+}
+
+async function deleteSalesForecastRepo(businessId = null, forecastId = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteSalesForecast === 'function') {
+    return repo.deleteSalesForecast(businessId, forecastId);
+  }
+  return { success: false };
+}
+
+function getUnsyncedSalesForecastsRepo(businessId = null, limit = 50, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedSalesForecasts === 'function') {
+    return repo.getUnsyncedSalesForecasts(businessId, limit);
+  }
+  return [];
+}
+
+async function updateSalesForecastSyncStatusRepo(businessId = null, ids = [], synced = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateSalesForecastSyncStatus === 'function') {
+    return repo.updateSalesForecastSyncStatus(businessId, ids, synced);
+  }
+  return 0;
+}
+
+function computeBusinessHealthMetricsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.computeBusinessHealthMetrics === 'function') {
+    return repo.computeBusinessHealthMetrics(businessId, options);
+  }
+  return { healthScore: 0, tier: { code: 'AT_RISK' } };
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -11702,6 +12301,20 @@ const repoExport = {
   redeemPointsToWallet: redeemPointsToWalletRepo,
   getUnsyncedRewardLedgerEntries: getUnsyncedRewardLedgerEntriesRepo,
   updateRewardLedgerSyncStatus: updateRewardLedgerSyncStatusRepo,
+  saveAnalyticsSnapshot: saveAnalyticsSnapshotRepo,
+  getAnalyticsSnapshots: getAnalyticsSnapshotsRepo,
+  getAnalyticsSnapshotByKey: getAnalyticsSnapshotByKeyRepo,
+  deleteAnalyticsSnapshot: deleteAnalyticsSnapshotRepo,
+  getUnsyncedAnalyticsSnapshots: getUnsyncedAnalyticsSnapshotsRepo,
+  updateAnalyticsSnapshotSyncStatus: updateAnalyticsSnapshotSyncStatusRepo,
+  saveSalesForecast: saveSalesForecastRepo,
+  getSalesForecasts: getSalesForecastsRepo,
+  getLatestSalesForecast: getLatestSalesForecastRepo,
+  deleteSalesForecast: deleteSalesForecastRepo,
+  getUnsyncedSalesForecasts: getUnsyncedSalesForecastsRepo,
+  updateSalesForecastSyncStatus: updateSalesForecastSyncStatusRepo,
+  computeBusinessHealthMetrics: computeBusinessHealthMetricsRepo,
+  analyticsSubsystem: analyticsSubsystem,
   saveRechargeRecord: saveRechargeRecordRepo,
   getRechargeHistory: getRechargeHistoryRepo,
   getRechargeById: getRechargeByIdRepo,
@@ -11939,6 +12552,20 @@ if (typeof exports !== 'undefined') {
   exports.redeemPointsToWallet = redeemPointsToWalletRepo;
   exports.getUnsyncedRewardLedgerEntries = getUnsyncedRewardLedgerEntriesRepo;
   exports.updateRewardLedgerSyncStatus = updateRewardLedgerSyncStatusRepo;
+  exports.saveAnalyticsSnapshot = saveAnalyticsSnapshotRepo;
+  exports.getAnalyticsSnapshots = getAnalyticsSnapshotsRepo;
+  exports.getAnalyticsSnapshotByKey = getAnalyticsSnapshotByKeyRepo;
+  exports.deleteAnalyticsSnapshot = deleteAnalyticsSnapshotRepo;
+  exports.getUnsyncedAnalyticsSnapshots = getUnsyncedAnalyticsSnapshotsRepo;
+  exports.updateAnalyticsSnapshotSyncStatus = updateAnalyticsSnapshotSyncStatusRepo;
+  exports.saveSalesForecast = saveSalesForecastRepo;
+  exports.getSalesForecasts = getSalesForecastsRepo;
+  exports.getLatestSalesForecast = getLatestSalesForecastRepo;
+  exports.deleteSalesForecast = deleteSalesForecastRepo;
+  exports.getUnsyncedSalesForecasts = getUnsyncedSalesForecastsRepo;
+  exports.updateSalesForecastSyncStatus = updateSalesForecastSyncStatusRepo;
+  exports.computeBusinessHealthMetrics = computeBusinessHealthMetricsRepo;
+  exports.analyticsSubsystem = analyticsSubsystem;
   exports.saveRechargeRecord = saveRechargeRecordRepo;
   exports.getRechargeHistory = getRechargeHistoryRepo;
   exports.getRechargeById = getRechargeByIdRepo;

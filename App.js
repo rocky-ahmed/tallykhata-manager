@@ -1394,6 +1394,49 @@ function TallyKhataApp() {
     { id: 'CB-205', date: '১৫ অক্টোবর ২০২৬', ref: 'মার্চেন্ট সেলস বোনাস', type: 'QR', amount: 85 },
   ]);
 
+  // --- REA-ITER-241: TallyPay Merchant Business Health Analytics, Revenue Forecasting & Dynamic Insights Subsystem ---
+  const [modalBusinessHealthDashboard, setModalBusinessHealthDashboard] = useState(false);
+  const [modalRevenueForecastChart, setModalRevenueForecastChart] = useState(false);
+  const [modalTopCustomersAnalytics, setModalTopCustomersAnalytics] = useState(false);
+  const [modalExpenseCategoryBreakdown, setModalExpenseCategoryBreakdown] = useState(false);
+  const [modalBusinessHealthActionPlan, setModalBusinessHealthActionPlan] = useState(false);
+
+  const [businessHealthScore, setBusinessHealthScore] = useState(86);
+  const [businessHealthRating, setBusinessHealthRating] = useState('EXCELLENT');
+  const [businessNetProfit, setBusinessNetProfit] = useState(48500);
+  const [businessTurnover, setBusinessTurnover] = useState(285000);
+  const [businessCollectionRate, setBusinessCollectionRate] = useState(92);
+  const [businessPeriodFilter, setBusinessPeriodFilter] = useState('MONTHLY');
+  const [revenueForecastDays, setRevenueForecastDays] = useState(30);
+  const [projectedRevenueAmount, setProjectedRevenueAmount] = useState(345000);
+  const [forecastGrowthRate, setForecastGrowthRate] = useState(12.5);
+  const [forecastTrend, setForecastTrend] = useState('UP');
+  const [forecastConfidenceScore, setForecastConfidenceScore] = useState(94);
+  const [actionPlanAppliedToast, setActionPlanAppliedToast] = useState(false);
+
+  const [topCustomersList, setTopCustomersList] = useState([
+    { id: 'CUST-01', name: 'করিম স্টোর', phone: '01711000111', rank: 1, volume: 85000, velocity: 'FAST', due: 0, isVip: true },
+    { id: 'CUST-02', name: 'রহিম ব্রাদার্স', phone: '01812000222', rank: 2, volume: 62000, velocity: 'FAST', due: 2500, isVip: true },
+    { id: 'CUST-03', name: 'সজীব ট্রেডার্স', phone: '01913000333', rank: 3, volume: 44000, velocity: 'NORMAL', due: 6000, isVip: false },
+    { id: 'CUST-04', name: 'আকাশ ভ্যারাইটিজ', phone: '01514000444', rank: 4, volume: 32000, velocity: 'FAST', due: 1200, isVip: false },
+    { id: 'CUST-05', name: 'আলমগীর এন্টারপ্রাইজ', phone: '01615000555', rank: 5, volume: 28000, velocity: 'SLOW', due: 15000, isVip: false },
+  ]);
+
+  const [expenseCategoriesList, setExpenseCategoriesList] = useState([
+    { id: 'EXP-01', nameKey: 'category_inventory', label: 'পণ্য ক্রয় ও স্টক', amount: 125000, percentage: 65, color: '#0D6E5C' },
+    { id: 'EXP-02', nameKey: 'category_rent', label: 'দোকান ভাড়া', amount: 25000, percentage: 13, color: '#2563EB' },
+    { id: 'EXP-03', nameKey: 'category_salaries', label: 'কর্মচারী বেতন', amount: 20000, percentage: 10, color: '#D97706' },
+    { id: 'EXP-04', nameKey: 'category_utilities', label: 'বিদ্যুৎ ও বিল', amount: 12000, percentage: 7, color: '#9333EA' },
+    { id: 'EXP-05', nameKey: 'category_transport', label: 'পরিবহন ও যাতায়াত', amount: 9500, percentage: 5, color: '#DC2626' },
+  ]);
+
+  const [businessActionSteps, setBusinessActionSteps] = useState([
+    { id: 'ACT-01', titleKey: 'action_step_dues_recovery', descKey: 'action_step_dues_recovery_desc', isCompleted: false, priority: 'HIGH' },
+    { id: 'ACT-02', titleKey: 'action_step_stock_optimize', descKey: 'action_step_stock_optimize_desc', isCompleted: false, priority: 'MEDIUM' },
+    { id: 'ACT-03', titleKey: 'action_step_expense_control', descKey: 'action_step_expense_control_desc', isCompleted: false, priority: 'MEDIUM' },
+    { id: 'ACT-04', titleKey: 'action_step_cash_incentive', descKey: 'action_step_cash_incentive_desc', isCompleted: false, priority: 'LOW' },
+  ]);
+
 
   const [kycNidSide, setKycNidSide] = useState('FRONT');
   const [kycFlashOn, setKycFlashOn] = useState(false);
@@ -2773,6 +2816,37 @@ function TallyKhataApp() {
         return true;
       }
       // Iteration 239: Merchant Digital Micro-Loan & Credit Scoring BackHandler
+      // Iteration 241: Merchant Business Health Analytics & Forecasting BackHandler
+      if (modalRevenueForecastChart) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalRevenueForecastChart(false);
+        setModalBusinessHealthDashboard(true);
+        return true;
+      }
+      if (modalTopCustomersAnalytics) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalTopCustomersAnalytics(false);
+        setModalBusinessHealthDashboard(true);
+        return true;
+      }
+      if (modalExpenseCategoryBreakdown) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalExpenseCategoryBreakdown(false);
+        setModalBusinessHealthDashboard(true);
+        return true;
+      }
+      if (modalBusinessHealthActionPlan) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalBusinessHealthActionPlan(false);
+        setModalBusinessHealthDashboard(true);
+        return true;
+      }
+      if (modalBusinessHealthDashboard) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalBusinessHealthDashboard(false);
+        return true;
+      }
+
       // Iteration 240: Merchant Rewards, Scratch Cards & Cashback BackHandler
       if (modalScratchCard) {
         try { hapticFeedbackService.selection(); } catch (e) {}
@@ -3114,7 +3188,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalKycSplash, modalNidCameraScanner, modalNidInfoReview, modalLivenessSelfie, modalKycStatusResult, modalQrOrderCatalog, modalQrStandeePreview, modalDeliveryAddress, modalOrderPaymentCheckout, modalOrderTracking, modalLoanEligibility, modalLoanApplication, modalLoanBreakdownTerms, modalLoanEmiSchedule, modalLoanRepayment, modalRewardsHub, modalScratchCard, modalCashbackHistory, modalPointsRedeem, modalRewardTierDetails, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalKycSplash, modalNidCameraScanner, modalNidInfoReview, modalLivenessSelfie, modalKycStatusResult, modalQrOrderCatalog, modalQrStandeePreview, modalDeliveryAddress, modalOrderPaymentCheckout, modalOrderTracking, modalLoanEligibility, modalLoanApplication, modalLoanBreakdownTerms, modalLoanEmiSchedule, modalLoanRepayment, modalRewardsHub, modalScratchCard, modalCashbackHistory, modalPointsRedeem, modalRewardTierDetails, modalBusinessHealthDashboard, modalRevenueForecastChart, modalTopCustomersAnalytics, modalExpenseCategoryBreakdown, modalBusinessHealthActionPlan, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -7150,6 +7224,48 @@ function TallyKhataApp() {
   };
 
   // =========================================================================
+  // REA-ITER-241: BUSINESS HEALTH ANALYTICS & FORECASTING HANDLERS
+  // =========================================================================
+  const handleOpenBusinessHealthDashboard = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalBusinessHealthDashboard(true);
+  };
+
+  const handleOpenRevenueForecast = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalBusinessHealthDashboard(false);
+    setModalRevenueForecastChart(true);
+  };
+
+  const handleOpenTopCustomers = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalBusinessHealthDashboard(false);
+    setModalTopCustomersAnalytics(true);
+  };
+
+  const handleOpenExpenseBreakdown = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalBusinessHealthDashboard(false);
+    setModalExpenseCategoryBreakdown(true);
+  };
+
+  const handleOpenActionPlan = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalBusinessHealthDashboard(false);
+    setModalBusinessHealthActionPlan(true);
+  };
+
+  const handleToggleActionStep = (stepId) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setBusinessActionSteps(prev => prev.map(s => s.id === stepId ? { ...s, isCompleted: !s.isCompleted } : s));
+  };
+
+  const handleApplyActionPlan = () => {
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    setActionPlanAppliedToast(true);
+  };
+
+  // =========================================================================
   // QR STANDEE ORDER & COLLATERAL DELIVERY HANDLERS (Iteration 238)
   // =========================================================================
   const QR_STANDEE_CATALOG = [
@@ -8673,7 +8789,57 @@ function TallyKhataApp() {
       tallyPayService,
     };
 
-            global.__REWARDS_CASHBACK_TEST_HOOKS__ = {
+            global.__BUSINESS_ANALYTICS_TEST_HOOKS__ = {
+      modalBusinessHealthDashboard,
+      setModalBusinessHealthDashboard,
+      modalRevenueForecastChart,
+      setModalRevenueForecastChart,
+      modalTopCustomersAnalytics,
+      setModalTopCustomersAnalytics,
+      modalExpenseCategoryBreakdown,
+      setModalExpenseCategoryBreakdown,
+      modalBusinessHealthActionPlan,
+      setModalBusinessHealthActionPlan,
+      businessHealthScore,
+      setBusinessHealthScore,
+      businessHealthRating,
+      setBusinessHealthRating,
+      businessNetProfit,
+      setBusinessNetProfit,
+      businessTurnover,
+      setBusinessTurnover,
+      businessCollectionRate,
+      setBusinessCollectionRate,
+      businessPeriodFilter,
+      setBusinessPeriodFilter,
+      revenueForecastDays,
+      setRevenueForecastDays,
+      projectedRevenueAmount,
+      setProjectedRevenueAmount,
+      forecastGrowthRate,
+      setForecastGrowthRate,
+      forecastTrend,
+      setForecastTrend,
+      forecastConfidenceScore,
+      setForecastConfidenceScore,
+      topCustomersList,
+      setTopCustomersList,
+      expenseCategoriesList,
+      setExpenseCategoriesList,
+      businessActionSteps,
+      setBusinessActionSteps,
+      actionPlanAppliedToast,
+      setActionPlanAppliedToast,
+      handleOpenBusinessHealthDashboard,
+      handleOpenRevenueForecast,
+      handleOpenTopCustomers,
+      handleOpenExpenseBreakdown,
+      handleOpenActionPlan,
+      handleToggleActionStep,
+      handleApplyActionPlan,
+    };
+
+    global.__REWARDS_CASHBACK_TEST_HOOKS__ = {
       modalRewardsHub,
       setModalRewardsHub,
       modalScratchCard,
@@ -12609,6 +12775,21 @@ accessibilityLabel={
                 </Text>
               </TouchableOpacity>
 
+              <TouchableOpacity
+                testID="tp_business_analytics_btn"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                style={styles.walletServiceBtn}
+                onPress={handleOpenBusinessHealthDashboard}
+                activeOpacity={0.75}
+                accessibilityLabel={t('business_health_analytics')}
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_bechakena.png')} variant="primary" shape="rounded" size={26} containerSize={44} />
+                <Text style={[styles.walletServiceLabel, isDark && tStyles.textPrimary]}>
+                  {t('business_health_analytics')}
+                </Text>
+              </TouchableOpacity>
+
                             <TouchableOpacity
                 testID="tp_merchant_kyc_banner_btn"
                 accessibilityRole="button"
@@ -13151,6 +13332,22 @@ accessibilityLabel={
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('rewards_and_cashback')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('rewards_hub_subtitle')}</Text>
+                </View>
+                <Text style={styles.menuListChevron}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuListItem}
+                onPress={handleOpenBusinessHealthDashboard}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('business_health_analytics')}
+                testID="menu_tp_business_analytics_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_bechakena.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('business_health_analytics')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('business_health_subtitle')}</Text>
                 </View>
                 <Text style={styles.menuListChevron}>›</Text>
               </TouchableOpacity>
@@ -30667,6 +30864,916 @@ accessibilityLabel={
           </View>
         </View>
       </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 127: BUSINESS HEALTH DASHBOARD (modalBusinessHealthDashboard)       */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalBusinessHealthDashboard}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalBusinessHealthDashboard(false)}
+        testID="modal_business_health_dashboard"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                  {t('business_health_title')}
+                </Text>
+                <Text style={[{ fontSize: 13, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                  {t('business_health_subtitle')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                testID="btn_business_health_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => setModalBusinessHealthDashboard(false)}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Card 1: Overall Health Score Gauge */}
+              <View
+                testID="card_overall_health_score"
+                style={{
+                  backgroundColor: isDark ? '#0F172A' : '#0D6E5C',
+                  borderRadius: 16,
+                  padding: 18,
+                  marginBottom: 16,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View>
+                    <Text style={{ color: '#A7F3D0', fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>
+                      {t('overall_health_score')}
+                    </Text>
+                    <Text testID="text_health_score_number" style={{ color: '#FFFFFF', fontSize: 32, fontWeight: '800', marginTop: 4 }}>
+                      ৮৬ / ১০০
+                    </Text>
+                  </View>
+                  <View
+                    testID="badge_health_rating"
+                    style={{
+                      backgroundColor: '#D1FAE5',
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 20,
+                    }}
+                  >
+                    <Text style={{ color: '#044E39', fontSize: 13, fontWeight: '800' }}>
+                      ★ {t('health_rating_excellent')}
+                    </Text>
+                  </View>
+                </View>
+                {/* Score Progress Bar */}
+                <View style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, marginTop: 12, overflow: 'hidden' }}>
+                  <View style={{ width: '86%', height: '100%', backgroundColor: '#34D399', borderRadius: 3 }} />
+                </View>
+              </View>
+
+              {/* Period Selector Chips */}
+              <View testID="chips_period_selector" style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                <TouchableOpacity
+                  testID="chip_period_daily"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setBusinessPeriodFilter('DAILY');
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    backgroundColor: businessPeriodFilter === 'DAILY' ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                    borderWidth: 1,
+                    borderColor: businessPeriodFilter === 'DAILY' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: businessPeriodFilter === 'DAILY' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                    {t('period_daily')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  testID="chip_period_weekly"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setBusinessPeriodFilter('WEEKLY');
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    backgroundColor: businessPeriodFilter === 'WEEKLY' ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                    borderWidth: 1,
+                    borderColor: businessPeriodFilter === 'WEEKLY' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: businessPeriodFilter === 'WEEKLY' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                    {t('period_weekly')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  testID="chip_period_monthly"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setBusinessPeriodFilter('MONTHLY');
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    backgroundColor: businessPeriodFilter === 'MONTHLY' ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                    borderWidth: 1,
+                    borderColor: businessPeriodFilter === 'MONTHLY' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: businessPeriodFilter === 'MONTHLY' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                    {t('period_monthly')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Card 2: Financial KPIs */}
+              <View testID="card_financial_kpis" style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                {/* Net Profit */}
+                <View
+                  testID="card_kpi_net_profit"
+                  style={{
+                    flex: 1,
+                    backgroundColor: isDark ? '#1E293B' : '#F0FDF4',
+                    borderRadius: 12,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: '#86EFAC',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: '#166534', fontWeight: '600' }}>{t('kpi_net_profit')}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#15803D', marginTop: 4 }}>৳ ৪৮,৫০০</Text>
+                </View>
+                {/* Turnover */}
+                <View
+                  testID="card_kpi_turnover"
+                  style={{
+                    flex: 1,
+                    backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                    borderRadius: 12,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: '#93C5FD',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: '#1E40AF', fontWeight: '600' }}>{t('kpi_turnover')}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#1D4ED8', marginTop: 4 }}>৳ ২,৮৫,০০০</Text>
+                </View>
+                {/* Collection Rate */}
+                <View
+                  testID="card_kpi_collection_rate"
+                  style={{
+                    flex: 1,
+                    backgroundColor: isDark ? '#1E293B' : '#FEF3C7',
+                    borderRadius: 12,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: '#FDE68A',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: '#92400E', fontWeight: '600' }}>{t('kpi_collection_rate')}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#B45309', marginTop: 4 }}>৯২%</Text>
+                </View>
+              </View>
+
+              {/* Quick Navigation CTAs */}
+              <Text style={[styles.sectionTitle, isDark && tStyles.textPrimary, { fontSize: 14, fontWeight: '700', marginBottom: 10 }]}>
+                📊 {t('business_health_analytics')}
+              </Text>
+
+              {/* CTA 1: Revenue Forecast */}
+              <TouchableOpacity
+                testID="btn_nav_revenue_forecast"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleOpenRevenueForecast}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  padding: 14,
+                  borderRadius: 12,
+                  marginBottom: 10,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 22, marginRight: 12 }}>📈</Text>
+                  <View>
+                    <Text style={[{ fontSize: 14, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                      {t('revenue_forecast_title')}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      {t('revenue_forecast_subtitle')}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 18, color: '#94A3B8' }}>›</Text>
+              </TouchableOpacity>
+
+              {/* CTA 2: Top Customers */}
+              <TouchableOpacity
+                testID="btn_nav_top_customers"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleOpenTopCustomers}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  padding: 14,
+                  borderRadius: 12,
+                  marginBottom: 10,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 22, marginRight: 12 }}>👥</Text>
+                  <View>
+                    <Text style={[{ fontSize: 14, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                      {t('top_customers_title')}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      {t('top_customers_subtitle')}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 18, color: '#94A3B8' }}>›</Text>
+              </TouchableOpacity>
+
+              {/* CTA 3: Expense Breakdown */}
+              <TouchableOpacity
+                testID="btn_nav_expense_breakdown"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleOpenExpenseBreakdown}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  padding: 14,
+                  borderRadius: 12,
+                  marginBottom: 10,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 22, marginRight: 12 }}>📉</Text>
+                  <View>
+                    <Text style={[{ fontSize: 14, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                      {t('expense_breakdown_title')}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      {t('expense_breakdown_subtitle')}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 18, color: '#94A3B8' }}>›</Text>
+              </TouchableOpacity>
+
+              {/* CTA 4: Action Plan */}
+              <TouchableOpacity
+                testID="btn_nav_action_plan"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleOpenActionPlan}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  padding: 14,
+                  borderRadius: 12,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 22, marginRight: 12 }}>🎯</Text>
+                  <View>
+                    <Text style={[{ fontSize: 14, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                      {t('action_plan_title')}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      {t('action_plan_subtitle')}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 18, color: '#94A3B8' }}>›</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 128: REVENUE FORECAST (modalRevenueForecastChart)                   */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalRevenueForecastChart}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setModalRevenueForecastChart(false); setModalBusinessHealthDashboard(true); }}
+        testID="modal_revenue_forecast_chart"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_revenue_forecast_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => { setModalRevenueForecastChart(false); setModalBusinessHealthDashboard(true); }}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                {t('revenue_forecast_title')}
+              </Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Forecast Horizon Toggle Chips */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                <TouchableOpacity
+                  testID="chip_forecast_30d"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setRevenueForecastDays(30);
+                    setProjectedRevenueAmount(345000);
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    backgroundColor: revenueForecastDays === 30 ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                    borderWidth: 1,
+                    borderColor: revenueForecastDays === 30 ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: revenueForecastDays === 30 ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                    {t('forecast_days_30')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  testID="chip_forecast_60d"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setRevenueForecastDays(60);
+                    setProjectedRevenueAmount(710000);
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    backgroundColor: revenueForecastDays === 60 ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                    borderWidth: 1,
+                    borderColor: revenueForecastDays === 60 ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: revenueForecastDays === 60 ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                    {t('forecast_days_60')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Projected Revenue Card */}
+              <View
+                testID="card_projected_revenue"
+                style={{
+                  backgroundColor: isDark ? '#0F172A' : '#0D6E5C',
+                  borderRadius: 16,
+                  padding: 20,
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ color: '#A7F3D0', fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>
+                  {t('projected_revenue_label')} ({revenueForecastDays === 30 ? t('forecast_days_30') : t('forecast_days_60')})
+                </Text>
+                <Text testID="text_projected_revenue_amount" style={{ color: '#FFFFFF', fontSize: 30, fontWeight: '800', marginTop: 6 }}>
+                  ৳ {revenueForecastDays === 30 ? '৩,৪৫,০০০' : '৭,১০,০০০'}
+                </Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+                  <View
+                    testID="badge_growth_rate"
+                    style={{
+                      backgroundColor: '#34D399',
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <Text style={{ color: '#064E3B', fontSize: 12, fontWeight: '800' }}>
+                      {t('forecast_growth_bps')}
+                    </Text>
+                  </View>
+                  <View testID="indicator_trend_direction" style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ color: '#D1FAE5', fontSize: 13, fontWeight: '700' }}>
+                      📈 {t('trend_direction_up')}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Confidence Score Pill Card */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: isDark ? '#1E293B' : '#F0FDF4',
+                  borderRadius: 12,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: '#86EFAC',
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#166534' }}>
+                  🎯 {t('confidence_score_label')}
+                </Text>
+                <View
+                  testID="pill_confidence_score"
+                  style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#15803D' }}>
+                    ৯৪% নির্ভরযোগ্য
+                  </Text>
+                </View>
+              </View>
+
+              {/* Historical Trend Reference Card */}
+              <View
+                testID="card_historical_trend_ref"
+                style={{
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderRadius: 12,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={[styles.sectionTitle, isDark && tStyles.textPrimary, { fontSize: 13, fontWeight: '700', marginBottom: 4 }]}>
+                  ℹ️ {t('forecast_trend_analysis')}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 18 }}>
+                  {t('historical_reference_note')}
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 129: TOP CUSTOMERS ANALYTICS (modalTopCustomersAnalytics)           */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalTopCustomersAnalytics}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setModalTopCustomersAnalytics(false); setModalBusinessHealthDashboard(true); }}
+        testID="modal_top_customers_analytics"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_top_customers_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => { setModalTopCustomersAnalytics(false); setModalBusinessHealthDashboard(true); }}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                {t('top_customers_title')}
+              </Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            {/* Summary Card */}
+            <View
+              testID="card_top_customers_summary"
+              style={{
+                backgroundColor: isDark ? '#0F172A' : '#EFF6FF',
+                borderRadius: 14,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: '#BFDBFE',
+                marginBottom: 16,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E40AF' }}>
+                🌟 {t('top_customers_subtitle')}
+              </Text>
+            </View>
+
+            <ScrollView testID="list_top_customers" showsVerticalScrollIndicator={false}>
+              {topCustomersList.map((cust, idx) => (
+                <View
+                  key={cust.id}
+                  testID={'item_top_customer_' + idx}
+                  style={{
+                    backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                    borderRadius: 12,
+                    padding: 14,
+                    borderWidth: 1,
+                    borderColor: isDark ? '#334155' : '#E2E8F0',
+                    marginBottom: 10,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View
+                        testID="badge_customer_rank"
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 13,
+                          backgroundColor: idx === 0 ? '#F59E0B' : (idx === 1 ? '#94A3B8' : (idx === 2 ? '#D97706' : '#E2E8F0')),
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 10,
+                        }}
+                      >
+                        <Text style={{ color: idx < 3 ? '#FFFFFF' : '#475569', fontSize: 12, fontWeight: '800' }}>
+                          {idx + 1}
+                        </Text>
+                      </View>
+                      <View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={[{ fontSize: 14, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                            {cust.name}
+                          </Text>
+                          {cust.isVip && (
+                            <View
+                              testID="badge_vip_customer"
+                              style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}
+                            >
+                              <Text style={{ color: '#B45309', fontSize: 10, fontWeight: '800' }}>
+                                {t('vip_customer_badge')}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ fontSize: 12, color: '#64748B' }}>{cust.phone}</Text>
+                      </View>
+                    </View>
+
+                    {/* Purchase Volume */}
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text testID="badge_purchase_volume" style={{ fontSize: 15, fontWeight: '800', color: '#0D6E5C' }}>
+                        ৳ {cust.volume.toLocaleString('en-US')}
+                      </Text>
+                      <View
+                        testID="pill_recovery_velocity"
+                        style={{
+                          backgroundColor: cust.velocity === 'FAST' ? '#D1FAE5' : (cust.velocity === 'NORMAL' ? '#FEF3C7' : '#FEE2E2'),
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 6,
+                          marginTop: 4,
+                        }}
+                      >
+                        <Text style={{
+                          fontSize: 10,
+                          fontWeight: '700',
+                          color: cust.velocity === 'FAST' ? '#065F46' : (cust.velocity === 'NORMAL' ? '#92400E' : '#991B1B')
+                        }}>
+                          {cust.velocity === 'FAST' ? t('recovery_velocity_fast') : (cust.velocity === 'NORMAL' ? t('recovery_velocity_normal') : t('recovery_velocity_slow'))}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Customer Due Status */}
+                  <View
+                    testID="indicator_customer_due"
+                    style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: isDark ? '#334155' : '#F1F5F9' }}
+                  >
+                    <Text style={{ fontSize: 11, color: '#64748B' }}>{t('customer_due_status')}:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: cust.due > 0 ? '#DC2626' : '#166534' }}>
+                      {cust.due > 0 ? ('৳ ' + cust.due.toLocaleString('en-US')) : 'পরিশোধিত (০৳)'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 130: EXPENSE BREAKDOWN (modalExpenseCategoryBreakdown)               */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalExpenseCategoryBreakdown}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setModalExpenseCategoryBreakdown(false); setModalBusinessHealthDashboard(true); }}
+        testID="modal_expense_category_breakdown"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_expense_breakdown_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => { setModalExpenseCategoryBreakdown(false); setModalBusinessHealthDashboard(true); }}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                {t('expense_breakdown_title')}
+              </Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Total Store Expense Card */}
+              <View
+                testID="card_total_expense"
+                style={{
+                  backgroundColor: isDark ? '#0F172A' : '#1E293B',
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 14,
+                }}
+              >
+                <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>
+                  {t('total_expense_label')}
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: '800', marginTop: 4 }}>
+                  ৳ ১,৯১,৫০০
+                </Text>
+              </View>
+
+              {/* Highest Expense Alert */}
+              <View
+                testID="alert_highest_expense"
+                style={{
+                  backgroundColor: isDark ? '#1E293B' : '#FEF2F2',
+                  borderRadius: 12,
+                  padding: 12,
+                  borderWidth: 1,
+                  borderColor: '#FECACA',
+                  marginBottom: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 18, marginRight: 8 }}>⚠️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#991B1B' }}>
+                    {t('highest_expense_alert')}: {t('category_inventory')} (৬৫%)
+                  </Text>
+                </View>
+              </View>
+
+              {/* Categories Breakdown List */}
+              <View testID="list_expense_categories">
+                {expenseCategoriesList.map(cat => (
+                  <View
+                    key={cat.id}
+                    style={{
+                      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                      borderRadius: 12,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: isDark ? '#334155' : '#E2E8F0',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={[{ fontSize: 13, fontWeight: '700' }, isDark && tStyles.textPrimary]}>
+                        {cat.label}
+                      </Text>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: cat.color }}>
+                        ৳ {cat.amount.toLocaleString('en-US')} ({cat.percentage}%)
+                      </Text>
+                    </View>
+                    {/* Expense Percentage Bar */}
+                    <View
+                      testID="bar_expense_percentage"
+                      style={{ height: 8, backgroundColor: isDark ? '#334155' : '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}
+                    >
+                      <View style={{ width: (cat.percentage + '%'), height: '100%', backgroundColor: cat.color, borderRadius: 4 }} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL 131: BUSINESS ACTION PLAN (modalBusinessHealthActionPlan)           */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modalBusinessHealthActionPlan}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setModalBusinessHealthActionPlan(false); setModalBusinessHealthDashboard(true); }}
+        testID="modal_business_health_action_plan"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_action_plan_back"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => { setModalBusinessHealthActionPlan(false); setModalBusinessHealthDashboard(true); }}
+                style={{ padding: 6, borderRadius: 20, backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? '#94A3B8' : '#64748B' }}>←</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, isDark && tStyles.textPrimary, { fontSize: 18, fontWeight: '700' }]}>
+                {t('action_plan_title')}
+              </Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Recommendations Card */}
+              <View
+                testID="card_action_recommendations"
+                style={{
+                  backgroundColor: isDark ? '#0F172A' : '#F0FDF4',
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: '#86EFAC',
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#166534' }}>
+                  💡 {t('action_recommendations')}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#15803D', marginTop: 4 }}>
+                  {t('action_plan_subtitle')}
+                </Text>
+              </View>
+
+              {/* Action Steps List */}
+              <View testID="list_action_steps" style={{ marginBottom: 16 }}>
+                {businessActionSteps.map((step, idx) => (
+                  <TouchableOpacity
+                    key={step.id}
+                    testID={'checkbox_action_step_' + idx}
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={() => handleToggleActionStep(step.id)}
+                    style={{
+                      backgroundColor: isDark ? '#1E293B' : (step.isCompleted ? '#F0FDF4' : '#FFFFFF'),
+                      borderRadius: 12,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: step.isCompleted ? '#86EFAC' : (isDark ? '#334155' : '#E2E8F0'),
+                      marginBottom: 10,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                      <View
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 6,
+                          borderWidth: 2,
+                          borderColor: step.isCompleted ? '#0D6E5C' : '#94A3B8',
+                          backgroundColor: step.isCompleted ? '#0D6E5C' : 'transparent',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 10,
+                          marginTop: 2,
+                        }}
+                      >
+                        {step.isCompleted && <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>✓</Text>}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text style={[{ fontSize: 14, fontWeight: '700' }, isDark && tStyles.textPrimary, step.isCompleted && { textDecorationLine: 'line-through', color: '#94A3B8' }]}>
+                            {t(step.titleKey)}
+                          </Text>
+                          {step.isCompleted ? (
+                            <View
+                              testID="badge_step_completed"
+                              style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}
+                            >
+                              <Text style={{ color: '#15803D', fontSize: 10, fontWeight: '800' }}>
+                                {t('action_plan_completed_badge')}
+                              </Text>
+                            </View>
+                          ) : (
+                            <View style={{ backgroundColor: step.priority === 'HIGH' ? '#FEE2E2' : '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                              <Text style={{ color: step.priority === 'HIGH' ? '#991B1B' : '#92400E', fontSize: 10, fontWeight: '800' }}>
+                                {step.priority}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4, lineHeight: 16 }}>
+                          {t(step.descKey)}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Success Toast / Feedback Banner */}
+              {actionPlanAppliedToast && (
+                <View
+                  testID="text_action_plan_success"
+                  style={{
+                    backgroundColor: '#D1FAE5',
+                    borderRadius: 10,
+                    padding: 12,
+                    alignItems: 'center',
+                    marginBottom: 14,
+                    borderWidth: 1,
+                    borderColor: '#34D399',
+                  }}
+                >
+                  <Text style={{ color: '#065F46', fontSize: 13, fontWeight: '800' }}>
+                    ✓ {t('action_plan_success_toast')}
+                  </Text>
+                </View>
+              )}
+
+              {/* Primary Apply CTA */}
+              <TouchableOpacity
+                testID="btn_apply_action_plan"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleApplyActionPlan}
+                style={{
+                  backgroundColor: '#0D6E5C',
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+                  🚀 {t('apply_action_plan_btn')}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+
 
 
       {/* MODAL: BATCH TAGADA RESULT */}
