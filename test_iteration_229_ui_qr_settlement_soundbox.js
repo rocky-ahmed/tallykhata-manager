@@ -448,26 +448,26 @@ runTest('10.5: Inactive meta text (#64748B on #FFFFFF) achieves WCAG AA (>= 4.5:
 // -----------------------------------------------------------------------------
 // PART 11: MODAL COUNT & CONTROLLER INVARIANTS (80 MODALS)
 // -----------------------------------------------------------------------------
-console.log('\n--- PART 11: MODAL COUNT & CONTROLLER INVARIANTS (116 MODALS) ---');
+console.log('\n--- PART 11: MODAL COUNT & CONTROLLER INVARIANTS (121 MODALS) ---');
 
-runTest('11.1: App.js contains exactly 116 <Modal elements', () => {
+runTest('11.1: App.js contains exactly 121 <Modal elements', () => {
   const modalMatches = appSrc.match(/<Modal\b/g) || [];
-  assert.strictEqual(modalMatches.length, 116, `Expected exactly 116 modals in App.js, got ${modalMatches.length}`);
+  assert.strictEqual(modalMatches.length, 121, `Expected exactly 121 modals in App.js, got ${modalMatches.length}`);
 });
 
-runTest('11.2: App.js contains exactly 116 onRequestClose handlers', () => {
+runTest('11.2: App.js contains exactly 121 onRequestClose handlers', () => {
   const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-  assert.strictEqual(reqCloseMatches.length, 116, `Expected 116 onRequestClose handlers, got ${reqCloseMatches.length}`);
+  assert.strictEqual(reqCloseMatches.length, 121, `Expected 121 onRequestClose handlers, got ${reqCloseMatches.length}`);
 });
 
-runTest('11.3: App.js contains exactly 116 unique modal state controllers', () => {
+runTest('11.3: App.js contains exactly 121 unique modal state controllers', () => {
   const regex = /visible=\{([a-zA-Z0-9_]+)\}/g;
   const uniqueModals = new Set();
   let m;
   while ((m = regex.exec(appSrc)) !== null) {
     uniqueModals.add(m[1]);
   }
-  assert.strictEqual(uniqueModals.size, 116, `Expected 116 unique visible controllers, got ${uniqueModals.size}`);
+  assert.strictEqual(uniqueModals.size, 121, `Expected 121 unique visible controllers, got ${uniqueModals.size}`);
   assert.ok(uniqueModals.has('modalQrSettlement'), 'modalQrSettlement must be in unique controllers');
   assert.ok(uniqueModals.has('showSoundboxSettingsModal'), 'showSoundboxSettingsModal must be in unique controllers');
 });

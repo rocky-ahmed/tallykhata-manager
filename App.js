@@ -1338,6 +1338,34 @@ function TallyKhataApp() {
   const [lastPlacedOrder, setLastPlacedOrder] = useState(null);
   const [orderTrackingStep, setOrderTrackingStep] = useState('PLACED');
 
+  // --- REA-ITER-239: TallyPay Merchant Digital Micro-Loan, Credit Scoring & EMI Repayment Subsystem ---
+  const [modalLoanEligibility, setModalLoanEligibility] = useState(false);
+  const [modalLoanApplication, setModalLoanApplication] = useState(false);
+  const [modalLoanBreakdownTerms, setModalLoanBreakdownTerms] = useState(false);
+  const [modalLoanEmiSchedule, setModalLoanEmiSchedule] = useState(false);
+  const [modalLoanRepayment, setModalLoanRepayment] = useState(false);
+
+  const [selectedLoanAmount, setSelectedLoanAmount] = useState(30000);
+  const [selectedLoanTenure, setSelectedLoanTenure] = useState(6);
+  const [selectedLoanPurpose, setSelectedLoanPurpose] = useState('STOCK');
+  const [selectedPartnerBank, setSelectedPartnerBank] = useState('BRAC_BANK');
+  const [loanTermsAgreed, setLoanTermsAgreed] = useState(false);
+  const [loanTermsError, setLoanTermsError] = useState('');
+  const [loanRepaymentSource, setLoanRepaymentSource] = useState('WALLET');
+  const [loanRepaymentSuccess, setLoanRepaymentSuccess] = useState(false);
+  const [activeLoanData, setActiveLoanData] = useState({
+    loanId: 'LN-2026-8821',
+    principal: 30000,
+    tenure: 6,
+    interestRate: 9.0,
+    monthlyEmi: 5225,
+    totalPayable: 31350,
+    paidAmount: 15675,
+    remainingAmount: 15675,
+    nextDueDate: '১০ নভেম্বর ২০২৬',
+    status: 'ACTIVE',
+  });
+
 
   const [kycNidSide, setKycNidSide] = useState('FRONT');
   const [kycFlashOn, setKycFlashOn] = useState(false);
@@ -2716,6 +2744,36 @@ function TallyKhataApp() {
         setModalSelectCustomerAday(false);
         return true;
       }
+      // Iteration 239: Merchant Digital Micro-Loan & Credit Scoring BackHandler
+      if (modalLoanRepayment) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalLoanRepayment(false);
+        setModalLoanEmiSchedule(true);
+        return true;
+      }
+      if (modalLoanEmiSchedule) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalLoanEmiSchedule(false);
+        return true;
+      }
+      if (modalLoanBreakdownTerms) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalLoanBreakdownTerms(false);
+        setModalLoanApplication(true);
+        return true;
+      }
+      if (modalLoanApplication) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalLoanApplication(false);
+        setModalLoanEligibility(true);
+        return true;
+      }
+      if (modalLoanEligibility) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalLoanEligibility(false);
+        return true;
+      }
+
       // Iteration 238: QR Standee Order & Collateral Tracking BackHandler
       if (modalOrderTracking) {
         try { hapticFeedbackService.selection(); } catch (e) {}
@@ -2998,7 +3056,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalKycSplash, modalNidCameraScanner, modalNidInfoReview, modalLivenessSelfie, modalKycStatusResult, modalQrOrderCatalog, modalQrStandeePreview, modalDeliveryAddress, modalOrderPaymentCheckout, modalOrderTracking, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalKycSplash, modalNidCameraScanner, modalNidInfoReview, modalLivenessSelfie, modalKycStatusResult, modalQrOrderCatalog, modalQrStandeePreview, modalDeliveryAddress, modalOrderPaymentCheckout, modalOrderTracking, modalLoanEligibility, modalLoanApplication, modalLoanBreakdownTerms, modalLoanEmiSchedule, modalLoanRepayment, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -6897,6 +6955,63 @@ function TallyKhataApp() {
   };
 
   // =========================================================================
+  // REA-ITER-239: DIGITAL MICRO-LOAN, CREDIT SCORING & EMI HANDLERS
+  // =========================================================================
+  const handleOpenLoanEligibility = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalLoanEligibility(true);
+  };
+
+  const handleApplyLoanNow = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalLoanEligibility(false);
+    setModalLoanApplication(true);
+  };
+
+  const handleViewLoanSchedule = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalLoanEligibility(false);
+    setModalLoanEmiSchedule(true);
+  };
+
+  const handleProceedLoanTerms = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalLoanApplication(false);
+    setModalLoanBreakdownTerms(true);
+  };
+
+  const handleConfirmSubmitLoan = () => {
+    if (!loanTermsAgreed) {
+      try { hapticFeedbackService.notificationError(); } catch (e) {}
+      setLoanTermsError(t('terms_agreement_checkbox'));
+      return;
+    }
+    setLoanTermsError('');
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    setModalLoanBreakdownTerms(false);
+    setModalLoanEmiSchedule(true);
+  };
+
+  const handlePayEmiNow = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setLoanRepaymentSuccess(false);
+    setModalLoanEmiSchedule(false);
+    setModalLoanRepayment(true);
+  };
+
+  const handleConfirmEmiRepayment = () => {
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    setLoanRepaymentSuccess(true);
+  };
+
+  const handleDoneEmiRepayment = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setLoanRepaymentSuccess(false);
+    setModalLoanRepayment(false);
+    setModalLoanEmiSchedule(true);
+  };
+
+  // =========================================================================
   // QR STANDEE ORDER & COLLATERAL DELIVERY HANDLERS (Iteration 238)
   // =========================================================================
   const QR_STANDEE_CATALOG = [
@@ -8420,7 +8535,46 @@ function TallyKhataApp() {
       tallyPayService,
     };
 
-            global.__QR_ORDER_TEST_HOOKS__ = {
+            global.__LOAN_CREDIT_TEST_HOOKS__ = {
+      modalLoanEligibility,
+      setModalLoanEligibility,
+      modalLoanApplication,
+      setModalLoanApplication,
+      modalLoanBreakdownTerms,
+      setModalLoanBreakdownTerms,
+      modalLoanEmiSchedule,
+      setModalLoanEmiSchedule,
+      modalLoanRepayment,
+      setModalLoanRepayment,
+      selectedLoanAmount,
+      setSelectedLoanAmount,
+      selectedLoanTenure,
+      setSelectedLoanTenure,
+      selectedLoanPurpose,
+      setSelectedLoanPurpose,
+      selectedPartnerBank,
+      setSelectedPartnerBank,
+      loanTermsAgreed,
+      setLoanTermsAgreed,
+      loanTermsError,
+      setLoanTermsError,
+      loanRepaymentSource,
+      setLoanRepaymentSource,
+      loanRepaymentSuccess,
+      setLoanRepaymentSuccess,
+      activeLoanData,
+      setActiveLoanData,
+      handleOpenLoanEligibility,
+      handleApplyLoanNow,
+      handleViewLoanSchedule,
+      handleProceedLoanTerms,
+      handleConfirmSubmitLoan,
+      handlePayEmiNow,
+      handleConfirmEmiRepayment,
+      handleDoneEmiRepayment
+    };
+
+    global.__QR_ORDER_TEST_HOOKS__ = {
       modalQrOrderCatalog,
       setModalQrOrderCatalog,
       modalQrStandeePreview,
@@ -12233,6 +12387,34 @@ accessibilityLabel={
                 </Text>
               </TouchableOpacity>
 
+              <TouchableOpacity
+                testID="tp_digital_loan_btn"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                style={styles.walletServiceBtn}
+                onPress={handleOpenLoanEligibility}
+                activeOpacity={0.75}
+                accessibilityLabel={t('digital_micro_loan')}
+              >
+                <AppIcon
+                  source={require("./assets/icons/ic_menu_bechakena.png")}
+                  variant="primary"
+                  shape="rounded"
+                  size={24}
+                  containerSize={44}
+                />
+                <Text
+                  style={[
+                    styles.walletServiceBtnText,
+                    isDark && tStyles.textPrimary,
+                    { fontSize: 11, marginTop: 4, textAlign: 'center' }
+                  ]}
+                  numberOfLines={2}
+                >
+                  {t('digital_micro_loan')}
+                </Text>
+              </TouchableOpacity>
+
                             <TouchableOpacity
                 testID="tp_merchant_kyc_banner_btn"
                 accessibilityRole="button"
@@ -12743,6 +12925,22 @@ accessibilityLabel={
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('qr_standee_order')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('qr_order_catalog_subtitle')}</Text>
+                </View>
+                <Text style={{ fontSize: 18, color: isDark ? '#64748B' : '#94A3B8' }}>›</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.borderSubtle]}
+                onPress={handleOpenLoanEligibility}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('digital_micro_loan')}
+                testID="menu_tp_digital_loan_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_bechakena.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('digital_micro_loan')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('loan_subtitle')}</Text>
                 </View>
                 <Text style={{ fontSize: 18, color: isDark ? '#64748B' : '#94A3B8' }}>›</Text>
               </TouchableOpacity>
@@ -28344,6 +28542,1087 @@ accessibilityLabel={
                   {t('ঠিক আছে') || 'ঠিক আছে'}
                 </Text>
               </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 117: DIGITAL MICRO-LOAN ELIGIBILITY & CREDIT SCORING (ITER 239)
+         =================================================================== */}
+      <Modal
+        visible={modalLoanEligibility}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalLoanEligibility(false)}
+        testID="modal_loan_eligibility"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_loan_eligibility_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalLoanEligibility(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ padding: 8, marginRight: 8 }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? '#F1F5F9' : '#0F172A' }}>←</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={[{ fontSize: 18, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                  {t('digital_micro_loan')}
+                </Text>
+                <Text style={[{ fontSize: 12, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                  {t('loan_subtitle')}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Credit Score Gauge Card */}
+              <View
+                testID="card_credit_score_gauge"
+                style={[{
+                  backgroundColor: isDark ? '#1E293B' : '#F0FDF4',
+                  borderRadius: 16,
+                  padding: 18,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#BBF7D0',
+                  alignItems: 'center'
+                }]}
+              >
+                <Text style={[{ fontSize: 13, fontWeight: '600', color: '#166534', marginBottom: 8 }, isDark && { color: '#86EFAC' }]}>
+                  {t('credit_score_title')}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
+                  <Text testID="text_credit_score_value" style={{ fontSize: 44, fontWeight: '800', color: '#0D6E5C' }}>
+                    745
+                  </Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: '#64748B', marginLeft: 4 }}>
+                    / 850
+                  </Text>
+                </View>
+                <View
+                  testID="badge_credit_score_tier"
+                  style={{
+                    backgroundColor: '#D1FAE5',
+                    paddingHorizontal: 12,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    marginTop: 4
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#0D6E5C' }}>
+                    {t('credit_score_excellent')}
+                  </Text>
+                </View>
+                <Text style={[{ fontSize: 11, color: '#64748B', textAlign: 'center', marginTop: 10 }, isDark && tStyles.textSecondary]}>
+                  রিপেমেন্ট ট্র্যাক রেকর্ড ও ডিজিটাল বিক্রির ভিত্তিতে আপনার ক্রেডিট প্রোফাইল শীর্ষ অবস্থানে রয়েছে
+                </Text>
+              </View>
+
+              {/* Pre-Approved Limit Card */}
+              <View
+                testID="card_pre_approved_limit"
+                style={[{
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0'
+                }]}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={[{ fontSize: 13, fontWeight: '600', color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {t('pre_approved_limit')}
+                  </Text>
+                  <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#78350F' }}>
+                      ৯.০% সহজ সুদ
+                    </Text>
+                  </View>
+                </View>
+                <Text testID="text_pre_approved_amount" style={{ fontSize: 28, fontWeight: '800', color: '#0D6E5C', marginBottom: 8 }}>
+                  ৳ ৫০,০০০
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                  <Text style={{ fontSize: 14, color: '#0D6E5C', marginRight: 6 }}>✓</Text>
+                  <Text style={[{ fontSize: 12, color: '#475569' }, isDark && tStyles.textSecondary]}>
+                    তাৎক্ষণিক ট্যালিপে ওয়ালেটে ক্যাশ আউট সুবিধা
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                  <Text style={{ fontSize: 14, color: '#0D6E5C', marginRight: 6 }}>✓</Text>
+                  <Text style={[{ fontSize: 12, color: '#475569' }, isDark && tStyles.textSecondary]}>
+                    ৩ থেকে ১২ মাসের সহজ কিস্তি পরিশোধ
+                  </Text>
+                </View>
+              </View>
+
+              {/* Partner Financial Institutions */}
+              <View testID="card_partner_banks" style={{ marginBottom: 20 }}>
+                <Text style={[{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 10 }, isDark && tStyles.textPrimary]}>
+                  {t('partner_banks_title')}
+                </Text>
+                {[
+                  { id: 'BRAC_BANK', testId: 'partner_card_brac', name: t('partner_brac_bank'), type: 'ব্র্যাক ব্যাংক সুবিধা ডিজিটাল লোন', rate: '৯.০%' },
+                  { id: 'CITY_BANK', testId: 'partner_card_city', name: t('partner_city_bank'), type: 'সিটি আমার ঋণ (ক্ষুদ্র উদ্যোক্তা)', rate: '৯.৫%' },
+                  { id: 'MUTUAL_TRUST_BANK', testId: 'partner_card_mtb', name: t('partner_mtb'), type: 'এমটিবি ডিজিটাল সুযোগ ক্রেডিট', rate: '৯.০%' },
+                  { id: 'PRIME_BANK', testId: 'partner_card_prime', name: t('partner_prime_bank'), type: 'প্রাইম অগ্রণী এমএসএমই ঋণ', rate: '৯.২৫%' },
+                  { id: 'IPDC_FINANCE', testId: 'partner_card_ipdc', name: t('partner_ipdc'), type: 'আইপিডিসি দানা মাইক্রো-ক্রেডিট', rate: '১০.০%' }
+                ].map((partner) => (
+                  <TouchableOpacity
+                    key={partner.id}
+                    testID={partner.testId}
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={() => {
+                      try { hapticFeedbackService.selection(); } catch (e) {}
+                      setSelectedPartnerBank(partner.id);
+                    }}
+                    style={[{
+                      backgroundColor: selectedPartnerBank === partner.id ? (isDark ? '#064E3B' : '#ECFDF5') : (isDark ? '#1E293B' : '#FFFFFF'),
+                      borderWidth: 1.5,
+                      borderColor: selectedPartnerBank === partner.id ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                      borderRadius: 12,
+                      padding: 12,
+                      marginBottom: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                        {partner.name}
+                      </Text>
+                      <Text style={[{ fontSize: 11, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                        {partner.type}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#0D6E5C' }}>
+                        {partner.rate}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: '#94A3B8' }}>সুদের হার</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Action Buttons */}
+              <TouchableOpacity
+                testID="btn_apply_loan_now"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleApplyLoanNow}
+                style={{
+                  backgroundColor: '#0D6E5C',
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  marginBottom: 10
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                  {t('apply_loan_now')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                testID="btn_view_loan_schedule"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleViewLoanSchedule}
+                style={[{
+                  backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#CBD5E1'
+                }]}
+              >
+                <Text style={[{ fontSize: 13, fontWeight: '600', color: '#475569' }, isDark && tStyles.textPrimary]}>
+                  {t('emi_schedule_title')}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+
+      {/* ===================================================================
+          MODAL 118: LOAN APPLICATION, TENURE & PURPOSE SELECTOR (ITER 239)
+         =================================================================== */}
+      <Modal
+        visible={modalLoanApplication}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          try { hapticFeedbackService.selection(); } catch (e) {}
+          setModalLoanApplication(false);
+          setModalLoanEligibility(true);
+        }}
+        testID="modal_loan_application"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_loan_application_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalLoanApplication(false);
+                  setModalLoanEligibility(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ padding: 8, marginRight: 8 }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? '#F1F5F9' : '#0F172A' }}>←</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={[{ fontSize: 18, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                  {t('loan_amount_selector')}
+                </Text>
+                <Text style={[{ fontSize: 12, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                  {t('loan_tenure_months')}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Loan Amount Stepper Card */}
+              <View
+                testID="card_loan_amount_stepper"
+                style={[{
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderRadius: 16,
+                  padding: 18,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  alignItems: 'center'
+                }]}
+              >
+                <Text style={[{ fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 10 }, isDark && tStyles.textSecondary]}>
+                  {t('principal_amount')}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                  <TouchableOpacity
+                    testID="btn_loan_amount_minus"
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={() => {
+                      try { hapticFeedbackService.selection(); } catch (e) {}
+                      setSelectedLoanAmount(Math.max(10000, selectedLoanAmount - 5000));
+                    }}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: '#0F172A' }}>−</Text>
+                  </TouchableOpacity>
+
+                  <View style={{ marginHorizontal: 20, alignItems: 'center' }}>
+                    <Text testID="text_selected_loan_amount" style={{ fontSize: 32, fontWeight: '800', color: '#0D6E5C' }}>
+                      ৳ {selectedLoanAmount.toLocaleString('en-US')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                      সীমা: ৳১০,০০০ – ৳১,০০,০০০
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    testID="btn_loan_amount_plus"
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={() => {
+                      try { hapticFeedbackService.selection(); } catch (e) {}
+                      setSelectedLoanAmount(Math.min(100000, selectedLoanAmount + 5000));
+                    }}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: '#0F172A' }}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Tenure Selection Chips */}
+              <View testID="card_loan_tenure_selector" style={{ marginBottom: 16 }}>
+                <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 8 }, isDark && tStyles.textPrimary]}>
+                  {t('loan_tenure_months')}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  {[
+                    { months: 3, testId: 'chip_tenure_3m', label: t('tenure_3_months') },
+                    { months: 6, testId: 'chip_tenure_6m', label: t('tenure_6_months') },
+                    { months: 12, testId: 'chip_tenure_12m', label: t('tenure_12_months') }
+                  ].map((tenure) => (
+                    <TouchableOpacity
+                      key={tenure.months}
+                      testID={tenure.testId}
+                      accessibilityRole="button"
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      onPress={() => {
+                        try { hapticFeedbackService.selection(); } catch (e) {}
+                        setSelectedLoanTenure(tenure.months);
+                      }}
+                      style={[{
+                        flex: 1,
+                        marginHorizontal: 3,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        backgroundColor: selectedLoanTenure === tenure.months ? '#0D6E5C' : (isDark ? '#1E293B' : '#F1F5F9'),
+                        alignItems: 'center',
+                        borderWidth: 1,
+                        borderColor: selectedLoanTenure === tenure.months ? '#0D6E5C' : (isDark ? '#334155' : '#CBD5E1')
+                      }]}
+                    >
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: selectedLoanTenure === tenure.months ? '#FFFFFF' : (isDark ? '#F1F5F9' : '#334155')
+                      }}>
+                        {tenure.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Business Purpose Selector */}
+              <View testID="card_loan_purpose_selector" style={{ marginBottom: 16 }}>
+                <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 8 }, isDark && tStyles.textPrimary]}>
+                  {t('business_purpose')}
+                </Text>
+                {[
+                  { id: 'STOCK', testId: 'chip_purpose_stock', label: t('purpose_stock'), desc: 'দ্রুত পণ্য আমদানি ও মজুত বৃদ্ধি' },
+                  { id: 'EXPANSION', testId: 'chip_purpose_expansion', label: t('purpose_expansion'), desc: 'দোকান ডেকোরেশন ও নতুন শাখা' },
+                  { id: 'EMERGENCY', testId: 'chip_purpose_emergency', label: t('purpose_emergency'), desc: 'চলতি ক্যাশ ফ্লো ও সাপ্লায়ার দেনা' }
+                ].map((purpose) => (
+                  <TouchableOpacity
+                    key={purpose.id}
+                    testID={purpose.testId}
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={() => {
+                      try { hapticFeedbackService.selection(); } catch (e) {}
+                      setSelectedLoanPurpose(purpose.id);
+                    }}
+                    style={[{
+                      backgroundColor: selectedLoanPurpose === purpose.id ? (isDark ? '#064E3B' : '#ECFDF5') : (isDark ? '#1E293B' : '#FFFFFF'),
+                      borderWidth: 1.5,
+                      borderColor: selectedLoanPurpose === purpose.id ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                      borderRadius: 12,
+                      padding: 12,
+                      marginBottom: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center'
+                    }]}
+                  >
+                    <View style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      borderWidth: 2,
+                      borderColor: selectedLoanPurpose === purpose.id ? '#0D6E5C' : '#94A3B8',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginRight: 10
+                    }}>
+                      {selectedLoanPurpose === purpose.id && (
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#0D6E5C' }} />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                        {purpose.label}
+                      </Text>
+                      <Text style={[{ fontSize: 11, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                        {purpose.desc}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Document Verification Status Card */}
+              <View
+                testID="card_doc_verification_status"
+                style={[{
+                  backgroundColor: isDark ? '#1E293B' : '#F0FDF4',
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 20,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#BBF7D0',
+                  flexDirection: 'row',
+                  alignItems: 'center'
+                }]}
+              >
+                <Text style={{ fontSize: 18, color: '#0D6E5C', marginRight: 10 }}>🛡️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[{ fontSize: 12, fontWeight: '700', color: '#166534' }, isDark && { color: '#86EFAC' }]}>
+                    {t('trade_license_upload')}
+                  </Text>
+                  <Text style={[{ fontSize: 11, color: '#475569', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                    ভেরিফাইড মার্চেন্ট প্রোফাইল (NID ও ট্রেড লাইসেন্স সংযুক্ত)
+                  </Text>
+                </View>
+              </View>
+
+              {/* Proceed CTA */}
+              <TouchableOpacity
+                testID="btn_proceed_loan_terms"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleProceedLoanTerms}
+                style={{
+                  backgroundColor: '#0D6E5C',
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                  {t('transparent_disclosure')}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+
+      {/* ===================================================================
+          MODAL 119: LOAN DISCLOSURE BREAKDOWN & REGULATORY TERMS (ITER 239)
+         =================================================================== */}
+      <Modal
+        visible={modalLoanBreakdownTerms}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          try { hapticFeedbackService.selection(); } catch (e) {}
+          setModalLoanBreakdownTerms(false);
+          setModalLoanApplication(true);
+        }}
+        testID="modal_loan_breakdown_terms"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_loan_terms_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalLoanBreakdownTerms(false);
+                  setModalLoanApplication(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ padding: 8, marginRight: 8 }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? '#F1F5F9' : '#0F172A' }}>←</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={[{ fontSize: 18, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                  {t('transparent_disclosure')}
+                </Text>
+                <Text style={[{ fontSize: 12, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                  {t('regulatory_compliance_disclaimer')}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Financial Disclosure Breakdown Card */}
+              <View
+                testID="card_loan_disclosure_breakdown"
+                style={[{
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0'
+                }]}
+              >
+                <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 12 }, isDark && tStyles.textPrimary]}>
+                  ঋণের আর্থিক সারসংক্ষেপ
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <Text style={[{ fontSize: 12, fontWeight: '700', color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {t('principal_amount')}
+                  </Text>
+                  <Text testID="text_disclosure_principal" style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                    ৳ {selectedLoanAmount.toLocaleString('en-US')}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <Text style={[{ fontSize: 12, color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {t('processing_fee')}
+                  </Text>
+                  <Text testID="text_disclosure_fee" style={[{ fontSize: 13, color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                    ৳ {Math.round(selectedLoanAmount * 0.015).toLocaleString('en-US')} (১.৫%)
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <Text style={[{ fontSize: 12, color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {t('interest_rate')}
+                  </Text>
+                  <Text testID="text_disclosure_interest_rate" style={[{ fontSize: 13, color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                    ৯.০% (বাৎসরিক)
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <Text style={[{ fontSize: 12, color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {t('total_interest_amount')}
+                  </Text>
+                  <Text testID="text_disclosure_total_interest" style={[{ fontSize: 13, color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                    ৳ {Math.round(selectedLoanAmount * 0.09 * (selectedLoanTenure / 12)).toLocaleString('en-US')}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <Text style={{ fontSize: 12, color: '#0D6E5C', fontWeight: '700' }}>
+                    {t('monthly_emi')}
+                  </Text>
+                  <Text testID="text_disclosure_monthly_emi" style={{ fontSize: 15, fontWeight: '700', color: '#0D6E5C' }}>
+                    ৳ {Math.round((selectedLoanAmount + selectedLoanAmount * 0.09 * (selectedLoanTenure / 12)) / selectedLoanTenure).toLocaleString('en-US')}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 }}>
+                  <Text style={[{ fontSize: 12, fontWeight: '700', color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {t('disbursed_amount')}
+                  </Text>
+                  <Text testID="text_disclosure_disbursed_amount" style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                    ৳ {Math.round(selectedLoanAmount * 0.985).toLocaleString('en-US')}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Regulatory Notice Card */}
+              <View
+                testID="card_loan_regulatory_notice"
+                style={[{
+                  backgroundColor: '#FEF3C7',
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: '#FDE68A'
+                }]}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#78350F', marginBottom: 4 }}>
+                  বাংলাদেশ ব্যাংক রেগুলেশন ও শর্তাবলী
+                </Text>
+                <Text style={{ fontSize: 11, color: '#92400E', lineHeight: 16 }}>
+                  {t('regulatory_compliance_disclaimer')}। বাংলাদেশ ব্যাংকের ডিজিটাল ঋণ নীতিমালা ও ভোক্তা সুরক্ষা আইন অনুসারে সমুদয় লেনদেন পরিচালিত হবে।
+                </Text>
+              </View>
+
+              {/* Agreement Checkbox */}
+              <TouchableOpacity
+                testID="checkbox_loan_terms_agree"
+                accessibilityRole="checkbox"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setLoanTermsAgreed(!loanTermsAgreed);
+                  if (loanTermsError) setLoanTermsError('');
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                  padding: 8
+                }}
+              >
+                <View style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  borderWidth: 2,
+                  borderColor: loanTermsAgreed ? '#0D6E5C' : '#94A3B8',
+                  backgroundColor: loanTermsAgreed ? '#0D6E5C' : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 10
+                }}>
+                  {loanTermsAgreed && <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800' }}>✓</Text>}
+                </View>
+                <Text style={[{ fontSize: 12, color: '#334155', flex: 1 }, isDark && tStyles.textPrimary]}>
+                  {t('terms_agreement_checkbox')}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Validation Error Banner */}
+              {Boolean(loanTermsError) && (
+                <View style={{ backgroundColor: '#FEE2E2', padding: 10, borderRadius: 8, marginBottom: 16 }}>
+                  <Text testID="text_loan_terms_error" style={{ fontSize: 12, color: '#991B1B', fontWeight: '600' }}>
+                    {loanTermsError}
+                  </Text>
+                </View>
+              )}
+
+              {/* Submit CTA */}
+              <TouchableOpacity
+                testID="btn_confirm_submit_loan"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handleConfirmSubmitLoan}
+                style={{
+                  backgroundColor: '#0D6E5C',
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                  {t('apply_loan_now')}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+
+      {/* ===================================================================
+          MODAL 120: LOAN EMI SCHEDULE & REPAYMENT TRACKER (ITERATION 239)
+         =================================================================== */}
+      <Modal
+        visible={modalLoanEmiSchedule}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalLoanEmiSchedule(false)}
+        testID="modal_loan_emi_schedule"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_emi_schedule_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalLoanEmiSchedule(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ padding: 8, marginRight: 8 }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? '#F1F5F9' : '#0F172A' }}>←</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={[{ fontSize: 18, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                  {t('emi_schedule_title')}
+                </Text>
+                <Text style={[{ fontSize: 12, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                  {t('auto_debit_active')}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Active Loan Summary Header Card */}
+              <View
+                testID="card_active_loan_summary"
+                style={[{
+                  backgroundColor: isDark ? '#1E293B' : '#F0FDF4',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#BBF7D0'
+                }]}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text testID="text_active_loan_id" style={{ fontSize: 12, fontWeight: '700', color: '#0D6E5C' }}>
+                    {activeLoanData.loanId}
+                  </Text>
+                  <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#0D6E5C' }}>
+                      চলমান ঋণ
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                  <View>
+                    <Text style={[{ fontSize: 11, color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                      {t('total_borrowed')}
+                    </Text>
+                    <Text testID="text_active_loan_total" style={[{ fontSize: 18, fontWeight: '800', color: '#0F172A', marginTop: 2 }, isDark && tStyles.textPrimary]}>
+                      ৳ {activeLoanData.principal.toLocaleString('en-US')}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[{ fontSize: 11, color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                      {t('remaining_loan_balance')}
+                    </Text>
+                    <Text testID="text_active_loan_remaining" style={{ fontSize: 18, fontWeight: '800', color: '#D97706', marginTop: 2 }}>
+                      ৳ {activeLoanData.remainingAmount.toLocaleString('en-US')}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: isDark ? '#334155' : '#DCFCE7', flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={[{ fontSize: 11, color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {t('next_emi_due')}
+                  </Text>
+                  <Text testID="text_active_loan_next_due" style={{ fontSize: 11, fontWeight: '700', color: '#0D6E5C' }}>
+                    {activeLoanData.nextDueDate}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Interactive EMI Schedule List */}
+              <View testID="list_emi_schedule" style={{ marginBottom: 20 }}>
+                <Text style={[{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 10 }, isDark && tStyles.textPrimary]}>
+                  কিস্তির তালিকা
+                </Text>
+                {[
+                  { num: 1, date: '১০ সেপ্টেম্বর ২০২৬', amount: '৫,২২৫', status: 'PAID', testId: 'emi_item_1' },
+                  { num: 2, date: '১০ অক্টোবর ২০২৬', amount: '৫,২২৫', status: 'PAID', testId: 'emi_item_2' },
+                  { num: 3, date: '১০ নভেম্বর ২০২৬', amount: '৫,২২৫', status: 'DUE', testId: 'emi_item_3' },
+                  { num: 4, date: '১০ ডিসেম্বর ২০২৬', amount: '৫,২২৫', status: 'UPCOMING', testId: 'emi_item_4' },
+                  { num: 5, date: '১০ জানুয়ারি ২০২৭', amount: '৫,২২৫', status: 'UPCOMING', testId: 'emi_item_5' },
+                  { num: 6, date: '১০ ফেব্রুয়ারি ২০২৭', amount: '৫,২২৫', status: 'UPCOMING', testId: 'emi_item_6' }
+                ].map((emi) => (
+                  <View
+                    key={emi.num}
+                    testID={emi.testId}
+                    style={[{
+                      backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                      borderWidth: 1,
+                      borderColor: isDark ? '#334155' : '#E2E8F0',
+                      borderRadius: 12,
+                      padding: 12,
+                      marginBottom: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }]}
+                  >
+                    <View>
+                      <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                        কিস্তি {emi.num}
+                      </Text>
+                      <Text style={[{ fontSize: 11, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                        {emi.date}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 4 }, isDark && tStyles.textPrimary]}>
+                        ৳ {emi.amount}
+                      </Text>
+                      {emi.status === 'PAID' && (
+                        <View testID="badge_emi_status_paid" style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#0D6E5C' }}>
+                            {t('emi_status_paid')}
+                          </Text>
+                        </View>
+                      )}
+                      {emi.status === 'DUE' && (
+                        <View testID="badge_emi_status_due" style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#78350F' }}>
+                            {t('emi_status_due')}
+                          </Text>
+                        </View>
+                      )}
+                      {emi.status === 'UPCOMING' && (
+                        <View testID="badge_emi_status_upcoming" style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: '#64748B' }}>
+                            আসন্ন
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Repay Next EMI CTA */}
+              <TouchableOpacity
+                testID="btn_pay_emi_now"
+                accessibilityRole="button"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                onPress={handlePayEmiNow}
+                style={{
+                  backgroundColor: '#0D6E5C',
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                  {t('pay_emi_now')} (৳ ৫,২২৫)
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+
+      {/* ===================================================================
+          MODAL 121: LOAN EMI REPAYMENT CHECKOUT & PAYMENT METHOD (ITER 239)
+         =================================================================== */}
+      <Modal
+        visible={modalLoanRepayment}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          try { hapticFeedbackService.selection(); } catch (e) {}
+          setModalLoanRepayment(false);
+          setModalLoanEmiSchedule(true);
+        }}
+        testID="modal_loan_repayment"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_loan_repayment_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalLoanRepayment(false);
+                  setModalLoanEmiSchedule(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('ফিরে যান')}
+                style={{ padding: 8, marginRight: 8 }}
+              >
+                <Text style={{ fontSize: 20, color: isDark ? '#F1F5F9' : '#0F172A' }}>←</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={[{ fontSize: 18, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                  {t('loan_repayment_title')}
+                </Text>
+                <Text style={[{ fontSize: 12, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                  কিস্তি ৩ (পরিশোধের শেষ তারিখ: ১০ নভেম্বর ২০২৬)
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Payment Breakdown Card */}
+              <View
+                testID="card_repayment_breakdown"
+                style={[{
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#334155' : '#E2E8F0'
+                }]}
+              >
+                <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 10 }, isDark && tStyles.textPrimary]}>
+                  {t('repay_loan_btn')}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
+                  <Text style={[{ fontSize: 12, color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {t('monthly_emi')}
+                  </Text>
+                  <Text testID="text_repayment_installment_amount" style={[{ fontSize: 13, fontWeight: '600', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                    ৳ ৫,২২৫
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
+                  <Text style={[{ fontSize: 12, color: '#64748B' }, isDark && tStyles.textSecondary]}>
+                    {t('late_fee_penalty')}
+                  </Text>
+                  <Text testID="text_repayment_late_fee" style={[{ fontSize: 13, fontWeight: '600', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                    ৳ ০
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, marginTop: 4, borderTopWidth: 1, borderTopColor: isDark ? '#334155' : '#E2E8F0' }}>
+                  <Text style={[{ fontSize: 14, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                    সর্বমোট প্রদেয়
+                  </Text>
+                  <Text testID="text_repayment_total_amount" style={{ fontSize: 18, fontWeight: '800', color: '#0D6E5C' }}>
+                    ৳ ৫,২২৫
+                  </Text>
+                </View>
+              </View>
+
+              {/* Payment Source Selection */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 10 }, isDark && tStyles.textPrimary]}>
+                  {t('payment_method')}
+                </Text>
+
+                <TouchableOpacity
+                  testID="radio_repay_wallet"
+                  accessibilityRole="radio"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setLoanRepaymentSource('WALLET');
+                  }}
+                  style={[{
+                    backgroundColor: loanRepaymentSource === 'WALLET' ? (isDark ? '#064E3B' : '#ECFDF5') : (isDark ? '#1E293B' : '#FFFFFF'),
+                    borderWidth: 1.5,
+                    borderColor: loanRepaymentSource === 'WALLET' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                    borderRadius: 12,
+                    padding: 12,
+                    marginBottom: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }]}
+                >
+                  <View style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    borderWidth: 2,
+                    borderColor: loanRepaymentSource === 'WALLET' ? '#0D6E5C' : '#94A3B8',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 10
+                  }}>
+                    {loanRepaymentSource === 'WALLET' && (
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#0D6E5C' }} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                      {t('repayment_source_wallet')}
+                    </Text>
+                    <Text style={[{ fontSize: 11, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                      বর্তমান ব্যালেন্স: ৳ ১২,৪৫০
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  testID="radio_repay_bank"
+                  accessibilityRole="radio"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setLoanRepaymentSource('BANK');
+                  }}
+                  style={[{
+                    backgroundColor: loanRepaymentSource === 'BANK' ? (isDark ? '#064E3B' : '#ECFDF5') : (isDark ? '#1E293B' : '#FFFFFF'),
+                    borderWidth: 1.5,
+                    borderColor: loanRepaymentSource === 'BANK' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                    borderRadius: 12,
+                    padding: 12,
+                    marginBottom: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }]}
+                >
+                  <View style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    borderWidth: 2,
+                    borderColor: loanRepaymentSource === 'BANK' ? '#0D6E5C' : '#94A3B8',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 10
+                  }}>
+                    {loanRepaymentSource === 'BANK' && (
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#0D6E5C' }} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[{ fontSize: 13, fontWeight: '700', color: '#0F172A' }, isDark && tStyles.textPrimary]}>
+                      {t('repayment_source_bank')}
+                    </Text>
+                    <Text style={[{ fontSize: 11, color: '#64748B', marginTop: 2 }, isDark && tStyles.textSecondary]}>
+                      ব্র্যাক ব্যাংক (**** ৪৩২১)
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Success Banner or Submit Button */}
+              {loanRepaymentSuccess ? (
+                <View style={{ alignItems: 'center' }}>
+                  <View style={{ backgroundColor: '#D1FAE5', padding: 14, borderRadius: 12, width: '100%', alignItems: 'center', marginBottom: 12 }}>
+                    <Text style={{ fontSize: 24, marginBottom: 4 }}>🎉</Text>
+                    <Text testID="text_repayment_success_banner" style={{ fontSize: 14, fontWeight: '700', color: '#0D6E5C', textAlign: 'center' }}>
+                      {t('repayment_success_toast')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#065F46', marginTop: 4, textAlign: 'center' }}>
+                      ট্রানজেকশন আইডি: TXN-EMI-20261105-0912
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    testID="btn_repayment_done"
+                    accessibilityRole="button"
+                    hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                    onPress={handleDoneEmiRepayment}
+                    style={{
+                      backgroundColor: '#0D6E5C',
+                      borderRadius: 12,
+                      paddingVertical: 14,
+                      width: '100%',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                      {t('kyc_done_btn')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  testID="btn_confirm_emi_repayment"
+                  accessibilityRole="button"
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  onPress={handleConfirmEmiRepayment}
+                  style={{
+                    backgroundColor: '#0D6E5C',
+                    borderRadius: 12,
+                    paddingVertical: 14,
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                    {t('pay_emi_now')}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </ScrollView>
           </View>
         </View>

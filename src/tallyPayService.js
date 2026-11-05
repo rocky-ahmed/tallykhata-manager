@@ -8069,7 +8069,1084 @@ const merchantQrOrderEngine = new MerchantQrOrderEngine();
 const reconstructedQrOrderEngine = merchantQrOrderEngine;
 
 
+
+// =============================================================================
+// MILESTONE REA-ITER-239: TALLYPAY MERCHANT DIGITAL MICRO-LOAN, CREDIT SCORING
+// & EMI REPAYMENT SUBSYSTEM
+// =============================================================================
+
+// --- 1. ROOM SQLITE SCHEMAS & TABLE DEFINITIONS ---
+const MERCHANT_LOAN_SCHEMA = {
+  tableName: 'merchant_loan',
+  columns: [
+    'id',
+    'loan_id',
+    'business_id',
+    'partner_bank',
+    'principal_paisa',
+    'interest_rate_basis_points',
+    'tenure_months',
+    'total_payable_paisa',
+    'monthly_emi_paisa',
+    'disbursed_paisa',
+    'processing_fee_paisa',
+    'loan_status',
+    'disbursement_date',
+    'repayment_start_date',
+    'paid_paisa',
+    'remaining_paisa',
+    'credit_score',
+    'created_at',
+    'updated_at',
+    'synced'
+  ],
+  columnTypes: {
+    id: 'INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL',
+    loan_id: 'TEXT NOT NULL',
+    business_id: 'TEXT NOT NULL',
+    partner_bank: 'TEXT NOT NULL',
+    principal_paisa: 'INTEGER NOT NULL',
+    interest_rate_basis_points: 'INTEGER NOT NULL',
+    tenure_months: 'INTEGER NOT NULL',
+    total_payable_paisa: 'INTEGER NOT NULL',
+    monthly_emi_paisa: 'INTEGER NOT NULL',
+    disbursed_paisa: 'INTEGER NOT NULL',
+    processing_fee_paisa: 'INTEGER NOT NULL',
+    loan_status: 'TEXT NOT NULL',
+    disbursement_date: 'TEXT',
+    repayment_start_date: 'TEXT',
+    paid_paisa: 'INTEGER NOT NULL DEFAULT 0',
+    remaining_paisa: 'INTEGER NOT NULL',
+    credit_score: 'INTEGER NOT NULL',
+    created_at: 'TEXT NOT NULL',
+    updated_at: 'TEXT',
+    synced: 'INTEGER NOT NULL DEFAULT 0'
+  },
+  indices: [
+    {
+      name: 'index_merchant_loan_loan_id',
+      unique: true,
+      columns: ['loan_id'],
+      ddl: 'CREATE UNIQUE INDEX IF NOT EXISTS index_merchant_loan_loan_id ON merchant_loan (loan_id);'
+    },
+    {
+      name: 'index_merchant_loan_business_id',
+      unique: false,
+      columns: ['business_id'],
+      ddl: 'CREATE INDEX IF NOT EXISTS index_merchant_loan_business_id ON merchant_loan (business_id);'
+    }
+  ],
+  ddl: `CREATE TABLE IF NOT EXISTS merchant_loan (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    loan_id TEXT NOT NULL,
+    business_id TEXT NOT NULL,
+    partner_bank TEXT NOT NULL,
+    principal_paisa INTEGER NOT NULL,
+    interest_rate_basis_points INTEGER NOT NULL,
+    tenure_months INTEGER NOT NULL,
+    total_payable_paisa INTEGER NOT NULL,
+    monthly_emi_paisa INTEGER NOT NULL,
+    disbursed_paisa INTEGER NOT NULL,
+    processing_fee_paisa INTEGER NOT NULL,
+    loan_status TEXT NOT NULL,
+    disbursement_date TEXT,
+    repayment_start_date TEXT,
+    paid_paisa INTEGER NOT NULL DEFAULT 0,
+    remaining_paisa INTEGER NOT NULL,
+    credit_score INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT,
+    synced INTEGER NOT NULL DEFAULT 0
+  );`
+};
+const LOAN_TABLE_SCHEMA = MERCHANT_LOAN_SCHEMA;
+
+const MERCHANT_LOAN_EMI_SCHEMA = {
+  tableName: 'merchant_loan_emi',
+  columns: [
+    'id',
+    'emi_id',
+    'loan_id',
+    'business_id',
+    'installment_number',
+    'due_date',
+    'principal_component_paisa',
+    'interest_component_paisa',
+    'total_installment_paisa',
+    'penalty_paisa',
+    'payment_status',
+    'paid_date',
+    'transaction_reference',
+    'synced'
+  ],
+  columnTypes: {
+    id: 'INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL',
+    emi_id: 'TEXT NOT NULL',
+    loan_id: 'TEXT NOT NULL',
+    business_id: 'TEXT NOT NULL',
+    installment_number: 'INTEGER NOT NULL',
+    due_date: 'TEXT NOT NULL',
+    principal_component_paisa: 'INTEGER NOT NULL',
+    interest_component_paisa: 'INTEGER NOT NULL',
+    total_installment_paisa: 'INTEGER NOT NULL',
+    penalty_paisa: 'INTEGER NOT NULL DEFAULT 0',
+    payment_status: 'TEXT NOT NULL',
+    paid_date: 'TEXT',
+    transaction_reference: 'TEXT',
+    synced: 'INTEGER NOT NULL DEFAULT 0'
+  },
+  indices: [
+    {
+      name: 'index_merchant_loan_emi_emi_id',
+      unique: true,
+      columns: ['emi_id'],
+      ddl: 'CREATE UNIQUE INDEX IF NOT EXISTS index_merchant_loan_emi_emi_id ON merchant_loan_emi (emi_id);'
+    },
+    {
+      name: 'index_merchant_loan_emi_loan_id',
+      unique: false,
+      columns: ['loan_id'],
+      ddl: 'CREATE INDEX IF NOT EXISTS index_merchant_loan_emi_loan_id ON merchant_loan_emi (loan_id);'
+    },
+    {
+      name: 'index_merchant_loan_emi_business_id',
+      unique: false,
+      columns: ['business_id'],
+      ddl: 'CREATE INDEX IF NOT EXISTS index_merchant_loan_emi_business_id ON merchant_loan_emi (business_id);'
+    }
+  ],
+  ddl: `CREATE TABLE IF NOT EXISTS merchant_loan_emi (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    emi_id TEXT NOT NULL,
+    loan_id TEXT NOT NULL,
+    business_id TEXT NOT NULL,
+    installment_number INTEGER NOT NULL,
+    due_date TEXT NOT NULL,
+    principal_component_paisa INTEGER NOT NULL,
+    interest_component_paisa INTEGER NOT NULL,
+    total_installment_paisa INTEGER NOT NULL,
+    penalty_paisa INTEGER NOT NULL DEFAULT 0,
+    payment_status TEXT NOT NULL,
+    paid_date TEXT,
+    transaction_reference TEXT,
+    synced INTEGER NOT NULL DEFAULT 0
+  );`
+};
+const LOAN_EMI_TABLE_SCHEMA = MERCHANT_LOAN_EMI_SCHEMA;
+
+// --- 2. ENUMS & CONSTANTS ---
+const LOAN_STATUSES = {
+  ELIGIBLE: 'ELIGIBLE',
+  APPLIED: 'APPLIED',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  APPROVED: 'APPROVED',
+  DISBURSED: 'DISBURSED',
+  ACTIVE: 'ACTIVE',
+  PAID_OFF: 'PAID_OFF',
+  DEFAULTED: 'DEFAULTED',
+  REJECTED: 'REJECTED'
+};
+const LoanStatus = LOAN_STATUSES;
+const MerchantLoanStatus = LOAN_STATUSES;
+
+const EMI_PAYMENT_STATUSES = {
+  PENDING: 'PENDING',
+  OVERDUE: 'OVERDUE',
+  PAID: 'PAID',
+  AUTO_DEBITED: 'AUTO_DEBITED'
+};
+const EmiPaymentStatus = EMI_PAYMENT_STATUSES;
+const LoanEmiStatus = EMI_PAYMENT_STATUSES;
+
+const CREDIT_SCORE_TIERS = {
+  POOR: {
+    code: 'POOR',
+    minScore: 300,
+    maxScore: 579,
+    label_bn: 'দুর্বল',
+    isEligible: false,
+    maxLoanPaisa: 0
+  },
+  FAIR: {
+    code: 'FAIR',
+    minScore: 580,
+    maxScore: 669,
+    label_bn: 'মোটামুটি',
+    isEligible: true,
+    maxLoanPaisa: 5000000 // ৳50,000
+  },
+  GOOD: {
+    code: 'GOOD',
+    minScore: 670,
+    maxScore: 739,
+    label_bn: 'ভালো',
+    isEligible: true,
+    maxLoanPaisa: 15000000 // ৳150,000
+  },
+  VERY_GOOD: {
+    code: 'VERY_GOOD',
+    minScore: 740,
+    maxScore: 799,
+    label_bn: 'খুব ভালো',
+    isEligible: true,
+    maxLoanPaisa: 30000000 // ৳300,000
+  },
+  EXCELLENT: {
+    code: 'EXCELLENT',
+    minScore: 800,
+    maxScore: 850,
+    label_bn: 'চমৎকার',
+    isEligible: true,
+    maxLoanPaisa: 50000000 // ৳500,000
+  }
+};
+const CreditScoreTier = CREDIT_SCORE_TIERS;
+
+const LOAN_PARTNER_BANKS = {
+  BRAC_BANK: {
+    code: 'BRAC_BANK',
+    name_en: 'BRAC Bank PLC',
+    name_bn: 'ব্র্যাক ব্যাংক',
+    product_name: 'Shubidha Digital Loan',
+    interest_rate_bps: 900, // 9.00%
+    processing_fee_bps: 100, // 1.00%
+    min_tenure_months: 3,
+    max_tenure_months: 24,
+    min_amount_paisa: 1000000, // ৳10,000
+    max_amount_paisa: 50000000 // ৳500,000
+  },
+  CITY_BANK: {
+    code: 'CITY_BANK',
+    name_en: 'The City Bank PLC',
+    name_bn: 'সিটি ব্যাংক',
+    product_name: 'City Amar Rin',
+    interest_rate_bps: 950, // 9.50%
+    processing_fee_bps: 150, // 1.50%
+    min_tenure_months: 3,
+    max_tenure_months: 18,
+    min_amount_paisa: 1000000, // ৳10,000
+    max_amount_paisa: 30000000 // ৳300,000
+  },
+  MUTUAL_TRUST_BANK: {
+    code: 'MUTUAL_TRUST_BANK',
+    name_en: 'Mutual Trust Bank PLC',
+    name_bn: 'মিউচুয়াল ট্রাস্ট ব্যাংক',
+    product_name: 'MTB Digital Shujog',
+    interest_rate_bps: 900, // 9.00%
+    processing_fee_bps: 100, // 1.00%
+    min_tenure_months: 6,
+    max_tenure_months: 24,
+    min_amount_paisa: 2000000, // ৳20,000
+    max_amount_paisa: 40000000 // ৳400,000
+  },
+  PRIME_BANK: {
+    code: 'PRIME_BANK',
+    name_en: 'Prime Bank PLC',
+    name_bn: 'প্রাইম ব্যাংক',
+    product_name: 'Prime Agrani MSME',
+    interest_rate_bps: 925, // 9.25%
+    processing_fee_bps: 125, // 1.25%
+    min_tenure_months: 6,
+    max_tenure_months: 12,
+    min_amount_paisa: 1500000, // ৳15,000
+    max_amount_paisa: 25000000 // ৳250,000
+  },
+  IPDC_FINANCE: {
+    code: 'IPDC_FINANCE',
+    name_en: 'IPDC Finance Limited',
+    name_bn: 'আইপিডিসি ফাইন্যান্স',
+    product_name: 'IPDC Dana Micro-Credit',
+    interest_rate_bps: 1000, // 10.00%
+    processing_fee_bps: 200, // 2.00%
+    min_tenure_months: 3,
+    max_tenure_months: 12,
+    min_amount_paisa: 500000, // ৳5,000
+    max_amount_paisa: 20000000 // ৳200,000
+  }
+};
+const LoanPartnerBank = LOAN_PARTNER_BANKS;
+
+const LOAN_ARSC_TOKENS = {
+  LOAN_TITLE: 'ডিজিটাল ঋণ',
+  LOAN_SUBTITLE: 'সহজ শর্তে জামানতবিহীন ঋণ নিন',
+  CREDIT_SCORE: 'আপনার ক্রেডিট স্কোর',
+  MONTHLY_EMI: 'মাসিক কিস্তি (ইএমআই)',
+  REPAY_LOAN: 'ঋণ পরিশোধ করুন',
+  AUTO_DEBIT_ACTIVE: 'অটো-ডেবিট সক্রিয় আছে',
+  REPAYMENT_SUCCESS: 'কিস্তি পরিশোধ সফল হয়েছে',
+  INSUFFICIENT_BALANCE: 'পর্যাপ্ত ব্যালেন্স নেই',
+  APPLICATION_SUBMITTED: 'ঋণের আবেদন জমা দেওয়া হয়েছে',
+  LOAN_APPROVED: 'অভিনন্দন! আপনার ঋণ অনুমোদিত হয়েছে',
+  PROCESSING_FEE: 'প্রক্রিয়াকরণ ফি',
+  REMAINING_EMIS: 'বাকি কিস্তির সংখ্যা',
+  NEXT_DUE_DATE: 'পরবর্তী কিস্তির তারিখ'
+};
+
+// --- 3. FINANCIAL ARITHMETIC & CREDIT SCORING ENGINES ---
+
+function calculateMerchantCreditScore({
+  averageMonthlyTurnoverPaisa = 0,
+  activeDaysLast30 = 0,
+  debtCollectionRecoveryRate = 0,
+  averageWalletBalancePaisa = 0,
+  priorDefaultCount = 0,
+  priorOnTimeRepayments = 0
+} = {}) {
+  const BASE_SCORE = 300;
+  const MAX_SCORE = 850;
+
+  // Factor 1: Monthly Turnover (Max 180 points)
+  // ৳100,000 (10,000,000 paisa) or above receives maximum 180 points
+  const turnoverRatio = Math.min(1.0, Math.max(0, (averageMonthlyTurnoverPaisa || 0) / 10000000));
+  const turnoverPoints = Math.round(turnoverRatio * 180);
+
+  // Factor 2: Business Regularity & Activity (Max 140 points)
+  // 25+ active days out of 30 receives maximum 140 points
+  const regularityRatio = Math.min(1.0, Math.max(0, (activeDaysLast30 || 0) / 25));
+  const regularityPoints = Math.round(regularityRatio * 140);
+
+  // Factor 3: Customer Debt Collection Velocity (Max 130 points)
+  // Recovery rate of 80% or above receives maximum 130 points
+  const debtRatio = Math.min(1.0, Math.max(0, (debtCollectionRecoveryRate || 0) / 0.8));
+  const debtRecoveryPoints = Math.round(debtRatio * 130);
+
+  // Factor 4: Wallet Balance Retention (Max 70 points)
+  // ৳10,000 (1,000,000 paisa) or above receives maximum 70 points
+  const walletRatio = Math.min(1.0, Math.max(0, (averageWalletBalancePaisa || 0) / 1000000));
+  const walletPoints = Math.round(walletRatio * 70);
+
+  // Factor 5: Repayment History Bonus/Penalty (Max +30, or -120 per default)
+  const onTimeBonus = Math.min(30, (priorOnTimeRepayments || 0) * 5);
+  const defaultPenalty = (priorDefaultCount || 0) * 120;
+
+  let rawScore = BASE_SCORE + turnoverPoints + regularityPoints + debtRecoveryPoints + walletPoints + onTimeBonus - defaultPenalty;
+  const score = Math.max(BASE_SCORE, Math.min(MAX_SCORE, rawScore));
+
+  let tier;
+  let label_bn;
+  let isEligible;
+  let maxLoanAmountPaisa;
+
+  if (score < 580) {
+    tier = 'POOR';
+    label_bn = 'দুর্বল';
+    isEligible = false;
+    maxLoanAmountPaisa = 0;
+  } else if (score < 670) {
+    tier = 'FAIR';
+    label_bn = 'মোটামুটি';
+    isEligible = true;
+    maxLoanAmountPaisa = 5000000; // ৳50,000
+  } else if (score < 740) {
+    tier = 'GOOD';
+    label_bn = 'ভালো';
+    isEligible = true;
+    maxLoanAmountPaisa = 15000000; // ৳150,000
+  } else if (score < 800) {
+    tier = 'VERY_GOOD';
+    label_bn = 'খুব ভালো';
+    isEligible = true;
+    maxLoanAmountPaisa = 30000000; // ৳300,000
+  } else {
+    tier = 'EXCELLENT';
+    label_bn = 'চমৎকার';
+    isEligible = true;
+    maxLoanAmountPaisa = 50000000; // ৳500,000
+  }
+
+  return {
+    score,
+    tier,
+    label_bn,
+    isEligible,
+    maxLoanAmountPaisa,
+    factors: {
+      turnoverPoints,
+      regularityPoints,
+      debtRecoveryPoints,
+      walletPoints,
+      onTimeBonus,
+      defaultPenalty
+    }
+  };
+}
+
+function calculateLoanAmortization({
+  principalPaisa,
+  interestRateBps,
+  tenureMonths,
+  processingFeeBps = 100,
+  startDate = null
+}) {
+  if (!Number.isInteger(principalPaisa) || principalPaisa <= 0) {
+    throw new Error('Principal must be a positive integer in paisa');
+  }
+  if (!Number.isInteger(interestRateBps) || interestRateBps < 0) {
+    throw new Error('Interest rate basis points must be a non-negative integer');
+  }
+  if (!Number.isInteger(tenureMonths) || tenureMonths <= 0) {
+    throw new Error('Tenure months must be a positive integer');
+  }
+
+  const processingFeePaisa = Math.round((principalPaisa * processingFeeBps) / 10000);
+  const disbursedPaisa = principalPaisa - processingFeePaisa;
+
+  const annualRate = interestRateBps / 10000;
+  const monthlyRate = annualRate / 12;
+
+  let monthlyEmiPaisa;
+  if (monthlyRate === 0) {
+    monthlyEmiPaisa = Math.round(principalPaisa / tenureMonths);
+  } else {
+    const factor = Math.pow(1 + monthlyRate, tenureMonths);
+    monthlyEmiPaisa = Math.round(principalPaisa * ((monthlyRate * factor) / (factor - 1)));
+  }
+
+  const schedule = [];
+  let remainingPrincipal = principalPaisa;
+  const start = startDate ? new Date(startDate) : new Date();
+
+  const startY = start.getFullYear();
+  const startM = start.getMonth();
+  const startD = start.getDate();
+
+  for (let i = 1; i <= tenureMonths; i++) {
+    const dueDate = new Date(startY, startM + i, startD);
+    const m = dueDate.getMonth() + 1;
+    const d = dueDate.getDate();
+    const dueDateStr = dueDate.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (d < 10 ? '0' + d : d);
+
+    let interestComponentPaisa = Math.round(remainingPrincipal * monthlyRate);
+    let principalComponentPaisa;
+    let totalInstallmentPaisa;
+
+    if (i === tenureMonths) {
+      principalComponentPaisa = remainingPrincipal;
+      totalInstallmentPaisa = principalComponentPaisa + interestComponentPaisa;
+    } else {
+      principalComponentPaisa = monthlyEmiPaisa - interestComponentPaisa;
+      if (principalComponentPaisa > remainingPrincipal) {
+        principalComponentPaisa = remainingPrincipal;
+      }
+      totalInstallmentPaisa = principalComponentPaisa + interestComponentPaisa;
+    }
+
+    remainingPrincipal -= principalComponentPaisa;
+
+    schedule.push({
+      installmentNumber: i,
+      dueDate: dueDateStr,
+      principalComponentPaisa,
+      interestComponentPaisa,
+      totalInstallmentPaisa,
+      remainingPrincipalPaisa: Math.max(0, remainingPrincipal)
+    });
+  }
+
+  const totalPayablePaisa = schedule.reduce((sum, item) => sum + item.totalInstallmentPaisa, 0);
+  const totalPrincipalReturned = schedule.reduce((sum, item) => sum + item.principalComponentPaisa, 0);
+  const totalInterestPaisa = totalPayablePaisa - principalPaisa;
+
+  return {
+    principalPaisa,
+    interestRateBps,
+    tenureMonths,
+    processingFeePaisa,
+    disbursedPaisa,
+    monthlyEmiPaisa,
+    totalPayablePaisa,
+    totalInterestPaisa,
+    totalPrincipalReturned,
+    isExact: totalPrincipalReturned === principalPaisa,
+    schedule
+  };
+}
+
+function calculateEmiLatePenalty(emi, currentDate = new Date().toISOString()) {
+  if (!emi || !emi.due_date) return 0;
+  if (emi.payment_status === EMI_PAYMENT_STATUSES.PAID || emi.payment_status === EMI_PAYMENT_STATUSES.AUTO_DEBITED) {
+    return 0;
+  }
+  const due = new Date(emi.due_date);
+  const current = new Date(currentDate);
+  const diffTime = current - due;
+  const daysOverdue = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  if (daysOverdue <= 0) return 0;
+
+  // 200 bps (2.0%) per 30 days overdue
+  const baseInstallment = emi.total_installment_paisa || (emi.principal_component_paisa + emi.interest_component_paisa);
+  const calculatedPenalty = Math.round((baseInstallment * 200 * daysOverdue) / (10000 * 30));
+  // Capped at 10% of installment
+  const maxPenalty = Math.round(baseInstallment * 0.10);
+
+  return Math.min(calculatedPenalty, maxPenalty);
+}
+
+const VALID_LOAN_TRANSITIONS = {
+  [LOAN_STATUSES.ELIGIBLE]: [LOAN_STATUSES.APPLIED],
+  [LOAN_STATUSES.APPLIED]: [LOAN_STATUSES.UNDER_REVIEW, LOAN_STATUSES.REJECTED],
+  [LOAN_STATUSES.UNDER_REVIEW]: [LOAN_STATUSES.APPROVED, LOAN_STATUSES.REJECTED],
+  [LOAN_STATUSES.APPROVED]: [LOAN_STATUSES.DISBURSED],
+  [LOAN_STATUSES.DISBURSED]: [LOAN_STATUSES.ACTIVE],
+  [LOAN_STATUSES.ACTIVE]: [LOAN_STATUSES.PAID_OFF, LOAN_STATUSES.DEFAULTED],
+  [LOAN_STATUSES.DEFAULTED]: [LOAN_STATUSES.PAID_OFF],
+  [LOAN_STATUSES.PAID_OFF]: [],
+  [LOAN_STATUSES.REJECTED]: []
+};
+
+function transitionLoanStatus(currentStatus, targetStatus, context = {}) {
+  if (!LOAN_STATUSES[currentStatus]) {
+    throw new Error(`Invalid current loan status: ${currentStatus}`);
+  }
+  if (!LOAN_STATUSES[targetStatus]) {
+    throw new Error(`Invalid target loan status: ${targetStatus}`);
+  }
+
+  const allowed = VALID_LOAN_TRANSITIONS[currentStatus] || [];
+  if (!allowed.includes(targetStatus)) {
+    throw new Error(`Illegal loan status transition from ${currentStatus} to ${targetStatus}`);
+  }
+
+  if (targetStatus === LOAN_STATUSES.PAID_OFF && context.remaining_paisa > 0) {
+    throw new Error(`Cannot transition to PAID_OFF while remaining_paisa is ${context.remaining_paisa}`);
+  }
+
+  return {
+    previousStatus: currentStatus,
+    newStatus: targetStatus,
+    transitionedAt: new Date().toISOString(),
+    context
+  };
+}
+
+// --- 4. IN-MEMORY RECORDS & DAO CLASSES ---
+
+let _cachedIsoSec = 0;
+let _cachedIsoStr = '';
+function getFastIsoString() {
+  const now = Date.now();
+  const sec = Math.floor(now / 1000);
+  if (sec !== _cachedIsoSec) {
+    _cachedIsoSec = sec;
+    _cachedIsoStr = new Date(now).toISOString();
+  }
+  return _cachedIsoStr;
+}
+
+let _loanSequence = 1;
+let _emiSequence = 1;
+
+class MerchantLoanRecord {
+  constructor(data = {}) {
+    this.id = data.id || null;
+    this.loan_id = data.loan_id || `TK-LN-${Date.now()}-${(_loanSequence++)}`;
+    this.business_id = String(data.business_id || data.businessId || '1');
+    this.partner_bank = data.partner_bank || data.partnerBank || 'BRAC_BANK';
+    this.principal_paisa = Number.isInteger(data.principal_paisa) ? data.principal_paisa : 0;
+    this.interest_rate_basis_points = Number.isInteger(data.interest_rate_basis_points) ? data.interest_rate_basis_points : 900;
+    this.tenure_months = Number.isInteger(data.tenure_months) ? data.tenure_months : 6;
+    this.total_payable_paisa = Number.isInteger(data.total_payable_paisa) ? data.total_payable_paisa : 0;
+    this.monthly_emi_paisa = Number.isInteger(data.monthly_emi_paisa) ? data.monthly_emi_paisa : 0;
+    this.disbursed_paisa = Number.isInteger(data.disbursed_paisa) ? data.disbursed_paisa : 0;
+    this.processing_fee_paisa = Number.isInteger(data.processing_fee_paisa) ? data.processing_fee_paisa : 0;
+    this.loan_status = data.loan_status || LOAN_STATUSES.APPLIED;
+    this.disbursement_date = data.disbursement_date || null;
+    this.repayment_start_date = data.repayment_start_date || null;
+    this.paid_paisa = Number.isInteger(data.paid_paisa) ? data.paid_paisa : 0;
+    this.remaining_paisa = Number.isInteger(data.remaining_paisa) ? data.remaining_paisa : this.total_payable_paisa;
+    this.credit_score = Number.isInteger(data.credit_score) ? data.credit_score : 300;
+    this.created_at = data.created_at || getFastIsoString();
+    this.updated_at = data.updated_at || null;
+    this.synced = data.synced !== undefined ? data.synced : 0;
+  }
+}
+
+class MerchantLoanEmiRecord {
+  constructor(data = {}) {
+    this.id = data.id || null;
+    this.emi_id = data.emi_id || `TK-EMI-${Date.now()}-${(_emiSequence++)}`;
+    this.loan_id = data.loan_id || '';
+    this.business_id = String(data.business_id || data.businessId || '1');
+    this.installment_number = Number.isInteger(data.installment_number) ? data.installment_number : 1;
+    this.due_date = data.due_date || new Date().toISOString().slice(0, 10);
+    this.principal_component_paisa = Number.isInteger(data.principal_component_paisa) ? data.principal_component_paisa : 0;
+    this.interest_component_paisa = Number.isInteger(data.interest_component_paisa) ? data.interest_component_paisa : 0;
+    this.total_installment_paisa = Number.isInteger(data.total_installment_paisa) ? data.total_installment_paisa : 0;
+    this.penalty_paisa = Number.isInteger(data.penalty_paisa) ? data.penalty_paisa : 0;
+    this.payment_status = data.payment_status || EMI_PAYMENT_STATUSES.PENDING;
+    this.paid_date = data.paid_date || null;
+    this.transaction_reference = data.transaction_reference || null;
+    this.synced = data.synced !== undefined ? data.synced : 0;
+  }
+}
+
+class MerchantLoanDao {
+  constructor() {
+    this.loans = [];
+    this.loansById = new Map();
+    this.nextId = 1;
+  }
+
+  saveLoan(record) {
+    const loan = record instanceof MerchantLoanRecord ? record : new MerchantLoanRecord(record);
+    const existing = this.loansById.get(loan.loan_id);
+    if (existing) {
+      loan.id = existing.id;
+      loan.updated_at = new Date().toISOString();
+      Object.assign(existing, loan);
+      return { ...existing };
+    }
+    loan.id = this.nextId++;
+    loan.created_at = loan.created_at || getFastIsoString();
+    const cloned = { ...loan };
+    this.loans.push(cloned);
+    this.loansById.set(loan.loan_id, cloned);
+    return cloned;
+  }
+
+  getLoanById(loanId) {
+    const found = this.loansById.get(loanId);
+    return found ? { ...found } : null;
+  }
+
+  getLoansByBusinessId(businessId, options = {}) {
+    const bId = String(businessId);
+    let list = this.loans.filter(l => l.business_id === bId);
+    if (options.status) {
+      list = list.filter(l => l.loan_status === options.status);
+    }
+    if (options.partner_bank) {
+      list = list.filter(l => l.partner_bank === options.partner_bank);
+    }
+    if (options.synced !== undefined) {
+      list = list.filter(l => l.synced === options.synced);
+    }
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const offset = options.offset || 0;
+    const limit = options.limit || list.length;
+    return list.slice(offset, offset + limit).map(l => ({ ...l }));
+  }
+
+  updateLoanStatus(loanId, status, extraFields = {}) {
+    const loan = this.loans.find(l => l.loan_id === loanId);
+    if (!loan) throw new Error(`Loan not found with ID: ${loanId}`);
+    loan.loan_status = status;
+    loan.updated_at = new Date().toISOString();
+    loan.synced = 0;
+    Object.assign(loan, extraFields);
+    return { ...loan };
+  }
+
+  updateLoanRepayment(loanId, paidAmountPaisa) {
+    const loan = this.loans.find(l => l.loan_id === loanId);
+    if (!loan) throw new Error(`Loan not found with ID: ${loanId}`);
+    loan.paid_paisa += paidAmountPaisa;
+    loan.remaining_paisa = Math.max(0, loan.remaining_paisa - paidAmountPaisa);
+    loan.updated_at = new Date().toISOString();
+    loan.synced = 0;
+    if (loan.remaining_paisa === 0) {
+      loan.loan_status = LOAN_STATUSES.PAID_OFF;
+    }
+    return { ...loan };
+  }
+
+  getUnsyncedLoans(limit = 50) {
+    return this.loans.filter(l => l.synced === 0).slice(0, limit).map(l => ({ ...l }));
+  }
+
+  updateLoanSyncStatus(loanId, synced) {
+    const loan = this.loans.find(l => l.loan_id === loanId);
+    if (loan) {
+      loan.synced = synced ? 1 : 0;
+      return true;
+    }
+    return false;
+  }
+
+  deleteLoan(loanId) {
+    const idx = this.loans.findIndex(l => l.loan_id === loanId);
+    if (idx >= 0) {
+      this.loans.splice(idx, 1);
+      this.loansById.delete(loanId);
+      return true;
+    }
+    return false;
+  }
+
+  exists(loanId) {
+    return this.loansById.has(loanId);
+  }
+}
+
+class MerchantLoanEmiDao {
+  constructor() {
+    this.emis = [];
+    this.emisById = new Map();
+    this.nextId = 1;
+  }
+
+  saveEmis(records) {
+    const inputList = Array.isArray(records) ? records : [records];
+    const saved = [];
+    for (const r of inputList) {
+      const emi = r instanceof MerchantLoanEmiRecord ? r : new MerchantLoanEmiRecord(r);
+      const existing = this.emisById.get(emi.emi_id);
+      if (existing) {
+        emi.id = existing.id;
+        Object.assign(existing, emi);
+        saved.push({ ...existing });
+      } else {
+        emi.id = this.nextId++;
+        const cloned = { ...emi };
+        this.emis.push(cloned);
+        this.emisById.set(emi.emi_id, cloned);
+        saved.push(cloned);
+      }
+    }
+    return saved;
+  }
+
+  getEmisByLoanId(loanId) {
+    return this.emis
+      .filter(e => e.loan_id === loanId)
+      .sort((a, b) => a.installment_number - b.installment_number)
+      .map(e => ({ ...e }));
+  }
+
+  getEmiById(emiId) {
+    const found = this.emisById.get(emiId);
+    return found ? { ...found } : null;
+  }
+
+  getPendingEmisByBusinessId(businessId, options = {}) {
+    const bId = String(businessId);
+    let list = this.emis.filter(e => e.business_id === bId && (e.payment_status === EMI_PAYMENT_STATUSES.PENDING || e.payment_status === EMI_PAYMENT_STATUSES.OVERDUE));
+    list.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+    const offset = options.offset || 0;
+    const limit = options.limit || list.length;
+    return list.slice(offset, offset + limit).map(e => ({ ...e }));
+  }
+
+  recordEmiPayment(emiId, { paidDate = new Date().toISOString(), transactionReference, penaltyPaisa = 0, paymentStatus = EMI_PAYMENT_STATUSES.PAID }) {
+    const emi = this.emis.find(e => e.emi_id === emiId);
+    if (!emi) throw new Error(`EMI not found with ID: ${emiId}`);
+    emi.payment_status = paymentStatus;
+    emi.paid_date = paidDate;
+    emi.transaction_reference = transactionReference || `TXN-EMI-${Date.now()}`;
+    emi.penalty_paisa = penaltyPaisa;
+    emi.synced = 0;
+    return { ...emi };
+  }
+
+  getUnsyncedEmis(limit = 50) {
+    return this.emis.filter(e => e.synced === 0).slice(0, limit).map(e => ({ ...e }));
+  }
+
+  updateEmiSyncStatus(emiId, synced) {
+    const emi = this.emis.find(e => e.emi_id === emiId);
+    if (emi) {
+      emi.synced = synced ? 1 : 0;
+      return true;
+    }
+    return false;
+  }
+
+  deleteEmisByLoanId(loanId) {
+    const beforeLen = this.emis.length;
+    this.emis = this.emis.filter(e => e.loan_id !== loanId);
+    return beforeLen - this.emis.length;
+  }
+}
+
+// --- 5. END-TO-END MICRO-LOAN & EMI REPAYMENT ENGINE ---
+
+class MerchantLoanEngine {
+  constructor(loanDao = new MerchantLoanDao(), emiDao = new MerchantLoanEmiDao()) {
+    this.loanDao = loanDao;
+    this.emiDao = emiDao;
+  }
+
+  applyForLoan({
+    businessId,
+    partnerBankCode,
+    requestedAmountPaisa,
+    tenureMonths,
+    businessMetrics = {},
+    autoApproveThreshold = 700
+  }) {
+    const bank = LOAN_PARTNER_BANKS[partnerBankCode];
+    if (!bank) {
+      throw new Error(`Invalid partner bank code: ${partnerBankCode}`);
+    }
+
+    const creditScore = calculateMerchantCreditScore(businessMetrics);
+    if (!creditScore.isEligible) {
+      return {
+        success: false,
+        reason: 'INELIGIBLE_CREDIT_SCORE',
+        message: 'আপনার ক্রেডিট স্কোর প্রয়োজনীয় সীমার নিচে।',
+        creditScore
+      };
+    }
+
+    if (requestedAmountPaisa < bank.min_amount_paisa || requestedAmountPaisa > bank.max_amount_paisa) {
+      throw new Error(`Requested amount must be between ${bank.min_amount_paisa} and ${bank.max_amount_paisa} paisa`);
+    }
+
+    if (requestedAmountPaisa > creditScore.maxLoanAmountPaisa) {
+      return {
+        success: false,
+        reason: 'EXCEEDS_CREDIT_LIMIT',
+        message: `আপনার ক্রেডিট স্কোর অনুযায়ী সর্বোচ্চ ঋণের পরিমাণ ৳${(creditScore.maxLoanAmountPaisa / 100).toLocaleString('bn-BD')}`,
+        creditScore,
+        maxLoanAmountPaisa: creditScore.maxLoanAmountPaisa
+      };
+    }
+
+    if (tenureMonths < bank.min_tenure_months || tenureMonths > bank.max_tenure_months) {
+      throw new Error(`Tenure must be between ${bank.min_tenure_months} and ${bank.max_tenure_months} months`);
+    }
+
+    const amortization = calculateLoanAmortization({
+      principalPaisa: requestedAmountPaisa,
+      interestRateBps: bank.interest_rate_bps,
+      tenureMonths,
+      processingFeeBps: bank.processing_fee_bps
+    });
+
+    const initialStatus = creditScore.score >= autoApproveThreshold ? LOAN_STATUSES.APPROVED : LOAN_STATUSES.UNDER_REVIEW;
+
+    const loanRecord = this.loanDao.saveLoan({
+      business_id: businessId,
+      partner_bank: partnerBankCode,
+      principal_paisa: requestedAmountPaisa,
+      interest_rate_basis_points: bank.interest_rate_bps,
+      tenure_months: tenureMonths,
+      total_payable_paisa: amortization.totalPayablePaisa,
+      monthly_emi_paisa: amortization.monthlyEmiPaisa,
+      disbursed_paisa: amortization.disbursedPaisa,
+      processing_fee_paisa: amortization.processingFeePaisa,
+      loan_status: initialStatus,
+      credit_score: creditScore.score,
+      remaining_paisa: amortization.totalPayablePaisa,
+      paid_paisa: 0
+    });
+
+    // Create draft EMI schedule
+    const emiRecords = amortization.schedule.map(s => new MerchantLoanEmiRecord({
+      emi_id: s.emi_id || (loanRecord.loan_id + '-EMI-' + s.installmentNumber),
+      loan_id: loanRecord.loan_id,
+      business_id: businessId,
+      installment_number: s.installmentNumber,
+      due_date: s.dueDate,
+      principal_component_paisa: s.principalComponentPaisa,
+      interest_component_paisa: s.interestComponentPaisa,
+      total_installment_paisa: s.totalInstallmentPaisa,
+      penalty_paisa: 0,
+      payment_status: EMI_PAYMENT_STATUSES.PENDING
+    }));
+
+    const savedEmis = this.emiDao.saveEmis(emiRecords);
+
+    return {
+      success: true,
+      loan: loanRecord,
+      emis: savedEmis,
+      amortization,
+      creditScore
+    };
+  }
+
+  disburseLoan({
+    businessId,
+    loanId,
+    walletAccount,
+    disbursementDate = new Date().toISOString()
+  }) {
+    const loan = this.loanDao.getLoanById(loanId);
+    if (!loan) throw new Error(`Loan not found: ${loanId}`);
+    if (loan.business_id !== String(businessId)) throw new Error('Tenant mismatch');
+
+    if (loan.loan_status !== LOAN_STATUSES.APPROVED && loan.loan_status !== LOAN_STATUSES.APPLIED) {
+      throw new Error(`Cannot disburse loan in status: ${loan.loan_status}`);
+    }
+
+    if (!walletAccount || typeof walletAccount.balancePaisa !== 'number') {
+      throw new Error('Valid wallet account with balancePaisa required for disbursement');
+    }
+
+    // Credit net disbursed amount into wallet
+    walletAccount.balancePaisa += loan.disbursed_paisa;
+
+    // Transition loan status to ACTIVE
+    const updatedLoan = this.loanDao.updateLoanStatus(loanId, LOAN_STATUSES.ACTIVE, {
+      disbursement_date: disbursementDate,
+      repayment_start_date: new Date(new Date(disbursementDate).setMonth(new Date(disbursementDate).getMonth() + 1)).toISOString().slice(0, 10)
+    });
+
+    return {
+      success: true,
+      loan: updatedLoan,
+      disbursedPaisa: loan.disbursed_paisa,
+      walletBalanceAfter: walletAccount.balancePaisa
+    };
+  }
+
+  repayEmiFromWallet({
+    businessId,
+    loanId,
+    emiId,
+    walletAccount,
+    currentDate = new Date().toISOString()
+  }) {
+    const loan = this.loanDao.getLoanById(loanId);
+    if (!loan) throw new Error(`Loan not found: ${loanId}`);
+    if (loan.business_id !== String(businessId)) throw new Error('Tenant mismatch');
+
+    const emi = this.emiDao.getEmiById(emiId);
+    if (!emi) throw new Error(`EMI not found: ${emiId}`);
+    if (emi.loan_id !== loanId) throw new Error('Loan ID mismatch on EMI');
+
+    if (emi.payment_status === EMI_PAYMENT_STATUSES.PAID || emi.payment_status === EMI_PAYMENT_STATUSES.AUTO_DEBITED) {
+      throw new Error(`EMI ${emiId} is already paid`);
+    }
+
+    const penaltyPaisa = calculateEmiLatePenalty(emi, currentDate);
+    const totalRequiredPaisa = emi.total_installment_paisa + penaltyPaisa;
+
+    if (!walletAccount || typeof walletAccount.balancePaisa !== 'number') {
+      throw new Error('Valid wallet account required');
+    }
+
+    if (walletAccount.balancePaisa < totalRequiredPaisa) {
+      return {
+        success: false,
+        reason: 'INSUFFICIENT_WALLET_BALANCE',
+        message: 'ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই।',
+        requiredPaisa: totalRequiredPaisa,
+        availablePaisa: walletAccount.balancePaisa
+      };
+    }
+
+    // Deduct wallet balance
+    walletAccount.balancePaisa -= totalRequiredPaisa;
+
+    const txnRef = `TXN-EMI-REPAY-${Date.now()}`;
+    const updatedEmi = this.emiDao.recordEmiPayment(emiId, {
+      paidDate: currentDate,
+      transactionReference: txnRef,
+      penaltyPaisa,
+      paymentStatus: EMI_PAYMENT_STATUSES.AUTO_DEBITED
+    });
+
+    // Update loan repaid amount
+    const updatedLoan = this.loanDao.updateLoanRepayment(loanId, emi.total_installment_paisa);
+
+    return {
+      success: true,
+      emi: updatedEmi,
+      loan: updatedLoan,
+      totalPaidPaisa: totalRequiredPaisa,
+      penaltyPaisa,
+      walletBalanceAfter: walletAccount.balancePaisa,
+      transactionReference: txnRef
+    };
+  }
+
+  checkAndApplyEmiPenalties({
+    businessId,
+    loanId,
+    currentDate = new Date().toISOString()
+  }) {
+    const emis = this.emiDao.getEmisByLoanId(loanId);
+    const updatedEmis = [];
+    let isSevereDefault = false;
+
+    for (const emi of emis) {
+      if (emi.payment_status === EMI_PAYMENT_STATUSES.PENDING || emi.payment_status === EMI_PAYMENT_STATUSES.OVERDUE) {
+        const penalty = calculateEmiLatePenalty(emi, currentDate);
+        if (penalty > 0) {
+          emi.payment_status = EMI_PAYMENT_STATUSES.OVERDUE;
+          emi.penalty_paisa = penalty;
+          emi.synced = 0;
+          updatedEmis.push({ ...emi });
+
+          const due = new Date(emi.due_date);
+          const current = new Date(currentDate);
+          const daysOverdue = Math.floor((current - due) / (1000 * 60 * 60 * 24));
+          if (daysOverdue > 90) {
+            isSevereDefault = true;
+          }
+        }
+      }
+    }
+
+    if (isSevereDefault) {
+      this.loanDao.updateLoanStatus(loanId, LOAN_STATUSES.DEFAULTED);
+    }
+
+    return {
+      updatedCount: updatedEmis.length,
+      updatedEmis,
+      isSevereDefault
+    };
+  }
+
+  getLoanSummary(businessId, loanId) {
+    const loan = this.loanDao.getLoanById(loanId);
+    if (!loan || loan.business_id !== String(businessId)) return null;
+    const emis = this.emiDao.getEmisByLoanId(loanId);
+    const paidEmis = emis.filter(e => e.payment_status === EMI_PAYMENT_STATUSES.PAID || e.payment_status === EMI_PAYMENT_STATUSES.AUTO_DEBITED);
+    const pendingEmis = emis.filter(e => e.payment_status === EMI_PAYMENT_STATUSES.PENDING || e.payment_status === EMI_PAYMENT_STATUSES.OVERDUE);
+
+    return {
+      loan,
+      totalEmis: emis.length,
+      paidEmisCount: paidEmis.length,
+      pendingEmisCount: pendingEmis.length,
+      nextEmi: pendingEmis[0] || null,
+      repaymentProgressPercent: Math.round((loan.paid_paisa / loan.total_payable_paisa) * 100) || 0
+    };
+  }
+}
+
+const ReconstructedLoanEngine = MerchantLoanEngine;
+const LoanEngine = MerchantLoanEngine;
+const merchantLoanEngine = new MerchantLoanEngine();
+const reconstructedLoanEngine = merchantLoanEngine;
+
 module.exports = {
+  // Milestone REA-ITER-239 Exports
+  MERCHANT_LOAN_SCHEMA,
+  LOAN_TABLE_SCHEMA,
+  MERCHANT_LOAN_EMI_SCHEMA,
+  LOAN_EMI_TABLE_SCHEMA,
+  LOAN_STATUSES,
+  LoanStatus,
+  MerchantLoanStatus,
+  EMI_PAYMENT_STATUSES,
+  EmiPaymentStatus,
+  LoanEmiStatus,
+  CREDIT_SCORE_TIERS,
+  CreditScoreTier,
+  LOAN_PARTNER_BANKS,
+  LoanPartnerBank,
+  LOAN_ARSC_TOKENS,
+  calculateMerchantCreditScore,
+  calculateLoanAmortization,
+  calculateEmiLatePenalty,
+  transitionLoanStatus,
+  MerchantLoanRecord,
+  MerchantLoanEmiRecord,
+  MerchantLoanDao,
+  MerchantLoanEmiDao,
+  MerchantLoanEngine,
+  ReconstructedLoanEngine,
+  LoanEngine,
+  merchantLoanEngine,
+  reconstructedLoanEngine,
+
   // Milestone REA-ITER-238 Exports
   MERCHANT_QR_ORDER_SCHEMA,
   QR_ORDER_TABLE_SCHEMA,

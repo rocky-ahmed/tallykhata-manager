@@ -285,6 +285,8 @@ const VALID_COLLECTIONS = new Set([
   'soundboxConfig',
   'merchantKyc',
   'merchantQrOrders',
+  'merchantLoans',
+  'merchantLoanEmis',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -418,6 +420,8 @@ function sanitizeState(state) {
   if (!Array.isArray(s.transactionSettlementActions)) s.transactionSettlementActions = [];
   if (!Array.isArray(s.merchantKyc)) s.merchantKyc = [];
   if (!Array.isArray(s.merchantQrOrders)) s.merchantQrOrders = [];
+  if (!Array.isArray(s.merchantLoans)) s.merchantLoans = [];
+  if (!Array.isArray(s.merchantLoanEmis)) s.merchantLoanEmis = [];
   if (!s.soundboxConfig || typeof s.soundboxConfig !== 'object') s.soundboxConfig = {};
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
@@ -573,6 +577,8 @@ function createDefaultState() {
     soundboxConfig: {},
     merchantKyc: [],
     merchantQrOrders: [],
+    merchantLoans: [],
+    merchantLoanEmis: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -824,6 +830,10 @@ class StorageRepository {
   }
 
   async initStore() {
+    return this.loadStore();
+  }
+
+  async init() {
     return this.loadStore();
   }
 
@@ -1772,6 +1782,24 @@ class StorageRepository {
       authoritative.merchantKyc = [];
     }
 
+    if (authoritative.merchantLoans && Array.isArray(authoritative.merchantLoans)) {
+      authoritative.merchantLoans = authoritative.merchantLoans.map((l) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, bank_credential, ...rest } = l || {};
+        return rest;
+      });
+    } else {
+      authoritative.merchantLoans = [];
+    }
+
+    if (authoritative.merchantLoanEmis && Array.isArray(authoritative.merchantLoanEmis)) {
+      authoritative.merchantLoanEmis = authoritative.merchantLoanEmis.map((e) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = e || {};
+        return rest;
+      });
+    } else {
+      authoritative.merchantLoanEmis = [];
+    }
+
     if (authoritative.merchantQrOrders && Array.isArray(authoritative.merchantQrOrders)) {
       authoritative.merchantQrOrders = authoritative.merchantQrOrders.map((o) => {
         const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = o || {};
@@ -2446,6 +2474,8 @@ class StorageRepository {
         const transactionSettlementActions = (prevStore.transactionSettlementActions || []).filter((t) => getBizId(t) !== targetId);
         const merchantKyc = (prevStore.merchantKyc || []).filter((k) => getBizId(k) !== targetId);
         const merchantQrOrders = (prevStore.merchantQrOrders || []).filter((o) => getBizId(o) !== targetId);
+        const merchantLoans = (prevStore.merchantLoans || []).filter((l) => getBizId(l) !== targetId);
+        const merchantLoanEmis = (prevStore.merchantLoanEmis || []).filter((e) => getBizId(e) !== targetId);
         const soundboxConfig = { ...(prevStore.soundboxConfig || {}) };
         delete soundboxConfig[targetId];
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
@@ -2544,6 +2574,8 @@ class StorageRepository {
         transactionSettlementActions,
         merchantKyc,
         merchantQrOrders,
+        merchantLoans,
+        merchantLoanEmis,
         soundboxConfig,
         autoDisbursementConfig,
         cashReconciliation,
@@ -2721,6 +2753,10 @@ class StorageRepository {
         const importedMerchantKyc = (data.merchantKyc || []).filter(k => String(k.businessId || k.business_id || '1') === selectedBizId);
         const keptMerchantQrOrders = (prevStore.merchantQrOrders || []).filter(o => String(o.businessId || o.business_id || '1') !== selectedBizId);
         const importedMerchantQrOrders = (data.merchantQrOrders || []).filter(o => String(o.businessId || o.business_id || '1') === selectedBizId);
+        const keptMerchantLoans = (prevStore.merchantLoans || []).filter(l => String(l.businessId || l.business_id || '1') !== selectedBizId);
+        const importedMerchantLoans = (data.merchantLoans || []).filter(l => String(l.businessId || l.business_id || '1') === selectedBizId);
+        const keptMerchantLoanEmis = (prevStore.merchantLoanEmis || []).filter(e => String(e.businessId || e.business_id || '1') !== selectedBizId);
+        const importedMerchantLoanEmis = (data.merchantLoanEmis || []).filter(e => String(e.businessId || e.business_id || '1') === selectedBizId);
         const keptQrSettlements = (prevStore.qrSettlementActions || []).filter(q => String(q.businessId || '1') !== selectedBizId);
         const keptDisbursements = (prevStore.merchantDisbursements || []).filter(d => String(d.businessId || '1') !== selectedBizId);
         const keptReconciliations = (prevStore.reconciliations || []).filter(r => String(r.businessId || '1') !== selectedBizId);
@@ -2766,6 +2802,8 @@ class StorageRepository {
           tallyPayBeneficiaries: [...keptBeneficiaries, ...importedBeneficiaries],
           merchantKyc: [...keptMerchantKyc, ...importedMerchantKyc],
           merchantQrOrders: [...keptMerchantQrOrders, ...importedMerchantQrOrders],
+          merchantLoans: [...keptMerchantLoans, ...importedMerchantLoans],
+          merchantLoanEmis: [...keptMerchantLoanEmis, ...importedMerchantLoanEmis],
           qrSettlementActions: [...keptQrSettlements, ...importedQrSettlements],
           merchantDisbursements: [...keptDisbursements, ...importedDisbursements],
           reconciliations: [...keptReconciliations, ...importedReconciliations],
@@ -2819,6 +2857,8 @@ class StorageRepository {
         tallyPayBeneficiaries: Array.isArray(data.tallyPayBeneficiaries) ? data.tallyPayBeneficiaries : [],
         merchantKyc: Array.isArray(data.merchantKyc) ? data.merchantKyc : [],
         merchantQrOrders: Array.isArray(data.merchantQrOrders) ? data.merchantQrOrders : [],
+        merchantLoans: Array.isArray(data.merchantLoans) ? data.merchantLoans : [],
+        merchantLoanEmis: Array.isArray(data.merchantLoanEmis) ? data.merchantLoanEmis : [],
         qrSettlementActions: Array.isArray(data.qrSettlementActions) ? data.qrSettlementActions : [],
         merchantDisbursements: Array.isArray(data.merchantDisbursements) ? data.merchantDisbursements : [],
         reconciliations: Array.isArray(data.reconciliations) ? data.reconciliations : [],
@@ -3119,6 +3159,8 @@ class StorageRepository {
           rechargeHistory: (fullState.rechargeHistory || []).length,
           merchantKyc: (fullState.merchantKyc || []).length,
           merchantQrOrders: (fullState.merchantQrOrders || []).length,
+          merchantLoans: (fullState.merchantLoans || []).length,
+          merchantLoanEmis: (fullState.merchantLoanEmis || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -8877,6 +8919,418 @@ class StorageRepository {
       return Boolean(this.getMerchantQrOrderById(businessId, orderId));
     }
 
+
+    // =========================================================================
+    // REA-ITER-239: TallyPay Merchant Digital Micro-Loan & EMI Repayment Subsystem
+    // =========================================================================
+
+    /**
+     * REA-ITER-239: Saves or updates a merchant digital loan.
+     */
+    async saveMerchantLoan(businessId = null, loanData = {}) {
+      if (!loanData || typeof loanData !== 'object') {
+        return { success: false, error: 'INVALID_LOAN_DATA' };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || loanData.business_id || loanData.businessId || store.activeBusinessId || '1');
+      const loanId = String(loanData.loan_id || loanData.loanId || ('TK-LN-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000)));
+
+      const entry = {
+        ...loanData,
+        id: loanData.id || ('LN_' + Date.now() + '_' + Math.floor(Math.random() * 1000)),
+        loan_id: loanId,
+        loanId: loanId,
+        business_id: targetBizId,
+        businessId: targetBizId,
+        partner_bank: loanData.partner_bank || loanData.partnerBank || 'BRAC_BANK',
+        principal_paisa: Number(loanData.principal_paisa !== undefined ? loanData.principal_paisa : loanData.principalPaisa) || 0,
+        interest_rate_basis_points: Number(loanData.interest_rate_basis_points !== undefined ? loanData.interest_rate_basis_points : loanData.interestRateBps) || 900,
+        tenure_months: Number(loanData.tenure_months !== undefined ? loanData.tenure_months : loanData.tenureMonths) || 6,
+        total_payable_paisa: Number(loanData.total_payable_paisa !== undefined ? loanData.total_payable_paisa : loanData.totalPayablePaisa) || 0,
+        monthly_emi_paisa: Number(loanData.monthly_emi_paisa !== undefined ? loanData.monthly_emi_paisa : loanData.monthlyEmiPaisa) || 0,
+        disbursed_paisa: Number(loanData.disbursed_paisa !== undefined ? loanData.disbursed_paisa : loanData.disbursedPaisa) || 0,
+        processing_fee_paisa: Number(loanData.processing_fee_paisa !== undefined ? loanData.processing_fee_paisa : loanData.processingFeePaisa) || 0,
+        loan_status: loanData.loan_status || loanData.loanStatus || 'APPLIED',
+        disbursement_date: loanData.disbursement_date || loanData.disbursementDate || null,
+        repayment_start_date: loanData.repayment_start_date || loanData.repaymentStartDate || null,
+        paid_paisa: Number(loanData.paid_paisa !== undefined ? loanData.paid_paisa : loanData.paidPaisa) || 0,
+        remaining_paisa: Number(loanData.remaining_paisa !== undefined ? loanData.remaining_paisa : loanData.remainingPaisa) || 0,
+        credit_score: Number(loanData.credit_score !== undefined ? loanData.credit_score : loanData.creditScore) || 300,
+        created_at: loanData.created_at || loanData.createdAt || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        synced: loanData.synced !== undefined ? Number(loanData.synced) : 0,
+      };
+
+      let saved = null;
+      await this.mutateCollection('merchantLoans', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const idx = list.findIndex((l) => String(l.loan_id || l.loanId) === loanId);
+        if (idx >= 0) {
+          const prev = list[idx];
+          const merged = {
+            ...prev,
+            ...entry,
+            id: prev.id || entry.id,
+            created_at: prev.created_at || entry.created_at,
+            updated_at: new Date().toISOString(),
+          };
+          list[idx] = merged;
+          saved = { ...merged };
+        } else {
+          list.push(entry);
+          saved = { ...entry };
+        }
+        return list;
+      });
+
+      return { success: true, loan: saved };
+    }
+
+    /**
+     * REA-ITER-239: Retrieves a merchant loan by loan ID.
+     */
+    getMerchantLoanById(businessId = null, loanId = null) {
+      if (!loanId) return null;
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const targetLoanId = String(loanId);
+      const item = (store.merchantLoans || []).find((l) => {
+        const matchesId = String(l.loan_id || l.loanId) === targetLoanId;
+        if (!matchesId) return false;
+        if (targetBizId) {
+          return String(l.business_id || l.businessId || '1') === targetBizId;
+        }
+        return true;
+      });
+      return item ? { ...item } : null;
+    }
+
+    /**
+     * REA-ITER-239: Retrieves merchant loans for a business with optional filtering.
+     */
+    getMerchantLoansByBusinessId(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.merchantLoans || []).filter(
+        (l) => String(l.business_id || l.businessId || '1') === targetBizId
+      );
+
+      if (options.status || options.loan_status) {
+        const s = options.status || options.loan_status;
+        list = list.filter((l) => l.loan_status === s || l.loanStatus === s);
+      }
+      if (options.partner_bank || options.partnerBank) {
+        const b = options.partner_bank || options.partnerBank;
+        list = list.filter((l) => l.partner_bank === b || l.partnerBank === b);
+      }
+      if (options.synced !== undefined) {
+        list = list.filter((l) => Number(l.synced) === Number(options.synced));
+      }
+
+      list.sort((a, b) => new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0));
+
+      const offset = Number(options.offset) || 0;
+      const limit = Number(options.limit) || list.length;
+      return list.slice(offset, offset + limit).map((l) => ({ ...l }));
+    }
+
+    getMerchantLoans(businessId = null, options = {}) {
+      return this.getMerchantLoansByBusinessId(businessId, options);
+    }
+
+    /**
+     * REA-ITER-239: Updates status and metadata of a merchant loan.
+     */
+    async updateMerchantLoanStatus(businessId = null, loanId = null, status = 'ACTIVE', extraFields = {}) {
+      if (!loanId) return { success: false, error: 'MISSING_LOAN_ID' };
+      const targetLoanId = String(loanId);
+      const targetBizId = businessId ? String(businessId) : null;
+      let updated = null;
+
+      await this.mutateCollection('merchantLoans', (col) => {
+        return (col || []).map((l) => {
+          if (String(l.loan_id || l.loanId) === targetLoanId) {
+            if (!targetBizId || String(l.business_id || l.businessId || '1') === targetBizId) {
+              const res = {
+                ...l,
+                loan_status: status,
+                loanStatus: status,
+                ...extraFields,
+                synced: 0,
+                updated_at: new Date().toISOString(),
+              };
+              updated = { ...res };
+              return res;
+            }
+          }
+          return l;
+        });
+      });
+
+      return { success: Boolean(updated), loan: updated };
+    }
+
+    /**
+     * REA-ITER-239: Updates repaid amounts and decrements remaining balance on a loan.
+     */
+    async updateMerchantLoanRepayment(businessId = null, loanId = null, paidAmountPaisa = 0) {
+      if (!loanId) return { success: false, error: 'MISSING_LOAN_ID' };
+      const targetLoanId = String(loanId);
+      const targetBizId = businessId ? String(businessId) : null;
+      let updated = null;
+
+      await this.mutateCollection('merchantLoans', (col) => {
+        return (col || []).map((l) => {
+          if (String(l.loan_id || l.loanId) === targetLoanId) {
+            if (!targetBizId || String(l.business_id || l.businessId || '1') === targetBizId) {
+              const prevPaid = Number(l.paid_paisa !== undefined ? l.paid_paisa : l.paidPaisa) || 0;
+              const prevRemaining = Number(l.remaining_paisa !== undefined ? l.remaining_paisa : l.remainingPaisa) || 0;
+              const newPaid = prevPaid + paidAmountPaisa;
+              const newRemaining = Math.max(0, prevRemaining - paidAmountPaisa);
+              const newStatus = newRemaining === 0 ? 'PAID_OFF' : l.loan_status;
+
+              const res = {
+                ...l,
+                paid_paisa: newPaid,
+                paidPaisa: newPaid,
+                remaining_paisa: newRemaining,
+                remainingPaisa: newRemaining,
+                loan_status: newStatus,
+                loanStatus: newStatus,
+                synced: 0,
+                updated_at: new Date().toISOString(),
+              };
+              updated = { ...res };
+              return res;
+            }
+          }
+          return l;
+        });
+      });
+
+      return { success: Boolean(updated), loan: updated };
+    }
+
+    /**
+     * REA-ITER-239: Saves or updates an EMI installment schedule for a loan.
+     */
+    async saveMerchantLoanEmis(businessId = null, loanId = null, emis = []) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const targetLoanId = String(loanId || '');
+      const inputList = Array.isArray(emis) ? emis : [emis];
+      const savedEmis = [];
+
+      await this.mutateCollection('merchantLoanEmis', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        for (const e of inputList) {
+          const emiId = String(e.emi_id || e.emiId || ('TK-EMI-' + targetLoanId + '-' + (e.installment_number || e.installmentNumber || Date.now())));
+          const entry = {
+            ...e,
+            id: e.id || ('EMI_' + Date.now() + '_' + Math.floor(Math.random() * 1000)),
+            emi_id: emiId,
+            emiId: emiId,
+            loan_id: targetLoanId || e.loan_id || e.loanId,
+            loanId: targetLoanId || e.loan_id || e.loanId,
+            business_id: targetBizId,
+            businessId: targetBizId,
+            installment_number: Number(e.installment_number !== undefined ? e.installment_number : e.installmentNumber) || 1,
+            due_date: e.due_date || e.dueDate || new Date().toISOString().slice(0, 10),
+            principal_component_paisa: Number(e.principal_component_paisa !== undefined ? e.principal_component_paisa : e.principalComponentPaisa) || 0,
+            interest_component_paisa: Number(e.interest_component_paisa !== undefined ? e.interest_component_paisa : e.interestComponentPaisa) || 0,
+            total_installment_paisa: Number(e.total_installment_paisa !== undefined ? e.total_installment_paisa : e.totalInstallmentPaisa) || 0,
+            penalty_paisa: Number(e.penalty_paisa !== undefined ? e.penalty_paisa : e.penaltyPaisa) || 0,
+            payment_status: e.payment_status || e.paymentStatus || 'PENDING',
+            paid_date: e.paid_date || e.paidDate || null,
+            transaction_reference: e.transaction_reference || e.transactionReference || null,
+            synced: e.synced !== undefined ? Number(e.synced) : 0,
+          };
+
+          const idx = list.findIndex((item) => String(item.emi_id || item.emiId) === emiId);
+          if (idx >= 0) {
+            const merged = { ...list[idx], ...entry };
+            list[idx] = merged;
+            savedEmis.push({ ...merged });
+          } else {
+            list.push(entry);
+            savedEmis.push({ ...entry });
+          }
+        }
+        return list;
+      });
+
+      return { success: true, emis: savedEmis };
+    }
+
+    /**
+     * REA-ITER-239: Retrieves EMI installment records for a loan.
+     */
+    getMerchantLoanEmis(businessId = null, loanId = null) {
+      if (!loanId) return [];
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const targetLoanId = String(loanId);
+
+      return (store.merchantLoanEmis || [])
+        .filter((e) => {
+          if (String(e.loan_id || e.loanId) !== targetLoanId) return false;
+          if (targetBizId && String(e.business_id || e.businessId || '1') !== targetBizId) return false;
+          return true;
+        })
+        .sort((a, b) => (Number(a.installment_number || a.installmentNumber) - Number(b.installment_number || b.installmentNumber)))
+        .map((e) => ({ ...e }));
+    }
+
+    /**
+     * REA-ITER-239: Records payment of an EMI installment.
+     */
+    async recordMerchantLoanEmiPayment(businessId = null, loanId = null, emiId = null, paymentData = {}) {
+      if (!emiId) return { success: false, error: 'MISSING_EMI_ID' };
+      const targetEmiId = String(emiId);
+      const targetBizId = businessId ? String(businessId) : null;
+      let updatedEmi = null;
+
+      await this.mutateCollection('merchantLoanEmis', (col) => {
+        return (col || []).map((e) => {
+          if (String(e.emi_id || e.emiId) === targetEmiId) {
+            if (!targetBizId || String(e.business_id || e.businessId || '1') === targetBizId) {
+              const res = {
+                ...e,
+                payment_status: paymentData.payment_status || paymentData.paymentStatus || 'PAID',
+                paid_date: paymentData.paid_date || paymentData.paidDate || new Date().toISOString(),
+                transaction_reference: paymentData.transaction_reference || paymentData.transactionReference || ('TXN-EMI-' + Date.now()),
+                penalty_paisa: Number(paymentData.penalty_paisa !== undefined ? paymentData.penalty_paisa : paymentData.penaltyPaisa) || 0,
+                synced: 0,
+              };
+              updatedEmi = { ...res };
+              return res;
+            }
+          }
+          return e;
+        });
+      });
+
+      if (updatedEmi && loanId) {
+        const principalInterestPaisa = Number(updatedEmi.total_installment_paisa) || 0;
+        await this.updateMerchantLoanRepayment(businessId, loanId, principalInterestPaisa);
+      }
+
+      return { success: Boolean(updatedEmi), emi: updatedEmi };
+    }
+
+    /**
+     * REA-ITER-239: Retrieves unsynced merchant loans.
+     */
+    getUnsyncedMerchantLoans(businessId = null, limit = 50) {
+      return this.getMerchantLoansByBusinessId(businessId, { synced: 0 }).slice(0, limit);
+    }
+
+    /**
+     * REA-ITER-239: Updates sync status of a merchant loan.
+     */
+    async updateMerchantLoanSyncStatus(businessId = null, loanId = null, synced = 1) {
+      if (!loanId) return { success: false };
+      const targetLoanId = String(loanId);
+      const targetBizId = businessId ? String(businessId) : null;
+      let updatedCount = 0;
+      await this.mutateCollection('merchantLoans', (col) => {
+        return (col || []).map((l) => {
+          if (String(l.loan_id || l.loanId) === targetLoanId) {
+            if (!targetBizId || String(l.business_id || l.businessId || '1') === targetBizId) {
+              updatedCount++;
+              return {
+                ...l,
+                synced: Number(synced),
+                updated_at: new Date().toISOString(),
+              };
+            }
+          }
+          return l;
+        });
+      });
+      return { success: true, updatedCount };
+    }
+
+    /**
+     * REA-ITER-239: Retrieves unsynced loan EMIs.
+     */
+    getUnsyncedMerchantLoanEmis(businessId = null, limit = 100) {
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      return (store.merchantLoanEmis || [])
+        .filter((e) => {
+          if (targetBizId && String(e.business_id || e.businessId || '1') !== targetBizId) return false;
+          return Number(e.synced) === 0;
+        })
+        .slice(0, limit)
+        .map((e) => ({ ...e }));
+    }
+
+    /**
+     * REA-ITER-239: Updates sync status of a loan EMI.
+     */
+    async updateMerchantLoanEmiSyncStatus(businessId = null, emiId = null, synced = 1) {
+      if (!emiId) return { success: false };
+      const targetEmiId = String(emiId);
+      const targetBizId = businessId ? String(businessId) : null;
+      let updatedCount = 0;
+      await this.mutateCollection('merchantLoanEmis', (col) => {
+        return (col || []).map((e) => {
+          if (String(e.emi_id || e.emiId) === targetEmiId) {
+            if (!targetBizId || String(e.business_id || e.businessId || '1') === targetBizId) {
+              updatedCount++;
+              return {
+                ...e,
+                synced: Number(synced),
+              };
+            }
+          }
+          return e;
+        });
+      });
+      return { success: true, updatedCount };
+    }
+
+    /**
+     * REA-ITER-239: Deletes a merchant loan and its associated EMIs.
+     */
+    async deleteMerchantLoan(businessId = null, loanId = null) {
+      if (!loanId) return { success: false };
+      const targetLoanId = String(loanId);
+      const targetBizId = businessId ? String(businessId) : null;
+      let deleted = false;
+
+      await this.mutateCollection('merchantLoans', (col) => {
+        const list = Array.isArray(col) ? col : [];
+        const nextList = list.filter((l) => {
+          if (String(l.loan_id || l.loanId) === targetLoanId) {
+            if (!targetBizId || String(l.business_id || l.businessId || '1') === targetBizId) {
+              return false;
+            }
+          }
+          return true;
+        });
+        deleted = nextList.length < list.length;
+        return nextList;
+      });
+
+      if (deleted) {
+        await this.mutateCollection('merchantLoanEmis', (col) => {
+          const list = Array.isArray(col) ? col : [];
+          return list.filter((e) => String(e.loan_id || e.loanId) !== targetLoanId);
+        });
+      }
+
+      return { success: deleted };
+    }
+
+    /**
+     * REA-ITER-239: Checks existence of a merchant loan by ID.
+     */
+    existsMerchantLoan(businessId = null, loanId = null) {
+      return Boolean(this.getMerchantLoanById(businessId, loanId));
+    }
+
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
   }
@@ -10320,6 +10774,112 @@ function existsMerchantQrOrderRepo(businessId = null, orderId = null, repo = def
   return false;
 }
 
+// REA-ITER-239 Wrapper Functions
+async function saveMerchantLoanRepo(businessId = null, loanData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveMerchantLoan === 'function') {
+    return repo.saveMerchantLoan(businessId, loanData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getMerchantLoansByBusinessIdRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantLoansByBusinessId === 'function') {
+    return repo.getMerchantLoansByBusinessId(businessId, options);
+  }
+  return [];
+}
+
+function getMerchantLoansRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantLoans === 'function') {
+    return repo.getMerchantLoans(businessId, options);
+  }
+  return [];
+}
+
+function getMerchantLoanByIdRepo(businessId = null, loanId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantLoanById === 'function') {
+    return repo.getMerchantLoanById(businessId, loanId);
+  }
+  return null;
+}
+
+async function updateMerchantLoanStatusRepo(businessId = null, loanId = null, status = 'ACTIVE', extraFields = {}, repo = defaultRepository) {
+  if (repo && typeof repo.updateMerchantLoanStatus === 'function') {
+    return repo.updateMerchantLoanStatus(businessId, loanId, status, extraFields);
+  }
+  return { success: false };
+}
+
+async function updateMerchantLoanRepaymentRepo(businessId = null, loanId = null, paidAmountPaisa = 0, repo = defaultRepository) {
+  if (repo && typeof repo.updateMerchantLoanRepayment === 'function') {
+    return repo.updateMerchantLoanRepayment(businessId, loanId, paidAmountPaisa);
+  }
+  return { success: false };
+}
+
+async function saveMerchantLoanEmisRepo(businessId = null, loanId = null, emis = [], repo = defaultRepository) {
+  if (repo && typeof repo.saveMerchantLoanEmis === 'function') {
+    return repo.saveMerchantLoanEmis(businessId, loanId, emis);
+  }
+  return { success: false };
+}
+
+function getMerchantLoanEmisRepo(businessId = null, loanId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getMerchantLoanEmis === 'function') {
+    return repo.getMerchantLoanEmis(businessId, loanId);
+  }
+  return [];
+}
+
+async function recordMerchantLoanEmiPaymentRepo(businessId = null, loanId = null, emiId = null, paymentData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.recordMerchantLoanEmiPayment === 'function') {
+    return repo.recordMerchantLoanEmiPayment(businessId, loanId, emiId, paymentData);
+  }
+  return { success: false };
+}
+
+function getUnsyncedMerchantLoansRepo(businessId = null, limit = 50, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedMerchantLoans === 'function') {
+    return repo.getUnsyncedMerchantLoans(businessId, limit);
+  }
+  return [];
+}
+
+async function updateMerchantLoanSyncStatusRepo(businessId = null, loanId = null, synced = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateMerchantLoanSyncStatus === 'function') {
+    return repo.updateMerchantLoanSyncStatus(businessId, loanId, synced);
+  }
+  return { success: false };
+}
+
+function getUnsyncedMerchantLoanEmisRepo(businessId = null, limit = 100, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedMerchantLoanEmis === 'function') {
+    return repo.getUnsyncedMerchantLoanEmis(businessId, limit);
+  }
+  return [];
+}
+
+async function updateMerchantLoanEmiSyncStatusRepo(businessId = null, emiId = null, synced = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateMerchantLoanEmiSyncStatus === 'function') {
+    return repo.updateMerchantLoanEmiSyncStatus(businessId, emiId, synced);
+  }
+  return { success: false };
+}
+
+async function deleteMerchantLoanRepo(businessId = null, loanId = null, repo = defaultRepository) {
+  if (repo && typeof repo.deleteMerchantLoan === 'function') {
+    return repo.deleteMerchantLoan(businessId, loanId);
+  }
+  return { success: false };
+}
+
+function existsMerchantLoanRepo(businessId = null, loanId = null, repo = defaultRepository) {
+  if (repo && typeof repo.existsMerchantLoan === 'function') {
+    return repo.existsMerchantLoan(businessId, loanId);
+  }
+  return false;
+}
+
 function existsMerchantKycRepo(businessId = null, repo = defaultRepository) {
   if (repo && typeof repo.existsMerchantKyc === 'function') {
     return repo.existsMerchantKyc(businessId);
@@ -10558,6 +11118,21 @@ const repoExport = {
   getUnsyncedMerchantQrOrders: getUnsyncedMerchantQrOrdersRepo,
   updateMerchantQrOrderSyncStatus: updateMerchantQrOrderSyncStatusRepo,
   existsMerchantQrOrder: existsMerchantQrOrderRepo,
+  saveMerchantLoan: saveMerchantLoanRepo,
+  getMerchantLoansByBusinessId: getMerchantLoansByBusinessIdRepo,
+  getMerchantLoans: getMerchantLoansRepo,
+  getMerchantLoanById: getMerchantLoanByIdRepo,
+  updateMerchantLoanStatus: updateMerchantLoanStatusRepo,
+  updateMerchantLoanRepayment: updateMerchantLoanRepaymentRepo,
+  saveMerchantLoanEmis: saveMerchantLoanEmisRepo,
+  getMerchantLoanEmis: getMerchantLoanEmisRepo,
+  recordMerchantLoanEmiPayment: recordMerchantLoanEmiPaymentRepo,
+  getUnsyncedMerchantLoans: getUnsyncedMerchantLoansRepo,
+  updateMerchantLoanSyncStatus: updateMerchantLoanSyncStatusRepo,
+  getUnsyncedMerchantLoanEmis: getUnsyncedMerchantLoanEmisRepo,
+  updateMerchantLoanEmiSyncStatus: updateMerchantLoanEmiSyncStatusRepo,
+  deleteMerchantLoan: deleteMerchantLoanRepo,
+  existsMerchantLoan: existsMerchantLoanRepo,
   saveRechargeRecord: saveRechargeRecordRepo,
   getRechargeHistory: getRechargeHistoryRepo,
   getRechargeById: getRechargeByIdRepo,
@@ -10764,6 +11339,21 @@ if (typeof exports !== 'undefined') {
   exports.getUnsyncedMerchantQrOrders = getUnsyncedMerchantQrOrdersRepo;
   exports.updateMerchantQrOrderSyncStatus = updateMerchantQrOrderSyncStatusRepo;
   exports.existsMerchantQrOrder = existsMerchantQrOrderRepo;
+  exports.saveMerchantLoan = saveMerchantLoanRepo;
+  exports.getMerchantLoansByBusinessId = getMerchantLoansByBusinessIdRepo;
+  exports.getMerchantLoans = getMerchantLoansRepo;
+  exports.getMerchantLoanById = getMerchantLoanByIdRepo;
+  exports.updateMerchantLoanStatus = updateMerchantLoanStatusRepo;
+  exports.updateMerchantLoanRepayment = updateMerchantLoanRepaymentRepo;
+  exports.saveMerchantLoanEmis = saveMerchantLoanEmisRepo;
+  exports.getMerchantLoanEmis = getMerchantLoanEmisRepo;
+  exports.recordMerchantLoanEmiPayment = recordMerchantLoanEmiPaymentRepo;
+  exports.getUnsyncedMerchantLoans = getUnsyncedMerchantLoansRepo;
+  exports.updateMerchantLoanSyncStatus = updateMerchantLoanSyncStatusRepo;
+  exports.getUnsyncedMerchantLoanEmis = getUnsyncedMerchantLoanEmisRepo;
+  exports.updateMerchantLoanEmiSyncStatus = updateMerchantLoanEmiSyncStatusRepo;
+  exports.deleteMerchantLoan = deleteMerchantLoanRepo;
+  exports.existsMerchantLoan = existsMerchantLoanRepo;
   exports.saveRechargeRecord = saveRechargeRecordRepo;
   exports.getRechargeHistory = getRechargeHistoryRepo;
   exports.getRechargeById = getRechargeByIdRepo;
