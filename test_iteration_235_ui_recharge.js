@@ -417,28 +417,28 @@ async function main() {
   });
 
   // -----------------------------------------------------------------------------
-  // PART 12: MODAL COUNT & CONTROLLER INVARIANTS (101 MODALS)
+  // PART 12: MODAL COUNT & CONTROLLER INVARIANTS (106 MODALS)
   // -----------------------------------------------------------------------------
-  console.log("\n--- PART 12: MODAL COUNT & CONTROLLER INVARIANTS (101 MODALS) ---");
+  console.log("\n--- PART 12: MODAL COUNT & CONTROLLER INVARIANTS (106 MODALS) ---");
 
-  await runTest("12.1: App.js contains exactly 101 <Modal elements", () => {
+  await runTest("12.1: App.js contains exactly 106 <Modal elements", () => {
     const modalMatches = appSrc.match(/<Modal\b/g) || [];
-    assert.strictEqual(modalMatches.length, 101, "Expected exactly 101 modals in App.js, got " + modalMatches.length);
+    assert.strictEqual(modalMatches.length, 106, "Expected exactly 106 modals in App.js, got " + modalMatches.length);
   });
 
-  await runTest("12.2: App.js contains exactly 101 onRequestClose handlers", () => {
+  await runTest("12.2: App.js contains exactly 106 onRequestClose handlers", () => {
     const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-    assert.strictEqual(reqCloseMatches.length, 101, "Expected 101 onRequestClose handlers, got " + reqCloseMatches.length);
+    assert.strictEqual(reqCloseMatches.length, 106, "Expected 106 onRequestClose handlers, got " + reqCloseMatches.length);
   });
 
-  await runTest("12.3: App.js contains exactly 101 unique modal state controllers", () => {
+  await runTest("12.3: App.js contains exactly 106 unique modal state controllers", () => {
     const regex = /visible=\{([a-zA-Z0-9_]+)\}/g;
     const uniqueModals = new Set();
     let m;
     while ((m = regex.exec(appSrc)) !== null) {
       uniqueModals.add(m[1]);
     }
-    assert.strictEqual(uniqueModals.size, 101, "Expected 101 unique visible controllers, got " + uniqueModals.size);
+    assert.strictEqual(uniqueModals.size, 106, "Expected 106 unique visible controllers, got " + uniqueModals.size);
     assert.ok(uniqueModals.has("modalRechargeNumber"), "modalRechargeNumber must be in unique controllers");
     assert.ok(uniqueModals.has("modalRechargeAmount"), "modalRechargeAmount must be in unique controllers");
     assert.ok(uniqueModals.has("modalRechargePackages"), "modalRechargePackages must be in unique controllers");

@@ -6385,7 +6385,570 @@ const defaultRechargeEngine = new ReconstructedRechargeEngine();
 const rechargeEngine = defaultRechargeEngine;
 const reconstructedRechargeEngine = defaultRechargeEngine;
 
+
+// ============================================================================
+// MILESTONE REA-ITER-236: TALLYPAY MERCHANT SETTLEMENT AUTOMATION &
+// QR SOUNDBOX HARDWARE DIAGNOSTICS & TELEMETRY SUBSYSTEM
+// Reference: classes4.dex, ScCreditSettlementActivity, TransactionSettlementAction
+// ============================================================================
+
+const TRANSACTION_SETTLEMENT_ACTION_SCHEMA = Object.freeze({
+  tableName: 'transaction_settlement_action',
+  columns: Object.freeze(['id', 'transaction_number', 'action_type', 'synced', 'create_date', 'update_date']),
+  uniqueIndex: 'index_transaction_number',
+  ddl: 'CREATE TABLE IF NOT EXISTS `transaction_settlement_action` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `transaction_number` TEXT NOT NULL, `action_type` TEXT NOT NULL, `synced` INTEGER NOT NULL, `create_date` TEXT NOT NULL, `update_date` TEXT);',
+  indexDdl: 'CREATE UNIQUE INDEX IF NOT EXISTS `index_transaction_number` ON `transaction_settlement_action` (`transaction_number`);',
+});
+
+const TKEnum$TransactionSettlementAction = Object.freeze({
+  DIGITAL_SALE: 'DIGITAL_SALE',
+  CREDIT_COLLECTION: 'CREDIT_COLLECTION',
+  NO_ACTION: 'NO_ACTION',
+});
+
+const TRANSACTION_SETTLEMENT_ACTIONS = TKEnum$TransactionSettlementAction;
+const TransactionSettlementActionType = TKEnum$TransactionSettlementAction;
+
+const SETTLEMENT_SOUNDBOX_ARSC_TOKENS = Object.freeze({
+  SC_CREDIT_SETTLEMENT: '(বাকি আদায় সমন্বয়)',
+  SETTLE_PAYMENT_ACTION: 'পেমেন্ট সমন্বয় করি',
+  INVALID_SETTLE_AMOUNT: 'পেমেন্টের পরিমাণ ০ হতে পারে না।',
+  SELECT_PAYMENT_MODE: 'পেমেন্টের মাধ্যম সিলেক্ট করি',
+  PAYMENT_RECEIVED_WALLET: 'পেলাম (ওয়ালেট)',
+  WALLET_RECEIVED_COPY: 'ওয়ালেটে %1$s টাকা গ্রহণ করা হয়েছে।',
+  PAYMENT_ACCEPTED: 'পেমেন্ট গ্রহণ করা হয়েছে।',
+  PREVIOUS_BALANCE_PREFIX: 'সর্বশেষ ',
+  SETTLEMENT_INSTRUCTIONS: 'instructions generated from the NoboPay settlement bank.',
+});
+
+const BLE_STATES = Object.freeze({
+  DISCONNECTED: 'DISCONNECTED',
+  SCANNING: 'SCANNING',
+  CONNECTING: 'CONNECTING',
+  CONNECTED: 'CONNECTED',
+  RECONNECTING: 'RECONNECTING',
+  ERROR: 'ERROR',
+});
+
+const BATTERY_SERVICE_UUID = '0000180F-0000-1000-8000-00805F9B34FB';
+const BATTERY_LEVEL_CHAR_UUID = '00002A19-0000-1000-8000-00805F9B34FB';
+const SOUNDBOX_SERVICE_UUID = '0000FFE0-0000-1000-8000-00805F9B34FB';
+const SOUNDBOX_CMD_CHAR_UUID = '0000FFE1-0000-1000-8000-00805F9B34FB';
+
+const AUDIO_OUTPUT_SINKS = Object.freeze({
+  HARDWARE_BLE_SOUNDBOX: 'HARDWARE_BLE_SOUNDBOX',
+  SOFTWARE_IN_APP_TTS: 'SOFTWARE_IN_APP_TTS',
+  SILENT_OR_VIBRATE: 'SILENT_OR_VIBRATE',
+});
+
+const SETTLEMENT_PAYOUT_RULES = Object.freeze({
+  INSTANT_NPSB_FEE_PCT: 0.01,
+  INSTANT_NPSB_MIN_FEE_PAISA: 1000,
+  REGULAR_BEFTN_FEE_PAISA: 0,
+  AUTO_SWEEP_CUTOFF_HOUR: 17,
+  AUTO_SWEEP_MIN_THRESHOLD_PAISA: 50000,
+});
+
+function transitionBleState(current, action) {
+  switch (current) {
+    case BLE_STATES.DISCONNECTED:
+      if (action === 'START_SCAN') return BLE_STATES.SCANNING;
+      break;
+    case BLE_STATES.SCANNING:
+      if (action === 'DEVICE_FOUND') return BLE_STATES.CONNECTING;
+      if (action === 'TIMEOUT') return BLE_STATES.DISCONNECTED;
+      break;
+    case BLE_STATES.CONNECTING:
+      if (action === 'GATT_CONNECTED') return BLE_STATES.CONNECTED;
+      if (action === 'FAILED') return BLE_STATES.ERROR;
+      break;
+    case BLE_STATES.CONNECTED:
+      if (action === 'LINK_LOSS') return BLE_STATES.RECONNECTING;
+      if (action === 'DISCONNECT') return BLE_STATES.DISCONNECTED;
+      break;
+    case BLE_STATES.RECONNECTING:
+      if (action === 'GATT_RECONNECTED') return BLE_STATES.CONNECTED;
+      if (action === 'MAX_RETRIES_EXCEEDED') return BLE_STATES.DISCONNECTED;
+      break;
+    case BLE_STATES.ERROR:
+      if (action === 'RESET') return BLE_STATES.DISCONNECTED;
+      break;
+  }
+  return current;
+}
+
+function evaluateRssiHealth(rssiDbm) {
+  const dbm = Number(rssiDbm);
+  if (dbm >= -60) return { quality: 'EXCELLENT', bars: 4, reliable: true };
+  if (dbm >= -75) return { quality: 'GOOD', bars: 3, reliable: true };
+  if (dbm >= -85) return { quality: 'FAIR', bars: 2, reliable: true };
+  return { quality: 'POOR', bars: 1, reliable: false };
+}
+
+function evaluateBatteryTelemetry(voltageMv, isCharging = false) {
+  const clampedMv = Math.min(4200, Math.max(3200, Number(voltageMv || 0)));
+  const percentage = Math.round(((clampedMv - 3200) / 1000) * 100);
+  const isLow = percentage <= 15;
+  const isCritical = percentage <= 5;
+  const chargingBool = Boolean(isCharging);
+  return {
+    voltageMv: Number(voltageMv),
+    percentage,
+    isCharging: chargingBool,
+    isLow,
+    isCritical,
+    statusText: chargingBool ? 'CHARGING' : (isCritical ? 'CRITICAL' : (isLow ? 'LOW_BATTERY' : 'NORMAL')),
+  };
+}
+
+function syncSoundboxVolume(step) {
+  const clampedStep = Math.max(0, Math.min(15, Math.floor(Number(step || 0))));
+  const dutyPct = Math.round((clampedStep / 15) * 100);
+  const hexCmd = '0x' + clampedStep.toString(16).toUpperCase().padStart(2, '0');
+  return { step: clampedStep, dutyPct, hexCmd };
+}
+
+function buildSoundboxCommandPacket(amountPaisa, channelCode = 1) {
+  const buf = Buffer.alloc(16);
+  buf.writeUInt8(0xAA, 0);
+  buf.writeUInt8(0x55, 1);
+  buf.writeUInt8(0x01, 2);
+  buf.writeUInt8(0x01, 3);
+  buf.writeUInt8(Number(channelCode) & 0xFF, 4);
+  buf.writeBigUInt64BE(BigInt(Math.max(0, Math.round(Number(amountPaisa || 0)))), 5);
+  let crc = 0xFFFF;
+  for (let i = 0; i < 13; i++) {
+    crc ^= buf[i];
+    for (let j = 0; j < 8; j++) {
+      if (crc & 1) crc = (crc >> 1) ^ 0xA001;
+      else crc = crc >> 1;
+    }
+  }
+  buf.writeUInt16LE(crc, 13);
+  buf.writeUInt8(0x00, 15);
+  return buf;
+}
+
+function resolveAudioOutputSink(isBleConnected, batteryLevelPct, ttsEnabled) {
+  if (Boolean(isBleConnected) && Number(batteryLevelPct || 0) >= 10) {
+    return AUDIO_OUTPUT_SINKS.HARDWARE_BLE_SOUNDBOX;
+  }
+  if (Boolean(ttsEnabled)) {
+    return AUDIO_OUTPUT_SINKS.SOFTWARE_IN_APP_TTS;
+  }
+  return AUDIO_OUTPUT_SINKS.SILENT_OR_VIBRATE;
+}
+
+function toBengaliDigits(num) {
+  const bDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return String(num).replace(/[0-9]/g, (d) => bDigits[Number(d)]);
+}
+
+function generateBengaliVoiceAnnouncement(amountPaisa, channel = 'টালিপে') {
+  const safePaisa = Math.max(0, Math.round(Number(amountPaisa || 0)));
+  const taka = Math.floor(safePaisa / 100);
+  const paisa = safePaisa % 100;
+
+  let spokenAmount = '';
+  if (taka === 500) spokenAmount = 'পাঁচ শত';
+  else if (taka === 1000) spokenAmount = 'এক হাজার';
+  else if (taka === 100) spokenAmount = 'এক শত';
+  else if (taka === 50) spokenAmount = 'পঞ্চাশ';
+  else spokenAmount = toBengaliDigits(taka);
+
+  let phrase = (channel || 'টালিপে') + '-তে ' + spokenAmount + ' টাকা';
+  if (paisa > 0) {
+    phrase += ' ' + toBengaliDigits(paisa) + ' পয়সা';
+  }
+  phrase += ' পাওয়া গেছে';
+
+  return {
+    rawPaisa: safePaisa,
+    taka,
+    paisa,
+    formattedBengaliAmount: toBengaliDigits(taka) + (paisa > 0 ? '.' + toBengaliDigits(paisa) : ''),
+    announcementPhrase: phrase,
+  };
+}
+
+function calculateSettlementPayoutFee(amountPaisa, isInstant = false) {
+  const amount = Math.max(0, Math.round(Number(amountPaisa || 0)));
+  if (!isInstant) {
+    return {
+      amountPaisa: amount,
+      feePaisa: 0,
+      netPayoutPaisa: amount,
+      mode: 'BEFTN_REGULAR',
+      feeTaka: 0,
+      netPayoutTaka: amount / 100,
+    };
+  }
+  const feePaisa = Math.max(
+    SETTLEMENT_PAYOUT_RULES.INSTANT_NPSB_MIN_FEE_PAISA,
+    Math.round(amount * SETTLEMENT_PAYOUT_RULES.INSTANT_NPSB_FEE_PCT)
+  );
+  const netPayoutPaisa = Math.max(0, amount - feePaisa);
+  return {
+    amountPaisa: amount,
+    feePaisa,
+    netPayoutPaisa,
+    mode: 'NPSB_INSTANT',
+    feeTaka: feePaisa / 100,
+    netPayoutTaka: netPayoutPaisa / 100,
+  };
+}
+
+class TransactionSettlementAction {
+  constructor(payload = {}) {
+    this.id = payload.id !== undefined && payload.id !== null ? Number(payload.id) : null;
+    this.transaction_number = String(
+      payload.transaction_number || payload.transactionNumber || payload.txnNumber || ''
+    ).trim();
+    this.action_type = String(
+      payload.action_type || payload.actionType || TKEnum$TransactionSettlementAction.NO_ACTION
+    ).trim().toUpperCase();
+    this.synced = (payload.synced !== undefined && payload.synced !== null)
+      ? Number(payload.synced)
+      : (payload.syncStatus !== undefined ? Number(payload.syncStatus) : 0);
+    this.create_date = payload.create_date || payload.createDate || new Date().toISOString();
+    this.update_date = payload.update_date || payload.updateDate || null;
+  }
+}
+
+class TransactionSettlementActionDao {
+  constructor(storage = null, businessId = '1') {
+    this.storage = storage;
+    this.businessId = String(businessId || '1');
+    this.records = [];
+    this.idCounter = 1;
+  }
+
+  exists(transactionNumber) {
+    const txnNum = String(transactionNumber || '').trim();
+    if (this.storage && typeof this.storage.existsTransactionSettlementAction === 'function') {
+      return this.storage.existsTransactionSettlementAction(this.businessId, txnNum);
+    }
+    return this.records.some((r) => r.transaction_number === txnNum);
+  }
+
+  insert(record) {
+    const entity = record instanceof TransactionSettlementAction ? record : new TransactionSettlementAction(record);
+    if (!entity.id) entity.id = this.idCounter++;
+    if (this.storage && typeof this.storage.saveTransactionSettlementAction === 'function') {
+      return this.storage.saveTransactionSettlementAction(this.businessId, entity);
+    }
+    this.records.push(entity);
+    return entity;
+  }
+
+  getUnsyncedTxnSettlementActions(limit = 100) {
+    if (this.storage && typeof this.storage.getUnsyncedTxnSettlementActions === 'function') {
+      return this.storage.getUnsyncedTxnSettlementActions(this.businessId, limit);
+    }
+    return this.records.filter((r) => Number(r.synced) === 0).slice(0, limit);
+  }
+
+  updateTxnSettlementActionSyncStatusByIds(synced, ids = []) {
+    if (this.storage && typeof this.storage.updateTxnSettlementActionSyncStatusByIds === 'function') {
+      return this.storage.updateTxnSettlementActionSyncStatusByIds(this.businessId, synced, ids);
+    }
+    const idSet = new Set((ids || []).map(Number));
+    let count = 0;
+    for (const r of this.records) {
+      if (idSet.has(Number(r.id))) {
+        r.synced = Number(synced);
+        r.update_date = new Date().toISOString();
+        count++;
+      }
+    }
+    return count;
+  }
+
+  updateAllTxnSettlementActionUnsynced() {
+    if (this.storage && typeof this.storage.updateAllTxnSettlementActionUnsynced === 'function') {
+      return this.storage.updateAllTxnSettlementActionUnsynced(this.businessId);
+    }
+    let count = 0;
+    for (const r of this.records) {
+      r.synced = 0;
+      r.update_date = new Date().toISOString();
+      count++;
+    }
+    return count;
+  }
+
+  countUnsynced() {
+    return this.getUnsyncedTxnSettlementActions(100000).length;
+  }
+
+  getAll() {
+    if (this.storage && typeof this.storage.getTransactionSettlementActions === 'function') {
+      return this.storage.getTransactionSettlementActions(this.businessId);
+    }
+    return [...this.records];
+  }
+}
+
+class SettlementAutomationEngine {
+  constructor(options = {}) {
+    this.customers = new Map();
+    this.settlementActions = [];
+    this.journal = [];
+    this.walletBalancePaisa = options.walletBalancePaisa !== undefined ? options.walletBalancePaisa : 1000000;
+    this.idCounter = 1;
+    this.storage = options.storage || null;
+    this.businessId = String(options.businessId || '1');
+  }
+
+  addCustomer(id, name, mobile, startingDuePaisa) {
+    this.customers.set(id, { id, name, mobile, balancePaisa: Number(startingDuePaisa || 0) });
+  }
+
+  exists(transactionNumber) {
+    return this.settlementActions.some((a) => a.transaction_number === transactionNumber);
+  }
+
+  processIncomingTransaction(txn = {}) {
+    const { transactionNumber, amountPaisa, senderMobile, channel } = txn;
+
+    if (this.exists(transactionNumber)) {
+      return { success: false, reason: 'DUPLICATE_TRANSACTION', transactionNumber };
+    }
+
+    const safeAmountPaisa = Math.max(0, Math.round(Number(amountPaisa || 0)));
+    this.walletBalancePaisa += safeAmountPaisa;
+
+    let matchedCustomer = null;
+    for (const [id, cust] of this.customers.entries()) {
+      if (cust.mobile === senderMobile) {
+        matchedCustomer = cust;
+        break;
+      }
+    }
+
+    let actionType = TKEnum$TransactionSettlementAction.NO_ACTION;
+    let settledJournalId = null;
+
+    if (matchedCustomer && matchedCustomer.balancePaisa > 0) {
+      const settlementAmount = Math.min(matchedCustomer.balancePaisa, safeAmountPaisa);
+      matchedCustomer.balancePaisa -= settlementAmount;
+      actionType = TKEnum$TransactionSettlementAction.CREDIT_COLLECTION;
+
+      settledJournalId = 'JRN-' + this.idCounter++;
+      this.journal.push({
+        id: settledJournalId,
+        accountId: matchedCustomer.id,
+        txnType: 2,
+        amount: settlementAmount / 100,
+        amountReceived: settlementAmount / 100,
+        txnMode: 'WALLET',
+        transactionNumber,
+        note: SETTLEMENT_SOUNDBOX_ARSC_TOKENS.SC_CREDIT_SETTLEMENT,
+        date: new Date().toISOString(),
+      });
+    } else {
+      actionType = TKEnum$TransactionSettlementAction.DIGITAL_SALE;
+      settledJournalId = 'JRN-' + this.idCounter++;
+      this.journal.push({
+        id: settledJournalId,
+        accountId: null,
+        txnType: 1,
+        amount: safeAmountPaisa / 100,
+        amountReceived: safeAmountPaisa / 100,
+        txnMode: 'WALLET',
+        transactionNumber,
+        date: new Date().toISOString(),
+      });
+    }
+
+    const actionRecord = {
+      id: this.idCounter++,
+      transaction_number: transactionNumber,
+      action_type: actionType,
+      synced: 0,
+      create_date: new Date().toISOString(),
+      update_date: null,
+    };
+    this.settlementActions.push(actionRecord);
+
+    const voicePayload = generateBengaliVoiceAnnouncement(safeAmountPaisa, channel || 'টালিপে');
+
+    return {
+      success: true,
+      transactionNumber,
+      actionType,
+      actionId: actionRecord.id,
+      matchedCustomerId: matchedCustomer ? matchedCustomer.id : null,
+      customerRemainingDuePaisa: matchedCustomer ? matchedCustomer.balancePaisa : null,
+      voiceAnnouncement: voicePayload.announcementPhrase,
+    };
+  }
+
+  getUnsyncedTxnSettlementActions(limit = 100) {
+    return this.settlementActions.filter((a) => Number(a.synced) === 0).slice(0, limit);
+  }
+
+  updateTxnSettlementActionSyncStatusByIds(syncedStatus, ids = []) {
+    let count = 0;
+    const idSet = new Set((ids || []).map(Number));
+    for (const a of this.settlementActions) {
+      if (idSet.has(Number(a.id))) {
+        a.synced = Number(syncedStatus);
+        a.update_date = new Date().toISOString();
+        count++;
+      }
+    }
+    return count;
+  }
+
+  updateAllTxnSettlementActionUnsynced() {
+    let count = 0;
+    for (const a of this.settlementActions) {
+      a.synced = 0;
+      a.update_date = new Date().toISOString();
+      count++;
+    }
+    return count;
+  }
+
+  calculatePayoutFee(amountPaisa, isInstant = false) {
+    return calculateSettlementPayoutFee(amountPaisa, isInstant);
+  }
+}
+
+class SoundboxBleDiagnosticsService {
+  constructor(options = {}) {
+    this.state = BLE_STATES.DISCONNECTED;
+    this.deviceId = options.deviceId || 'SB-QR-001';
+    this.deviceName = options.deviceName || 'TallyPay Soundbox';
+    this.rssiDbm = options.rssiDbm || -65;
+    this.batteryVoltageMv = options.batteryVoltageMv || 3900;
+    this.isCharging = Boolean(options.isCharging);
+    this.volumeStep = options.volumeStep !== undefined ? options.volumeStep : 12;
+    this.retries = 0;
+    this.maxRetries = options.maxRetries || 3;
+    this.connectedTimestamp = null;
+    this.lastPacketSent = null;
+  }
+
+  transition(action) {
+    const prevState = this.state;
+    this.state = transitionBleState(this.state, action);
+    if (this.state === BLE_STATES.CONNECTED) {
+      this.retries = 0;
+      this.connectedTimestamp = Date.now();
+    } else if (this.state === BLE_STATES.RECONNECTING) {
+      this.retries++;
+      if (this.retries > this.maxRetries) {
+        this.state = transitionBleState(this.state, 'MAX_RETRIES_EXCEEDED');
+      }
+    }
+    return { prevState, currentState: this.state, action };
+  }
+
+  startScan() { return this.transition('START_SCAN'); }
+  deviceFound() { return this.transition('DEVICE_FOUND'); }
+  connect() {
+    if (this.state === BLE_STATES.DISCONNECTED) {
+      this.startScan();
+      this.deviceFound();
+    } else if (this.state === BLE_STATES.SCANNING) {
+      this.deviceFound();
+    }
+    return this.transition('GATT_CONNECTED');
+  }
+  disconnect() { return this.transition('DISCONNECT'); }
+  linkLoss() { return this.transition('LINK_LOSS'); }
+  reconnect() { return this.transition('GATT_RECONNECTED'); }
+  reset() { return this.transition('RESET'); }
+
+  setRssi(rssiDbm) {
+    this.rssiDbm = Number(rssiDbm);
+    return evaluateRssiHealth(this.rssiDbm);
+  }
+
+  setBattery(voltageMv, isCharging = false) {
+    this.batteryVoltageMv = Number(voltageMv);
+    this.isCharging = Boolean(isCharging);
+    return evaluateBatteryTelemetry(this.batteryVoltageMv, this.isCharging);
+  }
+
+  setVolume(step) {
+    const vol = syncSoundboxVolume(step);
+    this.volumeStep = vol.step;
+    return vol;
+  }
+
+  getTelemetry() {
+    const rssi = evaluateRssiHealth(this.rssiDbm);
+    const battery = evaluateBatteryTelemetry(this.batteryVoltageMv, this.isCharging);
+    const volume = syncSoundboxVolume(this.volumeStep);
+    return {
+      deviceId: this.deviceId,
+      deviceName: this.deviceName,
+      state: this.state,
+      isConnected: this.state === BLE_STATES.CONNECTED,
+      rssi,
+      battery,
+      volume,
+      retries: this.retries,
+      connectedTimestamp: this.connectedTimestamp,
+    };
+  }
+
+  dispatchPaymentPacket(amountPaisa, channelCode = 1, ttsEnabled = true) {
+    const telemetry = this.getTelemetry();
+    const sink = resolveAudioOutputSink(telemetry.isConnected, telemetry.battery.percentage, ttsEnabled);
+    const packet = buildSoundboxCommandPacket(amountPaisa, channelCode);
+    const voice = generateBengaliVoiceAnnouncement(amountPaisa);
+    this.lastPacketSent = {
+      timestamp: Date.now(),
+      amountPaisa,
+      channelCode,
+      sink,
+      packetLength: packet.length,
+      packetHex: packet.toString('hex'),
+      announcementPhrase: voice.announcementPhrase,
+    };
+    return {
+      success: true,
+      sink,
+      packet,
+      telemetry,
+      voiceAnnouncement: voice.announcementPhrase,
+    };
+  }
+}
+
 module.exports = {
+
+  // Milestone REA-ITER-236 Exports
+  TRANSACTION_SETTLEMENT_ACTION_SCHEMA,
+  TKEnum$TransactionSettlementAction,
+  TRANSACTION_SETTLEMENT_ACTIONS,
+  TransactionSettlementActionType,
+  SETTLEMENT_SOUNDBOX_ARSC_TOKENS,
+  BLE_STATES,
+  BATTERY_SERVICE_UUID,
+  BATTERY_LEVEL_CHAR_UUID,
+  SOUNDBOX_SERVICE_UUID,
+  SOUNDBOX_CMD_CHAR_UUID,
+  AUDIO_OUTPUT_SINKS,
+  SETTLEMENT_PAYOUT_RULES,
+  transitionBleState,
+  evaluateRssiHealth,
+  evaluateBatteryTelemetry,
+  syncSoundboxVolume,
+  buildSoundboxCommandPacket,
+  resolveAudioOutputSink,
+  toBengaliDigits,
+  generateBengaliVoiceAnnouncement,
+  calculateSettlementPayoutFee,
+  TransactionSettlementAction,
+  TransactionSettlementActionDao,
+  SettlementAutomationEngine,
+  SoundboxBleDiagnosticsService,
+
   // Milestone REA-ITER-235 Exports
   TELECOM_OPERATORS,
   RECHARGE_TELECOM_OPERATORS,

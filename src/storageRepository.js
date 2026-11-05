@@ -280,6 +280,9 @@ const VALID_COLLECTIONS = new Set([
     'savedCards',
     'transferHistory',
     'rechargeHistory',
+  'settlementHistory',
+  'transactionSettlementActions',
+  'soundboxConfig',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -409,6 +412,9 @@ function sanitizeState(state) {
   if (!Array.isArray(s.savedCards)) s.savedCards = [];
   if (!Array.isArray(s.transferHistory)) s.transferHistory = [];
   if (!Array.isArray(s.rechargeHistory)) s.rechargeHistory = [];
+  if (!Array.isArray(s.settlementHistory)) s.settlementHistory = [];
+  if (!Array.isArray(s.transactionSettlementActions)) s.transactionSettlementActions = [];
+  if (!s.soundboxConfig || typeof s.soundboxConfig !== 'object') s.soundboxConfig = {};
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
   if (!Array.isArray(s.tallyPayBeneficiaries)) s.tallyPayBeneficiaries = [];
@@ -558,6 +564,9 @@ function createDefaultState() {
       savedCards: [],
       transferHistory: [],
       rechargeHistory: [],
+    settlementHistory: [],
+    transactionSettlementActions: [],
+    soundboxConfig: {},
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1740,6 +1749,36 @@ class StorageRepository {
       authoritative.rechargeHistory = [];
     }
 
+    if (authoritative.transactionSettlementActions && Array.isArray(authoritative.transactionSettlementActions)) {
+      authoritative.transactionSettlementActions = authoritative.transactionSettlementActions.map((t) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = t || {};
+        return rest;
+      });
+    } else {
+      authoritative.transactionSettlementActions = [];
+    }
+
+    if (authoritative.settlementHistory && Array.isArray(authoritative.settlementHistory)) {
+      authoritative.settlementHistory = authoritative.settlementHistory.map((s) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = s || {};
+        return rest;
+      });
+    } else {
+      authoritative.settlementHistory = [];
+    }
+
+    if (authoritative.soundboxConfig && typeof authoritative.soundboxConfig === 'object') {
+      const sanitizedSoundbox = {};
+      for (const [bizId, cfg] of Object.entries(authoritative.soundboxConfig)) {
+        if (!cfg || typeof cfg !== 'object') continue;
+        const { connectionToken, token, socket, socketHandle, sessionToken, secret, ...rest } = cfg;
+        sanitizedSoundbox[bizId] = { ...rest, isConnected: false, connectionState: 'DISCONNECTED' };
+      }
+      authoritative.soundboxConfig = sanitizedSoundbox;
+    } else {
+      authoritative.soundboxConfig = {};
+    }
+
         if (authoritative.transferHistory && Array.isArray(authoritative.transferHistory)) {
       authoritative.transferHistory = authoritative.transferHistory.map((t) => {
         const rawPhone = String(t.recipientMobile || t.recipient || t.receiverMobile || t.phone || "").replace(/[\s-]+/g, "");
@@ -2363,6 +2402,10 @@ class StorageRepository {
         const savedCards = (prevStore.savedCards || []).filter((c) => getBizId(c) !== targetId);
         const transferHistory = (prevStore.transferHistory || []).filter((t) => getBizId(t) !== targetId);
         const rechargeHistory = (prevStore.rechargeHistory || []).filter((r) => getBizId(r) !== targetId);
+        const settlementHistory = (prevStore.settlementHistory || []).filter((s) => getBizId(s) !== targetId);
+        const transactionSettlementActions = (prevStore.transactionSettlementActions || []).filter((t) => getBizId(t) !== targetId);
+        const soundboxConfig = { ...(prevStore.soundboxConfig || {}) };
+        delete soundboxConfig[targetId];
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
         delete autoDisbursementConfig[targetId];
 
@@ -2455,6 +2498,9 @@ class StorageRepository {
         savedCards,
         transferHistory,
         rechargeHistory,
+        settlementHistory,
+        transactionSettlementActions,
+        soundboxConfig,
         autoDisbursementConfig,
         cashReconciliation,
       };
@@ -8088,8 +8134,257 @@ class StorageRepository {
       return found ? { ...found } : null;
     }
 
+    /**
+     * REA-ITER-236: Saves a transaction settlement action record with uniqueness check on transaction_number.
+     */
+    async saveTransactionSettlementAction(businessId = null, actionRecord = {}) {
+      if (!actionRecord || typeof actionRecord !== 'object') {
+        return { success: false, error: 'INVALID_RECORD' };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || actionRecord.businessId || store.activeBusinessId || '1');
+      const txnNumber = String(actionRecord.transaction_number || actionRecord.transactionNumber || actionRecord.txnNumber || '').trim();
+      if (!txnNumber) {
+        return { success: false, error: 'TRANSACTION_NUMBER_REQUIRED' };
+      }
 
+      const list = Array.isArray(store.transactionSettlementActions) ? store.transactionSettlementActions : [];
+      const existing = list.find((a) =>
+        String(a.transaction_number || a.transactionNumber) === txnNumber &&
+        String(a.businessId || '1') === targetBizId
+      );
+      if (existing) {
+        return {
+          success: false,
+          duplicate: true,
+          reason: 'DUPLICATE_TRANSACTION',
+          error: 'DUPLICATE_TRANSACTION',
+          existing,
+        };
+      }
 
+      const id = actionRecord.id !== undefined && actionRecord.id !== null
+        ? Number(actionRecord.id)
+        : (list.length > 0 ? Math.max(...list.map((x) => Number(x.id) || 0)) + 1 : 1);
+      const actionType = String(actionRecord.action_type || actionRecord.actionType || 'NO_ACTION').toUpperCase();
+      const entry = {
+        id,
+        businessId: targetBizId,
+        transaction_number: txnNumber,
+        transactionNumber: txnNumber,
+        action_type: actionType,
+        actionType: actionType,
+        synced: actionRecord.synced !== undefined ? Number(actionRecord.synced) : 0,
+        create_date: actionRecord.create_date || actionRecord.createDate || new Date().toISOString(),
+        update_date: actionRecord.update_date || actionRecord.updateDate || null,
+      };
+
+      let saved = null;
+      await this.mutateCollection('transactionSettlementActions', (col) => {
+        saved = entry;
+        return [...(col || []), entry];
+      });
+      return { success: true, record: saved, id: entry.id };
+    }
+
+    /**
+     * REA-ITER-236: Retrieves transaction settlement actions with optional sync and actionType filters.
+     */
+    getTransactionSettlementActions(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.transactionSettlementActions || []).filter(
+        (a) => String(a.businessId || '1') === targetBizId
+      );
+
+      if (options.synced !== undefined && options.synced !== null) {
+        const syn = Number(options.synced);
+        list = list.filter((a) => Number(a.synced) === syn);
+      }
+      if (options.actionType || options.action_type) {
+        const act = String(options.actionType || options.action_type).toUpperCase();
+        list = list.filter((a) => String(a.action_type || a.actionType).toUpperCase() === act);
+      }
+
+      list.sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+
+      const offset = Number(options.offset) || 0;
+      const limit = options.limit !== undefined ? Number(options.limit) : list.length;
+      return list.slice(offset, offset + limit);
+    }
+
+    /**
+     * REA-ITER-236: Retrieves a single settlement action by transaction number.
+     */
+    getTransactionSettlementActionByTxn(businessId = null, transactionNumber = '') {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const txnNum = String(transactionNumber || '').trim();
+      return (store.transactionSettlementActions || []).find(
+        (a) => String(a.businessId || '1') === targetBizId &&
+               String(a.transaction_number || a.transactionNumber) === txnNum
+      ) || null;
+    }
+
+    /**
+     * REA-ITER-236: Checks if a transaction settlement action exists (Room DAO exists query).
+     */
+    existsTransactionSettlementAction(businessId = null, transactionNumber = '') {
+      return Boolean(this.getTransactionSettlementActionByTxn(businessId, transactionNumber));
+    }
+
+    /**
+     * REA-ITER-236: Gets unsynced settlement actions (Room DAO getUnsyncedTxnSettlementActions).
+     */
+    getUnsyncedTxnSettlementActions(businessId = null, limit = 100) {
+      return this.getTransactionSettlementActions(businessId, { synced: 0, limit });
+    }
+
+    /**
+     * REA-ITER-236: Batch updates sync status by IDs (Room DAO updateTxnSettlementActionSyncStatusByIds).
+     */
+    async updateTxnSettlementActionSyncStatusByIds(businessId = null, synced = 1, ids = []) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const idSet = new Set((ids || []).map(Number));
+      let updatedCount = 0;
+
+      await this.mutateCollection('transactionSettlementActions', (col) => {
+        return (col || []).map((a) => {
+          if (String(a.businessId || '1') === targetBizId && idSet.has(Number(a.id))) {
+            updatedCount++;
+            return {
+              ...a,
+              synced: Number(synced),
+              update_date: new Date().toISOString(),
+            };
+          }
+          return a;
+        });
+      });
+      return updatedCount;
+    }
+
+    /**
+     * REA-ITER-236: Resets all settlement actions to unsynced (Room DAO updateAllTxnSettlementActionUnsynced).
+     */
+    async updateAllTxnSettlementActionUnsynced(businessId = null) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let updatedCount = 0;
+
+      await this.mutateCollection('transactionSettlementActions', (col) => {
+        return (col || []).map((a) => {
+          if (String(a.businessId || '1') === targetBizId) {
+            updatedCount++;
+            return {
+              ...a,
+              synced: 0,
+              update_date: new Date().toISOString(),
+            };
+          }
+          return a;
+        });
+      });
+      return updatedCount;
+    }
+
+    /**
+     * REA-ITER-236: Saves a settlement history record.
+     */
+    async saveSettlementHistoryRecord(businessId = null, record = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || record.businessId || store.activeBusinessId || '1');
+      const entry = {
+        id: record.id || 'SH_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        businessId: targetBizId,
+        transactionNumber: record.transactionNumber || record.transaction_number || '',
+        actionType: record.actionType || record.action_type || 'NO_ACTION',
+        amountPaisa: Number(record.amountPaisa || 0),
+        senderMobile: record.senderMobile || '',
+        channel: record.channel || 'টালিপে',
+        status: record.status || 'SETTLED',
+        createdAt: record.createdAt || new Date().toISOString(),
+        ...record,
+      };
+
+      let saved = null;
+      await this.mutateCollection('settlementHistory', (col) => {
+        saved = entry;
+        return [...(col || []), entry];
+      });
+      return saved;
+    }
+
+    /**
+     * REA-ITER-236: Retrieves settlement history records.
+     */
+    getSettlementHistory(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.settlementHistory || []).filter(
+        (s) => String(s.businessId || '1') === targetBizId
+      );
+      if (options.status) {
+        list = list.filter((s) => s.status === options.status);
+      }
+      const offset = Number(options.offset) || 0;
+      const limit = Number(options.limit) || list.length;
+      return list.slice(offset, offset + limit);
+    }
+
+    /**
+     * REA-ITER-236: Saves Soundbox hardware and diagnostics configuration.
+     */
+    async saveSoundboxConfig(businessId = null, config = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let updatedConfig = null;
+
+      await this.mutateStore((prevStore) => {
+        const prevMap = (prevStore.soundboxConfig && typeof prevStore.soundboxConfig === 'object')
+          ? { ...prevStore.soundboxConfig }
+          : {};
+        const existing = prevMap[targetBizId] || {
+          isConnected: false,
+          connectionState: 'DISCONNECTED',
+          volumeStep: 12,
+          ttsEnabled: true,
+          deviceId: 'SB-QR-001',
+          deviceName: 'TallyPay Soundbox',
+        };
+        updatedConfig = {
+          ...existing,
+          ...config,
+          businessId: targetBizId,
+          updatedAt: new Date().toISOString(),
+        };
+        prevMap[targetBizId] = updatedConfig;
+        return {
+          ...prevStore,
+          soundboxConfig: prevMap,
+        };
+      });
+      return updatedConfig;
+    }
+
+    /**
+     * REA-ITER-236: Retrieves Soundbox configuration for business.
+     */
+    getSoundboxConfig(businessId = null) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const cfg = store.soundboxConfig && store.soundboxConfig[targetBizId];
+      if (cfg) return { ...cfg };
+      return {
+        isConnected: false,
+        connectionState: 'DISCONNECTED',
+        volumeStep: 12,
+        ttsEnabled: true,
+        deviceId: 'SB-QR-001',
+        deviceName: 'TallyPay Soundbox',
+      };
+    }
 
   sanitizeState(state) {
     return sanitizeState(state || this.currentStore);
@@ -9351,6 +9646,83 @@ function getTransferByIdRepo(businessId = null, transferId = null, repo = defaul
   return null;
 }
 
+async function saveTransactionSettlementActionRepo(businessId = null, actionRecord = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveTransactionSettlementAction === 'function') {
+    return repo.saveTransactionSettlementAction(businessId, actionRecord);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getTransactionSettlementActionsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getTransactionSettlementActions === 'function') {
+    return repo.getTransactionSettlementActions(businessId, options);
+  }
+  return [];
+}
+
+function getTransactionSettlementActionByTxnRepo(businessId = null, txnNumber = null, repo = defaultRepository) {
+  if (repo && typeof repo.getTransactionSettlementActionByTxn === 'function') {
+    return repo.getTransactionSettlementActionByTxn(businessId, txnNumber);
+  }
+  return null;
+}
+
+function existsTransactionSettlementActionRepo(businessId = null, txnNumber = null, repo = defaultRepository) {
+  if (repo && typeof repo.existsTransactionSettlementAction === 'function') {
+    return repo.existsTransactionSettlementAction(businessId, txnNumber);
+  }
+  return false;
+}
+
+function getUnsyncedTxnSettlementActionsRepo(businessId = null, limit = 100, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedTxnSettlementActions === 'function') {
+    return repo.getUnsyncedTxnSettlementActions(businessId, limit);
+  }
+  return [];
+}
+
+async function updateTxnSettlementActionSyncStatusByIdsRepo(businessId = null, synced = 1, ids = [], repo = defaultRepository) {
+  if (repo && typeof repo.updateTxnSettlementActionSyncStatusByIds === 'function') {
+    return repo.updateTxnSettlementActionSyncStatusByIds(businessId, synced, ids);
+  }
+  return 0;
+}
+
+async function updateAllTxnSettlementActionUnsyncedRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.updateAllTxnSettlementActionUnsynced === 'function') {
+    return repo.updateAllTxnSettlementActionUnsynced(businessId);
+  }
+  return 0;
+}
+
+async function saveSettlementHistoryRecordRepo(businessId = null, record = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveSettlementHistoryRecord === 'function') {
+    return repo.saveSettlementHistoryRecord(businessId, record);
+  }
+  return null;
+}
+
+function getSettlementHistoryRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getSettlementHistory === 'function') {
+    return repo.getSettlementHistory(businessId, options);
+  }
+  return [];
+}
+
+async function saveSoundboxConfigRepo(businessId = null, config = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveSoundboxConfig === 'function') {
+    return repo.saveSoundboxConfig(businessId, config);
+  }
+  return null;
+}
+
+function getSoundboxConfigRepo(businessId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getSoundboxConfig === 'function') {
+    return repo.getSoundboxConfig(businessId);
+  }
+  return null;
+}
+
 async function saveRechargeRecordRepo(businessId = null, recordData = {}, repo = defaultRepository) {
   if (repo && typeof repo.saveRechargeRecord === 'function') {
     return repo.saveRechargeRecord(businessId, recordData);
@@ -9555,6 +9927,17 @@ const repoExport = {
   saveTransferRecord: saveTransferRecordRepo,
   getTransferHistory: getTransferHistoryRepo,
   getTransferById: getTransferByIdRepo,
+  saveTransactionSettlementAction: saveTransactionSettlementActionRepo,
+  getTransactionSettlementActions: getTransactionSettlementActionsRepo,
+  getTransactionSettlementActionByTxn: getTransactionSettlementActionByTxnRepo,
+  existsTransactionSettlementAction: existsTransactionSettlementActionRepo,
+  getUnsyncedTxnSettlementActions: getUnsyncedTxnSettlementActionsRepo,
+  updateTxnSettlementActionSyncStatusByIds: updateTxnSettlementActionSyncStatusByIdsRepo,
+  updateAllTxnSettlementActionUnsynced: updateAllTxnSettlementActionUnsyncedRepo,
+  saveSettlementHistoryRecord: saveSettlementHistoryRecordRepo,
+  getSettlementHistory: getSettlementHistoryRepo,
+  saveSoundboxConfig: saveSoundboxConfigRepo,
+  getSoundboxConfig: getSoundboxConfigRepo,
   saveRechargeRecord: saveRechargeRecordRepo,
   getRechargeHistory: getRechargeHistoryRepo,
   getRechargeById: getRechargeByIdRepo,
@@ -9734,6 +10117,17 @@ if (typeof exports !== 'undefined') {
   exports.saveTransferRecord = saveTransferRecordRepo;
   exports.getTransferHistory = getTransferHistoryRepo;
   exports.getTransferById = getTransferByIdRepo;
+  exports.saveTransactionSettlementAction = saveTransactionSettlementActionRepo;
+  exports.getTransactionSettlementActions = getTransactionSettlementActionsRepo;
+  exports.getTransactionSettlementActionByTxn = getTransactionSettlementActionByTxnRepo;
+  exports.existsTransactionSettlementAction = existsTransactionSettlementActionRepo;
+  exports.getUnsyncedTxnSettlementActions = getUnsyncedTxnSettlementActionsRepo;
+  exports.updateTxnSettlementActionSyncStatusByIds = updateTxnSettlementActionSyncStatusByIdsRepo;
+  exports.updateAllTxnSettlementActionUnsynced = updateAllTxnSettlementActionUnsyncedRepo;
+  exports.saveSettlementHistoryRecord = saveSettlementHistoryRecordRepo;
+  exports.getSettlementHistory = getSettlementHistoryRepo;
+  exports.saveSoundboxConfig = saveSoundboxConfigRepo;
+  exports.getSoundboxConfig = getSoundboxConfigRepo;
   exports.saveRechargeRecord = saveRechargeRecordRepo;
   exports.getRechargeHistory = getRechargeHistoryRepo;
   exports.getRechargeById = getRechargeByIdRepo;

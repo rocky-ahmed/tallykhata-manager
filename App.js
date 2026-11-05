@@ -1150,7 +1150,6 @@ function TallyKhataApp() {
   const [modalSoundboxSettings, setModalSoundboxSettings] = useState(false);
   const [soundboxBleState, setSoundboxBleState] = useState('DISCONNECTED'); // 'DISCONNECTED' | 'SCANNING' | 'CONNECTING' | 'CONNECTED' | 'ERROR'
   const [soundboxBatteryLevel, setSoundboxBatteryLevel] = useState(85);
-  const [soundboxIsCharging, setSoundboxIsCharging] = useState(false);
   const [soundboxHardwareVolume, setSoundboxHardwareVolume] = useState(10); // 0-15 steps
   const [soundboxSoftwareVolume, setSoundboxSoftwareVolume] = useState(3); // 1-5 levels
   const [soundboxDeviceName, setSoundboxDeviceName] = useState('TallyKhata Soundbox Pro');
@@ -1277,6 +1276,41 @@ function TallyKhataApp() {
   const [rechargePackageSearch, setRechargePackageSearch] = useState("");
   const [rechargePin, setRechargePin] = useState("");
   const [rechargeVoucherData, setRechargeVoucherData] = useState(null);
+  // --- REA-ITER-236: TallyPay Merchant Settlement & QR Soundbox Hardware Diagnostics ---
+  const [modalSettlementReconciliation, setModalSettlementReconciliation] = useState(false);
+  const [modalSettlementConfirmation, setModalSettlementConfirmation] = useState(false);
+  const [modalSoundboxDiagnostics, setModalSoundboxDiagnostics] = useState(false);
+  const [modalSoundboxVolumeCalibration, setModalSoundboxVolumeCalibration] = useState(false);
+  const [modalSoundboxVoiceBroadcast, setModalSoundboxVoiceBroadcast] = useState(false);
+
+  // Settlement states
+  const [settlementSearchQuery, setSettlementSearchQuery] = useState("");
+  const [selectedSettlementCustomer, setSelectedSettlementCustomer] = useState(null);
+  const [settlementAmountInput, setSettlementAmountInput] = useState("1000");
+  const [settlementSubmitting, setSettlementSubmitting] = useState(false);
+  const [settlementSuccessToast, setSettlementSuccessToast] = useState(false);
+  const [activeSettlementTxn, setActiveSettlementTxn] = useState({
+    transactionNumber: "TKQR-" + Date.now(),
+    amountPaisa: 100000,
+    amountTaka: 1000,
+    senderMobile: "01712000000",
+    senderName: "করিম স্টোর",
+    channel: "Bangla QR",
+    timestamp: new Date().toISOString(),
+  });
+
+  // Soundbox states
+  const [soundboxBatteryMv, setSoundboxBatteryMv] = useState(3850);
+  const [soundboxBatteryPct, setSoundboxBatteryPct] = useState(75);
+  const [soundboxIsCharging, setSoundboxIsCharging] = useState(false);
+  const [soundboxRssiDbm, setSoundboxRssiDbm] = useState(-65);
+  const [soundboxVolumeStep, setSoundboxVolumeStep] = useState(10);
+  const [soundboxDutyCyclePct, setSoundboxDutyCyclePct] = useState(67);
+  const [soundboxTestBeepPlaying, setSoundboxTestBeepPlaying] = useState(false);
+  const [soundboxVoiceLanguage, setSoundboxVoiceLanguage] = useState("bn");
+  const [soundboxVoicePromptText, setSoundboxVoicePromptText] = useState("টালিপে-তে ১,০০০ টাকা পাওয়া গেছে");
+  const [soundboxAudioSink, setSoundboxAudioSink] = useState("HARDWARE_BLE_SOUNDBOX");
+  const [soundboxReconnectCountdown, setSoundboxReconnectCountdown] = useState(null);
   const [transferWalletMobile, setTransferWalletMobile] = useState('');
   const [transferWalletAmount, setTransferWalletAmount] = useState('1000');
   const [transferWalletPreset, setTransferWalletPreset] = useState(1000);
@@ -2638,6 +2672,35 @@ function TallyKhataApp() {
         setModalSelectCustomerAday(false);
         return true;
       }
+      // Iteration 236: Settlement & Soundbox BackHandler
+      if (modalSoundboxVoiceBroadcast) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalSoundboxVoiceBroadcast(false);
+        setModalSoundboxDiagnostics(true);
+        return true;
+      }
+      if (modalSoundboxVolumeCalibration) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalSoundboxVolumeCalibration(false);
+        setModalSoundboxDiagnostics(true);
+        return true;
+      }
+      if (modalSoundboxDiagnostics) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalSoundboxDiagnostics(false);
+        return true;
+      }
+      if (modalSettlementConfirmation) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalSettlementConfirmation(false);
+        setModalSettlementReconciliation(true);
+        return true;
+      }
+      if (modalSettlementReconciliation) {
+        try { hapticFeedbackService.selection(); } catch (e) {}
+        setModalSettlementReconciliation(false);
+        return true;
+      }
       if (modalRechargeVoucher) {
         setModalRechargeVoucher(false);
         setRechargeVoucherData(null);
@@ -2832,7 +2895,7 @@ function TallyKhataApp() {
   }, [
     modalAddTxn, modalEditTxn, modalAddAccount, modalEditAccount, modalAddCash,
     modalReconcileCash, modalBackupRestore, modalFullReport, modalNotes,
-    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettings,
+    modalAddStock, modalAdjustStock, modalBanglaQR, modalTallyMessage, modalSoundboxSettings, modalDigitalAnalytics, modalBatchTagada, batchTagadaResultModal, batchTagadaQuotaModal, batchTagadaPreviewModal, modalBillPayment, billPaymentStep, showSampleBillModal, modalTransactionHistory, modalTpTransactionDetails, modalAccountManager, modalAddBankAccount, modalAddMfsAccount, modalVerifyBankDeposit, modalQrSettlement, showSoundboxSettingsModal, qrSettlementStep, modalSettlementHistory, modalAutoDisbursementSettings, modalTpChangePin, modalResetPin, modalLinkedAccountsManager, modalAddNewBankAccount, modalLinkMfsAccount, modalAddMoneyMain, modalAddMoneyBankForm, modalAddMoneyCardForm, modalAddMoneyReceiptVoucher, modalTransferHub, modalTransferWallet, modalTransferBank, modalTransferMfs, modalSelectCustomerAday, modalRechargeNumber, modalRechargeAmount, modalRechargePackages, modalRechargePin, modalRechargeVoucher, modalSettlementReconciliation, modalSettlementConfirmation, modalSoundboxDiagnostics, modalSoundboxVolumeCalibration, modalSoundboxVoiceBroadcast, modalSettings,
     modalSupport, modalInbox, modalBusinessPicker, modalAddBusiness, modalAddMoney,
     modalMobileRecharge, modalAudioRecord, modalTagada, modalReceiptScanner, modalReceiptViewer, modalCustomerStatement, modalStatementExport, modalPrintPreview, modalBulkTagada, modalVoucherPrintShare, modalVoucher, modalPinSetup, modalChangePin, modalPinRecovery, modalProfitLoss,
     modalBechaKena, modalBakiReport, modalCashReport, modalExpenseReport,
@@ -6501,6 +6564,143 @@ function TallyKhataApp() {
     setRechargeAirtimeAmount("50");
     setRechargeSelectedPackage(null);
     setRechargePin("");
+    };
+
+  // =========================================================================
+  // REA-ITER-236: TALLYPAY MERCHANT SETTLEMENT & QR SOUNDBOX HANDLERS
+  // =========================================================================
+  const handleOpenSettlementReconciliation = (txn = null) => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    const incomingTxn = txn || {
+      transactionNumber: "TKQR-" + Date.now(),
+      amountPaisa: 100000,
+      amountTaka: 1000,
+      senderMobile: "01712000000",
+      senderName: "করিম স্টোর",
+      channel: "Bangla QR",
+      timestamp: new Date().toISOString(),
+    };
+    setActiveSettlementTxn(incomingTxn);
+    setSettlementAmountInput(String(incomingTxn.amountTaka || 1000));
+    setSettlementSearchQuery("");
+    setSelectedSettlementCustomer(null);
+    setModalSettlementReconciliation(true);
+  };
+
+  const handleProceedSettlementConfirmation = () => {
+    const amt = parseFloat(settlementAmountInput) || 0;
+    if (!amt || amt <= 0) {
+      Alert.alert(tStatic("সতর্কতা"), t("invalid_settle_amount"));
+      return;
+    }
+    if (!selectedSettlementCustomer) {
+      Alert.alert(tStatic("সতর্কতা"), t("settlement_select_customer_prompt"));
+      return;
+    }
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalSettlementReconciliation(false);
+    setModalSettlementConfirmation(true);
+  };
+
+  const handleConfirmSettlementAction = async () => {
+    const amt = parseFloat(settlementAmountInput) || 0;
+    if (!selectedSettlementCustomer || amt <= 0) return;
+    try {
+      setSettlementSubmitting(true);
+      try { hapticFeedbackService.impactMedium(); } catch (e) {}
+      const targetBizId = activeBusinessId || "1";
+      const txnNumber = activeSettlementTxn?.transactionNumber || ("TKQR-" + Date.now());
+
+      const newBalance = Math.max(0, (selectedSettlementCustomer.balance || 0) - amt);
+      await updateAccountBalance(selectedSettlementCustomer.id, newBalance);
+
+      await addJournalEntry({
+        accountId: selectedSettlementCustomer.id,
+        amount: amt,
+        type: "received",
+        desc: `${t("payment_received_wallet")} - ${txnNumber}`,
+        date: new Date().toISOString().slice(0, 10),
+      });
+
+      const actionRecord = {
+        transaction_number: txnNumber,
+        action_type: "CREDIT_COLLECTION",
+        synced: 0,
+        create_date: new Date().toISOString(),
+      };
+      if (storageRepository && typeof storageRepository.saveTransactionSettlementAction === "function") {
+        await storageRepository.saveTransactionSettlementAction(targetBizId, actionRecord);
+      }
+
+      setSettlementSubmitting(false);
+      setModalSettlementConfirmation(false);
+      setSettlementSuccessToast(true);
+      try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+      setTimeout(() => setSettlementSuccessToast(false), 3000);
+    } catch (err) {
+      setSettlementSubmitting(false);
+      Alert.alert(tStatic("ত্রুটি"), err.message || "Settlement failed");
+    }
+  };
+
+  const handleOpenSoundboxDiagnostics = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setModalSoundboxDiagnostics(true);
+  };
+
+  const handleSoundboxBleScan = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSoundboxBleState("SCANNING");
+    setTimeout(() => {
+      setSoundboxBleState("CONNECTING");
+      setTimeout(() => {
+        setSoundboxBleState("CONNECTED");
+        setSoundboxRssiDbm(-58);
+        setSoundboxBatteryPct(82);
+        setSoundboxBatteryMv(3920);
+        try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+      }, 700);
+    }, 800);
+  };
+
+  const handleSoundboxBleConnect = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSoundboxBleState("CONNECTED");
+    setSoundboxAudioSink("HARDWARE_BLE_SOUNDBOX");
+  };
+
+  const handleSoundboxBleDisconnect = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSoundboxBleState("DISCONNECTED");
+    setSoundboxAudioSink("SOFTWARE_IN_APP_TTS");
+  };
+
+  const handleSoundboxVolumeChange = (newStep) => {
+    const step = Math.max(0, Math.min(15, newStep));
+    setSoundboxVolumeStep(step);
+    setSoundboxDutyCyclePct(Math.round((step / 15) * 100));
+    try { hapticFeedbackService.selection(); } catch (e) {}
+  };
+
+  const handleTriggerSoundboxBeep = () => {
+    try { hapticFeedbackService.selection(); } catch (e) {}
+    setSoundboxTestBeepPlaying(true);
+    setTimeout(() => {
+      setSoundboxTestBeepPlaying(false);
+    }, 1200);
+  };
+
+  const handleTriggerVoiceAnnouncement = () => {
+    try { hapticFeedbackService.notificationSuccess(); } catch (e) {}
+    const amt = parseFloat(settlementAmountInput) || 1000;
+    let spokenText = "";
+    if (soundboxVoiceLanguage === "bn") {
+      spokenText = `টালিপে-তে ${formatMoney(amt)} টাকা পাওয়া গেছে`;
+    } else {
+      spokenText = `Received ${formatMoney(amt)} Taka on TallyPay`;
+    }
+    setSoundboxVoicePromptText(spokenText);
+    Alert.alert(t("soundbox_voice_broadcast_title"), spokenText);
   };
 
   // =========================================================================
@@ -7905,6 +8105,67 @@ function TallyKhataApp() {
       validateRechargeParameters: tpValidateRechargeParameters || tallyPayModule.validateRechargeParameters,
       getRechargePackages: tpGetRechargePackages || tallyPayModule.getRechargePackages,
       searchRechargePackages: tpSearchRechargePackages || tallyPayModule.searchRechargePackages,
+      storageRepository,
+      tallyPayService,
+    };
+
+        global.__SETTLEMENT_SOUNDBOX_TEST_HOOKS__ = {
+      modalSettlementReconciliation,
+      setModalSettlementReconciliation,
+      modalSettlementConfirmation,
+      setModalSettlementConfirmation,
+      modalSoundboxDiagnostics,
+      setModalSoundboxDiagnostics,
+      modalSoundboxVolumeCalibration,
+      setModalSoundboxVolumeCalibration,
+      modalSoundboxVoiceBroadcast,
+      setModalSoundboxVoiceBroadcast,
+      settlementSearchQuery,
+      setSettlementSearchQuery,
+      selectedSettlementCustomer,
+      setSelectedSettlementCustomer,
+      settlementAmountInput,
+      setSettlementAmountInput,
+      settlementSubmitting,
+      setSettlementSubmitting,
+      settlementSuccessToast,
+      setSettlementSuccessToast,
+      activeSettlementTxn,
+      setActiveSettlementTxn,
+      soundboxBleState,
+      setSoundboxBleState,
+      soundboxBatteryMv,
+      setSoundboxBatteryMv,
+      soundboxBatteryPct,
+      setSoundboxBatteryPct,
+      soundboxIsCharging,
+      setSoundboxIsCharging,
+      soundboxRssiDbm,
+      setSoundboxRssiDbm,
+      soundboxVolumeStep,
+      setSoundboxVolumeStep,
+      soundboxDutyCyclePct,
+      setSoundboxDutyCyclePct,
+      soundboxTestBeepPlaying,
+      setSoundboxTestBeepPlaying,
+      soundboxVoiceLanguage,
+      setSoundboxVoiceLanguage,
+      soundboxVoicePromptText,
+      setSoundboxVoicePromptText,
+      soundboxAudioSink,
+      setSoundboxAudioSink,
+      soundboxReconnectCountdown,
+      setSoundboxReconnectCountdown,
+      handleOpenSettlementReconciliation,
+      handleProceedSettlementConfirmation,
+      handleConfirmSettlementAction,
+      handleOpenSoundboxDiagnostics,
+      handleSoundboxBleScan,
+      handleSoundboxBleConnect,
+      handleSoundboxBleDisconnect,
+      handleSoundboxVolumeChange,
+      handleTriggerSoundboxBeep,
+      handleTriggerVoiceAnnouncement,
       storageRepository,
       tallyPayService,
     };
@@ -11514,6 +11775,46 @@ accessibilityLabel={
               </TouchableOpacity>
 
               <TouchableOpacity
+                testID="tp_settlement_reconciliation_btn"
+                style={styles.walletServiceBtn}
+                onPress={() => handleOpenSettlementReconciliation()}
+                activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('settle_payment_action')}
+              >
+                <AppIcon
+                  source={require("./assets/icons/ic_menu_baki_report.png")}
+                  variant="primary"
+                  shape="circle"
+                  size={24}
+                  containerSize={50}
+                  accessibilityLabel={t('settle_payment_action')}
+                />
+                <Text style={styles.walletServiceLabel}>{t('settle_payment_action')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                testID="tp_soundbox_diagnostics_btn"
+                style={styles.walletServiceBtn}
+                onPress={handleOpenSoundboxDiagnostics}
+                activeOpacity={0.75}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('soundbox_diagnostics_title')}
+              >
+                <AppIcon
+                  source={require("./assets/icons/ic_menu_soundbox.png")}
+                  variant="warning"
+                  shape="circle"
+                  size={24}
+                  containerSize={50}
+                  accessibilityLabel={t('soundbox_diagnostics_title')}
+                />
+                <Text style={styles.walletServiceLabel}>{t('soundbox_diagnostics_title')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 testID="tp_mobile_recharge_btn"
                 style={styles.walletServiceBtn}
                 onPress={handleOpenRechargeNumber}
@@ -11951,6 +12252,38 @@ accessibilityLabel={
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('soundbox_settings')}</Text>
                   <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('voice_alert_desc')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={() => handleOpenSettlementReconciliation()}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('settle_payment_action')}
+                testID="menu_tp_settlement_reconciliation_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_baki_report.png')} variant="primary" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('settle_payment_action')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('sc_credit_settlement')}</Text>
+                </View>
+                <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuListItem, isDark && tStyles.menuListItem]}
+                onPress={handleOpenSoundboxDiagnostics}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={t('soundbox_diagnostics_title')}
+                testID="menu_tp_soundbox_diagnostics_item"
+              >
+                <AppIcon source={require('./assets/icons/ic_menu_soundbox.png')} variant="warning" shape="rounded" size={22} containerSize={38} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.menuListTitle, isDark && tStyles.textPrimary]}>{t('soundbox_diagnostics_title')}</Text>
+                  <Text style={[styles.menuListSub, isDark && tStyles.textSecondary]}>{t('soundbox_diagnostics_desc')}</Text>
                 </View>
                 <Image source={require('./assets/icons/arrow_right.png')} style={[styles.menuListArrow, isDark && { tintColor: currentTheme.textSecondary }]} resizeMode="contain" />
               </TouchableOpacity>
@@ -25113,6 +25446,786 @@ accessibilityLabel={
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 102: SETTLEMENT RECONCILIATION (ScCreditSettlementActivity) (ITERATION 236)
+         =================================================================== */}
+      <Modal
+        visible={modalSettlementReconciliation}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalSettlementReconciliation(false)}
+        testID="modal_settlement_reconciliation"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_settlement_reconciliation_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalSettlementReconciliation(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("পেছনে যান")}
+                style={{ padding: 6 }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>✕</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { fontSize: 16, textAlign: 'center' }]}>
+                  {t('settlement_reconciliation_title')}
+                </Text>
+                <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', textAlign: 'center' }}>
+                  {t('sc_credit_settlement')}
+                </Text>
+              </View>
+              <View style={{ width: 28 }} />
+            </View>
+
+            {/* Success Toast */}
+            {settlementSuccessToast && (
+              <View style={{ backgroundColor: '#D1FAE5', padding: 10, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#A7F3D0' }}>
+                <Text style={{ color: '#065F46', fontSize: 13, fontWeight: 'bold', textAlign: 'center' }}>
+                  {t('settlement_success_msg')}
+                </Text>
+              </View>
+            )}
+
+            {/* Incoming Payment Banner */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F0FDF4', borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#86EFAC' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B' }}>
+                    {t('select_payment_mode')}: {t('payment_received_wallet')}
+                  </Text>
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0D6E5C' }}>
+                    {activeSettlementTxn?.senderName || 'অজ্ঞাত প্রেরক'} ({activeSettlementTxn?.senderMobile || '01712000000'})
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  ৳ {formatMoney(activeSettlementTxn?.amountTaka || 1000)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Settlement Amount Input */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 4 }}>
+                {t('settlement_amount_label')} (৳)
+              </Text>
+              <TextInput
+                testID="input_settlement_amount"
+                style={[styles.modalInput, isDark && tStyles.input, { height: 44, fontSize: 15, fontWeight: 'bold' }]}
+                value={settlementAmountInput}
+                onChangeText={setSettlementAmountInput}
+                placeholder={t('settlement_amount_label')}
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                keyboardType="numeric"
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              />
+              {(!settlementAmountInput || parseFloat(settlementAmountInput) <= 0) && (
+                <Text style={{ fontSize: 11, color: '#DC2626', marginTop: 3 }}>
+                  {t('invalid_settle_amount')}
+                </Text>
+              )}
+            </View>
+
+            {/* Customer Search Filter */}
+            <View style={{ marginBottom: 10 }}>
+              <TextInput
+                testID="input_settlement_customer_search"
+                style={[styles.modalInput, isDark && tStyles.input, { height: 40, fontSize: 13 }]}
+                value={settlementSearchQuery}
+                onChangeText={setSettlementSearchQuery}
+                placeholder={t('settlement_customer_search_placeholder')}
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              />
+            </View>
+
+            {/* Debtor Customers List */}
+            <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 6 }}>
+              {t('settlement_select_customer_prompt')}
+            </Text>
+            <ScrollView style={{ maxHeight: 200, marginBottom: 14 }} keyboardShouldPersistTaps="handled">
+              {accounts
+                .filter(a => a.type === 1 && a.balance > 0)
+                .filter(a => !settlementSearchQuery || a.name.toLowerCase().includes(settlementSearchQuery.toLowerCase()) || (a.phone && a.phone.includes(settlementSearchQuery)))
+                .map(item => {
+                  const isSelected = selectedSettlementCustomer?.id === item.id;
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      testID={`card_settlement_customer_${item.id}`}
+                      style={{
+                        padding: 10,
+                        borderRadius: 8,
+                        marginBottom: 6,
+                        borderWidth: 1,
+                        borderColor: isSelected ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                        backgroundColor: isSelected ? (isDark ? '#064E3B' : '#ECFDF5') : (isDark ? '#1E293B' : '#FFFFFF'),
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                      onPress={() => {
+                        try { hapticFeedbackService.selection(); } catch (e) {}
+                        setSelectedSettlementCustomer(item);
+                        setSettlementAmountInput(String(Math.min(item.balance, activeSettlementTxn?.amountTaka || 1000)));
+                      }}
+                      hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                      accessibilityRole="button"
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                          {item.name}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                          {item.phone || 'মোবাইল নম্বর নেই'}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#DC2626' }}>
+                          {t('settlement_current_debt')}: ৳ {formatMoney(item.balance)}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: isDark ? '#94A3B8' : '#64748B' }}>
+                          {t('previous_balance_prefix')} ৳ {formatMoney(item.balance)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              {accounts.filter(a => a.type === 1 && a.balance > 0).length === 0 && (
+                <View style={{ padding: 16, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                    কোনো বকেয়াদার কাস্টমার নেই
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Proceed Action Button */}
+            <TouchableOpacity
+              testID="btn_proceed_settlement_confirmation"
+              style={{
+                height: 48,
+                backgroundColor: '#0D6E5C',
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: (!selectedSettlementCustomer || !settlementAmountInput || parseFloat(settlementAmountInput) <= 0) ? 0.6 : 1
+              }}
+              onPress={handleProceedSettlementConfirmation}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('settle_payment_action')}
+              disabled={!selectedSettlementCustomer || !settlementAmountInput || parseFloat(settlementAmountInput) <= 0}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>
+                {t('settle_payment_action')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 103: SETTLEMENT CONFIRMATION (ScCreditSettlementConfirmationActivity) (ITERATION 236)
+         =================================================================== */}
+      <Modal
+        visible={modalSettlementConfirmation}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalSettlementConfirmation(false)}
+        testID="modal_settlement_confirmation"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_settlement_confirmation_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalSettlementConfirmation(false);
+                  setModalSettlementReconciliation(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("পেছনে যান")}
+                style={{ padding: 6 }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>✕</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { fontSize: 16, textAlign: 'center' }]}>
+                {t('settlement_confirm_title')}
+              </Text>
+              <View style={{ width: 28 }} />
+            </View>
+
+            {/* Customer & Comparison Details */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B', marginBottom: 4 }}>
+                {selectedSettlementCustomer?.name}
+              </Text>
+              <Text style={{ fontSize: 12, color: isDark ? currentTheme.textSecondary : '#64748B', marginBottom: 12 }}>
+                {selectedSettlementCustomer?.phone || 'মোবাইল নম্বর নেই'}
+              </Text>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('previous_balance_prefix')}:
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#DC2626' }}>
+                  ৳ {formatMoney(selectedSettlementCustomer?.balance || 0)}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('settlement_amount_label')}:
+                </Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  - ৳ {formatMoney(Number(settlementAmountInput) || 0)}
+                </Text>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: isDark ? '#334155' : '#E2E8F0', marginVertical: 6 }} />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  {t('settlement_resulting_balance')}:
+                </Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  ৳ {formatMoney(Math.max(0, (selectedSettlementCustomer?.balance || 0) - (Number(settlementAmountInput) || 0)))}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B' }}>
+                  {t('select_payment_mode')}:
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  {t('payment_received_wallet')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Instruction note */}
+            <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B', textAlign: 'center', marginBottom: 16 }}>
+              {t('settlement_instructions')}
+            </Text>
+
+            {/* Confirm Settlement Button */}
+            <TouchableOpacity
+              testID="btn_confirm_settlement_action"
+              style={{
+                height: 48,
+                backgroundColor: '#0D6E5C',
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onPress={handleConfirmSettlementAction}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('settlement_confirm_btn')}
+              disabled={settlementSubmitting}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>
+                {settlementSubmitting ? 'প্রসেসিং হচ্ছে...' : t('settlement_confirm_btn')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 104: SOUNDBOX HARDWARE DIAGNOSTICS (TpSoundboxActivity) (ITERATION 236)
+         =================================================================== */}
+      <Modal
+        visible={modalSoundboxDiagnostics}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalSoundboxDiagnostics(false)}
+        testID="modal_soundbox_diagnostics"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '92%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_soundbox_diagnostics_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalSoundboxDiagnostics(false);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("পেছনে যান")}
+                style={{ padding: 6 }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>✕</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { fontSize: 16, textAlign: 'center' }]}>
+                  {t('soundbox_diagnostics_title')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', textAlign: 'center' }}>
+                  {t('soundbox_diagnostics_desc')}
+                </Text>
+              </View>
+              <View style={{ width: 28 }} />
+            </View>
+
+            {/* BLE State Card */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  {t('soundbox_ble_state_label')}
+                </Text>
+                <View
+                  testID="pill_soundbox_ble_state"
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 12,
+                    backgroundColor: soundboxBleState === 'CONNECTED' ? '#DCFCE7' : (soundboxBleState === 'SCANNING' || soundboxBleState === 'CONNECTING' ? '#FEF3C7' : '#FEE2E2')
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: soundboxBleState === 'CONNECTED' ? '#047857' : (soundboxBleState === 'SCANNING' || soundboxBleState === 'CONNECTING' ? '#B45309' : '#B91C1C') }}>
+                    {soundboxBleState}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <TouchableOpacity
+                  testID="btn_soundbox_scan"
+                  style={{ flex: 1, height: 36, backgroundColor: '#0D6E5C', borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 6 }}
+                  onPress={handleSoundboxBleScan}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                >
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#FFFFFF' }}>স্ক্যান</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="btn_soundbox_connect"
+                  style={{ flex: 1, height: 36, backgroundColor: isDark ? '#334155' : '#E2E8F0', borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 6 }}
+                  onPress={handleSoundboxBleConnect}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                >
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#1E293B' }}>কানেক্ট</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="btn_soundbox_disconnect"
+                  style={{ flex: 1, height: 36, backgroundColor: '#FEE2E2', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}
+                  onPress={handleSoundboxBleDisconnect}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                >
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#DC2626' }}>ডিসকানেক্ট</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Battery Telemetry Card */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  {t('soundbox_battery_title')}
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: soundboxBatteryPct <= 15 ? '#DC2626' : '#0D6E5C' }}>
+                  {soundboxBatteryPct}% {soundboxIsCharging ? '⚡' : ''}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B', marginBottom: 6 }}>
+                {t('soundbox_battery_voltage')}: {soundboxBatteryMv} mV
+              </Text>
+              {soundboxBatteryPct <= 15 && (
+                <View style={{ backgroundColor: '#FEF3C7', padding: 6, borderRadius: 6, marginTop: 4 }}>
+                  <Text style={{ fontSize: 10, color: '#92400E', fontWeight: 'bold' }}>
+                    {soundboxBatteryPct <= 5 ? t('soundbox_battery_critical_alert') : t('soundbox_battery_low_warning')}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* RSSI Signal Strength Card */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                    {t('soundbox_rssi_signal')}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B' }}>
+                    {soundboxRssiDbm} dBm
+                  </Text>
+                </View>
+                <View
+                  testID="pill_soundbox_rssi_rating"
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: soundboxRssiDbm >= -60 ? '#DCFCE7' : (soundboxRssiDbm >= -75 ? '#DBEAFE' : (soundboxRssiDbm >= -85 ? '#FEF3C7' : '#FEE2E2'))
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: soundboxRssiDbm >= -60 ? '#047857' : (soundboxRssiDbm >= -75 ? '#1D4ED8' : (soundboxRssiDbm >= -85 ? '#B45309' : '#DC2626')) }}>
+                    {soundboxRssiDbm >= -60 ? t('soundbox_rssi_excellent') : (soundboxRssiDbm >= -75 ? t('soundbox_rssi_good') : (soundboxRssiDbm >= -85 ? t('soundbox_rssi_fair') : t('soundbox_rssi_poor')))}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Sub-Modal Quick Actions */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+              <TouchableOpacity
+                testID="btn_open_soundbox_volume_calibration"
+                style={{ flex: 1, height: 44, borderRadius: 8, borderWidth: 1, borderColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalSoundboxDiagnostics(false);
+                  setModalSoundboxVolumeCalibration(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#0D6E5C' }}>
+                  🔊 {t('soundbox_volume_calibration_title')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="btn_open_soundbox_voice_broadcast"
+                style={{ flex: 1, height: 44, borderRadius: 8, backgroundColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalSoundboxDiagnostics(false);
+                  setModalSoundboxVoiceBroadcast(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#FFFFFF' }}>
+                  🗣️ {t('soundbox_voice_broadcast_title')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 105: SOUNDBOX VOLUME CALIBRATION (ITERATION 236)
+         =================================================================== */}
+      <Modal
+        visible={modalSoundboxVolumeCalibration}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalSoundboxVolumeCalibration(false)}
+        testID="modal_soundbox_volume_calibration"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '85%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <TouchableOpacity
+                testID="btn_soundbox_volume_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalSoundboxVolumeCalibration(false);
+                  setModalSoundboxDiagnostics(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("পেছনে যান")}
+                style={{ padding: 6 }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>✕</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { fontSize: 16, textAlign: 'center' }]}>
+                {t('soundbox_volume_calibration_title')}
+              </Text>
+              <View style={{ width: 28 }} />
+            </View>
+
+            {/* Volume Status Card */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0', alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B', marginBottom: 4 }}>
+                {t('soundbox_volume_step_label')}
+              </Text>
+              <Text testID="text_soundbox_volume_step" style={{ fontSize: 32, fontWeight: 'bold', color: '#0D6E5C', marginBottom: 4 }}>
+                {soundboxVolumeStep} / 15
+              </Text>
+              <Text testID="text_soundbox_duty_cycle" style={{ fontSize: 13, color: isDark ? currentTheme.textSecondary : '#64748B' }}>
+                {t('soundbox_volume_duty_cycle')}: {Math.round((soundboxVolumeStep / 15) * 100)}%
+              </Text>
+
+              {/* Stepper Controls */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14 }}>
+                <TouchableOpacity
+                  testID="btn_soundbox_volume_minus"
+                  style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: isDark ? '#334155' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}
+                  onPress={() => handleSoundboxVolumeChange(soundboxVolumeStep - 1)}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                >
+                  <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#1E293B' }}>−</Text>
+                </TouchableOpacity>
+
+                <View style={{ width: 40 }} />
+
+                <TouchableOpacity
+                  testID="btn_soundbox_volume_plus"
+                  style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#0D6E5C', alignItems: 'center', justifyContent: 'center' }}
+                  onPress={() => handleSoundboxVolumeChange(soundboxVolumeStep + 1)}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                >
+                  <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' }}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Test Beep Trigger Button */}
+            <TouchableOpacity
+              testID="btn_soundbox_test_beep"
+              style={{
+                height: 44,
+                borderRadius: 8,
+                backgroundColor: soundboxTestBeepPlaying ? '#10B981' : '#0D6E5C',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12
+              }}
+              onPress={handleTriggerSoundboxBeep}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+            >
+              <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' }}>
+                {soundboxTestBeepPlaying ? t('soundbox_volume_beep_playing') : t('soundbox_volume_test_beep')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Done button */}
+            <TouchableOpacity
+              testID="btn_soundbox_volume_done"
+              style={{
+                height: 44,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: isDark ? '#475569' : '#CBD5E1',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onPress={() => {
+                try { hapticFeedbackService.selection(); } catch (e) {}
+                setModalSoundboxVolumeCalibration(false);
+                setModalSoundboxDiagnostics(true);
+              }}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+            >
+              <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                {tStatic("সম্পন্ন")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================
+          MODAL 106: SOUNDBOX VOICE BROADCAST & AUTO-RECONNECT (ITERATION 236)
+         =================================================================== */}
+      <Modal
+        visible={modalSoundboxVoiceBroadcast}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalSoundboxVoiceBroadcast(false)}
+        testID="modal_soundbox_voice_broadcast"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, isDark && tStyles.modalSurface, { maxHeight: '90%', padding: 20 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <TouchableOpacity
+                testID="btn_soundbox_voice_back"
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setModalSoundboxVoiceBroadcast(false);
+                  setModalSoundboxDiagnostics(true);
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={tStatic("পেছনে যান")}
+                style={{ padding: 6 }}
+              >
+                <Text style={{ fontSize: 18, color: isDark ? currentTheme.textPrimary : '#1E293B' }}>✕</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={[styles.modalCardTitle, isDark && tStyles.textPrimary, { fontSize: 16, textAlign: 'center' }]}>
+                  {t('soundbox_voice_broadcast_title')}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDark ? currentTheme.textSecondary : '#64748B', textAlign: 'center' }}>
+                  {t('soundbox_voice_broadcast_desc')}
+                </Text>
+              </View>
+              <View style={{ width: 28 }} />
+            </View>
+
+            {/* Audio Sink Indicator */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F0FDF4', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#86EFAC' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                  {t('soundbox_audio_sink_label')}:
+                </Text>
+                <View
+                  testID="pill_soundbox_audio_sink"
+                  style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#047857' }}>
+                    {soundboxAudioSink === 'HARDWARE_BLE_SOUNDBOX' ? t('soundbox_sink_hardware') : t('soundbox_sink_software')}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Language Switcher */}
+            <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+              <TouchableOpacity
+                testID="tab_voice_lang_bn"
+                style={{
+                  flex: 1,
+                  height: 38,
+                  backgroundColor: soundboxVoiceLanguage === 'bn' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  borderRadius: 6,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 6
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setSoundboxVoiceLanguage('bn');
+                  setSoundboxVoicePromptText('টালিপে-তে ১,০০০ টাকা পাওয়া গেছে');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: soundboxVoiceLanguage === 'bn' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                  বাংলা (Bengali)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="tab_voice_lang_en"
+                style={{
+                  flex: 1,
+                  height: 38,
+                  backgroundColor: soundboxVoiceLanguage === 'en' ? '#0D6E5C' : (isDark ? '#334155' : '#E2E8F0'),
+                  borderRadius: 6,
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onPress={() => {
+                  try { hapticFeedbackService.selection(); } catch (e) {}
+                  setSoundboxVoiceLanguage('en');
+                  setSoundboxVoicePromptText('Received 1,000 Taka on TallyPay');
+                }}
+                hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: soundboxVoiceLanguage === 'en' ? '#FFFFFF' : (isDark ? '#94A3B8' : '#475569') }}>
+                  English
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Announcement Template Preview */}
+            <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 10, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0' }}>
+              <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B', marginBottom: 4 }}>
+                ঘোষণা প্রিভিউ:
+              </Text>
+              <Text testID="text_voice_prompt_preview" style={{ fontSize: 14, fontWeight: 'bold', color: isDark ? currentTheme.textPrimary : '#1E293B' }}>
+                "{soundboxVoicePromptText}"
+              </Text>
+            </View>
+
+            {/* Auto-Reconnect Banner (shown when reconnecting) */}
+            <View
+              testID="banner_soundbox_reconnect"
+              style={{ backgroundColor: '#FEF3C7', padding: 10, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#FCD34D' }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#92400E' }}>
+                  {t('soundbox_reconnect_banner').replace('%s', '3')}
+                </Text>
+                <TouchableOpacity
+                  testID="btn_cancel_soundbox_reconnect"
+                  onPress={() => {
+                    try { hapticFeedbackService.selection(); } catch (e) {}
+                    setSoundboxBleState('DISCONNECTED');
+                  }}
+                  hitSlop={STANDARD_TOUCH_HIT_SLOP}
+                  accessibilityRole="button"
+                >
+                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#DC2626' }}>
+                    {t('soundbox_reconnect_cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 10, color: '#B45309', marginTop: 2 }}>
+                {t('soundbox_reconnect_countdown').replace('%s', '5')}
+              </Text>
+            </View>
+
+            {/* Trigger Voice Announcement Button */}
+            <TouchableOpacity
+              testID="btn_trigger_voice_announcement"
+              style={{
+                height: 48,
+                backgroundColor: '#0D6E5C',
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 10
+              }}
+              onPress={handleTriggerVoiceAnnouncement}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' }}>
+                🗣️ {t('soundbox_trigger_announcement')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Done button */}
+            <TouchableOpacity
+              testID="btn_soundbox_voice_done"
+              style={{
+                height: 44,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: isDark ? '#475569' : '#CBD5E1',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onPress={() => {
+                try { hapticFeedbackService.selection(); } catch (e) {}
+                setModalSoundboxVoiceBroadcast(false);
+                setModalSoundboxDiagnostics(true);
+              }}
+              hitSlop={STANDARD_TOUCH_HIT_SLOP}
+              accessibilityRole="button"
+            >
+              <Text style={{ fontSize: 13, fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#1E293B' }}>
+                {tStatic("সম্পন্ন")}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

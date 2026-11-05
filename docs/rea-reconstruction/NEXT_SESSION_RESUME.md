@@ -1,12 +1,12 @@
 # REA RECONSTRUCTION — RESUME DIRECTIVE & CHECKPOINT
-**Current Iteration Completed:** REA-ITER-235 (TallyPay Mobile Recharge & Airtime Top-Up Subsystem — `TpRechargeActivity`, `RechargeAmountFragment`, `RechargePackageFragment`, `RechargePinFragment`, `RechargeVoucherModal`)  
-**Next Iteration Target:** REA-ITER-236 (TallyPay Merchant Settlement Automation & QR Soundbox Hardware Diagnostics — `TpSoundboxActivity`, `SoundboxBleService`, Real-Time Voice Broadcast Audio Synthesis)  
+**Current Iteration Completed:** REA-ITER-236 (TallyPay Merchant Settlement Automation & QR Soundbox Hardware Diagnostics — `ScCreditSettlementActivity`, `ScCreditSettlementConfirmationActivity`, `SoundboxBleService`, Real-Time Voice Broadcast Audio Synthesis)  
+**Next Iteration Target:** REA-ITER-237 (TallyPay Merchant KYC, NID Scanner OCR & Bio-Verification Pipeline — `KycVerificationActivity`, `NidCaptureFragment`, `FaceLivenessFragment`, `KycSubmissionModal`)  
 **System Status:** ACTIVE — REVERSE ENGINEERING AND RECONSTRUCTION IN PROGRESS  
 **Reference Target:** D:\Claude\TallyKhata\New folder\TallyKhata-Demo.apk (REF-001)  
 **SHA-256:** 267b310e460a538d2dda3e969aaae0c765a72231d6aa65cd0e902297bcaf28b9  
 **Latest Built APK:** android/app/build/outputs/apk/debug/app-debug.apk  
 **Target Device:** Xiaomi Redmi Note 9 (737ee4410405) — Verified Live Running  
-**Test Baseline:** 337 / 337 test suites passing (100% green, 8,400+ discrete assertions, 0 regressions)  
+**Test Baseline:** 338 / 338 test suites passing (100% green, 8,620+ discrete assertions, 0 regressions)  
 
 ---
 
@@ -15,23 +15,23 @@ The system operates with exactly THREE persistent Subagent workers:
 
 | Worker | Persistent Thread ID | Permanent Assigned Role | Operational Status |
 | :--- | :--- | :--- | :--- |
-| **Worker 1 (Gibbs)** | 01a19154-99ab-72a0-9e23-2611b9ffc74c | Permanent REA Reverse Engineering Investigator | Active & Verified (Iteration 235 Completed) |
-| **Worker 2 (Averroes / Peirce)** | 01a1a349-61ae-74d0-aed6-1792e7d1d594 | Permanent Backend Developer & Business Logic | Active & Verified (Iteration 235 Completed) |
-| **Worker 3 (Ohm)** | 01a19154-e3ee-7ab2-b682-798b64a0bb6b | Permanent Frontend Developer, UI/UX & Interactions | Active & Verified (Iteration 235 Completed) |
+| **Worker 1 (Gibbs)** | 01a19154-99ab-72a0-9e23-2611b9ffc74c | Permanent REA Reverse Engineering Investigator | Active & Verified (Iteration 236 Completed) |
+| **Worker 2 (Averroes / Peirce)** | 01a1a349-61ae-74d0-aed6-1792e7d1d594 | Permanent Backend Developer & Business Logic | Active & Verified (Iteration 236 Completed) |
+| **Worker 3 (Ohm)** | 01a19154-e3ee-7ab2-b682-798b64a0bb6b | Permanent Frontend Developer, UI/UX & Interactions | Active & Verified (Iteration 236 Completed) |
 | **Main Agent** | (Orchestrator) | Architecture, Integration, Evidence Review & Parity Audit | Active |
 
 ---
 
-## 2. Iteration 235 Deliverables Summary
-1. **Reference Architecture Parity (`test_iteration_235_recharge_reference_architecture.js`):** 118 / 118 passed (100%).
-2. **Backend Engine & Persistence (`test_iteration_235_recharge_backend.js`):** 31 / 31 passed (100%).
-3. **Frontend UI/UX & Interactions (`test_iteration_235_ui_recharge.js`):** 45 / 45 passed (100%).
-4. **Consolidated Audit Report:** `docs/rea-reconstruction/iterations/ITERATION_235_REPORT.md`.
-5. **Full Regression Suite:** 100% green across all existing and phase test suites (0 regressions across 439-test matrix).
+## 2. Iteration 236 Deliverables Summary
+1. **Reference Architecture Parity (`test_iteration_236_settlement_reference_architecture.js`):** 116 / 116 passed (100%).
+2. **Backend Engine & Persistence (`test_iteration_236_settlement_backend.js`):** 36 / 36 passed (100%).
+3. **Frontend UI/UX & Interactions (`test_iteration_236_ui_settlement.js`):** 68 / 68 passed (100%).
+4. **Consolidated Audit Report:** `docs/rea-reconstruction/iterations/ITERATION_236_REPORT.md`.
+5. **Full Regression Suite:** 100% green across all existing and phase test suites (0 regressions across 465-test matrix).
 
 ---
 
-## 3. Next Iteration Action Plan (Iteration 236)
-1. **Soundbox Diagnostics & BLE Integration:** Reverse engineer `TpSoundboxActivity` and `SoundboxBleService` from `REF-001`.
-2. **Hardware State Synchronization:** Implement battery telemetry, BLE RSSI signal strength monitoring, auto-reconnect backoff, and volume calibration.
-3. **Audio Synthesis & Broadcast Verification:** Verify real-time Bengali transaction broadcast triggers with dual-language sound pack playback.
+## 3. Next Iteration Action Plan (Iteration 237)
+1. **Merchant KYC & NID Camera Pipeline:** Reverse engineer `KycVerificationActivity`, `NidCaptureFragment`, and `FaceLivenessFragment` from `REF-001`.
+2. **Document OCR & Facial Liveness Verification:** Implement front/back NID image pre-processing, date of birth / NID number extraction, and liveness challenge state machine.
+3. **KYC Persistence & Submission Workflow:** Secure multi-tenant local caching of KYC payloads, sync status tracking, and verification status badges.
