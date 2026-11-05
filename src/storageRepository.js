@@ -278,6 +278,7 @@ const VALID_COLLECTIONS = new Set([
     'linkedBankAccounts',
     'linkedMfsAccounts',
     'savedCards',
+    'transferHistory',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -405,6 +406,7 @@ function sanitizeState(state) {
   if (!Array.isArray(s.linkedBankAccounts)) s.linkedBankAccounts = [];
   if (!Array.isArray(s.linkedMfsAccounts)) s.linkedMfsAccounts = [];
   if (!Array.isArray(s.savedCards)) s.savedCards = [];
+  if (!Array.isArray(s.transferHistory)) s.transferHistory = [];
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
   if (!Array.isArray(s.tallyPayBeneficiaries)) s.tallyPayBeneficiaries = [];
@@ -552,6 +554,7 @@ function createDefaultState() {
       linkedBankAccounts: [],
       linkedMfsAccounts: [],
       savedCards: [],
+      transferHistory: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1696,6 +1699,30 @@ class StorageRepository {
       authoritative.linkedMfsAccounts = [];
     }
 
+        if (authoritative.transferHistory && Array.isArray(authoritative.transferHistory)) {
+      authoritative.transferHistory = authoritative.transferHistory.map((t) => {
+        const rawPhone = String(t.recipientMobile || t.recipient || t.receiverMobile || t.phone || "").replace(/[\s-]+/g, "");
+        let maskedRecipient = t.recipient;
+        let maskedMobile = t.recipientMobile;
+        let maskedReceiver = t.receiverMobile;
+        if (/^01[3-9]\d{8}$/.test(rawPhone)) {
+          const masked = rawPhone.slice(0, 3) + "****" + rawPhone.slice(-4);
+          if (t.recipient) maskedRecipient = masked;
+          if (t.recipientMobile) maskedMobile = masked;
+          if (t.receiverMobile) maskedReceiver = masked;
+        }
+        const { pin, rawPin, pinHash, sessionToken, token, apiKey, secretKey, credential, secret, ...rest } = t || {};
+        return {
+          ...rest,
+          ...(maskedRecipient !== undefined ? { recipient: maskedRecipient } : {}),
+          ...(maskedMobile !== undefined ? { recipientMobile: maskedMobile } : {}),
+          ...(maskedReceiver !== undefined ? { receiverMobile: maskedReceiver } : {}),
+        };
+      });
+    } else {
+      authoritative.transferHistory = [];
+    }
+
     if (authoritative.savedCards && Array.isArray(authoritative.savedCards)) {
       authoritative.savedCards = authoritative.savedCards.map((c) => {
         const rawNum = String(c.cardNumber || c.maskedNumber || c.maskedCardNumber || "").replace(/[\s-]+/g, "");
@@ -2293,6 +2320,7 @@ class StorageRepository {
         const linkedBankAccounts = (prevStore.linkedBankAccounts || []).filter((b) => getBizId(b) !== targetId);
         const linkedMfsAccounts = (prevStore.linkedMfsAccounts || []).filter((m) => getBizId(m) !== targetId);
         const savedCards = (prevStore.savedCards || []).filter((c) => getBizId(c) !== targetId);
+        const transferHistory = (prevStore.transferHistory || []).filter((t) => getBizId(t) !== targetId);
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
         delete autoDisbursementConfig[targetId];
 
@@ -2383,6 +2411,7 @@ class StorageRepository {
         linkedBankAccounts,
         linkedMfsAccounts,
         savedCards,
+        transferHistory,
         autoDisbursementConfig,
         cashReconciliation,
       };
@@ -2945,6 +2974,7 @@ class StorageRepository {
           tagadaLogs: (fullState.tagadaLogs || fullState.tagada_log || []).length,
           billPaymentTransactions: (fullState.billPaymentTransactions || []).length,
           savedBillers: (fullState.savedBillers || []).length,
+          transferHistory: (fullState.transferHistory || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -7796,6 +7826,114 @@ class StorageRepository {
       }
       return { success: true, deletedId: cardId };
     }
+    /**
+     * REA-ITER-234: Saves a wallet transfer / money out record for a business.
+     */
+    async saveTransferRecord(businessId = null, recordData = {}) {
+      if (!recordData || typeof recordData !== 'object') {
+        return { success: false, error: 'RECORD_DATA_REQUIRED' };
+      }
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      const transferId = recordData.id || recordData.transferId || ('TRX-' + Date.now() + '-' + Math.floor(Math.random() * 10000));
+      const orderId = recordData.orderId || ('TRX-OUT-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
+      const nowIso = new Date().toISOString();
+
+      const record = {
+        ...recordData,
+        id: transferId,
+        transferId,
+        orderId,
+        businessId: targetBizId,
+        createdAt: recordData.createdAt || recordData.timestamp || nowIso,
+        timestamp: recordData.timestamp || recordData.createdAt || nowIso,
+        createDate: recordData.createDate || nowIso.slice(0, 10),
+        status: recordData.status || 'SUCCESS',
+      };
+
+      let saved = null;
+      await this.mutateCollection('transferHistory', (list) => {
+        const withoutCurrent = (list || []).filter((t) => t.id !== transferId && t.transferId !== transferId);
+        saved = record;
+        return [record, ...withoutCurrent];
+      });
+
+      return { success: true, transfer: saved, record: saved };
+    }
+
+    /**
+     * REA-ITER-234: Retrieves transfer history for a business with optional filtering and pagination.
+     */
+    getTransferHistory(businessId = null, options = {}) {
+      const store = this.currentStore || {};
+      const targetBizId = String(businessId || store.activeBusinessId || '1');
+      let list = (store.transferHistory || []).filter(
+        (t) => String(t.businessId || '1') === targetBizId
+      );
+
+      if (options.channel) {
+        const ch = String(options.channel).toUpperCase();
+        list = list.filter((t) => String(t.channel || '').toUpperCase() === ch || String(t.channelType || '').toUpperCase() === ch);
+      }
+      if (options.status) {
+        const st = String(options.status).toUpperCase();
+        list = list.filter((t) => String(t.status || '').toUpperCase() === st);
+      }
+      if (options.startDate) {
+        const start = new Date(options.startDate).getTime();
+        list = list.filter((t) => new Date(t.timestamp || t.createdAt || 0).getTime() >= start);
+      }
+      if (options.endDate) {
+        const end = new Date(options.endDate).getTime();
+        list = list.filter((t) => new Date(t.timestamp || t.createdAt || 0).getTime() <= end);
+      }
+      if (options.searchQuery || options.query || options.search) {
+        const q = String(options.searchQuery || options.query || options.search).toLowerCase();
+        list = list.filter((t) =>
+          String(t.orderId || '').toLowerCase().includes(q) ||
+          String(t.recipient || '').toLowerCase().includes(q) ||
+          String(t.recipientMobile || '').toLowerCase().includes(q) ||
+          String(t.customerName || '').toLowerCase().includes(q) ||
+          String(t.note || '').toLowerCase().includes(q)
+        );
+      }
+
+      list.sort((a, b) => new Date(b.timestamp || b.createdAt || 0) - new Date(a.timestamp || a.createdAt || 0));
+
+      const totalCount = list.length;
+      const offset = Number(options.offset) || 0;
+      const limit = Number(options.limit) || 50;
+      const paginated = list.slice(offset, offset + limit);
+
+      const totalAmountPaisa = list.reduce((acc, t) => acc + (Number(t.amountPaisa) || Math.round((Number(t.amount) || 0) * 100)), 0);
+      const totalFeePaisa = list.reduce((acc, t) => acc + (Number(t.feePaisa) || Math.round((Number(t.fee) || 0) * 100)), 0);
+
+      return {
+        items: paginated,
+        transfers: paginated,
+        totalCount,
+        offset,
+        limit,
+        hasMore: offset + limit < totalCount,
+        totalAmountPaisa,
+        totalFeePaisa,
+      };
+    }
+
+    /**
+     * REA-ITER-234: Retrieves a transfer record by ID for a business.
+     */
+    getTransferById(businessId = null, transferId = null) {
+      if (!transferId) return null;
+      const store = this.currentStore || {};
+      const targetBizId = businessId ? String(businessId) : null;
+      const found = (store.transferHistory || []).find(
+        (t) => (t.id === transferId || t.transferId === transferId || t.orderId === transferId) &&
+               (!targetBizId || String(t.businessId || '1') === targetBizId)
+      );
+      return found ? { ...found } : null;
+    }
+
 
 
   sanitizeState(state) {
@@ -9036,6 +9174,28 @@ function getSavedCardByIdRepo(businessId = null, cardId = null, repo = defaultRe
   return null;
 }
 
+
+function saveTransferRecordRepo(businessId = null, recordData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveTransferRecord === 'function') {
+    return repo.saveTransferRecord(businessId, recordData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getTransferHistoryRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getTransferHistory === 'function') {
+    return repo.getTransferHistory(businessId, options);
+  }
+  return { items: [], transfers: [], totalCount: 0, totalAmountPaisa: 0, totalFeePaisa: 0 };
+}
+
+function getTransferByIdRepo(businessId = null, transferId = null, repo = defaultRepository) {
+  if (repo && typeof repo.getTransferById === 'function') {
+    return repo.getTransferById(businessId, transferId);
+  }
+  return null;
+}
+
 async function deleteCardRepo(businessId = null, cardId = null, repo = defaultRepository) {
   if (repo && typeof repo.deleteCard === "function") {
     return repo.deleteCard(businessId, cardId);
@@ -9208,6 +9368,9 @@ const repoExport = {
   getSavedCards: getSavedCardsRepo,
   getSavedCardById: getSavedCardByIdRepo,
   deleteCard: deleteCardRepo,
+  saveTransferRecord: saveTransferRecordRepo,
+  getTransferHistory: getTransferHistoryRepo,
+  getTransferById: getTransferByIdRepo,
   sanitizeState: sanitizeStateRepo,
   default: defaultRepository,
 };
@@ -9379,6 +9542,9 @@ if (typeof exports !== 'undefined') {
   exports.getSavedCards = getSavedCardsRepo;
   exports.getSavedCardById = getSavedCardByIdRepo;
   exports.deleteCard = deleteCardRepo;
+  exports.saveTransferRecord = saveTransferRecordRepo;
+  exports.getTransferHistory = getTransferHistoryRepo;
+  exports.getTransferById = getTransferByIdRepo;
   exports.sanitizeState = sanitizeStateRepo;
   exports.default = defaultRepository;
 }

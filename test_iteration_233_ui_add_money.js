@@ -439,24 +439,24 @@ const appSrc = fs.readFileSync(path.join(__dirname, "App.js"), "utf8");
   // -----------------------------------------------------------------------------
   console.log("\n--- PART 11: MODAL COUNT & CONTROLLER INVARIANTS (91 MODALS) ---");
 
-  await runTest("11.1: App.js contains exactly 91 <Modal elements", () => {
+  await runTest("11.1: App.js contains exactly 96 <Modal elements", () => {
     const modalMatches = appSrc.match(/<Modal\b/g) || [];
-    assert.strictEqual(modalMatches.length, 91, "Expected exactly 91 modals in App.js, got " + modalMatches.length);
+    assert.strictEqual(modalMatches.length, 96, "Expected exactly 96 modals in App.js, got " + modalMatches.length);
   });
 
-  await runTest("11.2: App.js contains exactly 91 onRequestClose handlers", () => {
+  await runTest("11.2: App.js contains exactly 96 onRequestClose handlers", () => {
     const reqCloseMatches = appSrc.match(/onRequestClose=\{/g) || [];
-    assert.strictEqual(reqCloseMatches.length, 91, "Expected 91 onRequestClose handlers, got " + reqCloseMatches.length);
+    assert.strictEqual(reqCloseMatches.length, 96, "Expected 96 onRequestClose handlers, got " + reqCloseMatches.length);
   });
 
-  await runTest("11.3: App.js contains exactly 91 unique modal state controllers", () => {
+  await runTest("11.3: App.js contains exactly 96 unique modal state controllers", () => {
     const regex = /visible=\{([a-zA-Z0-9_]+)\}/g;
     const uniqueModals = new Set();
     let m;
     while ((m = regex.exec(appSrc)) !== null) {
       uniqueModals.add(m[1]);
     }
-    assert.strictEqual(uniqueModals.size, 91, "Expected 91 unique visible controllers, got " + uniqueModals.size);
+    assert.strictEqual(uniqueModals.size, 96, "Expected 96 unique visible controllers, got " + uniqueModals.size);
     assert.ok(uniqueModals.has("modalAddMoneyMain"), "modalAddMoneyMain must be in unique controllers");
     assert.ok(uniqueModals.has("modalAddMoneyBankForm"), "modalAddMoneyBankForm must be in unique controllers");
     assert.ok(uniqueModals.has("modalAddMoneyCardForm"), "modalAddMoneyCardForm must be in unique controllers");
