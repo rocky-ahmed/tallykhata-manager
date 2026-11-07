@@ -11,6 +11,10 @@
 const crypto = require('crypto');
 const rewardsSubsystem = require('./rewardsSubsystem');
 const analyticsSubsystem = require('./analyticsSubsystem');
+let disputeSubsystem = null;
+try {
+  disputeSubsystem = require('./disputeSubsystem');
+} catch (e) {}
 
 // -------------------------------------------------------------
 // 1. TRANSACTION LIMITS & THRESHOLDS (activity_transaction_limit.xml)
@@ -9119,6 +9123,39 @@ const merchantLoanEngine = new MerchantLoanEngine();
 const reconstructedLoanEngine = merchantLoanEngine;
 
 module.exports = {
+  // Milestone REA-ITER-242 Exports
+  ...disputeSubsystem,
+  RECONCILIATION_SCHEMA: disputeSubsystem && disputeSubsystem.RECONCILIATION_SCHEMA,
+  TRANSACTION_SETTLEMENT_ACTION_SCHEMA: disputeSubsystem && disputeSubsystem.TRANSACTION_SETTLEMENT_ACTION_SCHEMA,
+  MERCHANT_DISPUTE_TICKET_SCHEMA: disputeSubsystem && disputeSubsystem.MERCHANT_DISPUTE_TICKET_SCHEMA,
+  RECONCILIATION_TABLE_DDL: disputeSubsystem && disputeSubsystem.RECONCILIATION_TABLE_DDL,
+  TRANSACTION_SETTLEMENT_ACTION_DDL: disputeSubsystem && disputeSubsystem.TRANSACTION_SETTLEMENT_ACTION_DDL,
+  MERCHANT_DISPUTE_TICKET_DDL: disputeSubsystem && disputeSubsystem.MERCHANT_DISPUTE_TICKET_DDL,
+  DISPUTE_CATEGORIES: disputeSubsystem && disputeSubsystem.DISPUTE_CATEGORIES,
+  DISPUTE_CATEGORY_METADATA: disputeSubsystem && disputeSubsystem.DISPUTE_CATEGORY_METADATA,
+  DISPUTE_STATUSES: disputeSubsystem && disputeSubsystem.DISPUTE_STATUSES,
+  DISPUTE_SLA_HOURS: disputeSubsystem && disputeSubsystem.DISPUTE_SLA_HOURS,
+  RECONCILIATION_STATUSES: disputeSubsystem && disputeSubsystem.RECONCILIATION_STATUSES,
+  DISPUTE_ARSC_TOKENS: disputeSubsystem && disputeSubsystem.DISPUTE_ARSC_TOKENS,
+  MAX_PROOF_FILE_SIZE_BYTES: disputeSubsystem && disputeSubsystem.MAX_PROOF_FILE_SIZE_BYTES,
+  ALLOWED_PROOF_MIME_TYPES: disputeSubsystem && disputeSubsystem.ALLOWED_PROOF_MIME_TYPES,
+  VALID_DISPUTE_TRANSITIONS: disputeSubsystem && disputeSubsystem.VALID_DISPUTE_TRANSITIONS,
+  ReconciliationDao: disputeSubsystem && disputeSubsystem.ReconciliationDao,
+  TransactionSettlementActionDao: disputeSubsystem && disputeSubsystem.TransactionSettlementActionDao,
+  MerchantDisputeTicketDao: disputeSubsystem && disputeSubsystem.MerchantDisputeTicketDao,
+  calculateDailyReconciliation: disputeSubsystem && disputeSubsystem.calculateDailyReconciliation,
+  getBstDateComponents: disputeSubsystem && disputeSubsystem.getBstDateComponents,
+  isBeforeCutOffTime: disputeSubsystem && disputeSubsystem.isBeforeCutOffTime,
+  calculateClearingDate: disputeSubsystem && disputeSubsystem.calculateClearingDate,
+  validateProofAttachment: disputeSubsystem && disputeSubsystem.validateProofAttachment,
+  generateDisputeTicketId: disputeSubsystem && disputeSubsystem.generateDisputeTicketId,
+  calculateSlaDeadline: disputeSubsystem && disputeSubsystem.calculateSlaDeadline,
+  isValidDisputeTransition: disputeSubsystem && disputeSubsystem.isValidDisputeTransition,
+  SettlementDisputeEngine: disputeSubsystem && disputeSubsystem.SettlementDisputeEngine,
+  MerchantDisputeAndReconciliationEngine: disputeSubsystem && disputeSubsystem.MerchantDisputeAndReconciliationEngine,
+  ReconstructedDisputeReconciliationEngine: disputeSubsystem && disputeSubsystem.ReconstructedDisputeReconciliationEngine,
+  settlementDisputeEngine: disputeSubsystem && disputeSubsystem.settlementDisputeEngine,
+
   // Milestone REA-ITER-241 Exports
   ...analyticsSubsystem,
   MERCHANT_ANALYTICS_SNAPSHOT_SCHEMA: analyticsSubsystem.MERCHANT_ANALYTICS_SNAPSHOT_SCHEMA,

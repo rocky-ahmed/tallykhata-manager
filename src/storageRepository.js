@@ -137,6 +137,34 @@ try {
   analyticsSubsystem = require('./analyticsSubsystem');
 } catch (e) {}
 
+let disputeSubsystem = null;
+try {
+  disputeSubsystem = require('./disputeSubsystem');
+} catch (e) {}
+
+const {
+  calculateDailyReconciliation,
+  getBstDateComponents,
+  isBeforeCutOffTime,
+  calculateClearingDate,
+  validateProofAttachment,
+  generateDisputeTicketId,
+  calculateSlaDeadline,
+  isValidDisputeTransition,
+  DISPUTE_CATEGORIES,
+  DISPUTE_CATEGORY_METADATA,
+  DISPUTE_STATUSES,
+  DISPUTE_SLA_HOURS,
+  SETTLEMENT_ACTION_TYPES,
+  RECONCILIATION_STATUSES,
+  DISPUTE_ARSC_TOKENS,
+  ReconciliationDao,
+  TransactionSettlementActionDao,
+  MerchantDisputeTicketDao,
+  SettlementDisputeEngine,
+  settlementDisputeEngine,
+} = disputeSubsystem || {};
+
 const {
   calculateBusinessHealthScore,
   classifyHealthTier,
@@ -313,6 +341,7 @@ const VALID_COLLECTIONS = new Set([
   'merchantRewardLedger',
   'merchantAnalyticsSnapshots',
   'merchantSalesForecasts',
+  'merchantDisputeTickets',
 ]);
 
 // Default initial dataset with 100% mathematically consistent opening balances and journal running totals
@@ -452,6 +481,12 @@ function sanitizeState(state) {
   if (!Array.isArray(s.merchantRewardLedger)) s.merchantRewardLedger = [];
   if (!Array.isArray(s.merchantAnalyticsSnapshots)) s.merchantAnalyticsSnapshots = [];
   if (!Array.isArray(s.merchantSalesForecasts)) s.merchantSalesForecasts = [];
+  if (!Array.isArray(s.merchantDisputeTickets)) s.merchantDisputeTickets = [];
+  else s.merchantDisputeTickets = s.merchantDisputeTickets.map((ticket) => {
+    if (!ticket || typeof ticket !== 'object') return ticket;
+    const persistedSyncState = Number(ticket.synced);
+    return { ...ticket, synced: persistedSyncState === 1 ? 1 : 0 };
+  });
   if (!s.soundboxConfig || typeof s.soundboxConfig !== 'object') s.soundboxConfig = {};
   if (!s.autoDisbursementConfig || typeof s.autoDisbursementConfig !== 'object') s.autoDisbursementConfig = {};
   if (!Array.isArray(s.qrSettlementActions)) s.qrSettlementActions = [];
@@ -613,6 +648,7 @@ function createDefaultState() {
     merchantRewardLedger: [],
     merchantAnalyticsSnapshots: [],
     merchantSalesForecasts: [],
+    merchantDisputeTickets: [],
     autoDisbursementConfig: {},
     version: 6,
   };
@@ -1869,6 +1905,19 @@ class StorageRepository {
       authoritative.merchantSalesForecasts = [];
     }
 
+    if (authoritative.merchantDisputeTickets && Array.isArray(authoritative.merchantDisputeTickets)) {
+      authoritative.merchantDisputeTickets = authoritative.merchantDisputeTickets.map((t) => {
+        const { pin, rawPin, sessionToken, token, apiKey, secretKey, credential, secret, proof_url, proofAttachmentUrl, proofUrl, ...rest } = t || {};
+        return {
+          ...rest,
+          proof_url: (proof_url || proofAttachmentUrl || proofUrl) ? '[ATTACHMENT_REDACTED_FOR_BACKUP]' : null,
+          proofAttachmentUrl: (proof_url || proofAttachmentUrl || proofUrl) ? '[ATTACHMENT_REDACTED_FOR_BACKUP]' : null,
+        };
+      });
+    } else {
+      authoritative.merchantDisputeTickets = [];
+    }
+
 
     if (authoritative.merchantQrOrders && Array.isArray(authoritative.merchantQrOrders)) {
       authoritative.merchantQrOrders = authoritative.merchantQrOrders.map((o) => {
@@ -2550,6 +2599,7 @@ class StorageRepository {
         const merchantRewardLedger = (prevStore.merchantRewardLedger || []).filter((e) => getBizId(e) !== targetId);
         const merchantAnalyticsSnapshots = (prevStore.merchantAnalyticsSnapshots || []).filter((s) => getBizId(s) !== targetId);
         const merchantSalesForecasts = (prevStore.merchantSalesForecasts || []).filter((f) => getBizId(f) !== targetId);
+        const merchantDisputeTickets = (prevStore.merchantDisputeTickets || []).filter((d) => getBizId(d) !== targetId);
         const soundboxConfig = { ...(prevStore.soundboxConfig || {}) };
         delete soundboxConfig[targetId];
         const autoDisbursementConfig = { ...(prevStore.autoDisbursementConfig || {}) };
@@ -2654,6 +2704,7 @@ class StorageRepository {
         merchantRewardLedger,
         merchantAnalyticsSnapshots,
         merchantSalesForecasts,
+        merchantDisputeTickets,
         soundboxConfig,
         autoDisbursementConfig,
         cashReconciliation,
@@ -2843,6 +2894,8 @@ class StorageRepository {
         const importedMerchantAnalyticsSnapshots = (data.merchantAnalyticsSnapshots || []).filter(s => String(s.businessId || s.business_id || '1') === selectedBizId);
         const keptMerchantSalesForecasts = (prevStore.merchantSalesForecasts || []).filter(f => String(f.businessId || f.business_id || '1') !== selectedBizId);
         const importedMerchantSalesForecasts = (data.merchantSalesForecasts || []).filter(f => String(f.businessId || f.business_id || '1') === selectedBizId);
+        const keptMerchantDisputeTickets = (prevStore.merchantDisputeTickets || []).filter(d => String(d.businessId || d.business_id || '1') !== selectedBizId);
+        const importedMerchantDisputeTickets = (data.merchantDisputeTickets || []).filter(d => String(d.businessId || d.business_id || '1') === selectedBizId);
         const keptQrSettlements = (prevStore.qrSettlementActions || []).filter(q => String(q.businessId || '1') !== selectedBizId);
         const keptDisbursements = (prevStore.merchantDisbursements || []).filter(d => String(d.businessId || '1') !== selectedBizId);
         const keptReconciliations = (prevStore.reconciliations || []).filter(r => String(r.businessId || '1') !== selectedBizId);
@@ -2894,6 +2947,8 @@ class StorageRepository {
           merchantRewardLedger: [...keptMerchantRewardLedger, ...importedMerchantRewardLedger],
           merchantAnalyticsSnapshots: [...keptMerchantAnalyticsSnapshots, ...importedMerchantAnalyticsSnapshots],
           merchantSalesForecasts: [...keptMerchantSalesForecasts, ...importedMerchantSalesForecasts],
+          merchantDisputeTickets: [...keptMerchantDisputeTickets, ...importedMerchantDisputeTickets],
+          transactionSettlementActions: (data.transactionSettlementActions ? [...(prevStore.transactionSettlementActions || []).filter(t => String(t.businessId || t.business_id || "1") !== selectedBizId), ...(data.transactionSettlementActions || []).filter(t => String(t.businessId || t.business_id || "1") === selectedBizId)] : (prevStore.transactionSettlementActions || [])),
           qrSettlementActions: [...keptQrSettlements, ...importedQrSettlements],
           merchantDisbursements: [...keptDisbursements, ...importedDisbursements],
           reconciliations: [...keptReconciliations, ...importedReconciliations],
@@ -2953,6 +3008,8 @@ class StorageRepository {
         merchantRewardLedger: Array.isArray(data.merchantRewardLedger) ? data.merchantRewardLedger : [],
         merchantAnalyticsSnapshots: Array.isArray(data.merchantAnalyticsSnapshots) ? data.merchantAnalyticsSnapshots : [],
         merchantSalesForecasts: Array.isArray(data.merchantSalesForecasts) ? data.merchantSalesForecasts : [],
+        merchantDisputeTickets: Array.isArray(data.merchantDisputeTickets) ? data.merchantDisputeTickets : [],
+        transactionSettlementActions: Array.isArray(data.transactionSettlementActions) ? data.transactionSettlementActions : [],
         qrSettlementActions: Array.isArray(data.qrSettlementActions) ? data.qrSettlementActions : [],
         merchantDisbursements: Array.isArray(data.merchantDisbursements) ? data.merchantDisbursements : [],
         reconciliations: Array.isArray(data.reconciliations) ? data.reconciliations : [],
@@ -3259,6 +3316,9 @@ class StorageRepository {
         merchantRewardLedger: (fullState.merchantRewardLedger || []).length,
           merchantAnalyticsSnapshots: (fullState.merchantAnalyticsSnapshots || []).length,
           merchantSalesForecasts: (fullState.merchantSalesForecasts || []).length,
+          merchantDisputeTickets: (fullState.merchantDisputeTickets || []).length,
+          reconciliations: (fullState.reconciliations || []).length,
+          transactionSettlementActions: (fullState.transactionSettlementActions || []).length,
           mmAccounts: (fullState.moneyManager && Array.isArray(fullState.moneyManager.accounts)) ? fullState.moneyManager.accounts.length : 0,
           mmTransactions: (fullState.moneyManager && Array.isArray(fullState.moneyManager.transactions)) ? fullState.moneyManager.transactions.length : 0,
           mmCategories: (fullState.moneyManager && Array.isArray(fullState.moneyManager.categories)) ? fullState.moneyManager.categories.length : 0,
@@ -7271,6 +7331,338 @@ class StorageRepository {
     ) || null;
   }
 
+  /** Saves a dispute ticket in the existing serialized business-state store. */
+  async saveDisputeTicket(businessId = null, ticketData = {}) {
+    if (!ticketData || typeof ticketData !== 'object' || Array.isArray(ticketData)) {
+      return { success: false, error: 'INVALID_TICKET' };
+    }
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || ticketData.businessId || ticketData.business_id || store.activeBusinessId || '1');
+    const transactionNumber = String(ticketData.transaction_number || ticketData.transactionNumber || ticketData.txnNumber || '').trim();
+    const category = String(ticketData.category || '');
+    const amountRaw = ticketData.claimed_amount_paisa !== undefined ? ticketData.claimed_amount_paisa : ticketData.claimedAmountPaisa;
+    const claimedAmountPaisa = Number(amountRaw);
+    if (!transactionNumber || !category || !Number.isSafeInteger(claimedAmountPaisa) || claimedAmountPaisa <= 0) {
+      return { success: false, error: 'INVALID_TICKET_FIELDS' };
+    }
+    if (!Object.values(DISPUTE_CATEGORIES || {}).includes(category)) {
+      return { success: false, error: 'INVALID_DISPUTE_CATEGORY' };
+    }
+    if (ticketData.fileSizeBytes !== undefined || ticketData.mimeType !== undefined) {
+      const proofCheck = validateProofAttachment({ fileSizeBytes: ticketData.fileSizeBytes, mimeType: ticketData.mimeType });
+      if (!proofCheck.valid) return { success: false, error: proofCheck.error };
+    }
+
+    const existingRecords = Array.isArray(store.merchantDisputeTickets) ? store.merchantDisputeTickets : [];
+    let ticketId = String(ticketData.ticket_id || ticketData.ticketId || '').trim();
+    if (!ticketId) {
+      do { ticketId = generateDisputeTicketId(); }
+      while (existingRecords.some((ticket) => String(ticket.ticket_id || ticket.ticketId) === ticketId));
+    }
+    if (existingRecords.some((ticket) => String(ticket.ticket_id || ticket.ticketId) === ticketId)) {
+      return { success: false, error: 'DUPLICATE_TICKET', duplicate: true, ticketId };
+    }
+
+    let savedTicket = null;
+    const mutation = await this.mutateCollection('merchantDisputeTickets', (records) => {
+      const list = Array.isArray(records) ? records : [];
+      if (list.some((ticket) => String(ticket.ticket_id || ticket.ticketId) === ticketId)) return list;
+      const dao = new MerchantDisputeTicketDao(list);
+      savedTicket = dao.insert({
+        ...ticketData,
+        ticket_id: ticketId,
+        business_id: targetBizId,
+        transaction_number: transactionNumber,
+        category,
+        claimed_amount_paisa: claimedAmountPaisa,
+      });
+      return dao.records;
+    });
+    if (!mutation.success) return { success: false, error: mutation.error };
+    if (!savedTicket) return { success: false, error: 'DUPLICATE_TICKET', duplicate: true, ticketId };
+    return { success: true, ticketId, ticket: { ...savedTicket } };
+  }
+
+  getDisputeTickets(businessId = null, options = {}) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const all = (store.merchantDisputeTickets || []).filter((ticket) =>
+      String(ticket.businessId || ticket.business_id || '1') === targetBizId
+    );
+    let filtered = all;
+    if (options.status) filtered = filtered.filter((ticket) => String(ticket.status).toUpperCase() === String(options.status).toUpperCase());
+    if (options.category) filtered = filtered.filter((ticket) => String(ticket.category) === String(options.category));
+    if (options.search) {
+      const query = String(options.search).toLowerCase();
+      filtered = filtered.filter((ticket) => [ticket.ticket_id, ticket.transaction_number, ticket.description]
+        .some((value) => String(value || '').toLowerCase().includes(query)));
+    }
+    filtered.sort((a, b) => new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0));
+    const totalCount = filtered.length;
+    const offset = Math.max(0, Number(options.offset) || 0);
+    const limit = Math.max(1, Number(options.limit) || 50);
+    const items = filtered.slice(offset, offset + limit).map((ticket) => ({ ...ticket }));
+    return { items, tickets: items, totalCount, offset, limit, hasMore: offset + items.length < totalCount };
+  }
+
+  getDisputeTicketById(businessId = null, ticketId = '') {
+    const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+    const wantedId = String(ticketId || '').trim();
+    const ticket = (this.currentStore?.merchantDisputeTickets || []).find((item) =>
+      String(item.businessId || item.business_id || '1') === targetBizId &&
+      String(item.ticket_id || item.ticketId) === wantedId
+    );
+    return ticket ? { ...ticket } : null;
+  }
+
+  async updateDisputeTicketStatus(businessId = null, ticketId = '', newStatus = '', resolutionData = {}) {
+    const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+    const wantedId = String(ticketId || '').trim();
+    let result = { success: false, error: 'DISPUTE_NOT_FOUND' };
+    const mutation = await this.mutateStore((store) => {
+      const tickets = Array.isArray(store.merchantDisputeTickets) ? store.merchantDisputeTickets : [];
+      const index = tickets.findIndex((item) =>
+        String(item.businessId || item.business_id || '1') === targetBizId &&
+        String(item.ticket_id || item.ticketId) === wantedId
+      );
+      if (index < 0) return store;
+
+      const ticket = { ...tickets[index] };
+      if (!isValidDisputeTransition(ticket.status, newStatus)) {
+        result = { success: false, error: 'INVALID_STATUS_TRANSITION' };
+        return store;
+      }
+      const resolution = typeof resolutionData === 'string' ? { resolutionNotes: resolutionData } : (resolutionData || {});
+      const now = new Date().toISOString();
+      ticket.status = newStatus;
+      ticket.updated_at = now;
+      ticket.updatedAt = now;
+      ticket.synced = 0;
+      if (resolution.resolutionNotes !== undefined) ticket.resolution = resolution.resolutionNotes;
+      if (resolution.resolution !== undefined) ticket.resolution = resolution.resolution;
+
+      let actions = Array.isArray(store.transactionSettlementActions) ? [...store.transactionSettlementActions] : [];
+      let refundAction = null;
+      if (newStatus === DISPUTE_STATUSES.RESOLVED_REFUNDED) {
+        const resolvedAmount = resolution.resolvedAmountPaisa !== undefined
+          ? Number(resolution.resolvedAmountPaisa)
+          : Number(ticket.claimed_amount_paisa || ticket.claimedAmountPaisa || 0);
+        if (!Number.isSafeInteger(resolvedAmount) || resolvedAmount < 0) {
+          result = { success: false, error: 'INVALID_RESOLVED_AMOUNT' };
+          return store;
+        }
+        ticket.resolved_amount_paisa = resolvedAmount;
+        const previousRefund = actions.find((action) =>
+          String(action.businessId || action.business_id || '1') === targetBizId &&
+          String(action.transaction_number || action.transactionNumber) === String(ticket.transaction_number || ticket.transactionNumber) &&
+          String(action.action_type || action.actionType).toUpperCase() === SETTLEMENT_ACTION_TYPES.REFUND
+        );
+        if (previousRefund) {
+          refundAction = previousRefund;
+        } else {
+          const transactionNumber = String(ticket.transaction_number || ticket.transactionNumber || '');
+          const transactionAlreadyUsed = actions.some((action) =>
+            String(action.businessId || action.business_id || '1') === targetBizId &&
+            String(action.transaction_number || action.transactionNumber) === transactionNumber
+          );
+          if (transactionAlreadyUsed) {
+            result = { success: false, error: 'SETTLEMENT_ACTION_EXISTS' };
+            return store;
+          }
+          const nextId = actions.reduce((max, action) => Math.max(max, Number(action.id) || 0), 0) + 1;
+          refundAction = {
+            id: nextId,
+            businessId: targetBizId,
+            transaction_number: transactionNumber,
+            transactionNumber,
+            action_type: SETTLEMENT_ACTION_TYPES.REFUND,
+            actionType: SETTLEMENT_ACTION_TYPES.REFUND,
+            amount_paisa: resolvedAmount,
+            amountPaisa: resolvedAmount,
+            synced: 0,
+            create_date: now,
+            update_date: null,
+          };
+          actions.push(refundAction);
+        }
+      }
+
+      const nextTickets = [...tickets];
+      nextTickets[index] = ticket;
+      result = { success: true, ticket: { ...ticket }, refundAction: refundAction ? { ...refundAction } : null };
+      return { ...store, merchantDisputeTickets: nextTickets, transactionSettlementActions: actions };
+    });
+    if (!mutation.success) return { success: false, error: mutation.error };
+    return result;
+  }
+
+  async deleteDisputeTicket(businessId = null, ticketId = '') {
+    const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+    const wantedId = String(ticketId || '').trim();
+    let deleted = false;
+    const mutation = await this.mutateCollection('merchantDisputeTickets', (tickets) => (tickets || []).filter((ticket) => {
+      const matches = String(ticket.businessId || ticket.business_id || '1') === targetBizId &&
+        String(ticket.ticket_id || ticket.ticketId) === wantedId;
+      if (matches) deleted = true;
+      return !matches;
+    }));
+    return mutation.success ? { success: deleted } : { success: false, error: mutation.error };
+  }
+
+  async performAutoSettlementReconciliation(businessId = null, dateInput = null) {
+    const store = this.currentStore || {};
+    const targetBizId = String(businessId || store.activeBusinessId || '1');
+    const bstToday = getBstDateComponents(new Date());
+    const defaultDateKey = [bstToday.year, String(bstToday.month + 1).padStart(2, '0'), String(bstToday.day).padStart(2, '0')].join('-');
+    const dateKey = dateInput ? String(dateInput).slice(0, 10) : defaultDateKey;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || Number.isNaN(Date.parse(dateKey))) {
+      return { success: false, error: 'INVALID_RECONCILIATION_DATE' };
+    }
+    const recordMatchesDate = (record) => {
+      const value = record.time || record.createDate;
+      if (!value) return false;
+      const parsed = new Date(value);
+      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === dateKey;
+    };
+    const existing = (store.reconciliations || []).find((record) =>
+      String(record.businessId || record.business_id || '1') === targetBizId &&
+      recordMatchesDate(record)
+    );
+    if (existing) return { success: true, duplicate: true, reconciliation: { ...existing } };
+
+    const sameBusiness = (record) => String(record.businessId || record.business_id || '1') === targetBizId;
+    const onDate = (record) => {
+      const rawDate = record.date || record.txn_date || record.time || record.timestamp || record.create_date || record.createDate || '';
+      if (!rawDate) return false;
+      const parsed = new Date(rawDate);
+      if (Number.isNaN(parsed.getTime())) return String(rawDate).slice(0, 10) === dateKey;
+      const bstDate = new Date(parsed.getTime() + 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      return bstDate === dateKey;
+    };
+    const amountPaisa = (record) => {
+      if (record.amountPaisa !== undefined) return Math.round(Number(record.amountPaisa) || 0);
+      if (record.amount_paisa !== undefined) return Math.round(Number(record.amount_paisa) || 0);
+      if (record.amountTaka !== undefined) return Math.round((Number(record.amountTaka) || 0) * 100);
+      return Math.round((Number(record.amount) || 0) * 100);
+    };
+
+    const cashSalesPaisa = (store.cashEntries || []).filter((entry) => sameBusiness(entry) && onDate(entry) &&
+      (String(entry.category || entry.tag || '').toUpperCase() === 'SALE') &&
+      ['IN', 'CASH_IN'].includes(String(entry.type || '').toUpperCase())
+    ).reduce((sum, entry) => sum + amountPaisa(entry), 0);
+    const digitalCollectedPaisa = (store.transactionSettlementActions || []).filter((action) => sameBusiness(action) && onDate(action) &&
+      String(action.action_type || action.actionType).toUpperCase() === SETTLEMENT_ACTION_TYPES.DIGITAL_SALE
+    ).reduce((sum, action) => sum + amountPaisa(action), 0);
+    const bankDisbursedPaisa = (store.merchantDisbursements || []).filter((disbursement) => sameBusiness(disbursement) && onDate(disbursement))
+      .reduce((sum, disbursement) => sum + amountPaisa(disbursement), 0);
+    const business = (store.businesses || []).find((item) => String(item.id || item.business_id) === targetBizId);
+    const openingTaka = business && (business.openingBalance !== undefined || business.opening_balance !== undefined)
+      ? Number(business.openingBalance !== undefined ? business.openingBalance : business.opening_balance) || 0
+      : (String(store.activeBusinessId || '1') === targetBizId ? Number(store.openingBalance) || 0 : 0);
+    const reconciliationResult = calculateDailyReconciliation({
+      openingBalancePaisa: Math.round(openingTaka * 100),
+      otherCashSalesPaisa: cashSalesPaisa,
+      otherCreditSalesPaisa: 0,
+      digitalInflowPaisa: digitalCollectedPaisa,
+      bankDisbursedPaisa,
+    });
+    const reconTime = new Date(`${dateKey}T12:00:00.000Z`).toISOString();
+    let reconciliation = null;
+    let duplicate = false;
+    const mutation = await this.mutateStore((latest) => {
+      const records = Array.isArray(latest.reconciliations) ? latest.reconciliations : [];
+      const previous = records.find((record) =>
+        String(record.businessId || record.business_id || '1') === targetBizId &&
+        recordMatchesDate(record)
+      );
+      if (previous) {
+        duplicate = true;
+        reconciliation = { ...previous };
+        return latest;
+      }
+      const now = new Date().toISOString();
+      reconciliation = {
+        id: 'RECON_' + targetBizId + '_' + dateKey,
+        _id: 'RECON_' + targetBizId + '_' + dateKey,
+        businessId: targetBizId,
+        business_id: targetBizId,
+        time: reconTime,
+        opening_balance: reconciliationResult.openingBalancePaisa / 100,
+        openingBalance: reconciliationResult.openingBalancePaisa / 100,
+        other_cash_sales: reconciliationResult.otherCashSalesPaisa / 100,
+        otherCashSale: reconciliationResult.otherCashSalesPaisa / 100,
+        other_credit_sales: reconciliationResult.otherCreditSalesPaisa / 100,
+        otherCreditSale: reconciliationResult.otherCreditSalesPaisa / 100,
+        digital_settlements: reconciliationResult.totalCollectedPaisa / 100,
+        digitalSettlements: reconciliationResult.totalCollectedPaisa / 100,
+        closing_balance: reconciliationResult.closingBalancePaisa / 100,
+        closingBalance: reconciliationResult.closingBalancePaisa / 100,
+        sync_status: 0,
+        syncStatus: 0,
+        createDate: now,
+        updateDate: now,
+      };
+      return { ...latest, reconciliations: [reconciliation, ...records] };
+    });
+    if (!mutation.success) return { success: false, error: mutation.error || 'RECONCILIATION_SAVE_FAILED' };
+    return { success: true, duplicate, reconciliation: { ...reconciliation }, reconciliationResult };
+  }
+
+  saveSettlementAction(businessId = null, action = {}) {
+    return this.saveTransactionSettlementAction(businessId, action);
+  }
+
+  getSettlementActions(businessId = null, options = {}) {
+    return this.getTransactionSettlementActions(businessId, options);
+  }
+
+  getSettlementActionByTxn(businessId = null, transactionNumber = '') {
+    return this.getTransactionSettlementActionByTxn(businessId, transactionNumber);
+  }
+
+  getUnsyncedSettlementActions(businessId = null, limit = 100) {
+    return this.getUnsyncedTxnSettlementActions(businessId, limit);
+  }
+
+  updateSettlementActionSyncStatus(businessId = null, synced = 1, ids = []) {
+    return this.updateTxnSettlementActionSyncStatusByIds(businessId, synced, ids);
+  }
+
+  getUnsyncedDisputeTickets(businessId = null, limit = 100) {
+    const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+    return (this.currentStore?.merchantDisputeTickets || []).filter((ticket) =>
+      String(ticket.businessId || ticket.business_id || '1') === targetBizId && Number(ticket.synced) === 0
+    ).slice(0, Math.max(0, Number(limit) || 0)).map((ticket) => ({ ...ticket }));
+  }
+
+  async updateDisputeTicketSyncStatus(businessId = null, ticketIds = [], synced = 1) {
+    const targetBizId = String(businessId || this.currentStore?.activeBusinessId || '1');
+    const idSet = new Set((Array.isArray(ticketIds) ? ticketIds : [ticketIds]).map(String));
+    let updated = 0;
+    const mutation = await this.mutateCollection('merchantDisputeTickets', (tickets) => (tickets || []).map((ticket) => {
+      if (String(ticket.businessId || ticket.business_id || '1') !== targetBizId ||
+          (!idSet.has(String(ticket.id)) && !idSet.has(String(ticket.ticket_id || ticket.ticketId)))) return ticket;
+      updated++;
+      return { ...ticket, synced: Number(synced), updated_at: new Date().toISOString() };
+    }));
+    return mutation.success ? updated : 0;
+  }
+
+  async updateReconciliationSyncStatus(businessId = null, ids = [], syncStatus = 1) {
+    const targetBizId = businessId ? String(businessId) : null;
+    const idSet = new Set((Array.isArray(ids) ? ids : [ids]).map(String));
+    let updated = 0;
+    const mutation = await this.mutateCollection('reconciliations', (records) => (records || []).map((record) => {
+      const id = String(record._id !== undefined ? record._id : record.id);
+      if (idSet.has(id) && (!targetBizId || String(record.businessId || record.business_id || '1') === targetBizId)) {
+        updated++;
+        return { ...record, sync_status: Number(syncStatus), syncStatus: Number(syncStatus) };
+      }
+      return record;
+    }));
+    return mutation.success ? updated : 0;
+  }
+
   /**
    * Saves an End-of-Day reconciliation record atomically.
    */
@@ -8361,6 +8753,11 @@ class StorageRepository {
         ? Number(actionRecord.id)
         : (list.length > 0 ? Math.max(...list.map((x) => Number(x.id) || 0)) + 1 : 1);
       const actionType = String(actionRecord.action_type || actionRecord.actionType || 'NO_ACTION').toUpperCase();
+      const amountPaisa = actionRecord.amount_paisa !== undefined
+        ? Math.round(Number(actionRecord.amount_paisa) || 0)
+        : (actionRecord.amountPaisa !== undefined
+          ? Math.round(Number(actionRecord.amountPaisa) || 0)
+          : Math.round((Number(actionRecord.amount) || 0) * 100));
       const entry = {
         id,
         businessId: targetBizId,
@@ -8368,6 +8765,9 @@ class StorageRepository {
         transactionNumber: txnNumber,
         action_type: actionType,
         actionType: actionType,
+        amount_paisa: amountPaisa,
+        amountPaisa,
+        amount: amountPaisa / 100,
         synced: actionRecord.synced !== undefined ? Number(actionRecord.synced) : 0,
         create_date: actionRecord.create_date || actionRecord.createDate || new Date().toISOString(),
         update_date: actionRecord.update_date || actionRecord.updateDate || null,
@@ -12075,6 +12475,108 @@ function computeBusinessHealthMetricsRepo(businessId = null, options = {}, repo 
   return { healthScore: 0, tier: { code: 'AT_RISK' } };
 }
 
+// =========================================================================
+// REA-ITER-242: STANDALONE REPO FUNCTIONS FOR DISPUTES & RECONCILIATION
+// =========================================================================
+
+async function saveDisputeTicketRepo(businessId = null, ticketData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveDisputeTicket === 'function') {
+    return repo.saveDisputeTicket(businessId, ticketData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getDisputeTicketsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getDisputeTickets === 'function') {
+    return repo.getDisputeTickets(businessId, options);
+  }
+  return { items: [], tickets: [], totalCount: 0, offset: 0, limit: 50, hasMore: false };
+}
+
+function getDisputeTicketByIdRepo(businessId = null, ticketId = '', repo = defaultRepository) {
+  if (repo && typeof repo.getDisputeTicketById === 'function') {
+    return repo.getDisputeTicketById(businessId, ticketId);
+  }
+  return null;
+}
+
+async function updateDisputeTicketStatusRepo(businessId = null, ticketId = '', newStatus = '', resolutionData = {}, repo = defaultRepository) {
+  if (repo && typeof repo.updateDisputeTicketStatus === 'function') {
+    return repo.updateDisputeTicketStatus(businessId, ticketId, newStatus, resolutionData);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function deleteDisputeTicketRepo(businessId = null, ticketId = '', repo = defaultRepository) {
+  if (repo && typeof repo.deleteDisputeTicket === 'function') {
+    return repo.deleteDisputeTicket(businessId, ticketId);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getUnsyncedDisputeTicketsRepo(businessId = null, limit = 100, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedDisputeTickets === 'function') {
+    return repo.getUnsyncedDisputeTickets(businessId, limit);
+  }
+  return [];
+}
+
+async function updateDisputeTicketSyncStatusRepo(businessId = null, ticketIdOrIds = [], synced = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateDisputeTicketSyncStatus === 'function') {
+    return repo.updateDisputeTicketSyncStatus(businessId, ticketIdOrIds, synced);
+  }
+  return 0;
+}
+
+async function performAutoSettlementReconciliationRepo(businessId = null, date = null, repo = defaultRepository) {
+  if (repo && typeof repo.performAutoSettlementReconciliation === 'function') {
+    return repo.performAutoSettlementReconciliation(businessId, date);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+async function saveSettlementActionRepo(businessId = null, action = {}, repo = defaultRepository) {
+  if (repo && typeof repo.saveSettlementAction === 'function') {
+    return repo.saveSettlementAction(businessId, action);
+  }
+  return { success: false, error: 'NO_REPOSITORY' };
+}
+
+function getSettlementActionsRepo(businessId = null, options = {}, repo = defaultRepository) {
+  if (repo && typeof repo.getSettlementActions === 'function') {
+    return repo.getSettlementActions(businessId, options);
+  }
+  return [];
+}
+
+function getSettlementActionByTxnRepo(businessId = null, txn = '', repo = defaultRepository) {
+  if (repo && typeof repo.getSettlementActionByTxn === 'function') {
+    return repo.getSettlementActionByTxn(businessId, txn);
+  }
+  return null;
+}
+
+function getUnsyncedSettlementActionsRepo(businessId = null, limit = 100, repo = defaultRepository) {
+  if (repo && typeof repo.getUnsyncedSettlementActions === 'function') {
+    return repo.getUnsyncedSettlementActions(businessId, limit);
+  }
+  return [];
+}
+
+async function updateSettlementActionSyncStatusRepo(businessId = null, synced = 1, ids = [], repo = defaultRepository) {
+  if (repo && typeof repo.updateSettlementActionSyncStatus === 'function') {
+    return repo.updateSettlementActionSyncStatus(businessId, synced, ids);
+  }
+  return 0;
+}
+
+async function updateReconciliationSyncStatusRepo(businessId = null, ids = [], syncStatus = 1, repo = defaultRepository) {
+  if (repo && typeof repo.updateReconciliationSyncStatus === 'function') {
+    return repo.updateReconciliationSyncStatus(businessId, ids, syncStatus);
+  }
+  return 0;
+}
+
 const repoExport = {
   V6_KEY,
   V5_KEY,
@@ -12315,6 +12817,21 @@ const repoExport = {
   updateSalesForecastSyncStatus: updateSalesForecastSyncStatusRepo,
   computeBusinessHealthMetrics: computeBusinessHealthMetricsRepo,
   analyticsSubsystem: analyticsSubsystem,
+  saveDisputeTicket: saveDisputeTicketRepo,
+  getDisputeTickets: getDisputeTicketsRepo,
+  getDisputeTicketById: getDisputeTicketByIdRepo,
+  updateDisputeTicketStatus: updateDisputeTicketStatusRepo,
+  deleteDisputeTicket: deleteDisputeTicketRepo,
+  getUnsyncedDisputeTickets: getUnsyncedDisputeTicketsRepo,
+  updateDisputeTicketSyncStatus: updateDisputeTicketSyncStatusRepo,
+  performAutoSettlementReconciliation: performAutoSettlementReconciliationRepo,
+  saveSettlementAction: saveSettlementActionRepo,
+  getSettlementActions: getSettlementActionsRepo,
+  getSettlementActionByTxn: getSettlementActionByTxnRepo,
+  getUnsyncedSettlementActions: getUnsyncedSettlementActionsRepo,
+  updateSettlementActionSyncStatus: updateSettlementActionSyncStatusRepo,
+  updateReconciliationSyncStatus: updateReconciliationSyncStatusRepo,
+  disputeSubsystem: disputeSubsystem,
   saveRechargeRecord: saveRechargeRecordRepo,
   getRechargeHistory: getRechargeHistoryRepo,
   getRechargeById: getRechargeByIdRepo,
